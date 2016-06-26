@@ -89,20 +89,22 @@ type
   xqfloat = double;
 
   //** @abstract(Iterator over PIXQValue.) Faster version of TXQValueEnumerator
-  TXQValueEnumeratorPtr = record
+  TXQValueEnumeratorPtrUnsafe = record
   private
-    fguardian: IXQValue;
+    fsingleelement: pointer{IXQValue};
     fcurrent, flast: PIXQValue;
-    class procedure clear(out enum: TXQValueEnumeratorPtr); static;
+    class procedure clear(out enum: TXQValueEnumeratorPtrUnsafe); static;
+    class procedure makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe); static;
   public
     function MoveNext: Boolean; inline;
     property Current: PIXQValue read FCurrent;
-    function GetEnumerator: TXQValueEnumeratorPtr;
+    function GetEnumerator: TXQValueEnumeratorPtrUnsafe;
   end;
   //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
   TXQValueEnumerator = record
   private
-    ptr: TXQValueEnumeratorPtr;
+    fguardian: ixqvalue;
+    ptr: TXQValueEnumeratorPtrUnsafe;
     function GetCurrent: IXQValue; inline;
     class procedure clear(out enum: TXQValueEnumerator); static;
   public
@@ -364,8 +366,8 @@ type
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
 
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
-    function GetEnumerator: TXQValueEnumerator; //**< Returns an enumerator for @code(for var in value). For a sequence the enumerator runs over all values contained in the sequence, for other values it will do one iteration over the value of that value. The iterated values have the IXQValue interface type
-    function GetEnumeratorPtr: TXQValueEnumeratorPtr;
+    function GetEnumerator: TXQValueEnumerator; //**< Implements the enumerator for for..in.@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
+    function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
 
     function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $_. Use this to do an operation on all values of a sequence, e.g. @code(sum($_))
     function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $_1, $_2, ...
@@ -446,8 +448,8 @@ type
     function order(const q: string): IXQValue; virtual; //**< Orders the sequence, equivalent to query @code(for $_ in self order by (....) return $_) . The current value is in $_. Kind of slow
     function retrieve(): IXQValue; //**< Retrieves referenced resources. This is primarily used for HTTP requests, but can also retrieve files. It will parse the resource as HTML/XML/JSON if possible. It will retrieve each value in a sequence individually
 
-    function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtr. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
-    function GetEnumeratorPtr: TXQValueEnumeratorPtr;virtual; //**< Implements a faster version of GetEnumerator.
+    function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
+    function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;virtual; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
@@ -473,7 +475,7 @@ type
     function filter(const q: string; const vs: array of ixqvalue): IXQValue; override;
     function filter(const q: string; const vs: array of string): IXQValue; override;
 
-    function GetEnumeratorPtr: TXQValueEnumeratorPtr;override;
+    function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;override;
   end;
 
   { TXQValueBoolean }
@@ -706,7 +708,7 @@ type
 
     function getSequenceCount: integer; override;
     function get(i: integer): IXQValue; override;
-    function GetEnumeratorPtr: TXQValueEnumeratorPtr; override;
+    function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe; override;
     function map(const q: string): IXQValue; override;
     function order(const q: string): IXQValue; override;
 
@@ -852,7 +854,7 @@ type
     function isUndefined: boolean; override;
 
     function GetEnumeratorMembers: TXQValueEnumerator;
-    function GetEnumeratorMembersPtr: TXQValueEnumeratorPtr;
+    function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 
     function toBooleanEffective: boolean; override;
 
@@ -3611,14 +3613,14 @@ begin
   if v.getSequenceCount = 0 then exit(v);
   if v is TXQValueSequence then begin
     isAlreadyAtomized := true;
-    for x in v.GetEnumeratorPtr do
+    for x in v.GetEnumeratorPtrUnsafe do
       if not x^.instanceOf(baseSchema.AnyAtomicType) then begin
         isAlreadyAtomized := false;
         break;
       end;
     if isAlreadyAtomized then exit(v);
     seqResult := TXQValueSequence.create(v.getSequenceCount);
-    for x in v.GetEnumeratorPtr do seqResult.seq.add(xqvalueAtomize(x^));
+    for x in v.GetEnumeratorPtrUnsafe do seqResult.seq.add(xqvalueAtomize(x^));
     result := seqResult;
     exit
   end;
@@ -3638,13 +3640,13 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
   end;
 
 var i:integer;
-    enum1, enum2: TXQValueEnumeratorPtr;
+    enum1, enum2: TXQValueEnumeratorPtrUnsafe;
 begin
   if a.getSequenceCount <> b.getSequenceCount then
     exit(false);
 
-  enum1 := a.GetEnumeratorPtr; enum1.MoveNext;
-  enum2 := b.GetEnumeratorPtr; enum2.MoveNext;
+  enum1 := a.GetEnumeratorPtrUnsafe; enum1.MoveNext;
+  enum2 := b.GetEnumeratorPtrUnsafe; enum2.MoveNext;
   for i := 0 to a.getSequenceCount - 1 do begin
     if enum2.Current^.kind = pvkFunction then raiseFOTY0015(enum2.Current^);
 
@@ -4534,28 +4536,35 @@ end;
 
 { TXQValueEnumerator }
 
-class procedure TXQValueEnumeratorPtr.clear(out enum: TXQValueEnumeratorPtr);
+class procedure TXQValueEnumeratorPtrUnsafe.clear(out enum: TXQValueEnumeratorPtrUnsafe);
 begin
   enum.fcurrent := nil;
-  enum.fguardian := nil;
+  enum.fsingleelement := nil;
   enum.flast := nil;
 end;
 
-function TXQValueEnumeratorPtr.MoveNext: Boolean;
+class procedure TXQValueEnumeratorPtrUnsafe.makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe);
 begin
-  result := fcurrent < flast;
+  enum.fsingleelement := v;
+  enum.flast :=  nil;
+  enum.fcurrent := nil;
+end;
+
+function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
+begin
+  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs it occurs many times
   if result then begin
     inc(fcurrent);
     exit;
   end;
-  if (fguardian <> nil) and (fcurrent = nil) then begin
-    fcurrent := @fguardian; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
-    flast := @fguardian;
+  if (fsingleelement <> nil) and (fcurrent = nil) then begin
+    fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
+    flast := @fsingleelement;
     exit(true);
   end;
 end;
 
-function TXQValueEnumeratorPtr.GetEnumerator: TXQValueEnumeratorPtr;
+function TXQValueEnumeratorPtrUnsafe.GetEnumerator: TXQValueEnumeratorPtrUnsafe;
 begin
   result := self;
 end;
@@ -4567,7 +4576,7 @@ end;
 
 class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
 begin
-  TXQValueEnumeratorPtr.clear(enum.ptr);
+  TXQValueEnumeratorPtrUnsafe.clear(enum.ptr);
 end;
 
 function TXQValueEnumerator.MoveNext: Boolean;
@@ -5364,7 +5373,7 @@ begin
   assert(value <> nil);
   case value.kind of
     pvkSequence: begin
-      for v in value.GetEnumeratorPtr do begin
+      for v in value.GetEnumeratorPtrUnsafe do begin
         insertSingle(i, v^);
         i+=1;
       end;
@@ -5390,7 +5399,7 @@ begin
         for i := 0 to other.fcount - 1 do other.fbuffer[i]._AddRef;
         Move(other.fbuffer[0], fbuffer[fcount], sizeof(other.fbuffer[0]) * other.fcount); //assume fbuffer is initialized to nil
         inc(fcount, other.fcount);
-      end else for v in value.GetEnumeratorPtr do
+      end else for v in value.GetEnumeratorPtrUnsafe do
         Add(v^);
     end;
     pvkUndefined: ;
@@ -5445,7 +5454,7 @@ begin
     end;
     pvkUndefined: ;
     pvkSequence:
-      for s in node.GetEnumeratorPtr do
+      for s in node.GetEnumeratorPtrUnsafe do
         addOrdered(s^); //TODO: optimize
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
   end;
@@ -7019,7 +7028,7 @@ begin
   list := TXQVList.create(tempContext.SeqLength);
   try
     i := 1;
-    for v in previous.GetEnumeratorPtr do begin
+    for v in previous.GetEnumeratorPtrUnsafe do begin
       tempContext.SeqValue:=v^;
       tempContext.SeqIndex:=i;
       if v^.kind = pvkNode then tempContext.ParentElement:=v^.toNode
@@ -7073,7 +7082,7 @@ begin
         jsoniqDescendants(tempprop.Value, searchedProperty);
     end;
     pvkSequence:
-      for tempvi in node.GetEnumeratorPtr do
+      for tempvi in node.GetEnumeratorPtrUnsafe do
         jsoniqDescendants(tempvi^, searchedProperty)
     else ;//we must ignore non structured item, otherwise it would be useless for any object (like a string<->string map) containing them
   end;
@@ -7178,14 +7187,14 @@ begin
                 if qmValue in command.matching then begin //read named property
                   //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                   if tempKind = pvkObject then newList.add(n.getProperty(command.value))
-                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtr do begin
+                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
                     if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
                     newList.add(pv^.getProperty(command.value));
                   end;
                 end else begin
                   //get all properties
                   if tempKind = pvkObject then newList.add((n as TXQValueObject).enumerateValues())
-                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtr do begin
+                  else for pv in (n as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
                     if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
                     newList.add((pv^ as TXQValueObject).enumerateValues());
                   end;

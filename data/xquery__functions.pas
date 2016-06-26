@@ -657,7 +657,7 @@ begin
       else raise EXQEvaluationException.Create('pxp:INTERNAL', 'nil node');
     pvkSequence: begin
       result := TXQValueSequence.create(v.getSequenceCount);
-      for x in v.GetEnumeratorPtr do begin
+      for x in v.GetEnumeratorPtrUnsafe do begin
         if (x^.kind <> pvkNode) or (x^.toNode = nil) then
           raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
         result.add(x^);
@@ -1210,7 +1210,7 @@ begin
   setlength(values, 0);
   SetLength(specialNames, 0);
   SetLength(specialValues, 0);
-  for v in value.GetEnumeratorPtr do
+  for v in value.GetEnumeratorPtrUnsafe do
     if v^ is TXQValueObject then begin
       if (v^ as TXQValueObject).prototype = nil then temp := v^
       else temp := v^.clone;
@@ -1381,7 +1381,7 @@ begin
 
 
   result := nil;
-  for v in args[0].GetEnumeratorPtr do
+  for v in args[0].GetEnumeratorPtrUnsafe do
     xqvalueSeqAddMove(result, encodeForm(v^.toNode));
   if result = nil then result := xqvalue;
 
@@ -1470,7 +1470,7 @@ begin
 
   multipart := '';
   headers := args[0].getProperty('headers');
-  for h in headers.GetEnumeratorPtr do begin
+  for h in headers.GetEnumeratorPtrUnsafe do begin
     propName := h^.toString;
     if striBeginsWith(propName, 'Content-Type') and striContains(propName, ContentTypeMultipart) then begin
       multipart:=propName;
@@ -1500,7 +1500,7 @@ begin
     if propName <> multipart then begin
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
       tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(propName)));
-      for h in headers.GetEnumeratorPtr do begin
+      for h in headers.GetEnumeratorPtrUnsafe do begin
         propName := h^.toString;
         if not striBeginsWith(propName, 'Content-Type') then
           tempSeq.add(h^);
@@ -1527,7 +1527,7 @@ var res: IXQValue;
     resolvedUri: RawByteString;
     tempobj: TXQValueObject;
   begin
-    for iv in seq.GetEnumeratorPtr do
+    for iv in seq.GetEnumeratorPtrUnsafe do
       case iv^.kind of
         pvkUndefined: ;
         pvkNode: begin
@@ -1655,7 +1655,7 @@ var temp: string;
 begin
   requiredArgCount(args,1);
   temp := '';
-  for v in args[0].GetEnumeratorPtr do begin
+  for v in args[0].GetEnumeratorPtrUnsafe do begin
     ok := tryValueToInteger(v^, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
     if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
@@ -2664,7 +2664,7 @@ begin
   end else begin
     i := 0;
     result := nil;
-    for v in args[0].GetEnumeratorPtr do begin
+    for v in args[0].GetEnumeratorPtrUnsafe do begin
       i += 1;
       if equal(v^, args[1]) then
         xqvalueSeqAddMove(result, xqvalue(i));
@@ -2712,7 +2712,7 @@ begin
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueSequence.create(atom.getSequenceCount);
-  for v in atom.GetEnumeratorPtr do begin
+  for v in atom.GetEnumeratorPtrUnsafe do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
       if context.staticContext.equalDeepAtomic(resseq.seq[i], v^, collation) then begin
@@ -2738,7 +2738,7 @@ begin
 
   if index < 1 then index := 1;
 
-  for a in args[0].GetEnumeratorPtr do begin
+  for a in args[0].GetEnumeratorPtrUnsafe do begin
     index -= 1;
     if index = 0 then resseq.seq.add(args[2]);
     resseq.seq.add(a^);
@@ -2864,7 +2864,7 @@ var x: PIXQValue;
   resseq: TXQVList;
 begin
   found := false;
-  for x in v.GetEnumeratorPtr do begin
+  for x in v.GetEnumeratorPtrUnsafe do begin
     if (x^.instanceOf(baseSchema.untypedAtomic)) or (x^.kind = pvkNode) or (x^.instanceOf(baseSchema.untyped)) then begin
       found := true;
       break;
@@ -2874,7 +2874,7 @@ begin
 
   result := TXQValueSequence.create(v.getSequenceCount);
   resseq := (result as TXQValueSequence).seq;;
-  for x in v.GetEnumeratorPtr do
+  for x in v.GetEnumeratorPtrUnsafe do
     if (x^.instanceOf(baseSchema.untypedAtomic)) or (x^.kind = pvkNode) or (x^.instanceOf(baseSchema.untyped)) then
       resseq.add(baseSchema.double.createValue(x^))
      else
@@ -2888,7 +2888,7 @@ begin
   requiredArgCount(args,1);
   if args[0].isUndefined then exit(args[0]);
   result := nil;
-  for v in args[0].GetEnumeratorPtr do
+  for v in args[0].GetEnumeratorPtrUnsafe do
     if result = nil then result := v^
     else result := xqvalueMultiply(context, result, v^);
 end;
@@ -3597,7 +3597,7 @@ begin
   if left then begin
     //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
     newargs[0] := args[1];
-    for v in args[0].GetEnumeratorPtr do begin
+    for v in args[0].GetEnumeratorPtrUnsafe do begin
       newargs[1] := v^;
       newargs[0] := func.evaluate(context, newargs, nil);
     end;
@@ -3812,7 +3812,7 @@ begin
   if length(args) = 2 then params.setFromNode(args[1].toNode);
 
   firstElement := nil;
-  for v in arg.GetEnumeratorPtr do with params do begin
+  for v in arg.GetEnumeratorPtrUnsafe do with params do begin
     n := v^.toNode;
     if n = nil then continue;
     if n.typ = tetDocument then n := n.getFirstChild();
@@ -3868,7 +3868,7 @@ begin
 
   hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
   wasNodeOrFirst := true;
-  for v in arg.GetEnumeratorPtr do with params do begin
+  for v in arg.GetEnumeratorPtrUnsafe do with params do begin
     if hasItemSeparator then begin
       if not wasNodeOrFirst then strres += params.itemSeparator;
       wasNodeOrFirst := false;

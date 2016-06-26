@@ -28,9 +28,9 @@ begin
   result := xqvalue();
 end;
 
-function TXQValueUndefined.GetEnumeratorPtr: TXQValueEnumeratorPtr;
+function TXQValueUndefined.GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
-  TXQValueEnumeratorPtr.clear(result);
+  TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
 function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
@@ -225,11 +225,9 @@ begin
   result := nil;
 end;
 
-function TXQValue.GetEnumeratorPtr: TXQValueEnumeratorPtr;
+function TXQValue.GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
-  result.fguardian := self;
-  result.fcurrent := nil;
-  result.flast := nil;
+  TXQValueEnumeratorPtrUnsafe.makesingleelement(self, result);
 end;
 
 function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
@@ -434,7 +432,8 @@ end;
 
 function TXQValue.GetEnumerator: TXQValueEnumerator;
 begin
-  result.ptr := GetEnumeratorPtr;
+  result.fguardian := self;
+  result.ptr := GetEnumeratorPtrUnsafe;
 end;
 
 { TXQValueBoolean }
@@ -1433,14 +1432,13 @@ begin
   exit(seq[i-1]);
 end;
 
-function TXQValueSequence.GetEnumeratorPtr: TXQValueEnumeratorPtr;
+function TXQValueSequence.GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
   if seq.Count > 0 then begin
     result.fcurrent:=@seq.fbuffer[0];
     dec(result.fcurrent);
     result.flast := @seq.fbuffer[seq.Count-1];
-    result.fguardian:=self;
-  end else TXQValueEnumeratorPtr.clear(result);
+  end else TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
 function TXQValueSequence.map(const q: string): IXQValue;
@@ -1929,18 +1927,17 @@ end;
 
 function TXQValueJSONArray.GetEnumeratorMembers: TXQValueEnumerator;
 begin
-  result.ptr := GetEnumeratorMembersPtr;
+  result.fguardian := self;
+  result.ptr := GetEnumeratorMembersPtrUnsafe;
 end;
 
-function TXQValueJSONArray.GetEnumeratorMembersPtr: TXQValueEnumeratorPtr;
+function TXQValueJSONArray.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
-  if self.RefCount > 0 then
-    result.fguardian := self;
   if seq.Count > 0 then begin
     result.fcurrent:=@seq.fbuffer[0];
     dec(result.fcurrent);
     result.flast := @seq.fbuffer[seq.Count-1];
-  end else TXQValueEnumeratorPtr.clear(result);
+  end else TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
 function TXQValueJSONArray.toBooleanEffective: boolean;
