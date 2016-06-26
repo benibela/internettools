@@ -275,17 +275,18 @@ end;
 
 function TXQTermReadObjectProperty.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  obj, v: IXQValue;
+  obj: IXQValue;
   seq: TXQVList;
+  v: PIXQValue;
 begin
   if length(children) = 0 then raiseEvaluationError('pxp:OBJ', 'Found no term to read property from');
   if length(children) > 1 then raiseEvaluationError('pxp:OBJ', 'Can only read property from one term');
   obj:=children[0].evaluate(context);
 
   seq := TXQVList.create(obj.getSequenceCount);
-  for v in obj do
-    if v is TXQValueObject then
-       seq.add(v.getProperty(propname));
+  for v in obj.GetEnumeratorPtrUnsafe do
+    if v^.kind = pvkObject then
+       seq.add(v^.getProperty(propname));
   result := xqvalueSeqSqueezed(seq);
 //  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
 //  result := (obj as TXQValueObject).getProperty(propname);
@@ -421,9 +422,10 @@ var varname: string;
     v: TXQTerm;
     assignmentMode: (amOverride, amArrayOverride, amArrayInsert, amArrayAppend);
     arrayIndex: integer;
-    value, temp: IXQValue;
+    value: IXQValue;
 
     seq: TXQValueSequence;
+    temp: PIXQValue;
 
     procedure applyProperties;
     var i: Integer;
@@ -501,12 +503,12 @@ begin
       else begin
         seq := TXQValueSequence.create(max(arrayIndex, value.getSequenceCount));
         if arrayIndex = 0 then seq.seq.add(result);
-        for temp in value do begin
+        for temp in value.GetEnumeratorPtrUnsafe do begin
           dec(arrayIndex);
-          if arrayIndex <> 0 then seq.seq.add(temp)
+          if arrayIndex <> 0 then seq.seq.add(temp^)
           else begin
             if assignmentMode = amArrayInsert then
-              seq.seq.add(temp);
+              seq.seq.add(temp^);
             seq.seq.add(result);
           end;
         end;
@@ -816,8 +818,8 @@ var nodeCondition: TXQPathNodeCondition;
   end;
 var
   count: Integer;
-  v: IXQValue;
   i: Integer;
+  v: PIXQValue;
 begin
   //compare count with sequence count
   case kind of
@@ -848,8 +850,8 @@ begin
       nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
   end;
   result := true;
-  for v in ta do begin
-    result := result and instanceOfSingleType(v);
+  for v in ta.GetEnumeratorPtrUnsafe do begin
+    result := result and instanceOfSingleType(v^);
     if not result then exit;
   end;
 end;
@@ -1065,8 +1067,9 @@ end;
 
 function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
   function evaluateSomeEvery(pos:integer): boolean;
-  var v: IXQValue;
+  var seq: IXQValue;
       typeDelta: integer;
+      v: PIXQValue;
   begin
     if pos = high(children) then exit(children[pos].evaluate(context).toBooleanEffective);
     if not (children[pos] is TXQTermVariable) then raiseEvaluationError('err:XPST0003', 'Expected variable, but got '+children[pos].debugTermToString);
@@ -1074,11 +1077,12 @@ function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
     else typeDelta:=0;
 
     result := isEvery;
-    for v in children[pos+1+typeDelta].evaluate(context) do begin
+    seq := children[pos+1+typeDelta].evaluate(context);
+    for v in seq.GetEnumeratorPtrUnsafe do begin
       if typeDelta <> 0 then
-        if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v, context) then
-          raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
-      Context.temporaryVariables.add(TXQTermVariable(children[pos]).value, v, TXQTermVariable(children[pos]).namespace);
+        if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v^, context) then
+          raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v^.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
+      Context.temporaryVariables.add(TXQTermVariable(children[pos]).value, v^, TXQTermVariable(children[pos]).namespace);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then exit(not isEvery);
       Context.temporaryVariables.removeLast;
     end;
@@ -1943,11 +1947,11 @@ var
       end;
     end;
 
-   var tempv: IXQValue;
-       i:integer;
+   var i:integer;
        clause: TXQTermFlowerSubClause;
-       tempSeq: IXQValue;
        newTuple: TOrderedTuple;
+       tempv: PIXQValue;
+       tempSeq: IXQValue;
    begin
      if pos = high(children) then begin
        if currentTuple = nil then
@@ -1973,8 +1977,8 @@ var
            1: addVariableBinding(tempSeq, 1);
            else begin
              i := 1;
-             for tempv in tempSeq do begin
-               addVariableBinding(tempv, i);
+             for tempv in tempSeq.GetEnumeratorPtrUnsafe do begin
+               addVariableBinding(tempv^, i);
                inc(i);
              end;
            end;
@@ -1982,9 +1986,11 @@ var
        end;
        xqtfcWindow: addWindowVariableBinding();
        xqtfcLetPattern: addPatternVariableBinding(TXQTermFlowerLetPattern(clause).expr.evaluate(context));
-       xqtfcForPattern:
-         for tempv in TXQTermFlowerForPattern(clause).expr.evaluate(context) do
-           addPatternVariableBinding(tempv);
+       xqtfcForPattern: begin
+         tempSeq := TXQTermFlowerForPattern(clause).expr.evaluate(context);
+         for tempv in tempSeq.GetEnumeratorPtrUnsafe do
+           addPatternVariableBinding(tempv^);
+       end;
        xqtfcWhere: if TXQTermFlowerWhere(clause).test.evaluate(context).toBooleanEffective then
          evaluateForLoop(pos + 1);
        xqtfcOrder: begin
@@ -2608,13 +2614,14 @@ end;
 
 function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  func, v: IXQValue;
+  func: IXQValue;
   index: IXQValue;
   ara: TXQValueJSONArray;
   i: Integer;
   sl: TStringList;
   evilkids: TXQVArray;
   resultSeq: TXQVList;
+  v: PIXQValue;
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -2635,17 +2642,21 @@ begin
 
   if length(children) = 1 then begin
     resultSeq := TXQVList.create();
-    for v in func do begin
-      if v is TXQValueObject then begin
-        sl := TStringList.Create;
-        (v as TXQValueObject).enumerateKeys(sl);
-        resultSeq.add(xqvalue(sl));
-        sl.free;
-      end else if v is TXQValueJSONArray then begin
-        ara := v as TXQValueJSONArray;;
-        for i := 0 to ara.seq.Count-1 do
-          resultSeq.add(ara.seq[i]);
-      end else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v.debugAsStringWithTypeAnnotation());
+    for v in func.GetEnumeratorPtrUnsafe do begin
+      case v^.kind of
+        pvkObject: begin
+          sl := TStringList.Create;
+          (v^ as TXQValueObject).enumerateKeys(sl);
+          resultSeq.add(xqvalue(sl));
+          sl.free;
+        end;
+        pvkArray: begin
+          ara := v^ as TXQValueJSONArray;;
+          for i := 0 to ara.seq.Count-1 do
+            resultSeq.add(ara.seq[i]);
+        end;
+        else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v^.debugAsStringWithTypeAnnotation());
+      end;
     end;
     result := xqvalueSeqSqueezed(resultSeq);
     exit;
@@ -2654,16 +2665,18 @@ begin
   if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices or object prop given');
   index := children[1].evaluate(context);
   resultSeq := TXQVList.create();
-  for v in func do begin
-    if v is TXQValueJSONArray then begin
-      if (index.toInt64 < 1) or (index.toInt64 > (v as TXQValueJSONArray).seq.Count) then continue;
-      resultSeq.add((v as TXQValueJSONArray).seq[index.toInt64-1]);
-    end else if v is TXQValueObject then begin
-      resultSeq.add(v.getProperty(index.ToString));
-    end else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
-    //end else
-      raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
-  end;
+  for v in func.GetEnumeratorPtrUnsafe do
+    case v^.kind of
+      pvkArray: begin
+        if (index.toInt64 < 1) or (index.toInt64 > (v^ as TXQValueJSONArray).seq.Count) then continue;
+        resultSeq.add((v^ as TXQValueJSONArray).seq[index.toInt64-1]);
+      end;
+      pvkObject: begin
+        resultSeq.add(v^.getProperty(index.ToString));
+      end;
+      else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
+        raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
+    end;
   result := xqvalueSeqSqueezed(resultSeq);
 
 end;
@@ -2710,6 +2723,7 @@ function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
     list: TXQVList;
     pe: TTreeNode;
     oldSeqIndex, oldSeqLength: integer;
+    pv: PIXQValue;
   begin
     seq := children[0].evaluate(context);
     pe := context.ParentElement; //todo: this is irrelevant?
@@ -2720,10 +2734,13 @@ function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
     list := TXQVList.create(context.SeqLength);
     try
       try
-        for context.SeqValue in seq do begin
+        context.SeqValue := nil;
+        for pv in seq.GetEnumeratorPtrUnsafe do begin
+          move(pv^, context.SeqValue, sizeof(context.SeqValue));
           list.add(children[1].evaluate(context));
           context.SeqIndex += 1;
         end;
+        FillChar(context.SeqValue, sizeof(context.SeqValue), 0);
         result := xqvalueSeqSqueezed(list);
       except
         list.free;
@@ -3554,10 +3571,10 @@ var
   end;
 
   procedure addValue(const v: IXQValue; firstAtomic: boolean = true);
-  var x: IXQValue;
-      temp: TTreeNode;
+  var temp: TTreeNode;
       i: integer;
       tempNamespaces: TNamespaceList;
+      x: PIXQValue;
   begin
     case v.kind of
       pvkUndefined:;
@@ -3618,11 +3635,9 @@ var
       end;
       pvkSequence: begin
         firstAtomic := true;
-        for x in v do begin
-          addValue(x, firstAtomic);
-          if x is TXQValueNode then firstAtomic := true
-          else if not (x is TXQValueString) then firstAtomic := false
-          else {if  (x.toString <> '')  then }firstAtomic:=false;
+        for x in v.GetEnumeratorPtrUnsafe do begin
+          addValue(x^, firstAtomic);
+          firstAtomic := x^.kind = pvkNode;
         end;
       end;
       pvkFunction: raiseEvaluationError('XQTY0105', 'Functions passed to element constructor')
@@ -3641,17 +3656,17 @@ var
     end;
   end;
 
-  function valueToString(v: IXQValue): string;
+  function valueToString(const v: IXQValue): string;
   var
     first: Boolean;
-    x: IXQValue;
+    x: PIXQValue;
   begin
     first := true;
     result := '';
-    for x in v do begin
+    for x in v.GetEnumeratorPtrUnsafe do begin
       if not first then result += ' ';
-      if x.kind = pvkFunction then raiseEvaluationError('FOTY0013', 'Cannot serialize function');
-      result += x.toString;
+      if x^.kind = pvkFunction then raiseEvaluationError('FOTY0013', 'Cannot serialize function');
+      result += x^.toString;
       first := false;
     end;
   end;

@@ -4569,7 +4569,7 @@ var
   endtarget: Pointer;
 begin
   while MoveNext do begin
-    size := PtrInt(pointer(flast)) - PtrInt(pointer(fcurrent)) + sizeof(IXQValue);
+    size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
     move(fcurrent^, target^, size  );
     endtarget := pointer(target) + size;
     while target < endtarget do begin
@@ -5237,14 +5237,13 @@ class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: T
   end;
 
 var
-i: Integer;
-w: PIXQValue;
+  w: PIXQValue;
 begin
   if typ = nil then exit(true);
   if typ.instanceOf(v, context) then exit(true);
   result := false;
   if typ.kind = tikAtomic then begin
-    if not (v is TXQValueSequence) then
+    if v.kind <> pvkSequence then
       exit(checkSingle(v));
     if ((not typ.allowMultiple) and (v.getSequenceCount > 1)) then exit(false);
     if ((not typ.allowNone) and (v.getSequenceCount = 0)) then exit(false);
@@ -7384,7 +7383,8 @@ begin
       end;
 
       if tempList.Count = 0 then continue;
-      if command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling] then tempList.revert;
+      if command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling] then
+        tempList.revert; //revert the list, because it is now in ancestor order (needed for indices in filtering), but need to be returned in document order
 
       if resultSeq.seq.Count = 0 then onlyNodes := tempList[0].kind = pvkNode;
       for i := 0 to tempList.Count - 1 do
