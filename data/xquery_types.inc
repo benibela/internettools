@@ -2102,7 +2102,7 @@ begin
     for j := 0 to high(parameters) do begin
       temp := args[j];
       TXQAbstractFunctionInfo.convertType(temp, parameters[j].seqtype, context, term);
-      tempcontext.temporaryVariables.add(parameters[j].variable, args[j]);
+      tempcontext.temporaryVariables.add(parameters[j].variable, temp);
     end;
     result := body.evaluate(tempcontext);
     TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);

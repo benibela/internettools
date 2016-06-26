@@ -3467,12 +3467,6 @@ begin
   result := f - frac(f);
 end;}
 
-procedure xqswap(var a, b: IXQValue); inline;
-var
-  t: IXQValue;
-begin
-  t := a; a:=b; b := t;
-end;
 
 
 {$I restoreRangeOverflowChecks.inc}
@@ -5019,6 +5013,27 @@ begin
   result := (v.kind = pvkSequence) and (v.getSequenceCount = 1) and (v.get(1) <> v)
 end;
 
+//Assigns source to dest without updating ref counts @br
+//This can be much faster, but will cause a crash, unless the reference count is corrected later, e.g. by xqvalueVaporize on source or dest.
+procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
+begin
+  PPointer(@dest)^ := PPointer(@source)^;
+end;
+
+procedure xqvalueVaporize(var dest: IXQValue); inline;
+begin
+  PPointer(@dest)^ := nil;
+end;
+
+procedure xqswap(var a, b: IXQValue); inline;
+var
+  t: Pointer;
+begin
+  t := PPointer(@a)^ ;
+  PPointer(@a)^ := PPointer(@b)^;
+  PPointer(@b)^ := t;
+end;
+
 
 
 {$IMPLICITEXCEPTIONS ON}
@@ -5205,7 +5220,7 @@ begin
   case typ.kind of
     tikAtomic, tikFunctionTest: begin
       if not (result is TXQValueSequence) then begin
-        conversionSingle(result);
+        result := conversionSingle(result);
         exit;
       end;
       seq := (result as TXQValueSequence).seq;

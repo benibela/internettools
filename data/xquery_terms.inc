@@ -2744,21 +2744,21 @@ function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
     context.SeqIndex := 1;
     context.SeqLength := seq.getSequenceCount;
     list := TXQVList.create(context.SeqLength);
+    context.SeqValue := nil;
     try
       try
-        context.SeqValue := nil;
         for pv in seq.GetEnumeratorPtrUnsafe do begin
-          move(pv^, context.SeqValue, sizeof(context.SeqValue));
+          xqvalueMoveNoRefCount(pv^, context.SeqValue);
           list.add(children[1].evaluate(context));
           context.SeqIndex += 1;
         end;
-        FillChar(context.SeqValue, sizeof(context.SeqValue), 0);
         result := xqvalueSeqSqueezed(list);
       except
         list.free;
         raise;
       end;
     finally
+      xqvalueVaporize(context.SeqValue);
       context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
       context.ParentElement := pe;
     end;
