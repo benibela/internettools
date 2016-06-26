@@ -713,9 +713,6 @@ type
     function map(const q: string): IXQValue; override;
     function order(const q: string): IXQValue; override;
 
-
-    function takeFirst: IXQValue;
-
     function clone: IXQValue; override;
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
@@ -2574,7 +2571,7 @@ public
   function xqvalue(v: Integer):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(v: xqfloat):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(const v: BigDecimal):IXQValue; inline; //**< Creates an BigDecimal IXQValue
-  function xqvalue(v: string):IXQValue; inline; //**< Creates a string IXQValue
+  function xqvalue(const v: string):IXQValue; inline; //**< Creates a string IXQValue
   function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates a node TXQValue
   function xqvalue(sl: TStringList): IXQValue; //**< Creates a sequence of strings (does *not* free the list)
@@ -4823,6 +4820,48 @@ begin
 end;
 
 
+{function xqvalue(v: TDateTime): IXQValue;
+begin
+  result := TXQValueDateTime.Create(v);
+end;}
+
+function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
+begin
+  result := nil;
+  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//This disables exception safe reference counting
+//If an exception were to occur in any of the below functions, it will cause a memory leak. So this section has to be carefully watched
+{$IMPLICITEXCEPTIONS OFF}
+
+
 var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
 
 function xqvalue: IXQValue;
@@ -4882,7 +4921,7 @@ begin
   result := TXQValueDecimal.Create(v);
 end;
 
-function xqvalue(v: string): IXQValue; inline;
+function xqvalue(const v: string): IXQValue; inline;
 begin
   {if v = '' then
     result := commonValues[cvkEmptyString]
@@ -4926,18 +4965,6 @@ begin
     resseq.add(sl[i]);
   result := resseq;
   xqvalueSeqSqueeze(result);
-
-end;
-
-{function xqvalue(v: TDateTime): IXQValue;
-begin
-  result := TXQValueDateTime.Create(v);
-end;}
-
-function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
-begin
-  result := nil;
-  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
 end;
 
 function xqvalue(v: TTreeNode): IXQValue;
@@ -4946,17 +4973,12 @@ begin
   result := TXQValueNode.Create(v);
 end;
 
-
 procedure xqvalueSeqSqueeze(var v: IXQValue);
-var
-  seq: TXQValueSequence;
 begin
-  if v.kind <> pvkSequence then exit;
-  seq := v as TXQValueSequence;
-  if seq.seq.Count > 1 then exit;
-  if seq.seq.Count = 1 then v := seq.takeFirst
-  else v := xqvalue();
+  if (v.getSequenceCount > 1) or (v.kind <> pvkSequence) then exit;
+  v := v.get(1);
 end;
+
 
 function xqvalueSeqSqueezed(l: TXQVList): IXQValue;
 begin
@@ -4967,6 +4989,7 @@ begin
   end;
   l.free;
 end;
+
 
 procedure xqvalueSeqAddMove(var list: IXQValue; add: IXQValue);
 var
@@ -4995,11 +5018,59 @@ begin
   for i := 0 to high(a) do Result[i] := a[i];
 end;
 
+
+
 // If the value is a sequence of exactly one element. That should not happen and this function should not be used.
 function xqvalueIsFakeSingleton(const v: IXQValue): boolean;
 begin
   result := (v.kind = pvkSequence) and (v.getSequenceCount = 1) and (v.get(1) <> v)
 end;
+
+
+
+{$IMPLICITEXCEPTIONS ON}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];
 

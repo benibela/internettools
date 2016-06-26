@@ -1509,14 +1509,6 @@ begin
   seq.addOrdered(node);
 end;
 
-
-function TXQValueSequence.takeFirst: IXQValue;
-begin
-  if seq.Count = 0 then exit(nil);
-  result := seq[0];
-  seq.Delete(0);
-end;
-
 destructor TXQValueSequence.Destroy;
 begin
   seq.Free;
