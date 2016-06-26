@@ -3322,7 +3322,7 @@ begin
     if not node.hasDocument then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
 
     node := node.getRootElement();
-    if node = nil then exit();
+    if node = nil then exit(xqvalue());
 
     useTrueId := XQGlobalUseIDfromDTD;
 
@@ -3341,8 +3341,8 @@ begin
     end;
   finally
     sl.free;
-    xqvalueSeqSqueeze(result);
   end;
+  xqvalueSeqSqueeze(result);
 end;
 
 
@@ -3400,7 +3400,7 @@ begin
     if node = nil then exit;
 
     useTrueId := XQGlobalUseIDfromDTD;
-    if not useTrueId then exit;
+    if not useTrueId then exit(xqvalue);
 
     resseq := TXQValueSequence.create();
     result := resseq;
