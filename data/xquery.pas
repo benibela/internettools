@@ -97,6 +97,7 @@ type
     class procedure makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe); static;
   public
     function MoveNext: Boolean; inline;
+    procedure CopyBlock(target: PIXQValue); //**< Copies all XQValue to the destination buffer and increases their ref count. For maximal performance, there is no check that the buffer is large enough
     property Current: PIXQValue read FCurrent;
     function GetEnumerator: TXQValueEnumeratorPtrUnsafe;
   end;
@@ -4564,6 +4565,23 @@ begin
   end;
 end;
 
+procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue);
+var
+  size: SizeInt;
+  endtarget: Pointer;
+begin
+  while MoveNext do begin
+    size := PtrInt(pointer(flast)) - PtrInt(pointer(fcurrent)) + sizeof(IXQValue);
+    move(fcurrent^, target^, size  );
+    endtarget := pointer(target) + size;
+    while target < endtarget do begin
+      target^._AddRef;
+      inc(target);
+    end;
+    fcurrent := flast;
+  end;
+end;
+
 function TXQValueEnumeratorPtrUnsafe.GetEnumerator: TXQValueEnumeratorPtrUnsafe;
 begin
   result := self;
@@ -5385,22 +5403,19 @@ end;
 
 procedure TXQVList.add(const value: IXQValue);
 var
- v: PIXQValue;
- other: TXQVList;
- i: Integer;
+ i, othercount: Integer;
+ enumerator: TXQValueEnumeratorPtrUnsafe;
 begin
   assert(value <> nil);
   case value.kind of
     pvkSequence: begin
-      if value is TXQValueSequence then begin
-        other := (value as TXQValueSequence).seq;
-        if other.fcount = 0 then exit;
-        reserve(fcount + other.fcount);
-        for i := 0 to other.fcount - 1 do other.fbuffer[i]._AddRef;
-        Move(other.fbuffer[0], fbuffer[fcount], sizeof(other.fbuffer[0]) * other.fcount); //assume fbuffer is initialized to nil
-        inc(fcount, other.fcount);
-      end else for v in value.GetEnumeratorPtrUnsafe do
-        Add(v^);
+      othercount := value.getSequenceCount;
+      if othercount > 0 then begin
+        enumerator := value.GetEnumeratorPtrUnsafe;
+        reserve(fcount + othercount);
+        enumerator.copyBlock(@fbuffer[fcount]);
+        inc(fcount, othercount);
+      end;
     end;
     pvkUndefined: ;
     else begin
