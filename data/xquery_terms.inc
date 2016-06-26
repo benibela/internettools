@@ -786,10 +786,10 @@ begin
   result := castableAsBase(v, staticContext);
 end;
 
-function TXQTermSequenceType.instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
-var nodeCondition: TXQPathNodeCondition;
+function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
 
-  function instanceOfSingleType(sub: IXQValue): boolean;
+
+  function instanceOfSingleType(const sub: IXQValue): boolean;
   var
     t: TXSType;
     fun: TXQValueFunction;
@@ -803,9 +803,8 @@ var nodeCondition: TXQPathNodeCondition;
         if atomicTypeInfo is TXSUnionType then exit(TXSUnionType(atomicTypeInfo).containsTransitive(t));
         exit(false);
       end;
-      tikElementTest: result  := TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, sub.toNode);
       tikFunctionTest: begin
-        if not (sub is TXQValueFunction) then exit(false);
+        if sub.kind <> pvkFunction then exit(false);
         if length(arguments) = 0 then exit(true);
         fun := sub as TXQValueFunction;
         if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
@@ -816,6 +815,27 @@ var nodeCondition: TXQPathNodeCondition;
       end;
     end;
   end;
+
+  function elementTest(): boolean;
+  var nodeCondition: TXQPathNodeCondition;
+    v: PIXQValue;
+  begin
+    //this is a sub function, so the f/initialization of nodeCondition is only done for tests that actually are element tests
+    TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
+    if qmCheckNamespacePrefix in self.nodeMatching.matching then begin
+      include(nodeCondition.options, xqpncCheckNamespace);
+      if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)
+      else nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
+    end;
+    if (context.staticContext <> nil) and (context.staticContext.nodeCollation <> nil) then
+      nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
+    result := true;
+    for v in ta.GetEnumeratorPtrUnsafe do begin
+      result := result and TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, v^.toNode);
+      if not result then exit;
+    end;
+  end;
+
 var
   count: Integer;
   i: Integer;
@@ -839,16 +859,8 @@ begin
   //compare item type
   if kind = tikAny then
     exit(true);
-  if kind = tikElementTest then begin
-    TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
-    if qmCheckNamespacePrefix in self.nodeMatching.matching then begin
-      include(nodeCondition.options, xqpncCheckNamespace);
-      if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)
-      else nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkElementType);
-    end;
-    if (context.staticContext <> nil) and (context.staticContext.nodeCollation <> nil) then
-      nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
-  end;
+  if kind = tikElementTest then
+    exit(elementTest);
   result := true;
   for v in ta.GetEnumeratorPtrUnsafe do begin
     result := result and instanceOfSingleType(v^);

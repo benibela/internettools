@@ -2091,6 +2091,7 @@ function TXQValueFunction.evaluate(const outerContext: TXQEvaluationContext; con
 var
   tempcontext: TXQEvaluationContext;
   j: Integer;
+  temp: IXQValue;
 begin
   tempcontext := context;
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
@@ -2098,10 +2099,13 @@ begin
   tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
   tempcontext.temporaryVariables.pushAll;
   try
-    for j := 0 to high(parameters) do
-      tempcontext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, context, term));
+    for j := 0 to high(parameters) do begin
+      temp := args[j];
+      TXQAbstractFunctionInfo.convertType(temp, parameters[j].seqtype, context, term);
+      tempcontext.temporaryVariables.add(parameters[j].variable, args[j]);
+    end;
     result := body.evaluate(tempcontext);
-    result := TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
+    TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
   finally
     tempcontext.temporaryVariables.popAll();
   end;
@@ -2110,14 +2114,18 @@ end;
 function TXQValueFunction.evaluateInContext(var inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
 var
   j: Integer;
+  temp: IXQValue;
 begin
   if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
   inContext.temporaryVariables.pushAll;
   try
-    for j := 0 to high(parameters) do
-      inContext.temporaryVariables.add(parameters[j].variable, TXQAbstractFunctionInfo.convertType(args[j], parameters[j].seqtype, inContext, term));
+    for j := 0 to high(parameters) do begin
+      temp := args[j];
+      TXQAbstractFunctionInfo.convertType(temp, parameters[j].seqtype, inContext, term);
+      inContext.temporaryVariables.add(parameters[j].variable, temp);
+    end;
     result := body.evaluate(inContext);
-    result := TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
+    TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
   finally
     inContext.temporaryVariables.popAll();
   end;

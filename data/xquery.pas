@@ -1338,7 +1338,7 @@ type
     minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
     //used for user defined functions where the parameters must be promoted to the right type
-    class function convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm): IXQValue; static;
+    class procedure convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm); static;
     //used for native functions (which should be robust enough to handle different types on the Pascal side)
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
     function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
@@ -1553,7 +1553,7 @@ type
     function castableAsBase(v: IXQValue; staticContext: TXQStaticContext): boolean;
     function castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
     function castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
-    function instanceOf(ta: IXQValue; const context: TXQEvaluationContext): boolean;
+    function instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
     function instanceOf(const ta: IXQValue): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
   private
@@ -5155,7 +5155,7 @@ end;
 
 { TXQAbstractFunctionInfo }
 
-class function TXQAbstractFunctionInfo.convertType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm): IXQValue;
+class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm);
 
   function conversionSingle(const w: IXQValue): IXQValue;
   var
@@ -5193,7 +5193,6 @@ var
   i: Integer;
   seq: TXQVList;
 begin
-  result := v;
   if typ = nil then exit;
   if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
   case result.getSequenceCount of
@@ -5205,8 +5204,10 @@ begin
   end;
   case typ.kind of
     tikAtomic, tikFunctionTest: begin
-      if not (result is TXQValueSequence) then
-        exit(conversionSingle(result));
+      if not (result is TXQValueSequence) then begin
+        conversionSingle(result);
+        exit;
+      end;
       seq := (result as TXQValueSequence).seq;
       for i := 0 to seq.Count - 1 do
         seq[i] := conversionSingle(seq[i]);
@@ -5256,10 +5257,53 @@ end;
 
 function TXQAbstractFunctionInfo.checkOrConvertTypes(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm): integer;
 var
-  i, j, countMatch, valueHigh: Integer;
+  countMatch, valueHigh: Integer;
   matches: Boolean;
-  errCode: String;
-  errMessage: String;
+
+  procedure makeErrorMessage;
+  var i, j: integer;
+      errCode: String;
+      errMessage: String;
+  begin
+    //print a nice error message
+    //nested procedure, because using strings in the outer function would create a pointless exception frame
+    if countMatch = -1 then
+      term.raiseEvaluationError('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
+    errCode := 'XPTY0004';
+    for i := 0 to valueHigh do
+      if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
+       errCode := 'FOTY0013'; //wtf?
+       break;
+      end else if (context.staticContext.model in PARSING_MODEL3) and (versions[countMatch].types[i].kind = tikAtomic) and (versions[countMatch].types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
+       errCode := 'XPTY0117'; //wtf?
+       break;
+      end;
+    errMessage := 'Invalid types for function '+versions[0].name+'.'+LineEnding;
+    errMessage += 'Got: ';
+    for i := 0 to valueHigh do begin
+      if i <> 0 then errMessage += ', ';
+      errMessage += values[i].debugAsStringWithTypeAnnotation();
+    end;
+    errMessage += LineEnding;
+    errMessage += 'Expected: ';
+    for i := countMatch to high(versions) do begin
+      if length(versions[i].types) <> count then continue;
+      if i <> countMatch then errMessage += LineEnding + 'or ';
+      errMessage += '(';
+      for j := 0 to high(versions[i].types) do begin
+        if j <> 0 then errMessage += ', ';
+        errMessage += versions[i].types[j].serialize;
+      end;
+      errMessage += ')';
+    end;
+
+    term.raiseEvaluationError(errCode, errMessage);
+  end;
+
+var i, j: integer;
+       errCode: String;
+      errMessage: String;
+
 begin
   if length(versions) = 0 then exit(-1);
   valueHigh := count - 1;
@@ -5275,45 +5319,14 @@ begin
     if matches then begin
      for j := 0 to valueHigh do
        if versions[i].types[j].kind = tikFunctionTest then
-         values[j] := convertType(values[j], versions[i].types[j], context, term);
+         convertType(values[j], versions[i].types[j], context, term);
       result := i;
       exit;
     end;
     if countMatch = -1 then countMatch := i;
   end;
 
-  //print a nice error message
-  if countMatch = -1 then
-    term.raiseEvaluationError('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
-  errCode := 'XPTY0004';
-  for i := 0 to valueHigh do
-    if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
-     errCode := 'FOTY0013'; //wtf?
-     break;
-    end else if (context.staticContext.model in PARSING_MODEL3) and (versions[countMatch].types[i].kind = tikAtomic) and (versions[countMatch].types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
-     errCode := 'XPTY0117'; //wtf?
-     break;
-    end;
-  errMessage := 'Invalid types for function '+versions[0].name+'.'+LineEnding;
-  errMessage += 'Got: ';
-  for i := 0 to valueHigh do begin
-    if i <> 0 then errMessage += ', ';
-    errMessage += values[i].debugAsStringWithTypeAnnotation();
-  end;
-  errMessage += LineEnding;
-  errMessage += 'Expected: ';
-  for i := countMatch to high(versions) do begin
-    if length(versions[i].types) <> count then continue;
-    if i <> countMatch then errMessage += LineEnding + 'or ';
-    errMessage += '(';
-    for j := 0 to high(versions[i].types) do begin
-      if j <> 0 then errMessage += ', ';
-      errMessage += versions[i].types[j].serialize;
-    end;
-    errMessage += ')';
-  end;
-
-  term.raiseEvaluationError(errCode, errMessage);
+  makeErrorMessage;
 end;
 
 destructor TXQAbstractFunctionInfo.Destroy;
