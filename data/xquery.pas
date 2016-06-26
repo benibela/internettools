@@ -8116,6 +8116,7 @@ end;
 var xs: TXQNativeModule;
 
 initialization
+assert(SizeOf(IXQValue) = sizeof(pointer));
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;

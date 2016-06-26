@@ -3145,8 +3145,8 @@ var
   i: Integer;
 begin
   if index >= 0 then begin
-    result := context.temporaryVariables.top(index);
-    if context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name <> value then begin
+    if (context.temporaryVariables.count - 1 - index < 0) or
+        (context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name <> value) then begin
       err := 'Var mismatch: '+value+'('+IntToStr(index)+')' + ' <> '+context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name + LineEnding;
       err += 'Vars on stack: ';
       for i := 0 to context.temporaryVariables.count - 1 do
@@ -3154,6 +3154,7 @@ begin
 
       raise EXQEvaluationException.create('PXP:INTERNAL',err);
     end;
+    result := context.temporaryVariables.top(index);
     exit;
   end;
   if index = -2 then
@@ -3989,8 +3990,10 @@ begin
   if term^ is TXQTermVariable then begin
     if not overridenVariables.hasVariable(TXQTermVariable(term^), temp) then begin
       v := TXQTermVariable(term^);
-      assert(v.index >= 0);
-      replace(term, TXQTermConstant.create(context^.temporaryVariables.top(v.index-overridenVariables.count)))
+      if v.index >= 0 then replace(term, TXQTermConstant.create(context^.temporaryVariables.top(v.index-overridenVariables.count)))
+      else if v.index = -2 then replace(term, TXQTermConstant.create(v.evaluate(context^)))
+      else raisePXPInternalError;
+
     end else if length(patterns) > 0 then begin
       {not sure what to do with these
       selfdefined := false;
