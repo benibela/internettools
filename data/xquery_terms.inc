@@ -2844,6 +2844,7 @@ var
   i: Integer;
   attrib: TTreeAttribute;
   nsCheck: TXQNamespaceMode;
+  resseq: TXQValueSequence;
 begin
   tempEl := nil;
   if context.SeqValue <> nil then begin
@@ -2881,13 +2882,15 @@ begin
   result := nil;
 
   testValue := readvalue <> '*';
+  result := nil;
+  resseq := nil;
   for i := 0 to tempel.attributes.Count - 1 do begin
     attrib := tempel.attributes.items[i];
     if      (not testValue or striEqual(attrib.value, readvalue))
         and ((nsCheck <> xqnmURL) or ( attrib.getNamespaceURL() = readnamespace))
         and not attrib.isNamespaceNode
         then
-      xqvalueSeqAddMove(result, xqvalue(tempEl.attributes.Items[i]));
+          xqvalueSeqConstruct(result, resseq, xqvalue(tempEl.attributes.Items[i]));
   end;
   if result = nil then result:=xqvalue();
 end;

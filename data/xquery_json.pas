@@ -230,14 +230,18 @@ var
 
 var
   value: TXQValue;
+  resseq: TXQValueSequence;
 
 begin
   scanner := TJSONScanner.Create(data);
   try
     result := parse();
     if multipleTopLevelItems then begin
+      resseq := TXQValueSequence.create(result);
+      result := resseq;
       while nextToken <> tkEOF do
-        xqvalueSeqAddMove(result, parse(true));
+        resseq.add(parse(true));
+      xqvalueSeqSqueeze(result);
     end else if nextToken <> tkEOF then
       raiseError('Unexpected values after json data');
   finally

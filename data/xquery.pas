@@ -2580,11 +2580,10 @@ public
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
   function xqvalueSeqSqueezed(l: TXQVList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
-  //** Adds a value to an implicit sequence list.
-  //**(i.e. if list is not a list, a list with both is created; if @code(list) is undefined it just becomes @code(add) ) @br
-  //**Warning: this is a dangerous function. If @code(list) becomes @code(add) you must not call it again on @code(list) or you modify the previous @code(add). If there is a reference to @code(add) anywhere else (e.g. variable, object property), it can break everything.
-  procedure xqvalueSeqAddMove(var list: IXQValue; add: IXQValue);
-  //function commonTyp(const a, b: TXQValueKind): TXQValueKind; //**< Returns the most general primary type of a,b
+  //** Adds a value to an implicit sequence list in result, i.e. you call it multiple times and the result becomes a sequence of all the add values.  @br
+  //** For the first call result and seq must be nil. @br
+  //** The point is that it only creates a sequence if there are multiple values, and it is especially fast, if you do not expect multiple values.
+  procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
 
   function xqvalueArray(a: array of IXQValue): TXQVArray;
 type
@@ -4990,23 +4989,15 @@ begin
   l.free;
 end;
 
-
-procedure xqvalueSeqAddMove(var list: IXQValue; add: IXQValue);
-var
-  temp: TXQValueSequence;
+procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
 begin
-  if list = nil then begin
-    list := add;
-    exit;
-  end;
-  case list.kind of
-    pvkUndefined: list := add;
-    pvkSequence: (list as TXQValueSequence).add(add);
-    else begin
-      temp := TXQValueSequence.create(list);
-      temp.add(add);
-      list := temp;
+  if result = nil then result := add
+  else begin
+    if seq = nil then begin
+      seq := TXQValueSequence.create(result);
+      result := seq;
     end;
+    seq.add(add);
   end;
 end;
 
@@ -6070,20 +6061,30 @@ end;
 
 function TXQVariableChangeLog.collected: TXQVariableChangeLog;
 var i: integer;
-  oldid: Integer;
+  oldid, j: Integer;
+  templist: TFPList; //list of sequences, so we do not need to cast ixqvalue -> txqvaluesequence
 begin
   result := TXQVariableChangeLog.create();
+  templist := nil;
   for i := 0 to count - 1 do begin
     oldid := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
     if oldid < 0 then begin
-      if varstorage[i].value.kind <> pvkSequence then
-        result.add(varstorage[i].name, varstorage[i].value, varstorage[i].namespaceURL)
-       else
-        result.add(varstorage[i].name, TXQValueSequence.create(varstorage[i].value), varstorage[i].namespaceURL) //must not change vars[i].value later
+      result.add(varstorage[i].name, varstorage[i].value, varstorage[i].namespaceURL);
+      if templist <> nil then templist.Add(nil);
     end else begin
-      xqvalueSeqAddMove(result.varstorage[oldid].value, varstorage[i].value);
+      if templist = nil then begin
+        templist := TFPList.Create;
+        templist.Capacity := result.count;
+        for j := 0 to result.count - 1 do templist.Add(nil);
+      end;
+      if templist[oldid] = nil then begin
+        templist[oldid] := TXQValueSequence.create(result.varstorage[oldid].value);
+        result.varstorage[oldid].value := TXQValueSequence(templist[oldid]);
+      end;
+      TXQValueSequence(templist[oldid]).add(varstorage[i].value);
     end;
   end;
+  templist.free;
 end;
 
 function TXQVariableChangeLog.condensedCollected: TXQVariableChangeLog;

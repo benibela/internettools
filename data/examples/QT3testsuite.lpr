@@ -839,12 +839,14 @@ function TAssertionAssert.check(errorCode: string): TTestCaseResult;
   function parseXMLFragment: IXQValue;
   var
     n: TTreeNode;
+    resseq: TXQValueSequence;
   begin
     n := tree.parseTree(value).getFirstChild();
+    resseq := nil;
     result := xqvalue(n);
     while n.getNextSibling() <> nil do begin
       n := n.getNextSibling();
-      xqvalueSeqAddMove(result, xqvalue(n));
+      xqvalueSeqConstruct(result, resseq, xqvalue(n));
     end;
   end;
 
@@ -1471,13 +1473,15 @@ end;
 function TEnvironment.getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
 var
   i, j: Integer;
+  resseq: TXQValueSequence;
 begin
   value := xqvalue();
+  resseq := nil;
   if collections = nil then exit;
   for i := 0 to collections.count - 1 do
     if collections[i] = variable then begin
       for j := 0 to tlist(collections.Objects[i]).Count - 1 do
-        xqvalueSeqAddMove(value, xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
+        xqvalueSeqConstruct(value, resseq, xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
     end;
 end;
 

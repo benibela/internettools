@@ -1368,6 +1368,7 @@ var replaceNames, replaceValues: TStringArray;
     end;
 
 var v: PIXQValue;
+  resseq: TXQValueSequence;
 begin
   requiredArgCount(args, 1, 2);
 
@@ -1380,11 +1381,11 @@ begin
     urlEncodingFromValue(args[1], cmp, false, replaceNames, replaceValues, specialReplaceNames, specialReplaceValues);
 
 
-  result := nil;
+  resseq := TXQValueSequence.create();
+  result := resseq;
   for v in args[0].GetEnumeratorPtrUnsafe do
-    xqvalueSeqAddMove(result, encodeForm(v^.toNode));
-  if result = nil then result := xqvalue;
-
+    resseq.add(encodeForm(v^.toNode));
+  xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionUri_combine(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
@@ -1512,12 +1513,12 @@ begin
 end;
 
 function xqFunctionResolve_Html(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
-var res: IXQValue;
+var resseq: TXQValueSequence;
     baseUri: String;
 
   procedure addString(const s: string);
   begin
-    xqvalueSeqAddMove(res, xqvalue(strResolveURI(s, baseUri)));
+    resseq.add(xqvalue(strResolveURI(s, baseUri)));
   end;
 
   procedure resolve(const seq: IXQValue);
@@ -1573,9 +1574,9 @@ var res: IXQValue;
               tempobj := TXQValueObject.create();
               tempobj.prototype := iv^;
               tempobj.values.add('url', resolvedUri);
-              xqvalueSeqAddMove(res, tempobj);
-            end else xqvalueSeqAddMove(res, iv^);
-          end else xqvalueSeqAddMove(res, iv^);
+              resseq.add(tempobj);
+            end else resseq.add(iv^);
+          end else resseq.add(iv^);
         end;
         else addString(iv^.toString);
       end;
@@ -1606,10 +1607,10 @@ begin
     end;
   end;
 
-  res := nil;
+  resseq := TXQValueSequence.create();
+  result := resseq;
   resolve(args[0]);
-  result := res;
-  if res = nil then exit(xqvalue);
+  xqvalueSeqSqueeze(result);
 end;
 
 function tryValueToInteger(const v: IXQValue; out outv: integer): boolean;
@@ -2654,6 +2655,7 @@ var
 
 var  i: Integer;
      v: PIXQValue;
+     resseq: TXQValueSequence;
 begin
   requiredArgCount(args, 2, 3);
   if length(args) = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
@@ -2664,10 +2666,11 @@ begin
   end else begin
     i := 0;
     result := nil;
+    resseq := nil;
     for v in args[0].GetEnumeratorPtrUnsafe do begin
       i += 1;
       if equal(v^, args[1]) then
-        xqvalueSeqAddMove(result, xqvalue(i));
+        xqvalueSeqConstruct(result, resseq, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
   end;
@@ -3300,6 +3303,7 @@ var
   node: TTreeNode;
   attrib: TTreeAttribute;
   useTrueId: Boolean;
+  resseq: TXQValueSequence;
 begin
   ignore(parentElement); //we should give the parent element of an id-element, but atm we ignore all id-elements
   requiredArgCount(args,1, 2);
@@ -3322,21 +3326,22 @@ begin
 
     useTrueId := XQGlobalUseIDfromDTD;
 
-
+    resseq := TXQValueSequence.create();
+    result := resseq;
     while node <> nil do begin
       if node.attributes <> nil then
         for attrib in node.attributes do
           if (not useTrueId and context.staticContext.nodeCollation.equal(attrib.value, 'id')) or
              (useTrueId  and ((attrib.getDataTypeHack() = 1) or ((attrib.value = 'id') and equalNamespaces(attrib.namespace, XMLNamespace_XML) ) )) then
             if isSearchedId(attrib.realvalue) then begin
-              xqvalueSeqAddMove(result, xqvalue(node));
+              resseq.add(xqvalue(node));
               break;
             end;
       node := node.next;
     end;
   finally
     sl.free;
-    if result= nil then result := xqvalue();
+    xqvalueSeqSqueeze(result);
   end;
 end;
 
@@ -3371,6 +3376,7 @@ var
   attrib: TTreeAttribute;
   useTrueId: Boolean;
   temp: String;
+  resseq: TXQValueSequence;
 begin
   requiredArgCount(args,1, 2);
   result := nil;
@@ -3396,20 +3402,22 @@ begin
     useTrueId := XQGlobalUseIDfromDTD;
     if not useTrueId then exit;
 
+    resseq := TXQValueSequence.create();
+    result := resseq;
     while node <> nil do begin
       if node.attributes <> nil then
         for attrib in node.attributes do
           if  attrib.getDataTypeHack() = 2 then
             if matchesSearchedId(attrib.realvalue) then begin
-              xqvalueSeqAddMove(result, xqvalue(node));
+              resseq.add(xqvalue(node));
               break;
             end;
       node := node.next;
     end;
   finally
     sl.free;
-    if result= nil then result := xqvalue();
   end;
+  xqvalueSeqSqueeze(Result);
 end;
 
 
@@ -3670,11 +3678,14 @@ end;
 function xqFunctionAvailable_Environment_Variables(const args: TXQVArray): IXQValue;
 var
   i: Integer;
+  resseq: TXQValueSequence;
 begin
   requiredArgCount(args, 0);
-  result := xqvalue();
+  resseq := TXQValueSequence.create();
+  result := resseq;
   for i:=1 to GetEnvironmentVariableCount do
-    xqvalueSeqAddMove(result, xqvalue(strBefore(GetEnvironmentString(i), '=')));
+    resseq.add(xqvalue(strBefore(GetEnvironmentString(i), '=')));
+  xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionParse_Common(const context: TXQEvaluationContext; const args: TXQVArray; typ: string): IXQValue;

@@ -372,6 +372,7 @@ end;
 
 function TXQValue.retrieve: IXQValue;
 var tempContext: TXQEvaluationContext;
+  resseq: TXQValueSequence;
   function dataToXQV(const data, uri, contenttype: string): ixqvalue;
   var
     f: TInternetToolsFormat;
@@ -407,13 +408,13 @@ var tempContext: TXQEvaluationContext;
          TXQValueObject.prepareInternetRequest(v, method, uri, post, defaultInternet);
          data := internetaccess.httpRequest(method, uri, post);
          defaultInternet.additionalHeaders.Text := tempHeaders;
-         xqvalueSeqAddMove(result, dataToXQV (data, uri, defaultInternet.getLastContentType));
+         resseq.add(dataToXQV (data, uri, defaultInternet.getLastContentType));
       end;
       else begin
         uri := v.toString;
         if not strIsAbsoluteURI(uri) then raise EXQEvaluationException.create('pxp:RETRIEVE', 'Need absolute URI to retrieve, got: '+uri);
         data := defaultQueryEngine.StaticContext.retrieveFromURI(uri, contenttype, 'pxp:RETRIEVE');
-        xqvalueSeqAddMove(result, dataToXQV(data, uri, contenttype));
+        resseq.add(dataToXQV(data, uri, contenttype));
       end;
     end;
   end;
@@ -422,12 +423,14 @@ var v: IXQValue;
     i: Integer;
 begin
   tempContext := defaultQueryEngine.getEvaluationContext();
-  result := xqvalue();
+  resseq := TXQValueSequence.create();
+  result := resseq;
   for i := 1 to getSequenceCount do begin
     v := get(i);
     if v.kind = pvkNode then handle(resolveHTMLCallback(tempContext, xqvalueArray([v])))
     else handle(v);
   end;
+  xqvalueSeqSqueeze(result);
 end;
 
 function TXQValue.GetEnumerator: TXQValueEnumerator;

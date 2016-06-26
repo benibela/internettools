@@ -827,8 +827,8 @@ var
   {$IFDEF USE_FLRE}
   i: Integer;
   captures: TFLREMultiCaptures;
-  list: TXQVList;
   {$ENDIF}
+  list: TXQVList;
 begin
   requiredArgCount(args, 2, 3);
   input := args[0].toString;
@@ -839,15 +839,16 @@ begin
   try
     try
       {$IFDEF USE_SOROKINS_REGEX}
-      result := nil;
       if regEx.Exec(input) then begin
+        list := TXQVList.create();
         lastMatchEnd := 1;
         repeat
-          xqvalueSeqAddMove(result, xqvalue(copy(input, lastMatchEnd, regEx.MatchPos[0] - lastMatchEnd)));
+          list.add(xqvalue(copy(input, lastMatchEnd, regEx.MatchPos[0] - lastMatchEnd)));
           lastMatchEnd := regex.MatchPos[0] + regex.MatchLen[0];
         until not regEx.ExecNext;
-        xqvalueSeqAddMove(result, xqvalue(strCopyFrom(input, lastMatchEnd)));
-      end else xqvalueSeqAddMove(result, xqvalue(input));
+        list.add(xqvalue(strCopyFrom(input, lastMatchEnd)));
+        result := xqvalueSeqSqueezed(list);
+      end else result := xqvalue(input);
       {$ENDIF}
       {$IFDEF USE_FLRE}
       captures := nil;
@@ -975,6 +976,7 @@ var
  {$IFDEF USE_FLRE}
  captures: TFLREMultiCaptures;
  j: Integer;
+ resseq: TXQValueSequence;
  {$ENDIF}
 begin
   requiredArgCount(args, 2,4);
@@ -989,12 +991,13 @@ begin
       SetLength(matches, args[2].getSequenceCount);
       for i := 0 to high(matches) do matches[i] := args[2].get(i+1).toInt64;
     end;
-    result := nil;
+    resseq := TXQValueSequence.create();
+    result := resseq;
     {$IFDEF USE_SOROKINS_REGEX}
     if regEx.Exec(input) then
       repeat
         for i := 0 to high(matches) do
-          xqvalueSeqAddMove(result, xqvalue(regEx.Match[matches[i]]));
+          resseq.add(xqvalue(regEx.Match[matches[i]]));
       until not all or not regEx.ExecNext;
     {$ENDIF}
     {$IFDEF USE_FLRE}
@@ -1003,15 +1006,15 @@ begin
     else regex.UTF8MatchAll(input, captures);
     for i := 0 to high(captures) do
       for j := 0 to high(matches) do
-        if (matches[j] <= high(captures[i])) then xqvalueSeqAddMove(result, xqvalue(copy(input, captures[i][matches[j]].Start, captures[i][matches[j]].Length)))
-        else xqvalueSeqAddMove(result, xqvalue(''));
+        if (matches[j] <= high(captures[i])) then resseq.add(xqvalue(copy(input, captures[i][matches[j]].Start, captures[i][matches[j]].Length)))
+        else resseq.add(xqvalue(''));
     {$ENDIF}
-    if result = nil then
-      if all or (length(matches) = 0) then result := xqvalue()
-      else begin
+    if resseq.getSequenceCount = 0 then
+      if not ( all or (length(matches) = 0) ) then begin
         for i := 0 to high(matches) do
-          xqvalueSeqAddMove(result, xqvalue(''));
+          resseq.add(xqvalue(''));
       end;
+    xqvalueSeqSqueeze(result);
   finally
     wregexprFree(regEx)
   end;
