@@ -799,9 +799,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
       //tikAny, tikNone: ; //handled before
       tikAtomic: begin
         t := sub.typeAnnotation;;
-        if t.derivedFrom(atomicTypeInfo) then exit(true);
-        if atomicTypeInfo is TXSUnionType then exit(TXSUnionType(atomicTypeInfo).containsTransitive(t));
-        exit(false);
+        result := t.derivedFrom(atomicTypeInfo);
       end;
       tikFunctionTest: begin
         if sub.kind <> pvkFunction then exit(false);

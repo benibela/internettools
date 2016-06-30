@@ -8,6 +8,7 @@ begin
   base := aparent;
   schema := aschema;
   storage := astorage;
+  id := -1;
 
   if (schema = nil) and (base <> nil) then schema := base.schema;
   if schema <> nil then schema.typeList.AddObject(name, self);
@@ -21,19 +22,29 @@ end;}
 function TXSType.derivedFrom(t: TXSType): boolean;
 var s: TXSType;
 begin
+  if self = t then exit(true);
+  if (t.id >= 0) and (id >= 0) then
+    exit(t.descendantsIds and (int64(1) shl id) <> 0);
   s := self;
   while s <> nil do begin
     if s = t then exit(true);
     s := s.base;
   end;
- // if t is TXSUnionType then exit(TXSUnionType(t).containsTransitive(self));
-  exit(false);
+  result := t.containsTransitive(self);
 end;
 
 function TXSType.derivedFrom(t: array of TXSType): boolean;
 var s: TXSType;
   i: Integer;
+  allBasic: Boolean;
 begin
+  if id >= 0 then begin
+    allBasic := true;
+    for i := 0 to high(t) do
+      if t[i].id < 0 then allBasic := false
+      else if t[i].descendantsIds and (int64(1) shl id) <> 0 then exit(true);
+    if allbasic then exit(false);
+  end;
   s := self;
   while s <> nil do begin
     for i := 0 to high(t) do
@@ -302,6 +313,11 @@ begin
   result := temp;
 end;
 
+function TXSType.containsTransitive(t: TXSType): boolean;
+begin
+  result := false;
+end;
+
 function TXSType.tryCreateValue(const v: IXQValue; outv: PXQValue): TXSCastingError;
 begin
   if v.typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.node]) then
@@ -375,10 +391,8 @@ function TXSUnionType.containsTransitive(t: TXSType): boolean;
 var
   i: Integer;
 begin
-  for i := 0 to high(members) do begin
+  for i := 0 to high(members) do
     if t.derivedFrom(members[i]) then exit(true);
-    if (members[i] is TXSUnionType) and (TXSUnionType(members[i]).containsTransitive(t)) then exit(true);
-  end;
   result := false;
 end;
 
@@ -1003,6 +1017,23 @@ begin
   typeList.OwnsObjects := false;
   typeList.Delete(objIdx);
   typeList.OwnsObjects := true;
+end;
+
+procedure TXSSchema.cacheDescendants;
+var
+  i, j: Integer;
+begin
+  assert(typeList.Count < 64);
+  assert((hiddenTypeList = nil) or (hiddenTypeList.count = 0));
+  for i := 0 to typeList.Count - 1 do begin
+    TXSType(typeList.Objects[i]).id := -1;
+    TXSType(typeList.Objects[i]).descendantsIds := 0;
+    for j := 0 to typeList.Count - 1 do
+      if TXSType(typeList.Objects[j]).derivedFrom(TXSType(typeList.Objects[i])) then
+        TXSType(typeList.Objects[i]).descendantsIds := TXSType(typeList.Objects[i]).descendantsIds or (int64(1) shl j);
+  end;
+  for i := 0 to typeList.Count - 1 do
+    TXSType(typeList.Objects[i]).id := i;
 end;
 
 function TXSSchema.isAbstractType(t: TXSType): boolean;

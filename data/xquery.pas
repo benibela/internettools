@@ -1026,11 +1026,18 @@ type
     whiteSpaceFacet: TXSConstrainingFacetWhitespace;
     whiteSpaceFixed: boolean;
 
+    //types in baseSchema are numbered and descendantsIds is a bit field of all descendent types
+    //imported types would have id 0
+    id: integer;
+    descendantsIds: int64;
+
+
     constructor Create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
 
     //function isAtomic: boolean; virtual;
     function derivedFrom(t: TXSType): boolean;
     function derivedFrom(t: array of TXSType): boolean;
+    function containsTransitive(t: TXSType): boolean; virtual;
 
     class function commonType(a, b: TXSType): TXSType; static;
     class function commonType(const a, b: IXQValue): TXSType; static;
@@ -1052,6 +1059,7 @@ type
     function createValue(const v: BigDecimal): IXQValue; inline;
     function createValue(const v: String): IXQValue; inline;
   protected
+
     function tryCreateValue(const v: IXQValue; outv: PXQValue = nil): TXSCastingError;
     function tryCreateValue(v: string; outv: PXQValue = nil): TXSCastingError;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; virtual;
@@ -1097,7 +1105,7 @@ type
   TXSUnionType = class(TXSSimpleType)
     members: array of TXSSimpleType; //atomic types
     constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSSimpleType);
-    function containsTransitive(t: TXSType): boolean;
+    function containsTransitive(t: TXSType): boolean; override;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: String; outv: PXQValue=nil): TXSCastingError; override;
   end;
@@ -1230,6 +1238,7 @@ type
     procedure hide(const s: string); //do not use
   private
     typeList, hiddenTypeList: TXQMapStringObject;
+    procedure cacheDescendants;
   end;
 
   { TJSSchema }
@@ -5007,6 +5016,8 @@ end;
 
 
 
+
+
 // If the value is a sequence of exactly one element. That should not happen and this function should not be used.
 function xqvalueIsFakeSingleton(const v: IXQValue): boolean;
 begin
@@ -8185,10 +8196,13 @@ commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
 
 
+baseSchema.cacheDescendants; //this ignores the jsoniq types
+
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');
 baseSchema.hide('numeric');
+
 
 
 
