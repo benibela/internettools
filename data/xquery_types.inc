@@ -142,10 +142,12 @@ begin
   result[0] := self;
 end;
 
+{$ImplicitExceptions off}
 constructor TXQValue.create(atypeAnnotation: TXSType);
 begin
   ftypeAnnotation := atypeAnnotation;
 end;
+{$ImplicitExceptions on}
 
 constructor TXQValue.create(atypeAnnotation: TXSType; const value: IXQValue);
 begin
@@ -439,7 +441,7 @@ begin
   result.ptr := GetEnumeratorPtrUnsafe;
 end;
 
-{ TXQValueBoolean }
+{$ImplicitExceptions off}
 
 constructor TXQValueBoolean.create(abool: boolean);
 begin
@@ -458,6 +460,8 @@ begin
   ftypeAnnotation := atypeAnnotation;
   bool := abool;
 end;
+
+{$ImplicitExceptions on}
 
 class function TXQValueBoolean.classKind: TXQValueKind;
 begin
@@ -500,8 +504,8 @@ begin
   if bool then result := 'true' else result := 'false';
 end;
 
-{ TXQValueInt65 }
 
+{$ImplicitExceptions off}
 constructor TXQValueInt64.create(atypeAnnotation: TXSType);
 begin
   inherited create(atypeAnnotation);
@@ -524,6 +528,8 @@ begin
   ftypeAnnotation := atypeAnnotation;
   self.value := avalue.toInt64;
 end;
+
+{$ImplicitExceptions on}
 
 class function TXQValueInt64.classKind: TXQValueKind;
 begin
@@ -581,9 +587,7 @@ begin
   result := temp;
 end;
 
-
-{ TXQValueFloat }
-
+{$ImplicitExceptions off}
 constructor TXQValueFloat.create(const aflt: xqfloat);
 begin
   create(baseSchema.double, aflt);
@@ -605,6 +609,8 @@ class function TXQValueFloat.classKind: TXQValueKind;
 begin
   Result:=pvkFloat;
 end;
+{$ImplicitExceptions on}
+
 
 {class function TXQValueFloat.truncateRange(const v: BigDecimal): BigDecimal;
 begin
@@ -698,8 +704,7 @@ begin
   Result:=TXQValueFloat.create(typeAnnotation, value);
 end;
 
-{ TXQValueDecimal }
-
+{$ImplicitExceptions off}
 constructor TXQValueDecimal.create(const v: BigDecimal);
 begin
   if isIntegral(v) then inherited create(baseSchema.integer)
@@ -718,6 +723,7 @@ begin
   ftypeAnnotation := atypeAnnotation;
   value := avalue.toDecimal;
 end;
+{$ImplicitExceptions on}
 
 class function TXQValueDecimal.classKind: TXQValueKind;
 begin
@@ -767,8 +773,7 @@ begin
   result := TXQValueDecimalClass(self.ClassType).Create(ftypeAnnotation, value);
 end;
 
-{ TXQValueString }
-
+{$ImplicitExceptions off}
 constructor TXQValueString.create(const astr: string);
 begin
   inherited create(baseSchema.string_);
@@ -786,6 +791,8 @@ begin
   ftypeAnnotation := atypeAnnotation;
   str := value.toString;
 end;
+
+{$ImplicitExceptions on}
 
 class function TXQValueString.canCreateFromString(const v: string): boolean;
 begin
@@ -846,8 +853,6 @@ begin
   result := TXQValueString.create(ftypeAnnotation, str);
 end;
 
-
-{ TXQValueQName }
 
 constructor TXQValueQName.create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
 begin
@@ -1313,7 +1318,7 @@ begin
 end;
 
 
-{ TXQValueSequence }
+{$ImplicitExceptions off}
 
 constructor TXQValueSequence.create(capacity: integer);
 begin
@@ -1333,6 +1338,8 @@ begin
   inherited create(baseSchema.sequence);
   seq := list;
 end;
+
+{$ImplicitExceptions on}
 
 class function TXQValueSequence.classKind: TXQValueKind;
 begin
@@ -1520,11 +1527,13 @@ end;
 
 { TXQValueNode }
 
+{$ImplicitExceptions off}
 constructor TXQValueNode.create(anode: TTreeNode);
 begin
   inherited create(baseSchema.node);
   node := anode;
 end;
+{$ImplicitExceptions on}
 
 class function TXQValueNode.classKind: TXQValueKind;
 begin

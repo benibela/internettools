@@ -171,11 +171,11 @@ TTreeNode = class
   //Complex search functions.
   //**Returns the element with the given type and text which occurs before sequenceEnd.@br
   //**This function is nil-safe, so if you call TTreeNode(nil).findNext(...) it will return nil
-  function findNext(withTyp: TTreeNodeType; withText:string; findOptions: TTreeNodeFindOptions=[]; sequenceEnd: TTreeNode = nil):TTreeNode;
+  function findNext(withTyp: TTreeNodeType; const withText:string; findOptions: TTreeNodeFindOptions=[]; sequenceEnd: TTreeNode = nil):TTreeNode;
   //**Find a matching direct child (equivalent to findNext with certain parameters, but easier to use)@br
   //**A direct child of X is a node Y with Y.parent = X. @br
   //**The options tefoNoChildren, tefoNoGrandChildren have of course no effect. (former is set to false, latter to true)
-  function findChild(withTyp: TTreeNodeType; withText:string; findOptions: TTreeNodeFindOptions=[]): TTreeNode;
+  function findChild(withTyp: TTreeNodeType; const withText:string; findOptions: TTreeNodeFindOptions=[]): TTreeNode;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
   function outerXML(insertLineBreaks: boolean = false):string;
@@ -865,7 +865,8 @@ begin
   end;
 end;
 
-function TTreeNode.findNext(withTyp: TTreeNodeType; withText: string; findOptions: TTreeNodeFindOptions =[]; sequenceEnd: TTreeNode = nil): TTreeNode;
+{$ImplicitExceptions off}
+function TTreeNode.findNext(withTyp: TTreeNodeType; const withText: string; findOptions: TTreeNodeFindOptions =[]; sequenceEnd: TTreeNode = nil): TTreeNode;
 var cur: TTreeNode;
   //splitted: array of string;
 begin
@@ -890,7 +891,7 @@ begin
   result := nil;
 end;
 
-function TTreeNode.findChild(withTyp: TTreeNodeType; withText: string;
+function TTreeNode.findChild(withTyp: TTreeNodeType; const withText: string;
   findOptions: TTreeNodeFindOptions): TTreeNode;
 begin
   result := nil;
@@ -899,6 +900,8 @@ begin
   if reverse = nil then exit;
   result:=findNext(withTyp, withText, findOptions + [tefoNoGrandChildren] - [tefoNoChildren], reverse);
 end;
+
+{$ImplicitExceptions on}
 
 function TTreeNode.deepNodeText(separator: string): string;
 var cur:TTreeNode;
@@ -1062,6 +1065,8 @@ begin
   result := document is TTreeDocument;
 end;
 
+{$ImplicitExceptions off}
+
 function TTreeNode.getNodeName: string;
 begin
   case typ of
@@ -1072,6 +1077,8 @@ begin
     else result := '';
   end;
 end;
+
+
 
 function TTreeNode.getNamespacePrefix: string;
 begin
@@ -1104,6 +1111,8 @@ begin
   end;
   exit('');
 end;
+
+{$ImplicitExceptions on}
 
 procedure TTreeNode.getOwnNamespaces(var list: TNamespaceList);
 var attrib: TTreeAttribute;

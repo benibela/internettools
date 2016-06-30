@@ -5034,6 +5034,11 @@ begin
   PPointer(@b)^ := t;
 end;
 
+function xqvalueDecimalEqualInt(const d: IXQValue; const index: integer): boolean;
+begin
+  result := d.toDecimal = index;
+end;
+
 
 
 {$IMPLICITEXCEPTIONS ON}
@@ -5377,12 +5382,12 @@ end;
 {$I xquery_types.inc}
 {$I xquery_schemas.inc}
 
-function sequenceFilterConditionSatisfied(evaluatedCondition: IXQValue; const index: integer): boolean;
+function sequenceFilterConditionSatisfied(const evaluatedCondition: IXQValue; const index: integer): boolean;
 begin
   case evaluatedCondition.kind of
     pvkUndefined: result := false;
     pvkInt64: result := evaluatedCondition.toInt64 = index;
-    pvkBigDecimal: result := evaluatedCondition.toDecimal = index;
+    pvkBigDecimal: result := xqvalueDecimalEqualInt(evaluatedCondition, index);
     pvkFloat: result := (evaluatedCondition.toFloat = index);
     pvkDateTime: raise EXQEvaluationException.create('FORG0006', 'Sequence filter returned invalid value');
     else {pvkBoolean, pvkString,pvkSequence,pvkNode,pvkArray,pvkObject,pvkNull:} result := evaluatedCondition.toBooleanEffective;
@@ -5512,7 +5517,8 @@ begin
     pvkUndefined: ;
     else begin
       reserve(fcount + 1);
-      fbuffer[fcount] := value;
+      PPointer(fbuffer)[fcount] := value;
+      value._AddRef;
       fcount += 1;
     end;
   end;
@@ -5652,8 +5658,13 @@ begin
 end;
 
 procedure TXQVList.checkIndex(i: integer);
+  procedure error;
+  begin
+    raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
+  end;
+
 begin
-  if (i < 0) or (i >= fcount) then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
+  if (i < 0) or (i >= fcount) then error;
 end;
 
 procedure TXQVList.reserve(cap: integer);
@@ -7582,6 +7593,7 @@ begin
   end;
 end;
 
+{$ImplicitExceptions off}
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
 begin
   if not Assigned(node) or not (node.typ in nodeCondition.searchedTypes) then exit(false);
@@ -7607,6 +7619,7 @@ begin
   end;
   result := true;
 end;
+{$ImplicitExceptions on}
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode;
 begin
