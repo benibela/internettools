@@ -976,8 +976,8 @@ var
  {$IFDEF USE_FLRE}
  captures: TFLREMultiCaptures;
  j: Integer;
- resseq: TXQValueSequence;
  {$ENDIF}
+ resseq: TXQValueSequence;
 begin
   requiredArgCount(args, 2,4);
   input := args[0].toString;
