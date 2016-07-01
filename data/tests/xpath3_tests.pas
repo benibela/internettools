@@ -365,6 +365,7 @@ begin
   t('xs:float("5") mod xs:float("-INF")', '5', '');
 
   t('join(xs:ENTITIES("foo bar"), "|")', 'foo|bar');
+  f('xs:ENTITIES("####")', 'FORG0001');
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
