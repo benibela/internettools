@@ -1363,7 +1363,9 @@ begin
     0: exit(false);
     1: exit(seq[0].toBooleanEffective);
     else begin
-      if (seq[0] is TXQValueNode) or (seq[0] is TXQValueObject) or (seq[0] is TXQValueJSONArray) then exit(true);
+      case seq[0].kind of
+        pvkNode, pvkObject, pvkArray: exit(true);
+      end;
       raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
     end;
   end;

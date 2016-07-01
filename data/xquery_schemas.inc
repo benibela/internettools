@@ -376,7 +376,7 @@ end;
 
 { TXSUnionType }
 
-constructor TXSUnionType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; amembers: array of TXSSimpleType);
+constructor TXSUnionType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; amembers: array of TXSType);
 var
   i: Integer;
 begin
@@ -439,7 +439,7 @@ begin
     xsvAtomic: ; //ok
     xsvList: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (nested list)');
     xsvUnion: for i := 0 to high((aitemType as TXSUnionType).members) do
-      if TXSUnionType(aitemType).members[i].variety <> xsvAtomic then
+      if not (TXSUnionType(aitemType).members[i] is TXSSimpleType) or (TXSSimpleType(TXSUnionType(aitemType).members[i]).variety <> xsvAtomic) then
         raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)')
     else raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
   end;
@@ -1245,6 +1245,7 @@ begin
   typeList.AddObject('error', error);
 
   numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
+  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyAtomicType, TXQValueString, [untypedAtomic, untyped, node]);
   typeList.sorted := true;
 end;
 

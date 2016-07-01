@@ -1103,8 +1103,8 @@ type
 
   //** XML Schema union type
   TXSUnionType = class(TXSSimpleType)
-    members: array of TXSSimpleType; //atomic types
-    constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSSimpleType);
+    members: array of TXSType; //atomic types
+    constructor Create(aname: string; aparent: TXSType=nil; astorage: TXQValueClass=nil; amembers: array of TXSType);
     function containsTransitive(t: TXSType): boolean; override;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue=nil): TXSCastingError; override;
     function tryCreateValueInternal(const v: String; outv: PXQValue=nil): TXSCastingError; override;
@@ -1218,7 +1218,7 @@ type
     node: TXSType;
 
     sequence, function_: TXSType;
-    numericPseudoType: TXSUnionType;
+    numericPseudoType, untypedOrNodeUnion: TXSUnionType;
 
     //1.1 only
     error: TXSSimpleType;
@@ -3627,9 +3627,9 @@ begin
     exit
   end;
   if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
-  if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
-  if not (v is TXQValueNode) then
-    raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
+  if v.kind <> pvkNode then
+    if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.')
+    else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
   t := TXQValueNode.nodeTypeAnnotation(v.toNode);
   if t = baseSchema.untyped then t := baseSchema.untypedAtomic; //????
   result := t.createValue(v.toString);
@@ -3661,7 +3661,7 @@ begin
       if collation = nil then
         collation := context.staticContext.nodeCollation;
       if (enum2.Current^.instanceOf(baseSchema.anyAtomicType)) or
-         (((enum1.Current^ is TXQValueNode) or (enum2.Current^ is TXQValueNode))
+         (((enum1.Current^.kind = pvkNode) or (enum2.Current^.kind = pvkNode))
             and not enum1.Current^.toNode.isDeepEqual(enum2.Current^.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
         exit(false);
     end;

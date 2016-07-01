@@ -1069,7 +1069,7 @@ var sep: string;
 begin
   requiredArgCount(args, 0, 1);
   if length(args) = 1 then sep := args[0].toString;
-  if (context.SeqValue <> nil) and (context.SeqValue is TXQValueNode) then begin
+  if (context.SeqValue <> nil) and (context.SeqValue.kind = pvkNode) then begin
 //    raise EXQEvaluationException.Create('deep-text() needs a node, but context item is atomic value');
     result := xqvalue(treeElementAsString(context.SeqValue.toNode,sep));
   end else if context.ParentElement <> nil then //TODO: why doesn't it read textelement?
@@ -2928,7 +2928,7 @@ begin
        and ((args[0].typeAnnotation = baseSchema.duration) or not (args[0].instanceOf(baseSchema.duration)))
        and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
       raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
-    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result.toDecimal);
+    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result.toDecimal);
     exit();
   end;
 
@@ -3002,7 +3002,7 @@ begin
   if i = 1 then begin
     result := args[0];
     xqvalueSeqSqueeze(result);
-    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result)
+    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result)
     else begin
       kind := result.kind;
       if not (kind in [pvkInt64, pvkBigDecimal, pvkFloat])
@@ -3066,7 +3066,7 @@ begin
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
     if result is TXQValueSequence then result := args[0].get(1);
-    if (result.instanceOf(baseSchema.untypedAtomic)) or (result is TXQValueNode) then result := baseSchema.double.createValue(result);
+    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result);
     kind := result.kind;
     if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))
        or ((kind = pvkDateTime) and (result.typeAnnotation as TXSDateTimeType).isDuration and ( not result.instanceOf(baseSchema.yearMonthDuration)) and (not result.instanceOf(baseSchema.dayTimeDuration)))
