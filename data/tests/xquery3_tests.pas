@@ -127,6 +127,8 @@ begin
 
   m('declare namespace t = "foobar"; let $abc := "t:localName" return xs:QName($abc)', 't:localName');
 
+  m('<a omg="{function($foo:huh){10 + $foo:huh}(12)}" xmlns:foo="123"/> / @omg', '22');
+
   t('switch (10) case 10 return "a" case 20 return "b" default return "c"', 'a');
   t('switch (20) case 10 return "a" case 20 return "b" default return "c"', 'b');
   t('switch (30) case 10 return "a" case 20 return "b" default return "c"', 'c');

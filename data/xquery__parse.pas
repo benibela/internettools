@@ -1910,7 +1910,6 @@ end;
 
 function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean): TXQTermDefineFunction;
 var
-  tempVar: TXQTermDefineVariable;
   i: Integer;
 begin
   try
@@ -1922,14 +1921,7 @@ begin
     end else require3('Anonymous functions need XPath/XQuery 3');
     skipWhitespaceAndComment();
     while nextToken(true) <> ')' do begin
-      tempVar := parseDefineVariable;
-      //since functions can only be defined in the module declarations, all static namespaces are known here todo: this is nonsense for anonymous
-      if not (tempVar.variable is TXQTermVariable) then
-        tempVar.variable := (tempVar.variable as TXQTermPendingEQNameToken).resolveAndFree(staticContext) as TXQTermVariable;
-      result.push(tempVar);
-      for i := 0 to high(Result.children) - 1 do
-        if TXQTermVariable(TXQTermDefineVariable(Result.children[i]).variable).equalsVariable(TXQTermVariable(tempVar.variable)) then
-          raiseParsingError('XQST0039', 'Duplicate variable name: '+tempVar.ToString);
+      result.push(parseDefineVariable);
       skipWhitespaceAndComment();
       if not (pos^ in [',', ')']) then raiseParsingError('XPST0003', 'Missing , or )');
       if pos^ = ',' then pos+=1;
@@ -2836,6 +2828,18 @@ begin
   end;
 end;
 
+procedure resolveFunctionParams(f: TXQTermDefineFunction; sc: TXQStaticContext);
+var
+  i, m: Integer;
+begin
+  m := f.parameterCount;
+  if m >= length(f.children) then m := length(f.children);
+  for i := 0 to m - 1 do
+    if (f.children[i] is TXQTermDefineVariable) and (TXQTermDefineVariable(f.children[i]).variable is TXQTermPendingEQNameToken) then
+      TXQTermDefineVariable(f.children[i]).variable := (TXQTermPendingEQNameToken(TXQTermDefineVariable(f.children[i]).variable)).resolveAndFree(sc) as TXQTermVariable;;
+
+end;
+
 procedure initializeFunctions(module: TXQTermModule; var context: TXQEvaluationContext);
 var
   i: Integer;
@@ -2857,6 +2861,7 @@ begin
   functionCount := oldFunctionCount;
   for i:=0 to high(children) - 1 do
     if children[i] is TXQTermDefineFunction then begin
+      resolveFunctionParams(TXQTermDefineFunction(children[i]),context.staticContext);
       functions[functionCount] := TXQTermDefineFunction(children[i]).define(context, true);
       if functions[functionCount].body = nil then begin
         if not assigned(staticContext.sender.OnDeclareExternalFunction) then raise EXQParsingException.create('XPDY0002', 'External function declared, but no callback registered to OnDeclareExternalFunction.');
@@ -4067,9 +4072,23 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   procedure visitDefineFunction(f: TXQTermDefineFunction);
 
+  var
+    i, j: Integer;
   begin
     if f.name is TXQEQNameUnresolved then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
     visitAnnotations(f.annotations, true, f.name = nil);
+    if f.kind = xqtdfUserDefined then begin
+      resolveFunctionParams(f,staticContext);
+      for i := 0 to f.parameterCount - 1 do begin
+        if not (f.children[i] is TXQTermDefineVariable) then continue;
+        for j := i + 1 to f.parameterCount - 1 do begin
+          if not (f.children[j] is TXQTermDefineVariable) then continue;
+          if TXQTermVariable(TXQTermDefineVariable(f.children[i]).variable).equalsVariable(TXQTermVariable(TXQTermDefineVariable(f.children[j]).variable)) then
+            raiseParsingError('XQST0039', 'Duplicate variable name: '+TXQTermDefineVariable(f.children[i]).variable.ToString);
+        end;
+      end;
+    end;
+
    // if f.kind <> xqtdfUserDefined then
    //   lookupNamedFunction(f.children[high(f.children)] as TXQTermNamedFunction);
   end;
