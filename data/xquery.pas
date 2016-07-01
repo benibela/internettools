@@ -5271,13 +5271,14 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
     term.raiseEvaluationError(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
   end;
 
-var
-  i: Integer;
-  seq: TXQVList;
-begin
-  if typ = nil then exit;
-  if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
-  case result.getSequenceCount of
+  procedure convert;
+  var
+    i: Integer;
+    seq: TXQVList;
+    temp: IXQValue;
+    p: PIXQValue;
+  begin
+    case result.getSequenceCount of
     0:  if not typ.allowNone then term.raiseTypeError0004('Expected value, but got empty sequence.')
         else exit;
     1: ; //later
@@ -5290,12 +5291,20 @@ begin
         result := conversionSingle(result);
         exit;
       end;
-      seq := (result as TXQValueSequence).seq;
-      for i := 0 to seq.Count - 1 do
-        seq[i] := conversionSingle(seq[i]);
+      temp := result;
+      seq := TXQVList.create(temp.getSequenceCount);
+      result := TXQValueSequence.create(seq);
+      for p in temp.GetEnumeratorPtrUnsafe do
+        seq.add(conversionSingle(p^));
     end;
     tikNone, tikElementTest: term.raiseTypeError0004('Expected '+typ.serialize, result);
   end;
+  end;
+
+begin
+  if typ = nil then exit;
+  if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
+  convert;
 end;
 
 class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean;

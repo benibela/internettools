@@ -139,6 +139,8 @@ begin
 
   f('for $f in ((1,2,3) ! function(){.}) return "a" ! $f()', 'err:XPDY0002');
 
+  t('let $a := (xs:int(1),xs:int(2)), $prev := $a[1] instance of xs:int, $conv := function($b) as xs:double+{ $b }, $c := $conv($a) return ($prev, $a[1] instance of xs:int, $c[1] instance of xs:int) ', 'true true false');
+
   //closures
   t('(let $x := 17, $f := function ($y) { $x} return $f)(10)', '17');
   t('(let $x := 17, $f := function ($y) { $y } return $f)(10)', '10');
