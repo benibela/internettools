@@ -97,12 +97,13 @@ var
 //var  time: TDateTime;
 var tempb: Boolean;
   tt: String;
-  j: Integer;
+  j, k: Integer;
   baseboundary: String;
   func: String;
   untypedAtomic: String;
   xqv,xqw: IXQValue;
   randomboundary: String;
+  iterator, iterator2: TXQValueEnumeratorPtrUnsafe;
 begin
   i := 0;
 //  time := Now;
@@ -4182,6 +4183,18 @@ begin
   equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{$abc}{0}b')).evaluate().toString, 'aalphabet0b', 'xstring0');
   equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{1+2+3}b')).evaluate().toString, 'a6b', 'xstring1');
   equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{concat("x","y","z")}b')).evaluate().toString, 'axyzb', 'xstring2');
+
+  for i := 1 to 5 do begin
+    xqv := query('1 to $_1', [xqvalue(i)]);
+    for j := 1 to i do begin
+      iterator := xqv.GetEnumeratorPtrUnsafe;
+      iterator2 := xqv.GetEnumeratorPtrUnsafe;
+      iterator.MoveMany(j);
+      for k := 1 to j do iterator2.MoveNext;
+      if iterator.Current^ <> iterator2.Current^ then raise Exception.create(format('many fail: %i %i %i', [i,j,k]));
+    end;
+
+  end;
 
 
   writeln('XPath 2: ', i, ' completed');

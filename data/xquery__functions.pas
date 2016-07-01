@@ -613,14 +613,20 @@ begin
   cxt.staticContext.compareGeneral(a,b,result,1,0);
 end;
 
-function xqvalueToSingleNode(v: IXQValue): TTreeNode;
+function xqvalueToSingleNode(const v: IXQValue): TTreeNode;
+  function recurse: TTreeNode;
+  begin
+    result := xqvalueToSingleNode(v.get(1));
+  end;
+
 var
   k: TXQValueKind;
 begin
   k := v.kind;
-  if k = pvkNode then exit(v.toNode)
-  else if (k = pvkSequence) and (v.getSequenceCount=1) and ((v as TXQValueSequence).seq[0].kind = pvkNode) then exit((v as TXQValueSequence).seq[0].toNode)
-  else raise EXQEvaluationException.Create('XPTY0020', 'Expected node, got: '+v.debugAsStringWithTypeAnnotation());
+  if k = pvkNode then exit(v.toNode);
+  if (k = pvkSequence) and (v.getSequenceCount=1) then
+    exit(recurse); //split so we do not get an temporary ixqvalue in the main function
+  raiseXQEvaluationError('XPTY0020', 'Expected node', v);
 end;
 
 function xqvalueSameNode(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -2788,6 +2794,7 @@ var from,len,oldlen: Integer;
  i: Integer;
  resseq: TXQValueSequence;
  resseqseq, oldseqseq: TXQVList;
+ iterator: TXQValueEnumeratorPtrUnsafe;
 begin
   requiredArgCount(args,2,3);
   case args[0].kind of
@@ -2796,7 +2803,6 @@ begin
     else oldlen := 1;
   end;
   xpathRangeDefinition(args,oldlen,from,len);
-  from-=1;
 
   if len <= 0 then exit(xqvalue);
 
@@ -2804,14 +2810,14 @@ begin
     exit(args[0]);
 
   if len = 1 then
-    exit((args[0] as TXQValueSequence).seq[from]);
+    exit(args[0].get(from));
 
-  oldseqseq := (args[0] as TXQValueSequence).seq;
   resseq := TXQValueSequence.create(0);
   resseqseq := resseq.seq;
   TXQVListBreaker(resseqseq).setCount(len);
-  for i := from to from + len - 1 do
-    TXQVListBreaker(resseqseq).fbuffer[i - from] := oldseqseq[i];
+  iterator := args[0].GetEnumeratorPtrUnsafe;
+  if iterator.MoveMany(from - 1) then
+    iterator.CopyBlock(TXQVListBreaker(resseqseq).fbuffer, len);
   result := resseq;
 end;
 

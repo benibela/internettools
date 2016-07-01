@@ -97,7 +97,9 @@ type
     class procedure makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe); static;
   public
     function MoveNext: Boolean; inline;
+    function MoveMany(count: sizeint): Boolean;
     procedure CopyBlock(target: PIXQValue); //**< Copies all XQValue to the destination buffer and increases their ref count. For maximal performance, there is no check that the buffer is large enough
+    procedure CopyBlock(target: PIXQValue; count: SizeInt); //**< Copies count XQValue to the destination buffer and increases their ref count.
     property Current: PIXQValue read FCurrent;
     function GetEnumerator: TXQValueEnumeratorPtrUnsafe;
   end;
@@ -2970,6 +2972,8 @@ function urlHexDecode(s: string): string; deprecated 'for internal use';
 procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
 procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
 procedure raiseFOTY0013TypeError(const v: IXQValue);
+//Raises an error with an value in the string. String manipulation slows down the entire function, even if the branch is not taking, we should avoid it in functions
+procedure raiseXQEvaluationError(const code, s: string; const data: IXQValue);
 var
   XQDefaultDecimalFormat: TXQDecimalFormatPropertyData = (
     chars: (ord('.'), ord(','), ord('-'), ord('%'), $2030, ord('0'), ord('#'), ord(';'), ord('e') );
@@ -3853,6 +3857,14 @@ procedure raiseFOTY0013TypeError(const v: IXQValue);
 begin
   raise EXQEvaluationException.create('FOTY0013', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to atomic value');
 end;
+procedure raiseXQEvaluationError(const code, s: string; const data: IXQValue);
+var
+  t: String;
+begin
+  t := s;
+  if data <> nil then t += ' ; got: ' + data.debugAsStringWithTypeAnnotation();
+  raise EXQEvaluationException.create(code, t);
+end;
 procedure raiseInternalError(const s: string);
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error: ' + s);
@@ -4566,6 +4578,25 @@ begin
   end;
 end;
 
+function TXQValueEnumeratorPtrUnsafe.MoveMany(count: sizeint): Boolean;
+var
+  size: Integer;
+begin
+  result := true;
+  while count > 0 do begin
+    result := MoveNext;
+    if not result then exit;
+    dec(count);
+    if fcurrent + count > flast then begin
+      count -= (flast - fcurrent) div sizeof(IXQValue);
+      fcurrent := flast;
+    end else begin
+      fcurrent += count;
+      count := 0;
+    end;
+  end;
+end;
+
 procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue);
 var
   size: SizeInt;
@@ -4579,6 +4610,26 @@ begin
       target^._AddRef;
       inc(target);
     end;
+    fcurrent := flast;
+  end;
+end;
+
+procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue; count: SizeInt);
+var
+  size, maxsize: SizeInt;
+  endtarget: Pointer;
+begin
+  maxsize := count * sizeof(IXQValue);
+  while MoveNext and (maxsize > 0) do begin
+    size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
+    if size > maxsize then size := maxsize;
+    move(fcurrent^, target^, size  );
+    endtarget := pointer(target) + size;
+    while target < endtarget do begin
+      target^._AddRef;
+      inc(target);
+    end;
+    maxsize -= size;
     fcurrent := flast;
   end;
 end;
@@ -5235,7 +5286,7 @@ begin
   end;
   case typ.kind of
     tikAtomic, tikFunctionTest: begin
-      if not (result is TXQValueSequence) then begin
+      if result.kind <> pvkSequence then begin
         result := conversionSingle(result);
         exit;
       end;
