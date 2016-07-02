@@ -949,6 +949,8 @@ begin
   t('string-join(insert-before(("a", "b", "c"), 5, ("x","y","z")), ",")', 'a,b,c,x,y,z', '');
   t('string-join(remove(("a", "b", "c"), 0), ",")', 'a,b,c', '');
   t('string-join(remove(("a", "b", "c"), 1), ",")', 'b,c', '');
+  t('string-join(remove(("a", "b", "c"), 2), ",")', 'a,c', '');
+  t('string-join(remove(("a", "b", "c"), 3), ",")', 'a,b', '');
   t('string-join(remove(("a", "b", "c"), 6), ",")', 'a,b,c', '');
   t('string-join(remove((), 3), ",")', '', '');
   t('string-join(remove("a", 3), ",")', 'a', '');

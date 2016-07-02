@@ -2609,6 +2609,7 @@ public
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
   function xqvalueSeqSqueezed(l: TXQVList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
+  procedure xqvalueSeqSqueezed(var result: IXQValue; l: TXQVList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
   //** Adds a value to an implicit sequence list in result, i.e. you call it multiple times and the result becomes a sequence of all the add values.  @br
   //** For the first call result and seq must be nil. @br
   //** The point is that it only creates a sequence if there are multiple values, and it is especially fast, if you do not expect multiple values.
@@ -4631,13 +4632,15 @@ begin
   end;
 end;
 
+//The iterator will copy from the element after current
+//After the copying current will be the last copied element
 procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue; count: SizeInt);
 var
   size, maxsize: SizeInt;
   endtarget: Pointer;
 begin
   maxsize := count * sizeof(IXQValue);
-  while MoveNext and (maxsize > 0) do begin
+  while (maxsize > 0) and MoveNext  do begin
     size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
     if size > maxsize then size := maxsize;
     move(fcurrent^, target^, size  );
@@ -4647,7 +4650,7 @@ begin
       inc(target);
     end;
     maxsize -= size;
-    fcurrent := flast;
+    fcurrent := pointer(fcurrent) + size - sizeof(IXQValue) ;
   end;
 end;
 
@@ -5058,6 +5061,19 @@ begin
     0: result := xqvalue();
     1: result := l[0];
     else exit(TXQValueSequence.create(l));
+  end;
+  l.free;
+end;
+
+procedure xqvalueSeqSqueezed(var result: IXQValue; l: TXQVList);
+begin
+  case l.Count of
+    0: result := xqvalue();
+    1: result := l[0];
+    else begin
+      result := TXQValueSequence.create(l);
+      exit;
+    end;
   end;
   l.free;
 end;

@@ -2775,41 +2775,47 @@ end;
 
 function xqFunctionRemove(const args: TXQVArray): IXQValue;
 var
- i, j: Integer;
- oldseq, resseq: TXQValueSequence;
+ i, count: Integer;
+ iterator: TXQValueEnumeratorPtrUnsafe;
+ list: TXQVListBreaker;
 begin
   requiredArgCount(args,2);
-  i := args[1].toInt64 -1;
-  if (args[0].kind <> pvkSequence) then begin
-    if i <> 0 then exit(args[0]);
-    exit(xqvalue);
-  end;
+  i := args[1].toInt64;
+  if (args[0].kind <> pvkSequence) then
+    if i <> 1 then exit(args[0])
+    else exit(xqvalue);
 
-  if (i < 0) or (i >= args[0].getSequenceCount) then
+  count := args[0].getSequenceCount;
+  if (i < 1) or (i > count) then
     exit(args[0]);
-  oldseq := args[0] as TXQValueSequence;;
-  resseq := TXQValueSequence.create(args[0].getSequenceCount-1);
-  for j := 0 to oldseq.seq.count - 1 do
-    if j <> i then
-      resseq.seq.add(oldseq.seq[j]);
 
-  result := resseq;
-  xqvalueSeqSqueeze(result);
+  dec(i);
+
+  list := TXQVListBreaker(TXQVList.create);
+  list.setCount(count - 1);
+  iterator := args[0].GetEnumeratorPtrUnsafe;
+  iterator.CopyBlock(list.fbuffer, i );
+  if iterator.MoveNext then
+    iterator.CopyBlock(@list.fbuffer[i], count - i - 1 );
+  xqvalueSeqSqueezed(result, list);
 end;
 
 function xqFunctionreverse(const args: TXQVArray): IXQValue;
+var
+  list: TXQVList;
 begin
   requiredArgCount(args,1);
-  if args[0].kind <> pvkSequence then exit(args[0]);
-  result := args[0].clone;
-  (result as TXQValueSequence).seq.revert;
+  if (args[0].kind <> pvkSequence) or (args[0].getSequenceCount < 2) then exit(args[0]);
+  list := TXQVList.create();
+  list.add(args[0]);
+  list.revert;
+  result := TXQValueSequence.create(list);
 end;
 
 function xqFunctionsubsequence(const args: TXQVArray): IXQValue;
 var from,len,oldlen: Integer;
- i: Integer;
  resseq: TXQValueSequence;
- resseqseq, oldseqseq: TXQVList;
+ resseqseq: TXQVList;
  iterator: TXQValueEnumeratorPtrUnsafe;
 begin
   requiredArgCount(args,2,3);
@@ -2883,27 +2889,28 @@ begin
   result := xqvalue(args[0].getSequenceCount);
 end;
 
-function castUntypedToDouble(const v: IXQValue): IXQValue;
+function castUntypedToDouble(const v: IXQValue): IXQValue; //for sum,min,max
 var x: PIXQValue;
   found: Boolean;
-  resseq: TXQVList;
+  list: TXQVList;
 begin
   found := false;
   for x in v.GetEnumeratorPtrUnsafe do begin
-    if (x^.instanceOf(baseSchema.untypedAtomic)) or (x^.kind = pvkNode) or (x^.instanceOf(baseSchema.untyped)) then begin
+    if x^.instanceOf(baseSchema.untypedOrNodeUnion) then begin
       found := true;
       break;
     end;
   end;
   if not found then exit(v);
 
-  result := TXQValueSequence.create(v.getSequenceCount);
-  resseq := (result as TXQValueSequence).seq;;
+  list := TXQVList.create(v.getSequenceCount);
+  result := TXQValueSequence.create(list); //in case of exceptions
   for x in v.GetEnumeratorPtrUnsafe do
-    if (x^.instanceOf(baseSchema.untypedAtomic)) or (x^.kind = pvkNode) or (x^.instanceOf(baseSchema.untyped)) then
-      resseq.add(baseSchema.double.createValue(x^))
+    if x^.instanceOf(baseSchema.untypedOrNodeUnion) then
+      list.add(baseSchema.double.createValue(x^))
      else
-      resseq.add(x^);
+      list.add(x^);
+  xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionProduct(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
