@@ -139,6 +139,10 @@ begin
   end;
 end;
 
+function xqvalueAddDecimals(const a, b: IXQValue): IXQValue;
+begin
+  result := xqvalue(a.toDecimal + b.toDecimal);
+end;
 
 //** Perform vinary operations on xqvalue and destroys them.
 //** Assumes @a <> @b
@@ -163,7 +167,7 @@ begin
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
-    exit(xqvalue(a.toDecimal + b.toDecimal));
+    exit(xqvalueAddDecimals(a,b));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
@@ -191,16 +195,44 @@ begin
   end else} result := xqvalueF(af + bf, a, b)
 end;
 
+function xqvalueSubtractDecimals(const a, b: IXQValue): IXQValue;
+begin
+  result := xqvalue(a.toDecimal - b.toDecimal);
+end;
+
+function xqvalueSubtractDates(const cxt: TXQEvaluationContext; const a, b: IXQValue): ixqvalue;
+var
+  xqtempdt: TXQValueDateTime;
+  adatevalue, bdatevalue: PXQValueDateTimeData;
+  ai: Int64;
+begin
+  if not (b.typeAnnotation as TXSDateTimeType).isDuration then begin
+    if (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
+    adatevalue := a.getInternalDateTimeData;
+    ai := adatevalue^.toMicroSecondStamp();
+    if (adatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
+    bdatevalue := b.getInternalDateTimeData;
+    ai -= bdatevalue^.toMicroSecondStamp();
+    if (bdatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
+
+    xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration);//, abs(tempdt));
+    xqtempdt.value.year:=0;
+    xqtempdt.value.month:=0;
+    xqtempdt.value.day := xqtempdt.value.initFromMicroSecondStampTimeOnly(abs(ai));
+    if ai < 0 then TXQValueDateTimeBreaker(xqtempdt).multiplyComponents(-1);
+  end else begin
+    xqtempdt := TXQValueDateTime.create(a.typeAnnotation, a.getInternalDateTimeData^);
+    TXQValueDateTimeBreaker(xqtempdt).subtractDuration(b.getInternalDateTimeData^);
+  end;
+  exit(xqtempdt);
+end;
+
 function xqvalueSubtract(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var
   ak, bk: TXQValueKind;
   ad, bd: xqfloat;
-  xqtempdt: TXQValueDateTime;
-  btemp: IXQValue;
   ai: Int64;
   bi: Int64;
-  adatevalue: PXQValueDateTimeData;
-  bdatevalue: PXQValueDateTimeData;
 begin
   ignore(cxt);
 
@@ -216,7 +248,7 @@ begin
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
-    exit(xqvalue(a.toDecimal - b.toDecimal));
+    exit(xqvalueSubtractDecimals(a,b));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
@@ -224,28 +256,7 @@ begin
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
-    if not (b.typeAnnotation as TXSDateTimeType).isDuration then begin
-      if (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
-      adatevalue := a.getInternalDateTimeData;
-      ai := adatevalue^.toMicroSecondStamp();
-      if (adatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
-      bdatevalue := b.getInternalDateTimeData;
-      ai -= bdatevalue^.toMicroSecondStamp();
-      if (bdatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
-
-      xqtempdt := TXQValueDateTime.create(baseSchema.dayTimeDuration);//, abs(tempdt));
-      xqtempdt.value.year:=0;
-      xqtempdt.value.month:=0;
-      xqtempdt.value.day := xqtempdt.value.initFromMicroSecondStampTimeOnly(abs(ai));
-      if ai < 0 then TXQValueDateTimeBreaker(xqtempdt).multiplyComponents(-1);
-      exit(xqtempdt);
-    end else begin
-      btemp := b.clone; //need to keep reference to the clone
-      TXQValueDateTimeBreaker(btemp as TXQValueDateTime).multiplyComponents(-1);
-      result := a.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(btemp.getInternalDateTimeData^);
-    end;
-    exit;
+    exit(xqvalueSubtractDates(cxt,a,b));
   end;
 
   ad := a.toFloat; bd := b.toFloat;
@@ -301,6 +312,11 @@ begin
   result := resseq;
 end;
 
+function xqvalueMultiplyDecimals(const a, b: IXQValue): IXQValue;
+begin
+  result := xqvalue(a.toDecimal * b.toDecimal);
+end;
+
 function xqvalueMultiply(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var
   ak, bk: TXQValueKind;
@@ -320,7 +336,7 @@ begin
   end;
 
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
-    exit(xqvalue(a.toDecimal * b.toDecimal));
+    exit(xqvalueMultiplyDecimals(a,b));
 
   if (ak = pvkNull) or (bk = pvkNull) then
     raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');

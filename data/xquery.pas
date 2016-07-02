@@ -668,6 +668,7 @@ type
     procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure divideComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
+    procedure subtractDuration(D: TXQValueDateTimeData);
     class procedure addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 
     //**A duration can be represented as an integer ("months" = 12 * year + months and "dayTime" = "dayTime" = time since midnight in microseconds)

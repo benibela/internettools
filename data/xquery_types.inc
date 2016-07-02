@@ -1195,6 +1195,21 @@ begin
   truncateRange;
 end;
 
+procedure TXQValueDateTime.subtractDuration(D: TXQValueDateTimeData);
+var temp: TXQValueDateTimeData;
+  i: Integer;
+begin
+  if (typeAnnotation as TXSDateTimeType).isDuration then begin
+    setMonths(value, value.toMonths - D.toMonths, true);
+    setDayTime(value, value.toDayTime - d.toDayTime);
+  end else begin
+    for i := 1 to 7 do D.values[i] := -D.values[i];
+    addDurationDToDateS(value, D, temp);
+    value := temp;
+  end;
+  truncateRange;
+end;
+
 class procedure TXQValueDateTime.addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 begin
   E.timezone:=S.timezone;
