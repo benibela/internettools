@@ -468,8 +468,14 @@ end;
 
 procedure TLogger.printResults(var f: textfile; const r: TResultSet; addition: string = '');
 const cols = 4;
+  function p(i: integer): string;
+  begin
+    if i = 0 then exit('_');
+    str(i,result);
+  end;
+
 begin
-  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', r[tcrFail]:cols, '  Wrong error: ', r[tcrWrongError]:cols, '  N/A: ', r[tcrNA]:cols, '  Skipped: ', (r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols, addition );
+  writeln(f, 'Passed: ', r[tcrPass]:cols, '  Failed: ', p(r[tcrFail]):cols, '  Wrong error: ', p(r[tcrWrongError]):cols, '  N/A: ', p(r[tcrNA]):cols, '  Skipped: ', p(r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]):cols, addition );
 end;
 
 constructor TLogger.create(clr: TCommandLineReader);
