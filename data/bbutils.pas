@@ -2473,12 +2473,17 @@ begin
 end;
 
 function strlsiEqual(const p1, p2: pansichar; const l: longint): boolean;
-var i:integer;
+var i, c1, c2:integer;
 begin
   result := true;
-  for i:=0 to l-1 do
-    if upcase(p1[i])<>upCase(p2[i]) then
-      begin result := false; exit; end;
+  for i := 0 to l-1 do
+      if p1[i] <> p2[i] then begin
+        c1 := ord(p1[i]);
+        c2 := ord(p2[i]);
+        if c1 in [97..122] then dec(c1, 32);
+        if c2 in [97..122] then dec(c2, 32);
+        if c1 <> c2 then exit(false);
+      end;
 end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
