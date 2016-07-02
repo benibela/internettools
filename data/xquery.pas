@@ -1763,6 +1763,12 @@ type
     procedure addToQueryList(var path: TXQPathMatching); override;
   end;
 
+  TXQTermSimpleMap = class(TXQTermWithChildren)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function debugTermToString: string; override;
+    function getContextDependencies: TXQContextDependencies; override;
+  end;
+
   { TXQTermFlower }
   TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount, xqtfcGroup);
   TXQTermFlowerSubClause = class(TXQTerm)
@@ -3018,6 +3024,7 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
 
 
 constructor TXQMapStringObject.Create;

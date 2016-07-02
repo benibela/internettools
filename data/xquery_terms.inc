@@ -2727,51 +2727,12 @@ begin
 end;
 
 function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
-  function evaluateSimpleMap: IXQValue;
-  var
-    seq, oldContextItem: IXQValue;
-    list: TXQVList;
-    pe: TTreeNode;
-    oldSeqIndex, oldSeqLength: integer;
-    pv: PIXQValue;
-  begin
-    seq := children[0].evaluate(context);
-    pe := context.ParentElement; //todo: this is irrelevant?
-    context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
-    context.ParentElement := nil;
-    context.SeqIndex := 1;
-    context.SeqLength := seq.getSequenceCount;
-    list := TXQVList.create(context.SeqLength);
-    context.SeqValue := nil;
-    try
-      try
-        for pv in seq.GetEnumeratorPtrUnsafe do begin
-          xqvalueMoveNoRefCount(pv^, context.SeqValue);
-          list.add(children[1].evaluate(context));
-          context.SeqIndex += 1;
-        end;
-        result := xqvalueSeqSqueezed(list);
-      except
-        list.free;
-        raise;
-      end;
-    finally
-      xqvalueVaporize(context.SeqValue);
-      context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
-      context.ParentElement := pe;
-    end;
-  end;
 
 var evilkids: array[0..1] of IXQValue;
   i: Integer;
 begin
-  //if length(children)<2 then raiseEvaluationError('XPST0003', 'Not enough subterms');
-  //if length(children)>2 then raiseEvaluationError('XPST0003', 'Too many subterms');
-
-
   case op.name of
     '/', '//': exit(TXQueryEngine.evaluateAccessList(self, context));
-    '!': exit(evaluateSimpleMap);
   end;
 
 
@@ -2848,7 +2809,55 @@ begin
   end;
 end;
 
-{ TXQTermNodeMatcher }
+
+
+function TXQTermSimpleMap.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  seq, oldContextItem: IXQValue;
+  list: TXQVList;
+  pe: TTreeNode;
+  oldSeqIndex, oldSeqLength: integer;
+  pv: PIXQValue;
+begin
+  seq := children[0].evaluate(context);
+  pe := context.ParentElement; //todo: this is irrelevant?
+  context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+  context.ParentElement := nil;
+  context.SeqIndex := 1;
+  context.SeqLength := seq.getSequenceCount;
+  list := TXQVList.create(context.SeqLength);
+  context.SeqValue := nil;
+  try
+    try
+      for pv in seq.GetEnumeratorPtrUnsafe do begin
+        xqvalueMoveNoRefCount(pv^, context.SeqValue);
+        list.add(children[1].evaluate(context));
+        context.SeqIndex += 1;
+      end;
+      result := xqvalueSeqSqueezed(list);
+    except
+      list.free;
+      raise;
+    end;
+  finally
+    xqvalueVaporize(context.SeqValue);
+    context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
+    context.ParentElement := pe;
+  end;
+end;
+
+
+function TXQTermSimpleMap.debugTermToString: string;
+begin
+  Result:='(' + children[0].debugTermToString() + ' ! ' + children[1].debugTermToString + ')';
+end;
+
+function TXQTermSimpleMap.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=children[0].getContextDependencies +
+          ( children[1].getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast] );
+end;
+
 
 constructor TXQTermNodeMatcher.Create;
 begin

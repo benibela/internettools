@@ -4124,7 +4124,15 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       result := TXQTermIf.createLogicOperation(b.op.func = @xqvalueOrPlaceholder, b.children[0], b.children[1]);
       b.children := nil;
       b.free;
-    end else result := b;
+    end else case b.op.name of
+      '!': begin
+        result := TXQTermSimpleMap.Create;
+        TXQTermSimpleMap(result).children := b.children;
+        b.children := nil;
+        b.free;
+      end;
+      else result := b;
+    end;
   end;
 
   procedure visitFlower(f: TXQTermFlower);
