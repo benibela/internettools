@@ -3941,9 +3941,6 @@ end;
 function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
   function transformValue(v: IXQValue): IXQValue;
   begin
-    if not context.staticContext.objectsRestrictedToJSONTypes then
-      exit(v);
-
     if v.getSequenceCount = 0 then
       exit(TXQValueJSONNull.create());
     if v is TXQValueSequence then
@@ -3960,11 +3957,16 @@ function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext
 var
   obj: TXQValueObject;
   i: Integer;
+  v: IXQValue;
 begin
   obj := TXQValueObject.create();
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
-  for i := 0 to length(children) div 2 - 1 do
-    obj.setMutable(children[i*2].evaluate(context).toString, transformValue(children[i*2+1].evaluate(context)));   //todo: empty sequence becomes null, sequence becomes array
+  for i := 0 to length(children) div 2 - 1 do begin
+    v := children[i*2+1].evaluate(context);
+    if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then continue;
+    if context.staticContext.objectsRestrictedToJSONTypes then v := transformValue(v);
+    obj.setMutable(children[i*2].evaluate(context).toString, v);
+  end;
   result := obj;
 end;
 

@@ -2710,6 +2710,9 @@ begin
     t('serialize-json({"Sunday" : 1,     "Monday" : 1 + 1,    "Tuesday" : 3 * 1,    "Wednesday" : 8 div 2,    "Thursday" : 5,   "Friday" : count(for $i in 1 to 6 return $i),           "Saturday": 10 - 3 })','{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
 
 
+    t('serialize-json( {"a" ?: 123, "b" ?: (), "c" ?: (4,5) } )', '{"a": 123, "c": [4, 5]}');
+    t('serialize-json( {"a" ?: () } )', '{}');
+
     t('serialize-json({|  |})', '{}');
     t('serialize-json({| {}, {}, {} |})', '{}');
     t('serialize-json({| {"a": 123} |})', '{"a": 123}');

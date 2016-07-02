@@ -2165,6 +2165,8 @@ function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermWithChildren;
 var
   token: String;
   jn: TXQNativeModule;
+  optional: Boolean;
+  resobj: TXQTermJSONObjectConstructor;
 begin
   //expect('{'); parsed by caller
   if pos^ = '|' then begin
@@ -2178,16 +2180,24 @@ begin
     expect('}');
     exit;
   end;
-  result := TXQTermJSONObjectConstructor.create();
+  resobj := TXQTermJSONObjectConstructor.create();
+  result := resobj;
   try
     skipWhitespaceAndComment();
     if pos^ = '}' then begin expect('}'); exit;end;
     repeat
       result.push(parse);
-      expect(':');
+      skipWhitespaceAndComment();
+      optional := pos^ = '?';
+      if optional then expect('?:')
+      else expect(':');
       //if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString); //removed as json-iq allows variables there
       skipWhitespaceAndComment();
       result.push(parse);
+      if optional then begin
+        SetLength(resobj.optionals, length(resobj.children) div 2);
+        resobj.optionals[high(resobj.optionals)] := true;
+      end;
       token := nextToken();
     until (token <> ',');
     if token <> '}' then raiseParsingError('pxp:OBJ', 'Expected "}" or ",", but got '+token);
@@ -2718,7 +2728,7 @@ begin
     while true do begin
       word := nextToken(true);
       case word of
-        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'group', 'collation', 'case', 'default', 'count':
+        '', ',', ';', ':', '?', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'group', 'collation', 'case', 'default', 'count':
           exit(astroot);
         '[': begin
           expect('[');

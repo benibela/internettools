@@ -1989,6 +1989,7 @@ type
   { TXQTermJSONObjectConstructor }
 
   TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
+    optionals: array of boolean;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
