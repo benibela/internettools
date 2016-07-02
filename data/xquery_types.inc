@@ -1410,6 +1410,7 @@ begin
   else result := 0;
 end;
 
+{$ImplicitExceptions off}
 function TXQValueSequence.toNode: TTreeNode;
 begin
   if seq.Count >= 1 then result := seq[0].toNode
@@ -1438,11 +1439,13 @@ begin
   Result:=seq.Count;
 end;
 
+
 function TXQValueSequence.get(i: integer): IXQValue;
 begin
   if (i < 1) or (i > seq.Count) then exit(xqvalue);
   exit(seq[i-1]);
 end;
+{$ImplicitExceptions on}
 
 function TXQValueSequence.GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin

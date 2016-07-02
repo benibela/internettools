@@ -5738,6 +5738,8 @@ begin
   if (i < 0) or (i >= fcount) then error;
 end;
 
+{$ImplicitExceptions off}
+
 procedure TXQVList.reserve(cap: integer);
 var
   oldcap: Integer;
@@ -5779,11 +5781,13 @@ begin
   fcapacity := c;
 end;
 
+
 constructor TXQVList.create(capacity: integer);
 begin
   reserve(capacity);
   fcount := 0;
 end;
+{$ImplicitExceptions on}
 
 destructor TXQVList.Destroy;
 begin
