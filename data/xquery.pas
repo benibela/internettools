@@ -2592,7 +2592,7 @@ public
   //                                   Variant
   //============================================================================
   //Returns a IXQValue containing the passed value
-  function xqvalue():IXQValue; inline; //**< Creates an undefined/empty-sequence IXQValue
+  function xqvalue():IXQValue; //**< Creates an undefined/empty-sequence IXQValue
   function xqvalue(const v: Boolean):IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalueTrue:IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalueFalse:IXQValue; inline; //**< Creates an boolean IXQValue
@@ -2608,8 +2608,7 @@ public
   function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
-  function xqvalueSeqSqueezed(l: TXQVList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
-  procedure xqvalueSeqSqueezed(var result: IXQValue; l: TXQVList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
+  procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
   //** Adds a value to an implicit sequence list in result, i.e. you call it multiple times and the result becomes a sequence of all the add values.  @br
   //** For the first call result and seq must be nil. @br
   //** The point is that it only creates a sequence if there are multiple values, and it is especially fast, if you do not expect multiple values.
@@ -5015,7 +5014,7 @@ begin
   list := TXQVList.create(sl.Count);
   for i:=0 to sl.Count - 1 do
     list.add(xqvalue(sl[i]));
-  result := xqvalueSeqSqueezed(list);
+  xqvalueSeqSqueezed(result, list)
 end;
 
 function xqvalue(const sl: array of string): IXQValue;
@@ -5054,18 +5053,7 @@ begin
   v := v.get(1);
 end;
 
-
-function xqvalueSeqSqueezed(l: TXQVList): IXQValue;
-begin
-  case l.Count of
-    0: result := xqvalue();
-    1: result := l[0];
-    else exit(TXQValueSequence.create(l));
-  end;
-  l.free;
-end;
-
-procedure xqvalueSeqSqueezed(var result: IXQValue; l: TXQVList);
+procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList);
 begin
   case l.Count of
     0: result := xqvalue();
@@ -6078,7 +6066,7 @@ begin
   for i:=0 to count - 1 do
     if (varstorage[i].name = name) and (equalNamespaces(varstorage[i].namespaceURL, namespaceURL)) then
       list.add(varstorage[i].value);
-  result := xqvalueSeqSqueezed(list);
+  xqvalueSeqSqueezed(result, list)
 end;
 
 procedure TXQVariableChangeLog.clear;

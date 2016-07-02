@@ -287,7 +287,7 @@ begin
   for v in obj.GetEnumeratorPtrUnsafe do
     if v^.kind = pvkObject then
        seq.add(v^.getProperty(propname));
-  result := xqvalueSeqSqueezed(seq);
+  xqvalueSeqSqueezed(result, seq)
 //  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
 //  result := (obj as TXQValueObject).getProperty(propname);
 end;
@@ -2668,7 +2668,7 @@ begin
         else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v^.debugAsStringWithTypeAnnotation());
       end;
     end;
-    result := xqvalueSeqSqueezed(resultSeq);
+    xqvalueSeqSqueezed(result, resultSeq);
     exit;
   end;
 
@@ -2687,8 +2687,7 @@ begin
       else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
         raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
     end;
-  result := xqvalueSeqSqueezed(resultSeq);
-
+  xqvalueSeqSqueezed(result, resultSeq)
 end;
 
 function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
@@ -2800,7 +2799,7 @@ begin
         list.add(children[1].evaluate(context));
         context.SeqIndex += 1;
       end;
-      result := xqvalueSeqSqueezed(list);
+      xqvalueSeqSqueezed(result, list)
     except
       list.free;
       raise;

@@ -2184,7 +2184,7 @@ begin
     list.free;
     raise;
   end;
-  result := xqvalueSeqSqueezed(list);
+  xqvalueSeqSqueezed(result, list)
 end;
 
 function patternMatcherParse(const context: TXQStaticContext; data: string): TXQTermPatternMatcher;

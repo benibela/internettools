@@ -335,7 +335,7 @@ begin
       for i := 0 to ara.seq.Count-1 do
         list.add(ara.seq[i]);
     end;
-  result := xqvalueSeqSqueezed(list);
+  xqvalueSeqSqueezed(result, list)
 end;
 
 function xqFunctionSize(const args: TXQVArray): IXQValue;

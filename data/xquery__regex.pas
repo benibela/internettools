@@ -847,7 +847,7 @@ begin
           lastMatchEnd := regex.MatchPos[0] + regex.MatchLen[0];
         until not regEx.ExecNext;
         list.add(xqvalue(strCopyFrom(input, lastMatchEnd)));
-        result := xqvalueSeqSqueezed(list);
+        xqvalueSeqSqueezed(result, list);
       end else result := xqvalue(input);
       {$ENDIF}
       {$IFDEF USE_FLRE}
@@ -859,7 +859,7 @@ begin
       for i := 0 to high(captures) - 1 do
         list.add(xqvalue(copy(input, captures[i][0].Start + captures[i][0].Length, captures[i+1][0].Start - captures[i][0].Start - captures[i][0].Length)));
       list.add(xqvalue(strCopyFrom(input, captures[high(captures)][0].Start + captures[high(captures)][0].Length)));
-      result := xqvalueSeqSqueezed(list);
+      xqvalueSeqSqueezed(result, list);
       {$ENDIF}
     except
       on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
