@@ -1759,14 +1759,22 @@ type
     function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;
-
-    procedure addToQueryList(var path: TXQPathMatching); override;
   end;
 
   TXQTermSimpleMap = class(TXQTermWithChildren)
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
+  end;
+
+  TXQTermMap = class(TXQTermWithChildren)
+    isDoubleSlash: Boolean;
+    constructor create(b: TXQTermBinaryOp);
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function debugTermToString: string; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    procedure addToQueryList(var path: TXQPathMatching); override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermFlower }
@@ -6824,9 +6832,13 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
     result := TXQTermConstant.Create(s);
   end;
 
-  function newBinOp(left: TXQTerm; op: string; right: TXQTerm): TXQTerm;
+  function newBinOp(left: TXQTerm; op: string; right: TXQTerm): TXQTermBinaryOp;
   begin
     result := TXQTermBinaryOp.Create(left, op, right);
+  end;
+  function newMap(left, right: TXQTerm): TXQTerm;
+  begin
+    result := TXQTermMap.create(newBinOp(left, '/', right));
   end;
 
   function newFunction(f: string; args: array of TXQTerm): TXQTerm;
@@ -6999,10 +7011,10 @@ var pos: pchar;
     begin
       if elementName <> '*' then begin
         if axis <> '' then result := TXQTermNodeMatcher.Create(axis + '::'+elementName)
-        else result := newBinOp(TXQTermNodeMatcher.Create('..'), '/', TXQTermNodeMatcher.Create(elementName));
+        else result := newMap(TXQTermNodeMatcher.Create('..'), TXQTermNodeMatcher.Create(elementName));
       end else begin
         if axis <> '' then axisTerm := TXQTermNodeMatcher.Create(axis+'::*')
-        else axisTerm := newBinOp(TXQTermNodeMatcher.Create('..'), '/', TXQTermNodeMatcher.Create('*'));
+        else axisTerm := newMap(TXQTermNodeMatcher.Create('..'), TXQTermNodeMatcher.Create('*'));
         result := TXQTermFlower.Create();
         TXQTermFlower(result).push(TXQTermFlowerFor.Create);
         with TXQTermFlowerFor(TXQTermFlower(result).children[high(TXQTermFlower(result).children)]) do begin
@@ -7036,9 +7048,8 @@ var pos: pchar;
         result := newBinOp(newString(nextToken),
                            '=', //is newFunction('lang', [TXQTermNodeMatcher.Create('.')]) better? didn't work through
                            TXQTermFilterSequence.Create(
-                                                  newBinOp(
+                                                  newMap(
                                                      TXQTermNodeMatcher.Create('ancestor-or-self::*'),
-                                                     '/',
                                                      newReadAttrib('lang')
                                                   ),
                                                   newFunction('last', [])
@@ -7156,7 +7167,7 @@ var pos: pchar;
       end;
 
       if Result = nil then result := newMatch
-      else result := newBinOp(result, '/', newMatch);
+      else result := newMap(result, newMatch);
 
       while pos^ in HACPN do begin
         case pos^ of

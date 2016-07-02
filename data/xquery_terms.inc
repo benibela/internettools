@@ -2731,11 +2731,6 @@ function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
 var evilkids: array[0..1] of IXQValue;
   i: Integer;
 begin
-  case op.name of
-    '/', '//': exit(TXQueryEngine.evaluateAccessList(self, context));
-  end;
-
-
   evilkids[0] := children[0].evaluate(context);
   evilkids[1] := children[1].evaluate(context);
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
@@ -2779,35 +2774,6 @@ begin
   TXQTermBinaryOp(result).op := op;
 end;
 
-procedure TXQTermBinaryOp.addToQueryList(var path: TXQPathMatching);
-var
-  isDoubleSlash: Boolean;
-  last: Integer;
-begin
-  isDoubleSlash := op.name = '//';
-  if  not (isDoubleSlash or (op.name = '/')) then begin
-    inherited addToQueryList(path);
-    exit;
-  end;
-
-  children[0].addToQueryList(path);
-  if isDoubleSlash then begin
-    setlength(path, length(path) + 1);
-    path[high(path)].typ:=qcSameOrDescendant;
-    path[high(path)].matching:=[qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction];
-  end;
-  children[1].addToQueryList(path);
-
-  //optimization
-  //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
-  last := high(path);
-  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
-      and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].filters) = 0) then begin
-    path[last - 1] := path[last];
-    path[last - 1].typ := qcDescendant;
-    SetLength(path, last);
-  end;
-end;
 
 
 
@@ -2856,6 +2822,61 @@ function TXQTermSimpleMap.getContextDependencies: TXQContextDependencies;
 begin
   Result:=children[0].getContextDependencies +
           ( children[1].getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast] );
+end;
+
+
+
+constructor TXQTermMap.create(b: TXQTermBinaryOp);
+begin
+  isDoubleSlash := b.op.name = '//';
+  children := b.children;
+  b.children := nil;
+  b.free;
+end;
+
+function TXQTermMap.evaluate(var context: TXQEvaluationContext): IXQValue;
+begin
+  exit(TXQueryEngine.evaluateAccessList(self, context));
+end;
+
+function TXQTermMap.debugTermToString: string;
+begin
+  Result:='(' + children[0].debugTermToString() + IfThen(isDoubleSlash, '//', '/') + children[1].debugTermToString + ')';
+end;
+
+function TXQTermMap.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=children[0].getContextDependencies +
+          ( children[1].getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast] );
+end;
+
+procedure TXQTermMap.addToQueryList(var path: TXQPathMatching);
+var
+  last: Integer;
+begin
+  children[0].addToQueryList(path);
+  if isDoubleSlash then begin
+    setlength(path, length(path) + 1);
+    path[high(path)].typ:=qcSameOrDescendant;
+    path[high(path)].matching:=[qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction];
+  end;
+  children[1].addToQueryList(path);
+
+  //optimization
+  //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
+  last := high(path);
+  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
+      and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].filters) = 0) then begin
+    path[last - 1] := path[last];
+    path[last - 1].typ := qcDescendant;
+    SetLength(path, last);
+  end;
+end;
+
+function TXQTermMap.clone: TXQTerm;
+begin
+  Result := inherited;
+  TXQTermMap(Result).isDoubleSlash:=isDoubleSlash;
 end;
 
 

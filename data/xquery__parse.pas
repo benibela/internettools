@@ -3788,20 +3788,16 @@ var
 begin
   result := xqtvaContinue;
   if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0)
-     and ((TXQTermNodeMatcher(t^).namespaceCheck <> xqnmNone {this would be *:true}) and (TXQTermNodeMatcher(t^).namespaceURLOrPrefix = '')) then begin
+     and ((TXQTermNodeMatcher(t^).namespaceCheck <> xqnmNone {this would be *:true})
+     and (TXQTermNodeMatcher(t^).namespaceURLOrPrefix = ''))
+     and not (parent is TXQTermMap)
+     then begin
     case TXQTermNodeMatcher(t^).select of
       'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true', 0); end;
       'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'false', 0); end;
       'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t^.free; t^ := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'].getURL, 'null', 0); end;
     end;
     exit(xqtvaNoRecursion);
-  end;
-  if t^ is TXQTermBinaryOp then begin
-    if (TXQTermBinaryOp(t^).op.name = '/') or (TXQTermBinaryOp(t^).op.name = '//') then begin
-      for i := 0 to high(TXQTermNodeMatcher(t^).children) do
-        if not (TXQTermNodeMatcher(t^).children[i] is TXQTermNodeMatcher) then self.simpleTermVisit(@TXQTermNodeMatcher(t^).children[i], t^);
-      exit(xqtvaNoRecursion);
-    end;
   end;
 end;
 
@@ -4131,6 +4127,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         b.children := nil;
         b.free;
       end;
+      '/', '//': result := TXQTermMap.create(b)
       else result := b;
     end;
   end;
