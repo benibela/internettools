@@ -8262,7 +8262,7 @@ baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
 xquery__functions.initializeFunctions;
 
-commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped);
+commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped); //the type should probably be sequence (as undefined = empty-sequence()). however that cause xqts failures atm.
 commonValuesTrue := TXQValueBoolean.create(true);
 commonValuesFalse := TXQValueBoolean.create(false);
 

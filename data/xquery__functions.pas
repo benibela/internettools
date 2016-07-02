@@ -3071,13 +3071,15 @@ begin
 
   if args[0].getSequenceCount < 2 then begin
     Result := args[0];
-    if result is TXQValueSequence then result := args[0].get(1);
-    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result);
-    kind := result.kind;
-    if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))
-       or ((kind = pvkDateTime) and (result.typeAnnotation as TXSDateTimeType).isDuration and ( not result.instanceOf(baseSchema.yearMonthDuration)) and (not result.instanceOf(baseSchema.dayTimeDuration)))
-       then
-      raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:min/max');
+    if result.kind = pvkSequence then result := args[0].get(1);
+    if result.getSequenceCount > 0 then begin
+      if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result);
+      kind := result.kind;
+      if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))
+         or ((kind = pvkDateTime) and (result.typeAnnotation as TXSDateTimeType).isDuration and ( not result.instanceOf(baseSchema.yearMonthDuration)) and (not result.instanceOf(baseSchema.dayTimeDuration)))
+         then
+        raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:min/max');
+    end;
     exit();
   end;
 
