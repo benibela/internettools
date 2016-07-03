@@ -818,7 +818,7 @@ begin
     raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+debugAsStringWithTypeAnnotation() + ' to boolean.');
 end;
 
-
+{$ImplicitExceptions off}
 function TXQValueString.toString: string;
 begin
   result := str;
@@ -826,6 +826,7 @@ begin
   if instanceOf(baseSchema.base64Binary) then
     result := StringReplace(result, ' ', '', [rfReplaceAll]);
 end;
+{$ImplicitExceptions on}
 
 function TXQValueString.toDateTime: TDateTime;
 begin
@@ -1404,11 +1405,13 @@ begin
   Result := seq[0].toFloatChecked(scontext);
 end;
 
+{$ImplicitExceptions off}
 function TXQValueSequence.toString: string;
 begin
   if seq.Count >= 1 then result := seq[0].toString
   else result := '';
 end;
+{$ImplicitExceptions on}
 
 function TXQValueSequence.toJoinedString(const sep: string): string;
 var i: integer;
