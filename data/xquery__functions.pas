@@ -2706,23 +2706,13 @@ end;
 function xqFunctionExists(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
-  case args[0].kind of
-    pvkUndefined: result := xqvalueFalse;
-    pvkSequence: result := xqvalue(args[0].getSequenceCount > 0);
-    pvkNode: result := xqvalue(args[0].toNode <> nil);
-    else result := xqvalueTrue;
-  end;
+  result := xqvalue(not args[0].isUndefined);
 end;
 
 function xqFunctionEmpty(const args: TXQVArray): IXQValue;
 begin
   requiredArgCount(args, 1);
-  case args[0].kind of
-    pvkUndefined: result := xqvalueTrue;
-    pvkSequence: result := xqvalue(args[0].getSequenceCount = 0);
-    pvkNode: result := xqvalue(args[0].tonode = nil);
-    else result := xqvalueFalse;
-  end;
+  result := xqvalue(args[0].isUndefined);
 end;
 
 
