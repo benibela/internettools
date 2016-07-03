@@ -344,7 +344,7 @@ var
 begin
   requiredArgCount(args, 1);
   a := args[0];
-  if (a is TXQValueSequence) and (a.getSequenceCount = 1) then a := a.get(1);
+  if (a.kind = pvkSequence) and (a.getSequenceCount = 1) then a := a.get(1);
   if a.getSequenceCount = 0 then exit(xqvalue());
   if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.debugAsStringWithTypeAnnotation());
   result := xqvalue((a as TXQValueJSONArray).seq.Count);

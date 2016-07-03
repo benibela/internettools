@@ -667,73 +667,78 @@ end;
 
 
 
-function xqvalueToNormalizedNodeSeq(v: IXQValue): TXQValueSequence;
+function xqvalueToNormalizedNodeSeq(const v: IXQValue): TXQVList;
 var
  i: Integer;
  x: PIXQValue;
 begin
   case v.kind of
-    pvkUndefined: result:=TXQValueSequence.create(0);
+    pvkUndefined: result:=TXQVList.create(0);
     pvkNode:
-      if v.toNode <> nil then result := TXQValueSequence.create(v)
-      else raise EXQEvaluationException.Create('pxp:INTERNAL', 'nil node');
+      if v.toNode <> nil then begin
+        result := TXQVList.create(1);
+        result.add(v);
+      end else raise EXQEvaluationException.Create('pxp:INTERNAL', 'nil node');
     pvkSequence: begin
-      result := TXQValueSequence.create(v.getSequenceCount);
+      result := TXQVList.create(v.getSequenceCount);
       for x in v.GetEnumeratorPtrUnsafe do begin
         if (x^.kind <> pvkNode) or (x^.toNode = nil) then
           raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
         result.add(x^);
       end;
-      TXQVListBreaker(result.seq).sortInDocumentOrderUnchecked;
-      for i:=result.seq.Count-1 downto 1 do
-        if result.seq[i].toNode = result.seq[i-1].toNode then
-          result.seq.Delete(i);
+      TXQVListBreaker(result).sortInDocumentOrderUnchecked;
+      for i:=result.Count-1 downto 1 do
+        if result[i].toNode = result[i-1].toNode then
+          result.Delete(i);
     end;
     else raise EXQEvaluationException.Create('XPTY0004', 'expected node lists');
   end;
 end;
 
 function xqvalueUnion(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-var a: TXQValueSequence;
-    b: ixqvalue;
+var a, b: TXQVList;
+  seq: TXQValueSequence;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
     raise EXQEvaluationException.Create('XPTY0004', 'invalid type for union');
   a := xqvalueToNormalizedNodeSeq(ta); //todo: optimize
   b := xqvalueToNormalizedNodeSeq(tb);
+  seq := TXQValueSequence.create(a);
   a.addOrdered(b);
-  result := a;
+  result := seq;
+  b.free;
   xqvalueSeqSqueeze(result);
 end;
 
 function xqvalueIntersect(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-var a,b, resseq: TXQValueSequence;
-    ah, bh: IXQValue;
+var a,b: TXQVList;
+    resseq: TXQValueSequence;
     ia,ib,cmp: integer;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
     raise EXQEvaluationException.Create('XPTY0004', 'invalid type for intersect');
-  ah := xqvalueToNormalizedNodeSeq(ta);
-  bh := xqvalueToNormalizedNodeSeq(tb);
-  if (ah.getSequenceCount = 0) or (bh.getSequenceCount=0) then
+  a := xqvalueToNormalizedNodeSeq(ta);
+  b := xqvalueToNormalizedNodeSeq(tb);
+  if (a.Count = 0) or (b.count = 0) then begin
+    a.free; b.free;
     exit(xqvalue);
+  end;
 
-  a := ah as TXQValueSequence;
-  b := bh as TXQValueSequence;
   ia := 0; ib:=0;
-  resseq := TXQValueSequence.create(max(a.seq.Count,b.seq.Count));
-  while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
-    cmp := TTreeNode.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
+  resseq := TXQValueSequence.create(max(a.Count,b.Count));
+  while (ia < a.Count) and (ib < b.Count) do begin
+    cmp := TTreeNode.compareInDocumentOrder(a[ia].toNode, b[ib].toNode);
     if cmp = 0 then begin
-      resseq.add(xqvalue(a.seq[ia].toNode));
+      resseq.add(xqvalue(a[ia].toNode));
       ia+=1; ib+=1;
     end else if cmp < 0 then ia+=1
     else ib+=1;
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);
+  a.free; b.free;
 end;
 
 
@@ -746,8 +751,7 @@ begin
 end;
 
 function xqvalueExcept(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
-var ah,bh: IXQValue;
-    a, b: TXQValueSequence;
+var a,b: TXQVList;
     ia,ib,cmp: integer;
     i: Integer;
     resseq: TXQValueSequence;
@@ -755,19 +759,19 @@ begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
     raise EXQEvaluationException.Create('XPTY0004', 'invalid type for intersect');
-  ah := xqvalueToNormalizedNodeSeq(ta);
-  bh := xqvalueToNormalizedNodeSeq(tb);
-  if (ah.getSequenceCount = 0) or (bh.getSequenceCount=0) then
-    exit(ah);
+  a := xqvalueToNormalizedNodeSeq(ta);
+  b := xqvalueToNormalizedNodeSeq(tb);
+  if (a.count = 0) or (b.count=0) then begin
+    b.free;
+    exit(TXQValueSequence.create(a));
+  end;
 
-  a := ah as TXQValueSequence;
-  b := bh as TXQValueSequence;
   ia := 0; ib:=0;
-  resseq := TXQValueSequence.create(a.seq.Count);
-  while (ia < a.seq.Count) and (ib < b.seq.Count) do begin
-    cmp := TTreeNode.compareInDocumentOrder(a.seq[ia].toNode, b.seq[ib].toNode);
+  resseq := TXQValueSequence.create(a.Count);
+  while (ia < a.Count) and (ib < b.Count) do begin
+    cmp := TTreeNode.compareInDocumentOrder(a[ia].toNode, b[ib].toNode);
     if cmp < 0 then begin
-      resseq.add(a.seq[ia]);
+      resseq.add(a[ia]);
       ia+=1;
     end else if cmp > 0 then ib+=1
     else begin
@@ -775,12 +779,13 @@ begin
       ib+=1;
     end;
   end;
-  if ia < a.seq.Count then begin
-    for i:=ia to a.seq.Count-1 do
-      resseq.add(a.seq[i]);
+  if ia < a.Count then begin
+    for i:=ia to a.Count-1 do
+      resseq.add(a[i]);
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);
+  a.free; b.free;
 end;
 
 //==============================Functions===================================
@@ -2925,19 +2930,104 @@ begin
     else result := xqvalueMultiply(context, result, v^);
 end;
 
+
+//**< Returns the lowest type that all items in the list can be converted to
+function getPromotedType(const v: IXQValue): TXQValueKind;
+  function commonTyp(const a, b: TXQValueKind): TXQValueKind;
+  begin
+    //Conversion rules:
+    //  undefined, sequence unconvertible
+    //         int    -->      decimal               string
+    //                                                /||\
+    //                                                 ||
+    //       boolean          datetime                node
+
+    if (a in [pvkUndefined, pvkSequence, pvkNull]) or (b in [pvkUndefined,pvkSequence,pvkNull]) then exit(pvkUndefined);
+    //leafes
+    if (a = pvkDateTime) or (b = pvkDateTime) then if a = b then exit(pvkDateTime) else exit(pvkUndefined);
+    if (a = pvkBoolean) or (b = pvkBoolean) then if a = b then exit(pvkBoolean) else exit(pvkUndefined);
+    if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then
+      if (a in [pvkString,pvkNode]) = (b in [pvkString,pvkNode]) then exit(pvkString) else exit(pvkUndefined);
+
+
+    if (a = pvkInt64) and (b = pvkInt64) then exit(pvkInt64);
+    if (a in [pvkInt64,pvkBigDecimal]) and (b in [pvkInt64,pvkBigDecimal]) then exit(pvkBigDecimal);
+    if (a = pvkFloat) and (b = pvkFloat) then exit(pvkFloat);
+
+    if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
+    if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
+    if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);
+
+    result := pvkUndefined;
+  end;
+var
+  pv: PIXQValue;
+begin
+  if v.getSequenceCount = 0 then exit(pvkUndefined);
+  result := v.get(1).kind;
+  for pv in v.GetEnumeratorPtrUnsafe do
+    result := commonTyp(result, pv^.kind);
+end;
+
+{Returns the lowest type derived by integer that all items in the list can be converted to
+
+function TXQVList.getPromotedIntegerType: TXSType;
+var
+  i: Integer;
+begin
+  if count = 0 then exit(baseSchema.integer);
+  if count = 1 then exit(items[0].typeAnnotation);
+  result := TXSType.commonIntegerType(items[0], items[1]);
+  for i:=2 to count - 1 do
+    result := TXSType.commonIntegerType(result, items[i].typeAnnotation);
+end;                     }
+
+//** Returns the lowest type derived by decimal that all items in the list can be converted to
+function getPromotedDecimalType(const v: ixqvalue): TXSType;
+var
+  iterator: TXQValueEnumeratorPtrUnsafe;
+begin
+  case v.getSequenceCount of
+    0: exit(baseSchema.decimal);
+    1: exit(v.typeAnnotation.getDecimalType);
+  end;
+  result := TXSType.commonDecimalType(v.get(1), v.get(2));
+  iterator := v.GetEnumeratorPtrUnsafe;
+  if iterator.MoveNext and iterator.MoveNext then
+    while iterator.MoveNext do
+      result := TXSType.commonDecimalType(result, iterator.Current^.typeAnnotation, baseSchema.double);
+end;
+
+//** Returns the lowest type with datetime storage that all items in the list can be converted to
+function getPromotedDateTimeType(const v: ixqvalue; needDuration: boolean): TXSType;
+var
+  i: Integer;
+  pv: PIXQValue;
+begin
+  if v.getSequenceCount = 0 then
+    if needDuration then exit(baseSchema.duration)
+    else exit(baseSchema.dateTime);
+  result := v.get(1).typeAnnotation;
+  for pv in v.GetEnumeratorPtrUnsafe do begin
+    if result <> pv^.typeAnnotation then raise EXQEvaluationException.Create('FORG0006', 'Mixed date/time/duration types');
+  end;
+  if (needDuration) and (not result.derivedFrom(baseSchema.duration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.name);
+end;
+
+
 function xqFunctionSum(const args: TXQVArray): IXQValue;
 var
  tempf: xqfloat;
  tempd: BigDecimal;
  tempi: Int64;
- seq: TXQVList;
- i: Integer;
  ak: TXQValueKind;
- temp: IXQValue;
+ seq: IXQValue;
  baseKind: TXQValueKind;
  absMax: Int64;
  baseType: TXSNumericType;
  resdt: TXQValueDateTime;
+ enumerable: TXQValueEnumeratorPtrUnsafe;
+ pv: PIXQValue;
 begin
   requiredArgCount(args,1,2);
 
@@ -2961,43 +3051,43 @@ begin
     exit();
   end;
 
-  temp := castUntypedToDouble(args[0]);
-  seq := (temp as TXQValueSequence).seq;
-  baseKind := seq.getPromotedType;
+  seq := castUntypedToDouble(args[0]);
+  baseKind := getPromotedType(seq);
+  enumerable := seq.GetEnumeratorPtrUnsafe;
   case baseKind of
     pvkDateTime: begin
-      resdt := TXQValueDateTime.create(seq.getPromotedDateTimeType(true));
+      resdt := TXQValueDateTime.create(getPromotedDateTimeType(seq, true));
       result := resdt;
-      for i:=0 to seq.Count-1 do begin
-        if seq.items[i].typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
-        TXQValueDateTimeBreaker(resdt).addDuration(seq.items[i].getInternalDateTimeData^);
+      for pv in enumerable do begin
+        if pv^.typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
+        TXQValueDateTimeBreaker(resdt).addDuration(pv^.getInternalDateTimeData^);
       end;
     end;
     pvkInt64, pvkBigDecimal: begin
       if baseKind = pvkInt64 then begin
         absMax := $7FFFFFFFFFFFFFFF div seq.Count;
-        for i := 0 to seq.Count - 1 do
-          if not (seq[i] is TXQValueInt64) or (abs((seq[i] as TXQValueInt64).value) > absMax ) then begin
+        for pv in enumerable do
+          if (pv^.kind <> pvkInt64) or (abs(pv^.toInt64) > absMax) then begin
             baseKind := pvkBigDecimal; //sum would not fit in int64
             break;
           end;
       end;
       baseType := baseSchema.integer;
-      for i := 0 to seq.Count - 1 do if not seq[i].instanceOf(baseSchema.integer) then begin
+      for pv in enumerable do if not pv^.instanceOf(baseSchema.integer) then begin
         baseType := baseSchema.decimal;
         break;
       end;
       case baseKind of
         pvkInt64: begin;
           tempi := 0;
-          for i:=0 to seq.count-1 do
-            tempi += seq[i].toInt64;
+          for pv in enumerable do
+            tempi += pv^.toInt64;
           result := baseType.createValue(tempi);
         end;
         pvkBigDecimal: begin
           tempd := 0;
-          for i:=0 to seq.count-1 do
-            tempd += seq[i].toDecimal;
+          for pv in enumerable do
+            tempd += pv^.toDecimal;
           result := baseType.createValue(tempd);
         end;
       end;
@@ -3005,9 +3095,9 @@ begin
     pvkFloat: begin
       tempf := 0;
       try
-        for i:=0 to seq.count-1 do
-          tempf += seq[i].toFloat;
-        result := seq.getPromotedDecimalType.createValue(tempf);
+        for pv in enumerable do
+          tempf += pv^.toFloat;
+        result := getPromotedDecimalType(seq).createValue(tempf);
       except
         on e: EInvalidOp do raise EXQEvaluationException.Create('FOAR0002', e.Message);
       end;
@@ -3021,9 +3111,10 @@ var tempf: xqfloat;
     tempf2: xqfloat;
     tempd: BigDecimal;
  i: Integer;
- seq: TXQVList;
- temp: IXQValue;
+ seq: IXQValue;
  kind: TXQValueKind;
+ enumerable: TXQValueEnumeratorPtrUnsafe;
+ pv: PIXQValue;
 begin
   requiredArgCount(args,1);
   i := args[0].getSequenceCount;
@@ -3041,28 +3132,28 @@ begin
     exit;
   end;
 
-  temp := castUntypedToDouble(args[0]);
-  seq := (temp as TXQValueSequence).seq;
-  case seq.getPromotedType of
+  seq := castUntypedToDouble(args[0]);
+  enumerable := seq.GetEnumeratorPtrUnsafe;
+  case getPromotedType(seq) of
     pvkDateTime: begin
       result := xqFunctionSum(args);
       TXQValueDateTimeBreaker(result as TXQValueDateTime).divideComponents(i);
     end;
     pvkInt64, pvkBigDecimal: begin
       tempd:=0;
-      for i:=0 to seq.Count-1 do
-        tempd := tempd + seq[i].toDecimal;
-      result := seq.getPromotedDecimalType.createValue(tempd / seq.Count);
+      for pv in enumerable do
+        tempd := tempd + pv^.toDecimal;
+      result := getPromotedDecimalType(seq).createValue(tempd / seq.Count);
     end;
     pvkFloat: begin
       tempf:=0;
-      for i:=0 to seq.Count-1 do begin
-        tempf2 := seq[i].toFloat;;
+      for pv in enumerable do begin
+        tempf2 := pv^.toFloat;;
         if (isnan(tempf2)) or (isPosInf(tempf2) and isNegInf(tempf)) or (isNegInf(tempf2) and isPosInf(tempf))  then
-          exit(seq.getPromotedDecimalType.createValue(getNaN));
+          exit(getPromotedDecimalType(seq).createValue(getNaN));
         tempf += tempf2;
       end;
-      result := seq.getPromotedDecimalType.createValue(tempf / seq.Count);
+      result := getPromotedDecimalType(seq).createValue(tempf / seq.getSequenceCount);
     end;
     else raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:avg');
   end;
@@ -3078,15 +3169,16 @@ var tempf: xqfloat;
  tempi: int64;
  temps: string;
  tempb: boolean;
- seq: TXQVList;
- i, besti: Integer;
+ i: Integer;
  temps2: String;
  collation: TXQCollation;
- temp: IXQValue;
  tempf2: xqfloat;
  tempd: BigDecimal;
  kind: TXQValueKind;
  baseType: TXSType;
+ seq: IXQValue;
+ enumerable: TXQValueEnumeratorPtrUnsafe;
+ pv, bestp: PIXQValue;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
@@ -3106,82 +3198,89 @@ begin
     exit();
   end;
 
-  temp := castUntypedToDouble(args[0]);
-  seq := (temp as TXQValueSequence).seq;
+  seq := castUntypedToDouble(args[0]);
+  enumerable := seq.GetEnumeratorPtrUnsafe;
 
-  case seq.getPromotedType of
+  case getPromotedType(seq) of
     pvkDateTime: begin
-      result := seq[0];
+      result := seq.get(1);
       baseType := (result.typeAnnotation as TXSSimpleType).primitive;
-      for i:=1 to seq.count-1 do begin
-        if (context.staticContext.compareAtomic(result, seq[i], nil) < 0) <> asmin then
-          result := seq[i];
-        if (seq[i].typeAnnotation as TXSSimpleType).primitive <> baseType then raiseError;
+      for pv in enumerable do begin
+        if (context.staticContext.compareAtomic(result, pv^, nil) < 0) <> asmin then
+          result := pv^;
+        if (pv^.typeAnnotation as TXSSimpleType).primitive <> baseType then raiseError;
       end;
+      exit;
     end;
     pvkBoolean: begin
-      assert(seq[0].kind = pvkBoolean);
-      tempb := seq[0].toBoolean;
-      for i:=1 to seq.count-1 do begin
-        assert(seq[i].kind = pvkBoolean);
+      assert(seq.get(1).kind = pvkBoolean);
+      tempb := seq.get(1).toBoolean;
+      for pv in enumerable do begin
+        assert(pv^.kind = pvkBoolean);
         if asmin then begin
-          tempb := tempb and seq[i].toBoolean;
+          tempb := tempb and pv^.toBoolean;
           if not tempb then break;
         end else begin
-          tempb := tempb or seq[i].toBoolean;
+          tempb := tempb or pv^.toBoolean;
           if tempb then break;
         end;
       end;
       result := xqvalue(tempb);
+      exit;
     end;
     pvkInt64: begin
-      tempi := seq[0].toInt64;
-      besti := 0;
-      for i:=1 to seq.count-1 do
-        if (seq[i].toInt64 < tempi) = asmin then begin
-          tempi:= seq[i].toInt64;
-          besti := i;
+      tempi := seq.get(1).toInt64;
+      result := nil;
+      for pv in enumerable do
+        if (pv^.toInt64 < tempi) = asmin then begin
+          tempi:= pv^.toInt64;
+          xqvalueMoveNoRefCount(pv^, result);
         end;
-      result := seq[besti];
+      if result = nil then result := seq.get(1) else result._AddRef;
     end;
     pvkBigDecimal: begin
-      tempd := seq[0].toDecimal;
-      besti := 0;
-      for i := 1 to seq.Count-1 do
-        if (seq[i].toDecimal < tempd) = asmin then begin
-          tempd := seq[i].toDecimal;
-          besti := i;
+      tempd := seq.get(1).toDecimal;
+      result := nil;
+      for pv in enumerable do
+        if (pv^.toDecimal < tempd) = asmin then begin
+          tempd := pv^.toDecimal;
+          xqvalueMoveNoRefCount(pv^, result);
         end;
-      result := seq[besti];
+      if result = nil then result := seq.get(1) else result._AddRef;
     end;
     pvkFloat: begin
-      besti := 0;
-      tempf := seq[0].toFloat;
+      result := nil;
+      tempf := seq.get(1).toFloat;
       if not isnan(tempf) then
-        for i:=1 to seq.count-1 do begin
-          tempf2 := seq[i].toFloat;
-          if isnan(tempf2) then
-            exit(seq.getPromotedDecimalType.createValue(seq[i]));
+        for pv in enumerable do begin
+          tempf2 := pv^.toFloat;
+          if isnan(tempf2) then begin
+            xqvalueMoveNoRefCount(pv^, result);
+            break;
+          end;
           if (tempf2 < tempf) = asmin then begin
-            besti := i;
+            xqvalueMoveNoRefCount(pv^, result);
             tempf := tempf2
           end;
         end;
-      result := seq.getPromotedDecimalType.createValue(seq[besti]);
+      if result = nil then result := seq.get(1) else result._AddRef;
+      result := getPromotedDecimalType(seq).createValue(result);
     end;
     pvkString: begin
-      temps := seq[0].toString;
-      result := seq[0];
-      for i:=1 to seq.count-1 do begin
-        temps2 := seq[i].toString;
+      result := nil;
+      temps := seq.get(1).toString;
+      result := nil;
+      for pv in enumerable do begin
+        temps2 := pv^.toString;
         if (collation.compare(temps2, temps) < 0) = asmin then begin
           temps := temps2;
-          result := seq[i];
+          xqvalueMoveNoRefCount(pv^, result);
         end;
       end;
+      if result = nil then result := seq.get(1) else result._AddRef;
       if result.instanceOf(baseSchema.anyURI) then
-        for i := 0 to seq.Count-1 do
-          if (seq[i]<>result) and (seq[i].instanceOf(baseSchema.string_)) then begin
+        for pv in enumerable do
+          if (pv^<>result) and (pv^.instanceOf(baseSchema.string_)) then begin
             result := xqvalue(temps);
             exit;
           end;

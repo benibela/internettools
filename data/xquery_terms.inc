@@ -2638,7 +2638,7 @@ begin
   if func.isUndefined then
     if AllowJSONDefaultInternal then exit(xqvalue())
     else raise EXQEvaluationException.create('XPTY0004', 'Cannot use an empty sequence as function, if JSONiq is disabled');
-  if (func is TXQValueSequence) and (func.getSequenceCount = 1) then func := func.get(0);
+  if (func.kind = pvkSequence) and (func.getSequenceCount = 1) then func := func.get(1);
 
   if func is TXQValueFunction then begin
     setlength(evilkids, length(children)-1);
@@ -3737,7 +3737,7 @@ var
     var
       vname: TXQValueQName;
     begin
-      if (v is TXQValueSequence) and (v.getSequenceCount = 1) then v := v.get(1);
+      if (v.kind = pvkSequence) and (v.getSequenceCount = 1) then v := v.get(1);
       if (v.instanceOf(baseSchema.QName))  then begin
         vname := (v as TXQValueQName);
         setTreeNodeNameFromQName(vname.url, vname.prefix, vname.local, defkind);
@@ -3942,7 +3942,7 @@ function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext
   begin
     if v.getSequenceCount = 0 then
       exit(TXQValueJSONNull.create());
-    if v is TXQValueSequence then
+    if v.kind = pvkSequence then
       if v.getSequenceCount > 1 then begin
         result := TXQValueJSONArray.create(v.getSequenceCount);
         (result as TXQValueJSONArray).seq.add(v);

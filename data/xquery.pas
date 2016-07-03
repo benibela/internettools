@@ -1274,7 +1274,6 @@ type
     fcount, fcapacity: integer; // count
     fbuffer: PIXQValue; // Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
                         // Can have higher capaacity than count.
-    function everyIsNodeOrNot(checkForNode: boolean): boolean; //**< checks: every $n in (self) satisfies (($n is node) = checkForNode)
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
     procedure checkIndex(i: integer); inline; //**< Range check
     procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
@@ -1302,11 +1301,6 @@ type
     procedure sort(cmp: TPointerCompareFunction; data: TObject = nil); //**< Sorts the list
 
     property Count: integer read fcount write setCount;
-
-    function getPromotedType(): TXQValueKind; //**< Returns the lowest type that all items in the list can be converted to
-    function getPromotedIntegerType: TXSType; //**< Returns the lowest type derived by integer that all items in the list can be converted to
-    function getPromotedDecimalType: TXSType; //**< Returns the lowest type derived by decimal that all items in the list can be converted to
-    function getPromotedDateTimeType(needDuration: boolean): TXSType; //**< Returns the lowest type with datetime storage that all items in the list can be converted to
   end;
 
 
@@ -2615,6 +2609,10 @@ public
   procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
 
   function xqvalueArray(a: array of IXQValue): TXQVArray;
+  //**Assigns source to dest without updating ref counts @br
+  //**This can be much faster, but will cause a crash, unless the reference count is corrected later, e.g. by xqvalueVaporize on source or dest.
+  procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
+  procedure xqvalueVaporize(var dest: IXQValue); inline;
 type
   (***
   @abstract(A XQuery variable)
@@ -3634,7 +3632,7 @@ var x: PIXQValue;
   t: TXSType;
 begin
   if v.getSequenceCount = 0 then exit(v);
-  if v is TXQValueSequence then begin
+  if v.kind = pvkSequence then begin
     isAlreadyAtomized := true;
     for x in v.GetEnumeratorPtrUnsafe do
       if not x^.instanceOf(baseSchema.AnyAtomicType) then begin
@@ -5096,8 +5094,6 @@ begin
   result := (v.kind = pvkSequence) and (v.getSequenceCount = 1) and (v.get(1) <> v)
 end;
 
-//Assigns source to dest without updating ref counts @br
-//This can be much faster, but will cause a crash, unless the reference count is corrected later, e.g. by xqvalueVaporize on source or dest.
 procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
 begin
   PPointer(@dest)^ := PPointer(@source)^;
@@ -5722,20 +5718,6 @@ begin
   setBufferSize(0);
 end;
 
-function TXQVList.everyIsNodeOrNot(checkForNode: boolean): boolean;
-var
-  i: Integer;
-begin
-  result := true;
-  for i:=0 to count - 1 do
-    case items[i].kind of
-      pvkUndefined: ;
-      pvkSequence: if not (items[i] as TXQValueSequence).seq.everyIsNodeOrNot(checkForNode) then exit(false);
-      pvkNode: if not checkForNode then exit(false);
-      else if checkForNode then exit(false);
-    end;
-end;
-
 function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
 type PIXQValue = ^IXQValue;
 begin
@@ -5845,79 +5827,6 @@ begin
   stableSort(@fbuffer[0], @fbuffer[count-1], sizeof(fbuffer[0]), cmp, data);
 end;
 
-function TXQVList.getPromotedType: TXQValueKind;
-function commonTyp(const a, b: TXQValueKind): TXQValueKind;
-begin
-  //Conversion rules:
-  //  undefined, sequence unconvertible
-  //         int    -->      decimal               string
-  //                                                /||\
-  //                                                 ||
-  //       boolean          datetime                node
-
-  if (a in [pvkUndefined, pvkSequence, pvkNull]) or (b in [pvkUndefined,pvkSequence,pvkNull]) then exit(pvkUndefined);
-  //leafes
-  if (a = pvkDateTime) or (b = pvkDateTime) then if a = b then exit(pvkDateTime) else exit(pvkUndefined);
-  if (a = pvkBoolean) or (b = pvkBoolean) then if a = b then exit(pvkBoolean) else exit(pvkUndefined);
-  if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then
-    if (a in [pvkString,pvkNode]) = (b in [pvkString,pvkNode]) then exit(pvkString) else exit(pvkUndefined);
-
-
-  if (a = pvkInt64) and (b = pvkInt64) then exit(pvkInt64);
-  if (a in [pvkInt64,pvkBigDecimal]) and (b in [pvkInt64,pvkBigDecimal]) then exit(pvkBigDecimal);
-  if (a = pvkFloat) and (b = pvkFloat) then exit(pvkFloat);
-
-  if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
-  if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
-  if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);
-
-  result := pvkUndefined;
-end;
-var
-  i: Integer;
-begin
-  if count = 0 then exit(pvkUndefined);
-  result := items[0].kind;
-  for i:=1 to count-1 do
-    result := commonTyp(result, items[i].kind);
-end;
-
-function TXQVList.getPromotedIntegerType: TXSType;
-var
-  i: Integer;
-begin
-  if count = 0 then exit(baseSchema.integer);
-  if count = 1 then exit(items[0].typeAnnotation);
-  result := TXSType.commonIntegerType(items[0], items[1]);
-  for i:=2 to count - 1 do
-    result := TXSType.commonIntegerType(result, items[i].typeAnnotation);
-end;
-
-function TXQVList.getPromotedDecimalType: TXSType;
-var
-  i: Integer;
-begin
-  if count = 0 then exit(baseSchema.decimal);
-  if count = 1 then exit(items[0].typeAnnotation.getDecimalType);
-  result := TXSType.commonDecimalType(items[0], items[1]);
-  for i:=2 to count - 1 do
-    result := TXSType.commonDecimalType(result, items[i].typeAnnotation, baseSchema.double);
-end;
-
-function TXQVList.getPromotedDateTimeType(needDuration: boolean): TXSType;
-var
-  i: Integer;
-begin
-  if count = 0 then
-    if needDuration then exit(baseSchema.duration)
-    else exit(baseSchema.dateTime);
-  result := items[0].typeAnnotation;
-  for i:=1 to count - 1 do begin
-    if result <> items[i].typeAnnotation then raise EXQEvaluationException.Create('FORG0006', 'Mixed date/time/duration types');
-    //result := TXQValueDateTimeClass(commonClass(result, TXQValueClass(items[i])));
-  end;
-  if (needDuration) and (not result.derivedFrom(baseSchema.duration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.name);
-end;
 
 
 { TXQVariableStorage }
@@ -6116,17 +6025,27 @@ end;
 procedure TXQVariableChangeLog.stringifyNodes;
 var
   i: Integer;
-  j: Integer;
-  seq: TXQValueSequence;
+  pv: PIXQValue;
+  hasNodes: Boolean;
+  list: TXQVList;
 begin
   for i:=0 to count-1 do
     case varstorage[i].value.kind of
       pvkNode: varstorage[i].value := xqvalue(varstorage[i].value.toString);
       pvkSequence: begin
-        seq := varstorage[i].value as TXQValueSequence;
-        for j := 0 to seq.getSequenceCount - 1 do
-          if seq.seq[j].kind = pvkNode then
-            seq.seq[j] := xqvalue(seq.seq[j].toString);
+        hasNodes := false;
+        for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
+          if pv^.kind = pvkNode then begin
+            hasNodes := true;
+            break;
+          end;
+        if hasNodes then begin
+          list := txqvlist.create(varstorage[i].value.getSequenceCount);
+          for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
+            if pv^.kind = pvkNode then list.add(xqvalue(pv^.toString))
+            else list.add(pv^);
+          varstorage[i].value := TXQValueSequence.create(list);
+        end;
       end;
     end
 end;
