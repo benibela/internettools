@@ -3868,6 +3868,10 @@ procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
 begin
   raise EXQEvaluationException.create('XPTY0004', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to type '+convTo);
 end;
+procedure raiseXPTY0004TypeError(const v: IXQValue; const typ: TXSType);
+begin
+  raiseXPTY0004TypeError(v, typ.name);
+end;
 procedure raiseFOTY0013TypeError(const v: IXQValue);
 begin
   raise EXQEvaluationException.create('FOTY0013', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to atomic value');
@@ -4219,6 +4223,71 @@ var ak, bk: TXQValueKind;
     else result := -1;
   end;
 
+  function compareInts(delta: int64): integer;inline;
+  begin
+    if delta = 0 then exit(0)
+    else if delta < 0 then exit(-1)
+    else exit(1);
+  end;
+
+  function vtodecimalstr(k: TXQValueKind; v: txqvalue): string; //faster implementation of cast, mixed with vtod
+  begin
+    case k of
+      pvkInt64, pvkBigDecimal, //this case is handled in vtod
+      pvkFloat: raisePXPInternalError(); //float trigger floating point conversion
+      pvkString, pvkNode: begin
+        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
+        result := v.toString;
+      end;
+      else begin
+        if strictTypeChecking then raiseXPTY0004TypeError(v, 'decimal');
+        result := v.toString;
+      end;
+    end;
+  end;
+  function vtod(k: TXQValueKind; v: txqvalue): BigDecimal; //faster implementation of cast
+  begin
+    case k of
+      pvkInt64, pvkBigDecimal: result := v.toDecimal; //always ok
+      else if not tryStrToBigDecimal(vtodecimalstr(k, v), @result) then raiseFORG0001InvalidConversion(v, 'decimal');
+    end;
+  end;
+  function compareAsBigDecimals: integer;
+  begin
+    result := compareBigDecimals(vtod(ak,a), vtod(bk,b));
+  end;
+  function compareAsBigDecimals(i: TXQValue; const s: string): integer;
+  var
+    temp: BigDecimal;
+  begin
+    if not tryStrToBigDecimal(s, @temp) then raiseFORG0001InvalidConversion(xqvalue(s), 'decimal');
+    result := compareBigDecimals(i.toInt64, temp);
+  end;
+
+  function compareAsPossibleInt64: integer; //assumption ak != bk; ak, bk != pvkBigDecimal
+  const MaxInt64LogDec = 18;
+  var
+    temp: Int64;
+    s: String;
+  begin
+    if ak = pvkInt64 then begin
+      s := vtodecimalstr(bk, b);
+      if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then exit(compareAsBigDecimals(a, s));
+      temp := TXQValueInt64(a).value - temp;
+    end else if bk = pvkInt64 then begin
+      s := vtodecimalstr(ak, a);
+      if length(s) >= MaxInt64LogDec then exit(-compareAsBigDecimals(b, s));
+        if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then exit(-compareAsBigDecimals(b, s));
+      temp := temp - TXQValueInt64(b).value;
+    end else raisePXPInternalError;
+    result := compareInts(temp);
+  end;
+
+  function getFirst(const seq: TXQValue): txqvalue;
+  begin
+    result := seq.get(1) as txqvalue;
+  end;
+
   function compareCommonEqualKind(): integer;
   var
     adate: PXQValueDateTimeData;
@@ -4229,10 +4298,8 @@ var ak, bk: TXQValueKind;
       pvkBoolean:
         result := compareBooleans(TXQValueBoolean(a).bool, TXQValueBoolean(b).bool);
       pvkInt64:
-        if TXQValueInt64(a).value = TXQValueInt64(b).value then result := 0
-        else if TXQValueInt64(a).value < TXQValueInt64(b).value then result := -1
-        else result := 1;
-      pvkBigDecimal: result := compareBigDecimals(a.toDecimal, b.toDecimal);
+        result := compareInts(TXQValueInt64(a).value - TXQValueInt64(b).value);
+      pvkBigDecimal: result := compareAsBigDecimals();
       pvkFloat: result := compareCommonFloat();
       pvkDateTime: begin
         if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
@@ -4257,27 +4324,14 @@ var ak, bk: TXQValueKind;
       pvkSequence: begin
         if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
         if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
-        result := compareCommon(a.get(1) as TXQValue, b.get(1) as TXQValue, overrideCollation, castUnknownToString);
+        result := compareCommon(getFirst(a), getFirst(b), overrideCollation, castUnknownToString);
       end;
       pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
       else raisePXPInternalError;
     end;
   end;
-  function vtod(k: TXQValueKind; v: txqvalue): BigDecimal; //faster implementation of cast
-  begin
-    case k of
-      pvkInt64, pvkBigDecimal: result := v.toDecimal; //always ok
-      pvkFloat: raisePXPInternalError(); //float trigger floating point conversion
-      pvkString, pvkNode: begin
-        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
-        if not tryStrToBigDecimal(v.toString, @result) then raiseFORG0001InvalidConversion(v, 'decimal');
-      end;
-      else begin
-        if strictTypeChecking then raiseXPTY0004TypeError(v, 'decimal');
-        result := v.toDecimal;
-      end;
-    end;
-  end;
+
+
   {function vtob(k: TXQValueKind; v: TXQValue): Boolean;
   begin
     case k of
@@ -4293,7 +4347,14 @@ var ak, bk: TXQValueKind;
     end;
   end;             }
 
-var tempxqv: IXQValue;
+  function cast(from: txqvalue; tok: TXQValueKind; tov: TXQValue): txqvalue;
+  var temp: IXQvalue;
+  begin
+    if tok <> pvkQName then temp := (tov.typeAnnotation as TXSSimpleType).primitive.createValue(from)
+    else temp := ((tov.typeAnnotation as TXSSimpleType).primitive as TXSQNameType).cast(from, Self);
+    temp._AddRef;
+    result := temp as TXQValue;;
+  end;
 begin
   ak := a.kind; bk := b.kind;
   if ak = bk then exit(compareCommonEqualKind());
@@ -4301,7 +4362,7 @@ begin
     pvkUndefined: exit(-2);
     pvkSequence: begin
       if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
-      exit(compareCommon(a.get(1) as TXQValue,b,overrideCollation,castUnknownToString));
+      exit(compareCommon(getFirst(a),b,overrideCollation,castUnknownToString));
     end;
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
@@ -4310,7 +4371,7 @@ begin
     pvkUndefined: exit(-2);
     pvkSequence: begin
       if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
-      exit(compareCommon(a,b.get(1) as TXQValue,overrideCollation,castUnknownToString));
+      exit(compareCommon(a,getFirst(b),overrideCollation,castUnknownToString));
     end;
     pvkNull: exit(1);
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
@@ -4319,15 +4380,16 @@ begin
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
     exit(compareCommonAsStrings());
   if strictTypeChecking then begin
-    if (ak = pvkString) and not a.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(a, b.typeName);
-    if (bk = pvkString) and not b.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(b, a.typeName);
+    if (ak = pvkString) and not a.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(a, b.typeAnnotation);
+    if (bk = pvkString) and not b.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(b, a.typeAnnotation);
   end;
   if (ak = pvkFloat) or (bk = pvkFloat) then
     exit(compareCommonFloat());
   if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then begin
     //if not (ak in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(a) <> xsceNoError) then raiseXPTY0004TypeError(a, 'decimal');
     //if not (bk in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(b) <> xsceNoError) then raiseXPTY0004TypeError(b, 'decimal');
-    exit(compareBigDecimals(vtod(ak, a), vtod(bk, b)));
+    if (ak = pvkBigDecimal) or (bk = pvkBigDecimal) then exit(compareAsBigDecimals)
+    else exit(compareAsPossibleInt64);
   end;
   {if (ak = pvkQName) or (bk = pvkQName) then
     raise EXQEvaluationException.Create('XPTY0004', 'QName compared');
@@ -4345,18 +4407,22 @@ begin
   //if (ak = pvkBoolean) then exit(compareBooleans(TXQValueBoolean(a).bool, vtob(bk,b)));
   //if (bk = pvkBoolean) then exit(compareBooleans(vtob(ak,a), TXQValueBoolean(b).bool));
   if not (ak in [pvkString, pvkNode]) then begin
-    if ak <> pvkQName then tempxqv := (a.typeAnnotation as TXSSimpleType).primitive.createValue(b)
-    else tempxqv := ((a.typeAnnotation as TXSSimpleType).primitive as TXSQNameType).cast(b, Self);
-    b := tempxqv as TXQValue;
+    b := cast(b,ak,a);
     bk := ak;
-    exit(compareCommonEqualKind());
+    try
+      exit(compareCommonEqualKind());
+    finally
+      b._Release;
+    end;
   end;
   if not (bk in [pvkString, pvkNode]) then begin
-    if bk <> pvkQName then tempxqv := (b.typeAnnotation as TXSSimpleType).primitive.createValue(a)
-    else tempxqv := ((b.typeAnnotation as TXSSimpleType).primitive as TXSQNameType).cast(a, Self);
-    a := tempxqv as TXQValue;
+    a := cast(a,bk,b);
     ak := bk;
-    exit(compareCommonEqualKind());
+    try
+      exit(compareCommonEqualKind());
+    finally
+      a._Release;
+    end;
   end;
   exit(compareCommonAsStrings());
 end;
