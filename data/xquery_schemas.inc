@@ -80,7 +80,7 @@ exit(TXQValue);
     ta := ta.base;
     if b.derivedFrom(ta) then exit(ta);
   end;
-  exit(a.schema.anyType);
+  exit(baseSchema.anyType);
 end;
 
 class function TXSType.commonType(const a, b: IXQValue): TXSType;
@@ -97,15 +97,15 @@ end;
 class function TXSType.commonIntegerType(const a, b: TXSType): TXSNumericType;
 var aInteger, bInteger: Boolean;
 begin
-  aInteger := a.derivedFrom(a.schema.Integer);
-  bInteger := b.derivedFrom(b.schema.Integer);
-  if (not aInteger) and (not bInteger) then exit(a.schema.Integer);
+  aInteger := a.derivedFrom(baseSchema.Integer);
+  bInteger := b.derivedFrom(baseSchema.Integer);
+  if (not aInteger) and (not bInteger) then exit(baseSchema.Integer);
   if (not aInteger) or (not bInteger) then begin
     if aInteger then exit(TXSNumericType(a));
     if bInteger then exit(TXSNumericType(b));
   end;
   Result := TXSNumericType(commonType(a,b));
-  if Result = a.schema.AnyType then exit(a.schema.Integer);
+  if Result = baseSchema.AnyType then exit(baseSchema.Integer);
 end;
 
 class function TXSType.commonIntegerType(const a, b: IXQValue): TXSNumericType;
@@ -144,27 +144,27 @@ begin
  //That's the opposite of my type hierarchy (float -> decimal, double -> decimal), so handle all cases separately
 
  if a = b then
-   if a.derivedFrom(a.schema.Integer) then exit(a.schema.Decimal)
-   else if a.derivedFrom(a.schema.Decimal) or a.derivedFrom(a.schema.Float) or a.derivedFrom(a.schema.Double) then exit(a)
+   if a.derivedFrom(baseSchema.Integer) then exit(baseSchema.Decimal)
+   else if a.derivedFrom(baseSchema.numericPseudoType) then exit(a)
    else exit(failureType);
 
- if not a.derivedFrom(a.schema.Decimal) and not a.derivedFrom(a.schema.Float) and not a.derivedFrom(a.schema.Double) then
+ if not a.derivedFrom(baseSchema.numericPseudoType) then
    a := failureType;
- if not b.derivedFrom(b.schema.Decimal) and not b.derivedFrom(b.schema.Float) and not b.derivedFrom(b.schema.Double) then
+ if not b.derivedFrom(baseSchema.numericPseudoType) then
    b := failureType;
 
- if becomesType(a.schema.Double) then
+ if becomesType(baseSchema.Double) then
    exit; //all values can be converted to double, but double can not be converted to anything
 
  //(decimal, float, integer) bases remaining
 
- if becomesType(a.schema.Float) then
+ if becomesType(baseSchema.Float) then
    exit(); //all of them can be converted to float
 
  //(decimal, integer) remaining
 
  result := failureType;
- becomesType(a.schema.Decimal)
+ becomesType(baseSchema.Decimal)
 end;
 
 class function TXSType.commonDecimalType(const a, b: IXQValue): TXSType;
@@ -174,7 +174,7 @@ var
 begin
   at := a.typeAnnotation;
   bt := b.typeAnnotation;
-  result := commonDecimalType(at, bt, at.schema.Double);
+  result := commonDecimalType(at, bt, baseSchema.Double);
 end;
 
 class function TXSType.commonNumericType(a, b: TXSType): TXSNumericType;

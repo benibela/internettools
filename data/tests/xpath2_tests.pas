@@ -2443,6 +2443,9 @@ begin
   t('1000 + {"foo": {"bar": 456}} . "foo" ."bar" + 1', '1457');
   t('1000 + {"foo": {"bar": 456}} . "foo" . "bar" + 1', '1457');
 
+  f('{} <= 123e0', 'XPTY0004');
+  f('{} lt 123e0', 'XPTY0004');
+
   //multiple properties
   t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" })("foo"))', 'bar bar2'); //test based on jsoniq standard
   t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" })."foo")', 'bar bar2'); //test based on jsoniq standard
