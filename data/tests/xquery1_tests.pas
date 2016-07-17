@@ -1893,6 +1893,9 @@ begin
   f('for $i in (5, 4, 3, 2, 1) where $i > 1 order by $i order by -$i where true() where $i < 4 return $i', 'XPST0003');
   f('for $i in (1,2) count $i return $i', 'XPST0003');
 
+  //regressions
+  t('(text {"a"})[normalize-space(.)][1]/.', 'a');
+  t('(text {"a"}, text{"b"}, text{"c"})[normalize-space()][2]/.', 'b');
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');

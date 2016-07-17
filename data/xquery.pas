@@ -7286,7 +7286,7 @@ begin
   filterSequence(result, list1, filter[0], filter[0].getContextDependencies, context);
   for i:=1 to high(filter) do begin
     xqswap(seq1, seq2);
-    temp := list1; list1 := list2; list1 := temp;
+    temp := list1; list1 := list2; list2 := temp;
     filterSequence(seq2, list1, filter[i], filter[i].getContextDependencies, context);
   end;
   result := seq1;
