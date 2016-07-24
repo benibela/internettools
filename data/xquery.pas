@@ -4943,7 +4943,8 @@ destructor TXQuery.Destroy;
 begin
   fterm.Free; //delete term first, since it might contain other queries that have a reference to staticContext (let's hope they all share it => requirement nested queries must share);
   if not staticContextShared then FreeAndNil(staticContext)
-  else if staticContext.associatedModules <> nil then staticContext.associatedModules.Remove(self);
+  else if staticContext.associatedModules <> nil then
+    staticContext.associatedModules.Remove(self);
   inherited Destroy;
 end;
 
