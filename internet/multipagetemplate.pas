@@ -1402,10 +1402,10 @@ destructor TMultipageTemplateReader.destroy();
 var
   i: Integer;
 begin
-  parser.free;
   for i := 0 to queryCache.Count - 1 do
     TXQueryBreaker(queryCache.Objects[i])._Release;
   queryCache.Free;
+  parser.free;
   inherited destroy();
 end;
 
