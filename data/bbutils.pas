@@ -790,6 +790,8 @@ function strResolveURI(rel, base: RawByteString): RawByteString;
 function fileNameExpand(const rel: string): string;
 //**Expands a path to an absolute path starting with file://
 function fileNameExpandToURI(const rel: string): string;
+//**Moves oldname to newname, replacing newname if it exists
+function fileMoveReplace(const oldname,newname: string): boolean;
 
 //**Levenshtein distance between s and t
 //**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
@@ -5103,6 +5105,21 @@ begin
   if strContains(rel, '://') then exit;
   result := 'file://' + result;
 end;
+
+function fileMoveReplace(const oldname, newname: string): boolean;
+{$IFDEF WINDOWS}
+var o,n: UnicodeString;
+{$EndIf}
+begin
+  {$IFDEF WINDOWS}
+  o := oldname;
+  n := newname;
+  result := MoveFileExW(PWideChar(o), PWideChar(n), MOVEFILE_REPLACE_EXISTING or MOVEFILE_COPY_ALLOWED);
+  {$ELSE}
+  result := RenameFile(oldname, newname);
+  {$ENDIF}
+end;
+
 
 
 function strSimilarity(const s, t: RawByteString): integer;
