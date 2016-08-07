@@ -534,6 +534,8 @@ function fileNameExpand(const rel: string): string;
 function fileNameExpandToURI(const rel: string): string;
 //**Moves oldname to newname, replacing newname if it exists
 function fileMoveReplace(const oldname,newname: string): boolean;
+type TFileSaveSafe = procedure (stream: TStream; data: pointer);
+procedure fileSaveSafe(filename: string; callback: TFileSaveSafe; data: pointer);
 
 //**Levenshtein distance between s and t
 //**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
@@ -2978,12 +2980,21 @@ begin
   f.Free;
 end;
 
+type PRawByteString = ^RawByteString;
+procedure strSaveToFileCallback(stream: TStream; data: pointer);
+begin
+  stream.Write(PRawByteString(data)^[1], length(PRawByteString(data)^));
+end;
+
 procedure strSaveToFile(filename: RawByteString;str:RawByteString);
 var f:TFileStream;
 begin
-  f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmCreate);
-  if length(str)>0 then f.Write(str[1],length(str));
-  f.Free;
+  filename := strRemoveFileURLPrefix(filename);
+  if length(str) = 0 then begin
+    f:=TFileStream.Create(filename,fmCreate);
+    f.free;
+  end else
+    fileSaveSafe(filename, @strSaveToFileCallback, @str);
 end;
 
 {$IFNDEF FPC}
@@ -3288,6 +3299,25 @@ begin
   result := RenameFile(oldname, newname);
   {$ENDIF}
 end;
+
+procedure fileSaveSafe(filename: string; callback: TFileSaveSafe; data: pointer);
+var f:TFileStream;
+  tmpfilename: string;
+begin
+  filename := strRemoveFileURLPrefix(filename);
+  tmpfilename := filename;
+  while FileExists(tmpfilename) do
+    tmpfilename := filename + '~' + IntToStr(Random(1000000))+'.tmp';
+
+  f:=TFileStream.Create(tmpfilename,fmCreate);
+  callback(f,data);
+  f.Free;
+  if tmpfilename <> filename then begin
+    if not fileMoveReplace(tmpfilename, filename) then
+      DeleteFile(tmpfilename);
+  end;
+end;
+
 
 
 
