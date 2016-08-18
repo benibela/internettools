@@ -5145,7 +5145,7 @@ begin
   f.Free;
   if tmpfilename <> filename then begin
     if not fileMoveReplace(tmpfilename, filename) then
-      DeleteFile(tmpfilename);
+      SysUtils.DeleteFile(tmpfilename);
   end;
 end;
 
