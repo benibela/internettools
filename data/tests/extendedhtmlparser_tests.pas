@@ -1091,7 +1091,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> where . mod 2 = 0 return ., "; ")', '2; 6');
   q('let <a>{$a}</a> := <a>1</a>, <b>{$b}</b> := <b>3</b> let <c>{$c}</c> := <c>5</c> return join(($a,$b,$c))', '1 3 5');
 //  q('for $a in (1,2,3) where $a mod 2 = 0 let $c :=$a return $c', '2'); is this xquery 3?
-  q('join(for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> let <x>{$abc}</x> := <x>{.}</x> where . mod 2 ne 0 return $abc, "; ")', '1; 3');
+  q('join  (for    <ul>  <li>{.}</li>+  </ul> in   <ul>  <li>1</li>  <li>2</li>  <li>3</li>   <li>6</li>  </ul> let <x>{$abc}</x> := <x>{.}</x> where . mod 2 ne 0 return $abc, "; ")', '1; 3');
   q('join(for    <ul>  <li>{.}</li>*  </ul> in   <ul>  </ul> return count(.), "; ")', '');
   q('join(for    <ul>  <li>{$abc}</li>*  </ul> in   <ul>  </ul> return count($abc), "; ")', '');
   q('join(for    <ul> <t:loop><x>{$x}</x><y>{$y}</y></t:loop> </ul> in  <ul>  <x>1</x><y>2</y><x>3</x><y>4</y><x>5</x> </ul> return concat($x," ",$y), ";")', '1 ; 2;3 ; 4');
