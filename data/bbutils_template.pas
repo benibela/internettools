@@ -124,6 +124,7 @@ const CP_UTF32 = 12000;
       CP_WINDOWS1252 = 1252;
       CP_LATIN1 = 28591;
 
+
 type
   TStringArray=array of string;
   TLongintArray =array of longint;
@@ -242,9 +243,6 @@ function charDecodeHexDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDI
 //Naming scheme str <l> <i> <name>
 //L: use length (ignoring #0 characters, so the string must be at least length characters long)
 //I: case insensitive
-
-type
-  TEncoding=(eUnknown,eWindows1252,eUTF8,eUTF16BE,eUTF16LE,eUTF32BE,eUTF32LE,eUnknownUser1);
 
 //copy
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
@@ -464,20 +462,20 @@ function strFromSIze(size: int64):string;
 //**A similar function exists in lclproc, but this unit should be independent of the lcl to make it easier to compile with fpc on the command line@br
 //**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
 function strLengthUtf8(str: RawByteString): longint;
-function strConvertToUtf8(str: RawByteString; from: TEncoding): RawByteString; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
-function strConvertFromUtf8(str: RawByteString; toe: TEncoding): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
-function strChangeEncoding(const str: RawByteString; from,toe: TEncoding):RawByteString; //**< Changes the string encoding from @code(from) to @code(toe)
+function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteString; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
+function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
+function strChangeEncoding(const str: RawByteString; from,toe: TSystemCodePage):RawByteString; //**< Changes the string encoding from @code(from) to @code(toe)
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 
-function strGetUnicodeCharacter(const character: integer; encoding: TEncoding = eUTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
+function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = eUTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strEncodingFromName(str:RawByteString):TEncoding; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
-function strEncodingFromBOMRemove(var str:string):TEncoding; //**< Gets the encoding from an unicode bom and removes it
+function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+function strEncodingFromBOMRemove(var str:string):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
 
 //** This function converts codePoint to the corresponding uppercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
 //** It cannot be used to convert a character to uppercase, as SpecialCasing.txt is not a map from normal characters to their uppercase variants.
@@ -493,11 +491,11 @@ function strLowerCaseSpecialUTF8(codePoint: integer): string;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict: boolean = false):string; overload;
+function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TSystemCodePage; strict: boolean = false):string; overload;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(s:RawByteString;encoding:TEncoding; strict: boolean = false):string; overload;
+function strDecodeHTMLEntities(s:RawByteString;encoding:TSystemCodePage; strict: boolean = false):string; overload;
 //**Replace all occurences of x \in toEscape with escapeChar + x
 function strEscape(s:RawByteString; const toEscape: TCharSet; escapeChar: ansichar = '\'): RawByteString;
 //**Replace all occurences of x \in toEscape with escape + hex(ord(x))
@@ -788,6 +786,10 @@ function arrayBinarySearch(a: T__ArrayType__; value: T__ElementType__; choosen: 
 //** Ignores the parameter to suppress warnings
 procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 {%END-REPEAT}
+
+
+function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} deprecated; inline; {$ENDIF}
+function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} deprecated; inline; {$ENDIF}
 
 implementation
 
@@ -1934,6 +1936,11 @@ begin
   inc(len);
   a[result] := e;
 end;                           }
+function striLastIndexOf(const str: RawByteString; const searched: RawByteString):longint;
+begin
+
+end;
+
 {%END-REPEAT}
 
 procedure strSplit(out splitted: TStringArray; s, sep: RawByteString; includeEmpty: boolean);
@@ -2056,19 +2063,28 @@ begin
   end;
 end;
 
-function strConvertToUtf8(str: RawByteString; from: TEncoding): RawByteString;
+function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
+begin
+  case e of
+    CP_ACP: result := DefaultSystemCodePage;
+    else result := e;
+  end;
+end;
+
+function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteString;
 var len: longint;
     reslen: longint;
     pos: longint;
     i: Integer;
 begin
   if length(str) = 0 then begin result := ''; exit; end;
+  from := strActualEncoding(from);
   //use my own conversion, because i found no existing source which doesn't relies on iconv
   //(AnsiToUtf8 doesn't work, since Ansi<>latin1)
   //edit: okay, now i found lconvencoding, but i let this here, because i don't want to change it again
   case from of
-    eUnknown, eUTF8: result:=str;
-    eWindows1252: begin //we actually use latin1, because unicode $00..$FF = latin-1 $00..$FF
+    CP_ACP, CP_NONE, CP_ASCII, CP_UTF8: result:=str;
+    CP_WINDOWS1252, CP_LATIN1: begin //we actually use latin1, because unicode $00..$FF = latin-1 $00..$FF
       len:=length(str); //character and byte length of latin1-str
       //calculate length of resulting utf-8 string (gets larger)
       reslen:=len;
@@ -2095,7 +2111,7 @@ begin
       end;
       assert(pos=reslen+1);
     end;
-    {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
+    {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF}: begin
       SetLength(result, (length(str) * 3) div 2);
       {$IFDEF FPC}
       i := UnicodeToUtf8(pointer(result), length(result) + 1, pointer(str), length(str) div 2);
@@ -2105,13 +2121,13 @@ begin
       {$ENDIF}
       SetLength(result, max(i, 0));
     end;
-    {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
+    {$IFDEF ENDIAN_BIG}CP_UTF16{$ELSE}CP_UTF16BE{$ENDIF}: begin
       result := str;
       strSwapEndianWord(result);
-      result := strConvertToUtf8(result, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+      result := strConvertToUtf8(result, {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
     end;
-    {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF}: result := strConvertToUtf8FromUTF32N(str);
-    {$IFDEF ENDIAN_BIG}eUTF32LE{$ELSE}eUTF32BE{$ENDIF}: begin
+    {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF}: result := strConvertToUtf8FromUTF32N(str);
+    {$IFDEF ENDIAN_BIG}CP_UTF32{$ELSE}CP_UTF32BE{$ENDIF}: begin
       result := str + '' {is this needed or not?};
       strSwapEndianDWord(result);
       result := strConvertToUtf8FromUTF32N(result);
@@ -2133,16 +2149,17 @@ begin
   end;
 end;
 
-function strConvertFromUtf8(str: RawByteString; toe: TEncoding): RawByteString;
+function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString;
 var len, reslen, i, pos: longint;
 begin
   if str = '' then begin
     result := '';
     exit;
   end;
+  toe := strActualEncoding(toe);
   case toe of
-    eUnknown, eUTF8: result:=str;
-    eWindows1252: begin //actually latin-1
+    CP_ACP, CP_NONE, CP_ASCII, CP_UTF8: result:=str;
+    CP_WINDOWS1252, CP_LATIN1: begin //actually latin-1
       len:=length(str);//byte length
       reslen:=strLengthUtf8(str);//character len = new byte length
       //optimization
@@ -2163,7 +2180,7 @@ begin
         inc(pos);
       end ;
     end;
-    {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF}: begin
+    {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF}: begin
       SetLength(result, length(str)*2);
       {$IFDEF FPC};
       i := Utf8ToUnicode(pointer(result), length(result), pointer(str), length(str));
@@ -2173,12 +2190,12 @@ begin
       {$ENDIF}
       SetLength(result, max(i, 0) * 2);
     end;
-    {$IFDEF ENDIAN_BIG}eUTF16LE{$ELSE}eUTF16BE{$ENDIF}: begin
-      result := strConvertFromUtf8(str, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+    {$IFDEF ENDIAN_BIG}CP_UTF16{$ELSE}CP_UTF16BE{$ENDIF}: begin
+      result := strConvertFromUtf8(str, {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
       strSwapEndianWord(result)
     end;
-    {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF}: result := strConvertFromUtf8ToUTF32N(str);
-    {$IFDEF ENDIAN_BIG}eUTF32LE{$ELSE}eUTF32BE{$ENDIF}: begin
+    {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF}: result := strConvertFromUtf8ToUTF32N(str);
+    {$IFDEF ENDIAN_BIG}CP_UTF32{$ELSE}CP_UTF32BE{$ENDIF}: begin
       result := strConvertFromUtf8ToUTF32N(str);
       strSwapEndianDWord(result);
     end
@@ -2186,10 +2203,14 @@ begin
   end;
 end;
 
-function strChangeEncoding(const str: RawByteString; from, toe: TEncoding): RawByteString;
+function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString;
 var utf8temp: RawByteString;
 begin
-  if (from=toe) or (from=eUnknown) or (toe=eUnknown) then begin result := str; exit; end;
+  if (from=toe) or (from=CP_NONE) or (toe=CP_NONE) then begin result := str; exit; end;
+  from := strActualEncoding(from);
+  toe := strActualEncoding(toe);
+  if (from=toe) then begin result := str; exit; end;
+
   //two pass encoding: from -> utf8 -> to
   utf8temp:=strConvertToUtf8(str, from);
   result:=strConvertFromUtf8(utf8temp, toe);
@@ -2438,11 +2459,11 @@ begin
   end;
 end;
 
-function strGetUnicodeCharacter(const character: integer; encoding: TEncoding): RawByteString;
+function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage): RawByteString;
 begin
   setlength(result, strGetUnicodeCharacterUTFLength(character));
   strGetUnicodeCharacterUTF(character, @result[1]);
-  if not (encoding in [eUnknown, eUTF8]) then result:=strConvertFromUtf8(result, encoding);
+  if not (encoding in [CP_NONE, CP_UTF8]) then result:=strConvertFromUtf8(result, encoding);
 end;
 
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer;
@@ -2488,39 +2509,39 @@ begin
 end;
 
 
-function strEncodingFromName(str: RawByteString): TEncoding;
+function strEncodingFromName(str: RawByteString): TSystemCodePage;
 begin
   case UpperCase(str) of
-    'UTF-8', 'UTF8' {error preventive}, 'US-ASCII' {ascii is an utf-8 subset}: result:=eUTF8;
-    'CP1252', 'ISO-8859-1', 'LATIN1', 'ISO-8859-15': Result:=eWindows1252;
-    'UTF-16': result := {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF};
-    'UTF-16LE': result := eUTF16LE;
-    'UTF-16BE': result := eUTF16BE;
-    'UTF-32': result := {$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF};
-    'UTF-32LE': result := eUTF32LE;
-    'UTF-32BE': result := eUTF32BE;
-    else result:=eUnknown;
+    'UTF-8', 'UTF8' {error preventive}, 'US-ASCII' {ascii is an utf-8 subset}: result:=CP_UTF8;
+    'CP1252', 'ISO-8859-1', 'LATIN1', 'ISO-8859-15': Result:=CP_WINDOWS1252;
+    'UTF-16': result := {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF};
+    'UTF-16LE': result := CP_UTF16;
+    'UTF-16BE': result := CP_UTF16BE;
+    'UTF-32': result := {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF};
+    'UTF-32LE': result := CP_UTF32;
+    'UTF-32BE': result := CP_UTF32BE;
+    else result:=CP_NONE;
   end;
 end;
 
-function strEncodingFromBOMRemove(var str: string): TEncoding;
+function strEncodingFromBOMRemove(var str: string): TSystemCodePage;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
     delete(str,1,3);
     result:=eUTF8;
   end else if strbeginswith(str,#$fe#$ff) then begin
     delete(str,1,2);
-    result:=eUTF16BE;
+    result:=CP_UTF16BE;
   end else if strbeginswith(str,#$ff#$fe) then begin
     delete(str,1,2);
-    result:=eUTF16LE;
+    result:=CP_UTF16;
   end else if strbeginswith(str,#00#00#$fe#$ff) then begin
     delete(str,1,4);
-    result:=eUTF32BE;
+    result:=CP_UTF32BE;
   end else if strbeginswith(str,#$ff#$fe#00#00) then begin
     delete(str,1,4);
-    result:=eUTF32LE;
-  end else result := eUnknown;
+    result:=CP_UTF32;
+  end else result := CP_NONE;
 end;
 
 function strUpperCaseSpecialUTF8(codePoint: integer): string;
@@ -2681,7 +2702,7 @@ end;
 
 {$ifndef BBUTILS_INCLUDE_COMPLETE}
 
-function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TEncoding; strict: boolean = false):RawByteString;
+function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TSystemCodePage; strict: boolean = false):string;
 begin
   raise Exception.Create('bbutils include missing');
 end;
@@ -2775,7 +2796,7 @@ begin
   result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
 end;
 
-function strDecodeHTMLEntities(s: RawByteString; encoding: TEncoding; strict: boolean): string;
+function strDecodeHTMLEntities(s: RawByteString; encoding: TSystemCodePage; strict: boolean): string;
 begin
   result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, strict);
 end;
@@ -3008,7 +3029,7 @@ begin
   if codePage = CP_UTF8 then result := s
   else if (codePage = {CP_LATIN1} 28591) or (codePage = 1252) then result := strConvertFromUtf8(s, eWindows1252)
   else begin
-    temp := strConvertFromUtf8(s, {$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
+    temp := strConvertFromUtf8(s, {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
     setlength(tempws, (length(temp) + 1) div 2);
     move(s[1], tempws[1], length(temp));
     result := AnsiString(tempws); //todo
@@ -4770,6 +4791,16 @@ end;
 procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
 
+end;
+
+function eUTF8: TSystemCodePage;
+begin
+  result := CP_UTF8;
+end;
+
+function eWindows1252: TSystemCodePage;
+begin
+  result := CP_WINDOWS1252;
 end;
 
 {%END-REPEAT}

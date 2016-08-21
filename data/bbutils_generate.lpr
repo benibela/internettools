@@ -2189,12 +2189,12 @@ var totalresult: string;
 
 //Template for the strDecodeHTMLEntities function
 const SDHE_Header: string =
-'function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TEncoding;strict: boolean):string;'+LineEnding;
+'function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TSystemCodePage;strict: boolean):string;'+LineEnding;
 
 procedure writeln_SDHE_Map();
 var
   //e: Integer;
-  enc: TEncoding;
+  enc: TSystemCodePage;
   ent: Integer;
   s: String;
   i: Integer;
@@ -2202,13 +2202,10 @@ begin
   totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[0..1] of string=(')+LineEnding;
   for ent:=low(entities) to high(entities) do begin
     totalresult+=('('''+strcopyfrom(entities[ent].s,3)+''',');
-    enc:=low(TEncoding);inc(enc);
-    for enc:=eUTF8 to eUTF8 do begin
-      s := strGetUnicodeCharacter(entities[ent].c, enc);
-      for i:=1 to length(s) do
-        totalresult+='#'+IntToStr(ord(s[i]));
-      if enc <> eUTF8 then totalresult+=',';
-    end;
+    enc:=CP_UTF8;
+    s := strGetUnicodeCharacter(entities[ent].c, enc);
+    for i:=1 to length(s) do
+      totalresult+='#'+IntToStr(ord(s[i]));
     totalresult+=(')');
     if ent <> high(entities) then totalresult+=(',');
     if ent mod 5 = 0 then totalresult+=LineEnding
