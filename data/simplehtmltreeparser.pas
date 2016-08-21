@@ -2351,7 +2351,7 @@ begin
   FCurrentNamespaces := TNamespaceList.Create;
   FCurrentAndPreviousNamespaces := TNamespaceList.Create;
   globalNamespaces := TNamespaceList.Create;
-  FTargetEncoding:=eUTF8;
+  FTargetEncoding:=CP_UTF8;
 
   FRepairMissingStartTags:=false; //??
   FRepairMissingEndTags:=true;
@@ -2453,7 +2453,7 @@ begin
     CP_UTF8, CP_Windows1252, CP_NONE: ;
     else begin //do no want to handle multi-byte chars
       FCurrentFile := strConvertToUtf8(FCurrentFile, encBOM);
-      encBOM := eUTF8;
+      encBOM := CP_UTF8;
     end;
   end;
   FXmlHeaderEncoding := encBOM;
@@ -2481,21 +2481,21 @@ begin
     if (encMeta = encBOM) and (encMeta = FXmlHeaderEncoding) and (encMeta <> CP_NONE) then
       FCurrentTree.FEncoding := encMeta
     else begin //if in doubt, detect encoding and ignore meta/header data
-      FCurrentTree.FEncoding:=eUTF8;
+      FCurrentTree.FEncoding:=CP_UTF8;
       el := FCurrentTree.next;
       while el <> nil do begin
         case el.typ of
           tetText, tetInternalDoNotUseCDATAText: if isInvalidUTF8(el.value) then begin
-            FCurrentTree.FEncoding:=eWindows1252;
+            FCurrentTree.FEncoding:=CP_WINDOWS1252;
             break;
           end;
           tetOpen, tetDocument: if el.attributes <> nil then begin
             for attrib in el.attributes do
               if isInvalidUTF8(attrib.value) or isInvalidUTF8(attrib.realvalue) then begin
-                FCurrentTree.FEncoding:=eWindows1252;
+                FCurrentTree.FEncoding:=CP_WINDOWS1252;
                 break;
               end;
-            if FCurrentTree.FEncoding <> eUTF8 then break;
+            if FCurrentTree.FEncoding <> CP_UTF8 then break;
           end;
         end;
         el := el.next;
@@ -2628,8 +2628,8 @@ begin
       case s[i] of
         '&': push('&amp;');
         '"': push('&quot;');
-        #$A0: if encoding = eWindows1252 then push('&nbsp;') else normal;
-        #$C2: if (encoding = eUTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end else normal;
+        #$A0: if encoding = CP_WINDOWS1252 then push('&nbsp;') else normal;
+        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end else normal;
         else normal;
       end;
       i+=1;
@@ -2640,8 +2640,8 @@ begin
         '&': push('&amp;');
         '<': push('&lt;');
         '>': push('&gt;');
-        #$A0: if encoding = eWindows1252 then push('&nbsp;') else normal;
-        #$C2: if (encoding = eUTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end  else normal;
+        #$A0: if encoding = CP_WINDOWS1252 then push('&nbsp;') else normal;
+        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end  else normal;
         else normal;
       end;
       i+=1;

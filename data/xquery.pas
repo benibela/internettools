@@ -5357,7 +5357,6 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
 
   procedure convert;
   var
-    i: Integer;
     seq: TXQVList;
     temp: IXQValue;
     p: PIXQValue;
@@ -5476,9 +5475,6 @@ var
   end;
 
 var i, j: integer;
-       errCode: String;
-      errMessage: String;
-
 begin
   if length(versions) = 0 then exit(-1);
   valueHigh := count - 1;
@@ -7214,11 +7210,9 @@ end;}
 class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQTerm; termDependencies: TXQContextDependencies; var context: TXQEvaluationContext);
 var
  v: PIXQValue;
- i, j, backupA, backupB: Integer;
+ i, backupA, backupB: Integer;
  value, backupItem: IXQValue;
- list: TXQVList;
  i64: Int64;
- depends: TXQContextDependencies;
  oldParent: TTreeNode;
 begin
   outList.Count := 0;
@@ -7370,7 +7364,7 @@ var filterDependencies: array of TXQContextDependencies;
 
 
 var
-  j, i: Integer;
+  i: Integer;
   tempContext: TXQEvaluationContext;
   onlyNodes: boolean;
   n: PIXQValue;
@@ -7380,7 +7374,6 @@ var
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
   namespaceMatching: TXQNamespaceMode;
-  tempSeq: IXQValue;
   tempList: TXQVList;
   pv: PIXQValue;
 

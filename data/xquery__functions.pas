@@ -2991,7 +2991,6 @@ end;
 //** Returns the lowest type with datetime storage that all items in the list can be converted to
 function getPromotedDateTimeType(const v: ixqvalue; needDuration: boolean): TXSType;
 var
-  i: Integer;
   pv: PIXQValue;
 begin
   if v.getSequenceCount = 0 then
@@ -3159,7 +3158,6 @@ var tempf: xqfloat;
  tempi: int64;
  temps: string;
  tempb: boolean;
- i: Integer;
  temps2: String;
  collation: TXQCollation;
  tempf2: xqfloat;
@@ -3168,7 +3166,7 @@ var tempf: xqfloat;
  baseType: TXSType;
  seq: IXQValue;
  enumerable: TXQValueEnumeratorPtrUnsafe;
- pv, bestp: PIXQValue;
+ pv: PIXQValue;
 begin
   requiredArgCount(args,1, 3);
   if length(args) = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)

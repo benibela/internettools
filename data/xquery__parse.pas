@@ -1909,8 +1909,6 @@ begin
 end;
 
 function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean): TXQTermDefineFunction;
-var
-  i: Integer;
 begin
   try
     result := TXQTermDefineFunction.create();
@@ -2915,7 +2913,6 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
     i, j: Integer;
     modu: TXQTermModule;
     v: TXQTermVariable;
-    otherdef: TXQTermDefineVariable;
   begin
     v := TXQTermVariable(d.variable);
     if sc.importedModules <> nil then begin
@@ -3008,7 +3005,6 @@ var
   otherQuery: TXQueryBreaker;
   i: Integer;
   hadPending: Boolean;
-  shared: Boolean;
   tempTerm: TXQTerm;
   tempContext: TXQEvaluationContext;
 begin
@@ -3062,7 +3058,6 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
   var
     truehigh, i, j, ownvarcount, p, varcount: integer;
     //l, r, varcount, i, j, p: Integer;
-    temp: TXQTerm;
     imp: TXQTermModule;
   begin
     {sort children to (all variables, all functions, body term)
@@ -3793,8 +3788,6 @@ end;
 { TJSONLiteralReplaceVisitor }
 
 function TJSONLiteralReplaceVisitor.visit(t: PXQTerm): TXQTerm_VisitAction;
-var
-  i: Integer;
 begin
   result := xqtvaContinue;
   if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0)

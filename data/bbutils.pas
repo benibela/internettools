@@ -3245,8 +3245,6 @@ begin
 end;
 
 procedure strSwapEndianWord(var str: RawByteString);
-var
-  i: Integer;
 begin
   UniqueString(str);
   assert(length(str) and 1 = 0);
@@ -3263,8 +3261,6 @@ begin
 end;
 
 procedure strSwapEndianDWord(var str: RawByteString);
-var
-  i: Integer;
 begin
   UniqueString(str);
   assert(length(str) and 3 = 0);

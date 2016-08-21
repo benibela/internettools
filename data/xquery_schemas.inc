@@ -315,6 +315,7 @@ end;
 
 function TXSType.containsTransitive(t: TXSType): boolean;
 begin
+  ignore(t);
   result := false;
 end;
 
