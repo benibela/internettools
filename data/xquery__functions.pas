@@ -4031,7 +4031,7 @@ var
   data: String;
   encoding: String;
   contenttype: string;
-  enc: TEncoding;
+  enc: TSystemCodePage;
   pos: integer;
 begin
   requiredArgCount(args, 1, 2);
@@ -4044,18 +4044,18 @@ begin
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FOUT1170');
 
   enc := strEncodingFromBOMRemove(data);
-  if enc = eUnknown then
+  if enc = CP_NONE then
     enc := strEncodingFromContentType(contenttype);
-  if enc = eUnknown then begin
+  if enc = CP_NONE then begin
     if length(args) = 2 then begin
       encoding := args[1].toString;
       enc := strEncodingFromName(encoding);
-      if enc = eUnknown then raise EXQEvaluationException.create('FOUT1190', 'Unknown encoding: '+encoding);
-    end else enc := eUTF8;
+      if enc = CP_NONE then raise EXQEvaluationException.create('FOUT1190', 'Unknown encoding: '+encoding);
+    end else enc := CP_UTF8;
   end else if length(args) = 2 then begin
     encoding := args[1].toString;
     enc := strEncodingFromName(encoding);
-    if enc = eUnknown then raise EXQEvaluationException.create('FOUT1190', 'Unknown encoding: '+encoding);
+    if enc = CP_NONE then raise EXQEvaluationException.create('FOUT1190', 'Unknown encoding: '+encoding);
   end;
 
   data := strConvertToUtf8(data, enc);

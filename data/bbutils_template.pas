@@ -469,7 +469,7 @@ function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 
-function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = eUTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
+function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
@@ -788,8 +788,8 @@ procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDE
 {%END-REPEAT}
 
 
-function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} deprecated; inline; {$ENDIF}
-function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} deprecated; inline; {$ENDIF}
+function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} inline; deprecated; {$ENDIF}
+function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} inline; deprecated; {$ENDIF}
 
 implementation
 
@@ -2463,7 +2463,10 @@ function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodeP
 begin
   setlength(result, strGetUnicodeCharacterUTFLength(character));
   strGetUnicodeCharacterUTF(character, @result[1]);
-  if not (encoding in [CP_NONE, CP_UTF8]) then result:=strConvertFromUtf8(result, encoding);
+  case encoding of
+    CP_NONE, CP_UTF8: ;
+    else result:=strConvertFromUtf8(result, encoding);
+  end;
 end;
 
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer;
@@ -2528,7 +2531,7 @@ function strEncodingFromBOMRemove(var str: string): TSystemCodePage;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
     delete(str,1,3);
-    result:=eUTF8;
+    result:=CP_UTF8;
   end else if strbeginswith(str,#$fe#$ff) then begin
     delete(str,1,2);
     result:=CP_UTF16BE;
@@ -4793,6 +4796,10 @@ begin
 
 end;
 
+
+{%END-REPEAT}
+{$HINTS ON}
+
 function eUTF8: TSystemCodePage;
 begin
   result := CP_UTF8;
@@ -4802,9 +4809,6 @@ function eWindows1252: TSystemCodePage;
 begin
   result := CP_WINDOWS1252;
 end;
-
-{%END-REPEAT}
-{$HINTS ON}
 
 (*
 { TSet }

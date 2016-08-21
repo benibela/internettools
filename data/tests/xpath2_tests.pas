@@ -129,7 +129,7 @@ begin
   xml.readComments:=true;
   xml.readProcessingInstructions:=true;
   xml.repairMissingStartTags:=false;
-  xml.TargetEncoding:=eUnknown;
+  xml.TargetEncoding:=CP_NONE;
   xml.trimText:=true;
 
   f('',                          'XPST0003');
@@ -4098,12 +4098,12 @@ begin
   t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> </div><font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>'); //wrongly: </div> should be at end
   //did not work: &#252; is converted to &amp;#252???? t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> <font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis g&#252;ltig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>');
 
-  xml.TargetEncoding:=eUnknown;
+  xml.TargetEncoding:=CP_NONE;
   t('outer-html(/)', '<html><head></head><body>&amp;auml;&amp;nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
-  xml.TargetEncoding:=eUTF8;
+  xml.TargetEncoding:=CP_UTF8;
   t('outer-html(/)', '<html><head></head><body>ä&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
   t('outer-html(/)', '<html><head><script>&nbsp&auml;&nbsp;</script></head><body></body></html>', '<html><script>&nbsp&auml;&nbsp;</script></html>');
-  xml.TargetEncoding:=eWindows1252;
+  xml.TargetEncoding:=CP_WINDOWS1252;
   t('outer-html(/)', '<html><head></head><body>'#228'&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
   t('outer-html(/)', '<html><head></head><body>&nbsp;'#228'&nbsp;</body></html>', '<html>&nbsp&auml;&nbsp;</html>');
 

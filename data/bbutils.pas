@@ -121,8 +121,6 @@ const CP_UTF32 = 12000;
       CP_WINDOWS1252 = 1252;
       CP_LATIN1 = 28591;
 
-      eUTF8 = CP_UTF8;
-      eWindows1252 = CP_WINDOWS1252;
 
 type
   TStringArray=array of string;
@@ -729,7 +727,7 @@ function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 
-function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = eUTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
+function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
@@ -1089,6 +1087,10 @@ procedure ignore(const intentionallyUnusedParameter: TObject); overload; {$IFDEF
 //** Ignores the parameter to suppress warnings
 procedure ignore(const intentionallyUnusedParameter: pointer); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
+
+
+function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} inline; deprecated; {$ENDIF}
+function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} inline; deprecated; {$ENDIF}
 
 implementation
 
@@ -3691,7 +3693,10 @@ function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodeP
 begin
   setlength(result, strGetUnicodeCharacterUTFLength(character));
   strGetUnicodeCharacterUTF(character, @result[1]);
-  if not (encoding in [CP_NONE, CP_UTF8]) then result:=strConvertFromUtf8(result, encoding);
+  case encoding of
+    CP_NONE, CP_UTF8: ;
+    else result:=strConvertFromUtf8(result, encoding);
+  end;
 end;
 
 function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer;
@@ -3756,7 +3761,7 @@ function strEncodingFromBOMRemove(var str: string): TSystemCodePage;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
     delete(str,1,3);
-    result:=eUTF8;
+    result:=CP_UTF8;
   end else if strbeginswith(str,#$fe#$ff) then begin
     delete(str,1,2);
     result:=CP_UTF16BE;
@@ -4425,7 +4430,10 @@ begin
              if (entity > low(entityMap)) and (strBeginsWith(p+1, entityMap[entity-1][0])) then dec(entity); //some entities exist twice, with/out ;
              inc(p, 1+length(entityMap[entity][0]));
              entityStr := entityMap[entity][1];
-             if not (encoding in [eUnknown, eUtf8]) then entityStr := strConvertFromUtf8(entityStr, encoding);
+             case encoding of
+               CP_NONE, CP_UTF8: ;
+               else  entityStr := strConvertFromUtf8(entityStr, encoding);
+             end;
              for j:=1 to length(entityStr) do begin
                result[reslen] := entityStr[j];
                inc(reslen);
@@ -6732,10 +6740,12 @@ begin
 end;
 
 
+
 procedure ignore(const intentionallyUnusedParameter: boolean); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
 
 end;
+
 
 
 procedure ignore(const intentionallyUnusedParameter: Int64); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
@@ -6744,10 +6754,12 @@ begin
 end;
 
 
+
 procedure ignore(const intentionallyUnusedParameter: TObject); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
 
 end;
+
 
 
 procedure ignore(const intentionallyUnusedParameter: pointer); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
@@ -6756,7 +6768,18 @@ begin
 end;
 
 
+
 {$HINTS ON}
+
+function eUTF8: TSystemCodePage;
+begin
+  result := CP_UTF8;
+end;
+
+function eWindows1252: TSystemCodePage;
+begin
+  result := CP_WINDOWS1252;
+end;
 
 (*
 { TSet }

@@ -616,7 +616,8 @@ var ar8: array[0..100] of shortint;
     ms: double;
     tz: TDateTime;
     order: TBinarySearchChoosen;
-    e, f: TEncoding;
+    e, f: TSystemCodePage;
+    unicodePages: array[1..5] of TSystemCodePage = (CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE );
 begin
   //parse date function
   for i:=1 to high(strs) do
@@ -792,63 +793,62 @@ begin
   test(strCompareClever('a00b000c', 'a0b0000c'), 1);
 
   //string conversion
-  if strConvertToUtf8('a?=ßä'#$DF,eUTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
-  if strConvertFromUtf8('a?=ßä'#$DF,eUTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
-  if strConvertToUtf8('abcdef',eWindows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
-  if strConvertFromUtf8('abcdef',eWindows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
-  if strConvertToUtf8('ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo',eWindows1252)<>'ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo' then
+  if strConvertToUtf8('a?=ßä'#$DF,CP_UTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
+  if strConvertFromUtf8('a?=ßä'#$DF,CP_UTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
+  if strConvertToUtf8('abcdef',CP_Windows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
+  if strConvertFromUtf8('abcdef',CP_Windows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
+  if strConvertToUtf8('ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo',CP_Windows1252)<>'ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo' then
      raise Exception.Create('conversion latin1->utf8 failed');
-  if strConvertFromUtf8('ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo',eWindows1252)<>'ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo' then
+  if strConvertFromUtf8('ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo',CP_Windows1252)<>'ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo' then
      raise Exception.Create('conversion utf8->latin1 failed');
 
-  test(strGetUnicodeCharacter($79, eUTF16BE), #$00#$79);
-  test(strGetUnicodeCharacter($79, eUTF16LE), #$79#$00);
-  test(strGetUnicodeCharacter($20AC, eUTF16BE), #$20#$AC);
-  test(strGetUnicodeCharacter($20AC, eUTF16LE), #$AC#$20);
-  test(strGetUnicodeCharacter($1D11E, eUTF16BE), #$D8#$34#$DD#$1E);
-  test(strGetUnicodeCharacter($1D11E, eUTF16LE), #$34#$D8#$1E#$DD);
+  test(strGetUnicodeCharacter($79, CP_UTF16BE), #$00#$79);
+  test(strGetUnicodeCharacter($79, CP_UTF16), #$79#$00);
+  test(strGetUnicodeCharacter($20AC, CP_UTF16BE), #$20#$AC);
+  test(strGetUnicodeCharacter($20AC, CP_UTF16), #$AC#$20);
+  test(strGetUnicodeCharacter($1D11E, CP_UTF16BE), #$D8#$34#$DD#$1E);
+  test(strGetUnicodeCharacter($1D11E, CP_UTF16), #$34#$D8#$1E#$DD);
 
-  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), eUTF16BE), #$D8#$34#$DD#$1E#$D8#$34#$DD#$1E);
-  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), eUTF16LE), #$34#$D8#$1E#$DD#$34#$D8#$1E#$DD);
+  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), CP_UTF16BE), #$D8#$34#$DD#$1E#$D8#$34#$DD#$1E);
+  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), CP_UTF16), #$34#$D8#$1E#$DD#$34#$D8#$1E#$DD);
 
-  test('', strConvertToUtf8('', eUTF16BE));
-  test('', strConvertToUtf8('', eUTF16LE));
-  test(#$79, strConvertToUtf8(#$00#$79, eUTF16BE));
-  test(#$79, strConvertToUtf8(#$79#$00, eUTF16LE));
-  test(#$79#$79, strConvertToUtf8(#$00#$79#$00#$79, eUTF16BE));
-  test(#$79#$79, strConvertToUtf8(#$79#$00#$79#$00, eUTF16LE));
-  test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$D8#$34#$DD#$1E#$D8#$34#$DD#$1E, eUTF16BE));
-  test(strGetUnicodeCharacter($1D11E, eUTF8) + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$34#$D8#$1E#$DD#$34#$D8#$1E#$DD, eUTF16LE));
+  test('', strConvertToUtf8('', CP_UTF16BE));
+  test('', strConvertToUtf8('', CP_UTF16));
+  test(#$79, strConvertToUtf8(#$00#$79, CP_UTF16BE));
+  test(#$79, strConvertToUtf8(#$79#$00, CP_UTF16));
+  test(#$79#$79, strConvertToUtf8(#$00#$79#$00#$79, CP_UTF16BE));
+  test(#$79#$79, strConvertToUtf8(#$79#$00#$79#$00, CP_UTF16));
+  test(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), strConvertToUtf8(#$D8#$34#$DD#$1E#$D8#$34#$DD#$1E, CP_UTF16BE));
+  test(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), strConvertToUtf8(#$34#$D8#$1E#$DD#$34#$D8#$1E#$DD, CP_UTF16));
 
-  test('', strConvertFromUtf8('', eUTF16BE));
-  test('', strConvertFromUtf8('', eUTF16LE));
-  test(#$00#$79, strConvertFromUtf8(#$79, eUTF16BE));
-  test(#$79#$00, strConvertFromUtf8(#$79, eUTF16LE));
-  test(#$00#$79#$00#$79, strConvertFromUtf8(#$79#$79, eUTF16BE));
-  test(#$79#$00#$79#$00, strConvertFromUtf8(#$79#$79, eUTF16LE));
-  test(#00#00, strGetUnicodeCharacter(0, eUTF16BE));
-  test(#00#00, strGetUnicodeCharacter(0, eUTF16LE));
+  test('', strConvertFromUtf8('', CP_UTF16BE));
+  test('', strConvertFromUtf8('', CP_UTF16));
+  test(#$00#$79, strConvertFromUtf8(#$79, CP_UTF16BE));
+  test(#$79#$00, strConvertFromUtf8(#$79, CP_UTF16));
+  test(#$00#$79#$00#$79, strConvertFromUtf8(#$79#$79, CP_UTF16BE));
+  test(#$79#$00#$79#$00, strConvertFromUtf8(#$79#$79, CP_UTF16));
+  test(#00#00, strGetUnicodeCharacter(0, CP_UTF16BE));
+  test(#00#00, strGetUnicodeCharacter(0, CP_UTF16));
 
 
-  test('', strConvertToUtf8('', eUTF32BE));
-  test('', strConvertToUtf8('', eUTF32LE));
-  test(#$79, strConvertToUtf8(#$00#$00#$00#$79, eUTF32BE));
-  test(#$79, strConvertToUtf8(#$79#$00#$00#$00, eUTF32LE));
-  test(#$79 + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$00#$00#$00#$79#$00#$01#$D1#$1E, eUTF32BE));
-  test(#$79 + strGetUnicodeCharacter($1D11E, eUTF8), strConvertToUtf8(#$79#$00#$00#$00#$1E#$D1#$01#$00, eUTF32LE));
+  test('', strConvertToUtf8('', CP_UTF32BE));
+  test('', strConvertToUtf8('', CP_UTF32));
+  test(#$79, strConvertToUtf8(#$00#$00#$00#$79, CP_UTF32BE));
+  test(#$79, strConvertToUtf8(#$79#$00#$00#$00, CP_UTF32));
+  test(#$79 + strGetUnicodeCharacter($1D11E, CP_UTF8), strConvertToUtf8(#$00#$00#$00#$79#$00#$01#$D1#$1E, CP_UTF32BE));
+  test(#$79 + strGetUnicodeCharacter($1D11E, CP_UTF8), strConvertToUtf8(#$79#$00#$00#$00#$1E#$D1#$01#$00, CP_UTF32));
 
-  test('', strConvertFromUtf8('', eUTF32BE));
-  test('', strConvertFromUtf8('', eUTF32LE));
-  test(#$00#$00#$00#$79, strConvertFromUtf8(#$79, eUTF32BE));
-  test(#$79#$00#$00#$00, strConvertFromUtf8(#$79, eUTF32LE));
-  test(#$00#$00#$00#$79#$00#$00#$00#$79, strConvertFromUtf8(#$79#$79, eUTF32BE));
-  test(#$79#$00#$00#$00#$79#$00#$00#$00, strConvertFromUtf8(#$79#$79, eUTF32LE));
-  test(#00#00#00#00, strGetUnicodeCharacter(0, eUTF32BE));
-  test(#00#00#00#00, strGetUnicodeCharacter(0, eUTF32LE));
+  test('', strConvertFromUtf8('', CP_UTF32BE));
+  test('', strConvertFromUtf8('', CP_UTF32));
+  test(#$00#$00#$00#$79, strConvertFromUtf8(#$79, CP_UTF32BE));
+  test(#$79#$00#$00#$00, strConvertFromUtf8(#$79, CP_UTF32));
+  test(#$00#$00#$00#$79#$00#$00#$00#$79, strConvertFromUtf8(#$79#$79, CP_UTF32BE));
+  test(#$79#$00#$00#$00#$79#$00#$00#$00, strConvertFromUtf8(#$79#$79, CP_UTF32));
+  test(#00#00#00#00, strGetUnicodeCharacter(0, CP_UTF32BE));
+  test(#00#00#00#00, strGetUnicodeCharacter(0, CP_UTF32));
 
-  test(ord(eUTF32LE) - ord(eUTF8), 4);
-  for e := eUTF8 to eUTF32LE do
-    for f := eUTF8 to eUTF32LE do begin
+  for e in unicodePages do
+    for f in unicodePages do begin
       test(strChangeEncoding('', e, f), '');
       test(strChangeEncoding(strGetUnicodeCharacter(0, e), e, f), strGetUnicodeCharacter(0, f));
       test(strChangeEncoding(strGetUnicodeCharacter($80, e), e, f), strGetUnicodeCharacter($80, f));
@@ -939,25 +939,25 @@ begin
 
 
    //html str decode
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*',eUTF8,true) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*?*' then
-    raise Exception.Create('HTML Umlaut -> UTF-8-Konvertierung fehlgeschlagen'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*?*',eUTF8,true));
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;',eWindows1252,true) <> #$C4#$D6#$DC#$e4#$f6#$fc'?' then
-    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;?',eWindows1252,true));
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',eWindows1252, false) <> #$C4#$D6#$DC#$e4#$f6#$fc'&xyz;'#$C4 then
-    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strConvertToUtf8(strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',eWindows1252, false),eWindows1252));
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4',eUTF8,false) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84 then
-    raise Exception.Create('HTML Umlaut -> UTF8-Konvertierung fehlgeschlagen : "'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78',eUTF8,false)+'"');
-  if strDecodeHTMLEntities('&#xA;:&#xD;',eUTF8,false) <> #10':'#13 then
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*',CP_UTF8,true) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*?*' then
+    raise Exception.Create('HTML Umlaut -> UTF-8-Konvertierung fehlgeschlagen'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*?*',CP_UTF8,true));
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;',CP_WINDOWS1252,true) <> #$C4#$D6#$DC#$e4#$f6#$fc'?' then
+    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;?',CP_WINDOWS1252,true));
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',CP_WINDOWS1252, false) <> #$C4#$D6#$DC#$e4#$f6#$fc'&xyz;'#$C4 then
+    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strConvertToUtf8(strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',CP_WINDOWS1252, false),CP_WINDOWS1252));
+  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4',CP_UTF8,false) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84 then
+    raise Exception.Create('HTML Umlaut -> UTF8-Konvertierung fehlgeschlagen : "'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78',CP_UTF8,false)+'"');
+  if strDecodeHTMLEntities('&#xA;:&#xD;',CP_UTF8,false) <> #10':'#13 then
     raise Exception.Create('HTML Lineending -> UTF8-Konvertierung fehlgeschlagen');
-  test(strDecodeHTMLEntities('"&nbsp;"',eUTF8,false), '"'#$C2#$A0'"');
-  test(strDecodeHTMLEntities('"&nbsp;"',eWindows1252,false), '"'#$A0'"');
-  test(strDecodeHTMLEntities('&nbsp;',eUTF8,false), #$C2#$A0);
-  test(strDecodeHTMLEntities('&nbsp;',eWindows1252,false), #$A0);
-  test(strDecodeHTMLEntities('"&nbsp"',eUTF8,false), '"'#$C2#$A0'"');
-  test(strDecodeHTMLEntities('"&nbsp"',eWindows1252,false), '"'#$A0'"');
-  test(strDecodeHTMLEntities('&nbsp',eUTF8,false), #$C2#$A0);
-  test(strDecodeHTMLEntities('&nbsp',eWindows1252,false), #$A0);
-  test(strDecodeHTMLEntities('&123;&456',eUTF8,false), '&123;&456');
+  test(strDecodeHTMLEntities('"&nbsp;"',CP_UTF8,false), '"'#$C2#$A0'"');
+  test(strDecodeHTMLEntities('"&nbsp;"',CP_WINDOWS1252,false), '"'#$A0'"');
+  test(strDecodeHTMLEntities('&nbsp;',CP_UTF8,false), #$C2#$A0);
+  test(strDecodeHTMLEntities('&nbsp;',CP_WINDOWS1252,false), #$A0);
+  test(strDecodeHTMLEntities('"&nbsp"',CP_UTF8,false), '"'#$C2#$A0'"');
+  test(strDecodeHTMLEntities('"&nbsp"',CP_WINDOWS1252,false), '"'#$A0'"');
+  test(strDecodeHTMLEntities('&nbsp',CP_UTF8,false), #$C2#$A0);
+  test(strDecodeHTMLEntities('&nbsp',CP_WINDOWS1252,false), #$A0);
+  test(strDecodeHTMLEntities('&123;&456',CP_UTF8,false), '&123;&456');
 
   test(StrToBoolDef('', false) = false);
   test(StrToBoolDef('', true) = true);

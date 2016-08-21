@@ -2323,7 +2323,10 @@ begin
   reswriteln('             if (entity > low(entityMap)) and (strBeginsWith(p+1, entityMap[entity-1][0])) then dec(entity); //some entities exist twice, with/out ;');
   reswriteln('             inc(p, 1+length(entityMap[entity][0]));');
   reswriteln('             entityStr := entityMap[entity][1];');
-  reswriteln('             if not (encoding in [eUnknown, eUtf8]) then entityStr := strConvertFromUtf8(entityStr, encoding);');
+  reswriteln('             case encoding of');
+  reswriteln('               CP_NONE, CP_UTF8: ;');
+  reswriteln('               else  entityStr := strConvertFromUtf8(entityStr, encoding);');
+  reswriteln('             end;');
   reswriteln('             for j:=1 to length(entityStr) do begin');
   reswriteln('               result[reslen] := entityStr[j];');
   reswriteln('               inc(reslen);');

@@ -165,7 +165,7 @@ type
 
     //extensions
     defaultTypeNamespace: INamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
-    stringEncoding: TEncoding;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
+    stringEncoding: TSystemCodePage;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
     objectsRestrictedToJSONTypes: boolean; //**< When false, all values can be stored in object properties; when true all property values are JSON values (e.g. sequences become arrays, () becomes null, xml is serialized, ...)
@@ -2932,7 +2932,7 @@ protected
 
  options: TXQParsingOptions;
  parsingModel: TXQParsingModel;
- encoding: TEncoding;
+ encoding: TSystemCodePage;
  staticContext: TXQStaticContext;
 
  str: string;
@@ -6528,7 +6528,7 @@ begin
   StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
   StaticContext.copyNamespaceInherit:=true;
   StaticContext.copyNamespacePreserve:=true;
-  StaticContext.stringEncoding:=eUTF8;
+  StaticContext.stringEncoding:=CP_UTF8;
   StaticContext.useLocalNamespaces:=true;
   StaticContext.jsonPXPExtensions:=true;
   FDefaultVariableStack := TXQEvaluationStack.create();
@@ -6763,7 +6763,7 @@ begin
   staticContextShared := context <> nil;
   if context = nil then context := StaticContext.clone();
   cxt := TXQParsingContext.Create;
-  cxt.encoding:=eUTF8;
+  cxt.encoding:=CP_UTF8;
   cxt.options := ParsingOptions;
   cxt.staticContext := context;
   context.model := model;
@@ -6790,7 +6790,7 @@ begin
     exit;
   end;
   cxt := TXQParsingContext.Create;
-  cxt.encoding:=eUTF8;
+  cxt.encoding:=CP_UTF8;
   cxt.options :=ParsingOptions;
   cxt.options.AllowExtendedStrings:=true;
   cxt.staticContext := context;
@@ -8251,7 +8251,7 @@ GlobalInterpretedNativeFunctionStaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
 GlobalInterpretedNativeFunctionStaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
 GlobalInterpretedNativeFunctionStaticContext.copyNamespaceInherit:=true;
 GlobalInterpretedNativeFunctionStaticContext.copyNamespacePreserve:=true;
-GlobalInterpretedNativeFunctionStaticContext.stringEncoding:=eUTF8;
+GlobalInterpretedNativeFunctionStaticContext.stringEncoding:=CP_UTF8;
 GlobalInterpretedNativeFunctionStaticContext.jsonPXPExtensions:=true;
 
 

@@ -3228,8 +3228,8 @@ var declarationDuplicateChecker: TStringList;
   begin
     encname := parseString;
     encoding := strEncodingFromName(encname);
-    if encoding = eUnknown then raiseParsingError('XQST0087', 'Unknown encoding: ' + encname);
-    if (encoding <> eUTF8) and (options.LineEndingNormalization = xqlenXML11) then
+    if encoding = CP_NONE then raiseParsingError('XQST0087', 'Unknown encoding: ' + encname);
+    if (encoding <> CP_UTF8) and (options.LineEndingNormalization = xqlenXML11) then
       options.LineEndingNormalization := xqlenXML1; //need unicode to understand 85, 2023 line breaks
     expect(';');
   end;

@@ -165,7 +165,7 @@ TTreeNode = class
 //otherwise use the functions
   //procedure deleteNext(); delete the next node (you have to delete the reverse tag manually)
   procedure deleteAll(); //**< deletes the tree
-  procedure changeEncoding(from,toe: TEncoding; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
+  procedure changeEncoding(from,toe: TSystemCodePage; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
   //Complex search functions.
@@ -273,7 +273,7 @@ end;
 
 TTreeDocument = class(TTreeNode)
 protected
-  FEncoding: TEncoding;
+  FEncoding: TSystemCodePage;
   FBaseURI, FDocumentURI: string;
   FCreator: TTreeParser;
 
@@ -285,11 +285,11 @@ public
   function getCreator: TTreeParser;
 
   //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
-  function getEncoding: TEncoding;
+  function getEncoding: TSystemCodePage;
   //**Changes the tree encoding
   //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
   //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
-  procedure setEncoding(new: TEncoding; convertFromOldToNew: Boolean; convertEntities: boolean);
+  procedure setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
 
   destructor destroy; override;
 end;
@@ -306,7 +306,7 @@ TParsingModel = (pmStrict, pmHTML, pmUnstrictXML);
 //**To use it, you have to call @code(parseTree) with a string containing the document. Afterwards you can call @code(getLastTree) to get the document root node.@br
 //**
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
-//**If TargetEncoding is not eUnknown, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
+//**If TargetEncoding is not CP_NONE, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
 //**You can change the class used for the elements in the tree with the field treeNodeClass.
 TTreeParser = class
   function processingInstruction(text: pchar; textLen: longint; unusedParameter: TTextFlags): TParsingResult;
@@ -323,7 +323,7 @@ protected
   FTrimText, FReadComments: boolean;
   FTrees: TList;
   FCurrentTree: TTreeDocument;
-  FXmlHeaderEncoding: TEncoding;
+  FXmlHeaderEncoding: TSystemCodePage;
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
 
@@ -346,7 +346,7 @@ private
   FCurrentNamespaces: TNamespaceList;
   FCurrentNamespaceDefinitions: TList;
   FCurrentAndPreviousNamespaces: TNamespaceList; //all namespaces encountered during parsing
-  FTargetEncoding: TEncoding;
+  FTargetEncoding: TSystemCodePage;
   FHasOpenedPTag: boolean;
   FBasicParsingState: TBasicParsingState; //similar to html 5. Only used when repair start tags is enabled
   FLastHead, flastbody, flasthtml: TTreeNode;
@@ -387,7 +387,7 @@ published
   //** Determines if the encoding should be automatically detected (default true)
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
-  property TargetEncoding: TEncoding read FTargetEncoding write FTargetEncoding;
+  property TargetEncoding: TSystemCodePage read FTargetEncoding write FTargetEncoding;
   //trees owned/created by this object (which will be destroyed, when it is freed) (mostly for internal use)
   property OwnedTrees: TList read FTrees;
 end;
@@ -395,7 +395,7 @@ end;
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
 function xmlStrWhitespaceCollapse(const s: string):string;
-function htmlStrEscape(s: string; attrib: boolean = false; encoding: TEncoding = eUnknown):string;
+function htmlStrEscape(s: string; attrib: boolean = false; encoding: TSystemCodePage = CP_NONE):string;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -412,7 +412,7 @@ function namespaceGetURL(const n: INamespace): string; inline;
 type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<- not used, might be used in future});
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 
-function strEncodingFromContentType(const contenttype: string): TEncoding;
+function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 function isInvalidUTF8(const s: string): boolean;
 
 implementation
@@ -783,16 +783,16 @@ begin
   result := FCreator;
 end;
 
-function TTreeDocument.getEncoding: TEncoding;
+function TTreeDocument.getEncoding: TSystemCodePage;
 begin
-  if self = nil then exit(eUnknown);
+  if self = nil then exit(CP_NONE);
   result := FEncoding;
 end;
 
-procedure TTreeDocument.setEncoding(new: TEncoding; convertFromOldToNew: Boolean; convertEntities: boolean);
+procedure TTreeDocument.setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
 begin
   if self = nil then exit;
-  if (FEncoding = eUnknown) or not convertFromOldToNew then FEncoding:= new;
+  if (FEncoding = CP_NONE) or not convertFromOldToNew then FEncoding:= new;
   if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText);
   FEncoding := new;
 end;
@@ -827,7 +827,7 @@ begin
   end;
 end;
 
-procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boolean; trimText: boolean);
+procedure TTreeNode.changeEncoding(from, toe: TSystemCodePage; substituteEntities: boolean; trimText: boolean);
   function change(s: string): string;
   begin
     result := strChangeEncoding(s, from, toe);
@@ -839,7 +839,7 @@ procedure TTreeNode.changeEncoding(from, toe: TEncoding; substituteEntities: boo
 var tree: TTreeNode;
   attrib: TTreeAttribute;
 begin
-  if (from = eUnknown) or (toe = eUnknown) then exit;
+  if (from = CP_NONE) or (toe = CP_NONE) then exit;
   if (from = toe) and not substituteEntities then exit;
   tree := self;
   while tree <> nil do begin
@@ -1365,7 +1365,7 @@ end;
 
 function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): string;
 var known: TNamespaceList;
-  encoding: TEncoding;
+  encoding: TSystemCodePage;
   function requireNamespace(n: INamespace): string;
   begin //that function is useless the namespace should always be in known. But just for safety...
     if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
@@ -1471,7 +1471,7 @@ var known: TNamespaceList;
   end;
 begin
   known := TNamespaceList.Create;
-  encoding := eUnknown;
+  encoding := CP_NONE;
   if base.document is TTreeDocument then encoding := TTreeDocument(base.document).FEncoding;
   if nodeSelf then result := outer(base)
   else result := inner(base);
@@ -1756,8 +1756,8 @@ begin
       case cutproperty(tempcontent, value) of
         'encoding': begin
           case lowercase(value) of
-            'utf-8': FXmlHeaderEncoding:=eUTF8;
-            'windows-1252', 'iso-8859-1', 'iso-8859-15', 'latin1': FXmlHeaderEncoding:=eWindows1252;
+            'utf-8': FXmlHeaderEncoding:=CP_UTF8;
+            'windows-1252', 'iso-8859-1', 'iso-8859-15', 'latin1': FXmlHeaderEncoding:=CP_Windows1252;
           end;
         end;
         'standalone':
@@ -2409,7 +2409,7 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
 var
   el: TTreeNode;
   attrib: TTreeAttribute;
-  encMeta, encBOM: TEncoding;
+  encMeta, encBOM: TSystemCodePage;
   i: Integer;
 begin
   FTemplateCount:=0;
@@ -2447,11 +2447,14 @@ begin
   flasthtml := nil;
 
   encBOM := strEncodingFromBOMRemove(FCurrentFile);
-  if encBOM = eUnknown then
+  if encBOM = CP_NONE then
     encBOM := strEncodingFromContentType(contentType);
-  if not (encBOM in [eUTF8, eWindows1252, eUnknown]) then begin
-    FCurrentFile := strConvertToUtf8(FCurrentFile, encBOM);
-    encBOM := eUTF8;
+  case encBOM of
+    CP_UTF8, CP_Windows1252, CP_NONE: ;
+    else begin //do no want to handle multi-byte chars
+      FCurrentFile := strConvertToUtf8(FCurrentFile, encBOM);
+      encBOM := eUTF8;
+    end;
   end;
   FXmlHeaderEncoding := encBOM;
 
@@ -2465,17 +2468,17 @@ begin
   leaveTag(nil,0);
 
   if FAutoDetectHTMLEncoding  then begin
-    FCurrentTree.FEncoding:=eUnknown;
-    if (encBOM = eUnknown) and (parsingModel = pmHTML) then
+    FCurrentTree.FEncoding:=CP_NONE;
+    if (encBOM = CP_NONE) and (parsingModel = pmHTML) then
       encMeta := strEncodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
      else
       encMeta := encBOM;
 
-    if encBOM = eUnknown then encBOM := FXmlHeaderEncoding;
-    if encBOM = eUnknown then encBOM := encMeta;
-    if encMeta  = eUnknown then encMeta := encBOM;
-    if FXmlHeaderEncoding = eUnknown then FXmlHeaderEncoding := encBOM;
-    if (encMeta = encBOM) and (encMeta = FXmlHeaderEncoding) and (encMeta <> eUnknown) then
+    if encBOM = CP_NONE then encBOM := FXmlHeaderEncoding;
+    if encBOM = CP_NONE then encBOM := encMeta;
+    if encMeta  = CP_NONE then encMeta := encBOM;
+    if FXmlHeaderEncoding = CP_NONE then FXmlHeaderEncoding := encBOM;
+    if (encMeta = encBOM) and (encMeta = FXmlHeaderEncoding) and (encMeta <> CP_NONE) then
       FCurrentTree.FEncoding := encMeta
     else begin //if in doubt, detect encoding and ignore meta/header data
       FCurrentTree.FEncoding:=eUTF8;
@@ -2503,7 +2506,7 @@ begin
 
   FTrees.Add(FCurrentTree);
   result := FCurrentTree;
-  if FTargetEncoding <> eUnknown then begin
+  if FTargetEncoding <> CP_NONE then begin
     for i := 0 to FCurrentAndPreviousNamespaces.Count - 1 do
       with FCurrentAndPreviousNamespaces.Get(i) as TNamespace do begin
         url := strChangeEncoding(url, FCurrentTree.FEncoding, FTargetEncoding);
@@ -2601,7 +2604,7 @@ begin
   result := strTrimAndNormalize(s, [#9,#$A,#$D,' ']);
 end;
 
-function htmlStrEscape(s: string; attrib: boolean; encoding: TEncoding): string;
+function htmlStrEscape(s: string; attrib: boolean; encoding: TSystemCodePage): string;
 var
   i, p: Integer;
   procedure push(const t:string); inline;
@@ -2699,23 +2702,23 @@ begin
       result := itfXML;
 end;
 
-function strEncodingFromContentType(const contenttype: string): TEncoding;
+function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 var
   encoding: String;
 begin
   encoding := lowercase(contenttype);
-  if pos('charset=utf-8', encoding) > 0 then exit(eUTF8);
+  if pos('charset=utf-8', encoding) > 0 then exit(CP_UTF8);
   if (pos('charset=windows-1252',encoding) > 0) or
      (pos('charset=latin1',encoding) > 0) or
      (pos('charset=iso-8859-1',encoding) > 0) then //also -15
-      exit(eWindows1252);
-  if (pos('charset=utf-16le',encoding) > 0) then exit(eUTF16LE);
-  if (pos('charset=utf-16be',encoding) > 0) then exit(eUTF16BE);
-  if (pos('charset=utf-16',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF16BE{$ELSE}eUTF16LE{$ENDIF});
-  if (pos('charset=utf-32le',encoding) > 0) then exit(eUTF32LE);
-  if (pos('charset=utf-32be',encoding) > 0) then exit(eUTF32BE);
-  if (pos('charset=utf-32',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}eUTF32BE{$ELSE}eUTF32LE{$ENDIF});
-  exit(eUnknown);
+      exit(CP_Windows1252);
+  if (pos('charset=utf-16le',encoding) > 0) then exit(CP_UTF16);
+  if (pos('charset=utf-16be',encoding) > 0) then exit(CP_UTF16BE);
+  if (pos('charset=utf-16',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
+  if (pos('charset=utf-32le',encoding) > 0) then exit(CP_UTF32);
+  if (pos('charset=utf-32be',encoding) > 0) then exit(CP_UTF32BE);
+  if (pos('charset=utf-32',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF});
+  exit(CP_NONE);
 end;
 
 
