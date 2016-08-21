@@ -111,6 +111,7 @@ var cmdDef, cmdName, compareOp: string;
     j: Integer;
     temp2: String;
 begin
+  result := '';
  while s <> '' do begin
    result+=GetPart([], ['{%'], s);
    if s = '' then break;
