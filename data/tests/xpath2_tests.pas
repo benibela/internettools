@@ -34,7 +34,7 @@ const strictTypeChecking = true;
 
 procedure unittests(TestErrors:boolean);
 var
-  i: Integer;
+  testid,i: Integer;
   ps: TXQueryEngine;
   xml: TTreeParser;
 
@@ -43,7 +43,7 @@ var
     rooted: Boolean;
     context: TXQEvaluationContext;
   begin
-    i+=1;
+    testid+=1;
     context := ps.getEvaluationContext();
     if s3 <> '' then begin
       rooted := s3[1] = '!';
@@ -62,7 +62,7 @@ var
 //    writeln(ps.debugtermToString(ps.FCurTerm));
     got := ps.evaluate(context).toString;
     if got<>s2 then
-        raise Exception.Create('XPath Test failed: '+IntToStr(i)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'". Parsed query: '+ps.LastQuery.Term.debugTermToString);
+        raise Exception.Create('XPath Test failed: '+IntToStr(testid)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'". Parsed query: '+ps.LastQuery.Term.debugTermToString);
   end;
 
   procedure t(a,b: string; c: string = '');
@@ -105,7 +105,7 @@ var tempb: Boolean;
   randomboundary: String;
   iterator, iterator2: TXQValueEnumeratorPtrUnsafe;
 begin
-  i := 0;
+  testid := 0;
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
   if strictTypeChecking then untypedAtomic := 'xs:untypedAtomic'
@@ -4205,7 +4205,7 @@ begin
   end;
 
 
-  writeln('XPath 2: ', i, ' completed');
+  writeln('XPath 2: ', testid, ' completed');
 
   ps.free;
   xml.Free;
