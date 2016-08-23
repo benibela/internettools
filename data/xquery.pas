@@ -4660,8 +4660,6 @@ begin
 end;
 
 function TXQValueEnumeratorPtrUnsafe.MoveMany(count: sizeint): Boolean;
-var
-  size: Integer;
 begin
   result := true;
   while count > 0 do begin
@@ -7440,7 +7438,6 @@ begin
             end else exclude(nodeCondition.options, xqpncCheckNamespace);
             newnode := getNextQueriedNode(nil, nodeCondition);
             if newnode = nil then continue;
-            j:=0;
             newList.count := 0;
             while newnode <> nil do begin
               if (namespaceMatching <> xqnmPrefix)

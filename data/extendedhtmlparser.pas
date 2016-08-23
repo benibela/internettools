@@ -1401,7 +1401,6 @@ var xpathText: TTreeNode;
    value:IXQValue;
    oldvarcount: Integer;
    attribs: tStringAttributeList;
-   submatch: Integer;
    regex: String;
    name: String;
    props: TStringArray;
