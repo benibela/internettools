@@ -59,6 +59,7 @@ unit bbutils_template;
 {$COPERATORS OFF}
 {$DEFINE HASINLINE}
 {$DEFINE HASDefaultFormatSettings}
+{$DEFINE HASDeprecated}
 
 
 {$ELSE} //DELPHI
@@ -103,6 +104,8 @@ type
 {$ENDIF}{$ENDIF}
 {$IFNDEF UNICODE}
      RawByteString = ansistring;
+     UnicodeString = WideString;
+     PUnicodeChar = ^WideChar;
 {$ENDIF}
 const
    NaN = 0.0/0.0;
@@ -118,6 +121,8 @@ const
   CP_UTF16   = 1200;
   CP_UTF16BE = 1201;
   CP_UTF8    = 65001;
+  CP_NONE    = $FFFF;
+  CP_ASCII   = 20127;
 {$endif}
 const CP_UTF32 = 12000;
       CP_UTF32BE = 12001;
@@ -308,9 +313,9 @@ function strCount(const str: RawByteString; const searched: ansichar; from: long
 function strCount(const str: RawByteString; const searched: TCharSet; from: longint = 1): longint; overload;
 
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+function strlsIndexOf(str,searched:pansichar; l1, l2: longint): longint; overload;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint;
+function strlsIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint; overload;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
 function strlsiIndexOf(str,searched:pansichar; l1, l2: longint): longint;
 
@@ -328,9 +333,9 @@ function strIndexOf(const str: RawByteString; const searched: TCharSet; from: lo
 function striIndexOf(const str,searched:RawByteString; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence  (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsLastIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+function strlsLastIndexOf(str,searched:pansichar; l1, l2: longint): longint; overload;
 //**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsLastIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint;
+function strlsLastIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint; overload;
 //**Searchs @code(searched) in @code(str), case-insensitive, returns -1 on no occurrence (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
 function strlsiLastIndexOf(str,searched:pansichar; l1, l2: longint): longint;
 
@@ -414,16 +419,16 @@ function strSplitGetBetweenBrackets(var text: RawByteString; const openBracket, 
 function str_CASESENSITIVEMODIFIER_Between(const s, from, till: RawByteString): RawByteString;
 {%REPEAT _LASTMODIFIER_, [, Last]}
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: RawByteString): RawByteString; overload;
 //** If the string s has the form '...sepEND' it returns 'END'
-function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: RawByteString): RawByteString; overload;
 {%END-REPEAT}
 {%END-REPEAT}
 
 //** If the string s has the form 'STARTsep...' it returns 'START'. E.g. for /foo/bar it returns /foo with AllowDirectorySeparators do
-function strBeforeLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+function strBeforeLast(const s: RawByteString; const sep: TCharSet): RawByteString; overload;
 //** If the string s has the form '...sepEND' it returns 'END'. E.g. for /foo/bar it returns bar with AllowDirectorySeparators
-function strAfterLast(const s: RawByteString; const sep: TCharSet): RawByteString;
+function strAfterLast(const s: RawByteString; const sep: TCharSet): RawByteString; overload;
 
 
 //**Joins all string list items to a single string separated by @code(sep).@br
@@ -466,15 +471,16 @@ function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteStr
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
 function strChangeEncoding(const str: RawByteString; from,toe: TSystemCodePage):RawByteString; //**< Changes the string encoding from @code(from) to @code(toe)
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+{$IFDEF fpc}
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
-
+function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+ {$ENDIF}
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
-function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromBOMRemove(var str:string):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
 
 //** This function converts codePoint to the corresponding uppercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
@@ -505,9 +511,9 @@ function strUnescapeHex(s:RawByteString; escape: RawByteString = '\x'): RawByteS
 //**Returns a regex matching s
 function strEscapeRegex(const s:RawByteString): RawByteString;
 //**Decodes a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strUnescapeHex)
-function strDecodeHex(s:RawByteString):RawByteString; {$ifdef fpc}deprecated;{$endif}
+function strDecodeHex(s:RawByteString):RawByteString; {$ifdef HASDeprecated}deprecated;{$endif}
 //**Encodes to a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strEscapeToHex)
-function strEncodeHex(s:RawByteString; const code: RawByteString = '0123456789ABCDEF'):RawByteString;{$ifdef fpc}deprecated;{$endif}
+function strEncodeHex(s:RawByteString; const code: RawByteString = '0123456789ABCDEF'):RawByteString;{$ifdef HASDeprecated}deprecated;{$endif}
 //**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pansichar;l:longint):RawByteString;
 
@@ -613,8 +619,8 @@ const DateMonthDaysCumSum: array[false..true,0..12] of Cardinal =
      (00, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366));
 
 //**Week of year
-function dateWeekOfYear(const date:TDateTime):word;
-function dateWeekOfYear(year, month, day: integer):word;
+function dateWeekOfYear(const date:TDateTime):word;       overload;
+function dateWeekOfYear(year, month, day: integer):word;  overload;
 //**@returns if year is a leap year (supports negative years, i think)
 function dateIsLeapYear(const year: integer): boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 type EDateTimeParsingException = class(Exception);
@@ -660,7 +666,7 @@ function dateTimeFormat(const mask: RawByteString; const dateTime: TDateTime): R
 function dateTimeEncodeOLD(const y,m,d,h,n,s:integer; const secondFraction: double = 0): TDateTime;
 
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function dateTimeFormatOLD(const mask: RawByteString; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; overload; deprecated;
+function dateTimeFormatOLD(const mask: RawByteString; y, m,d, h, n, s: Integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; overload; {$ifdef HASDeprecated}deprecated;{$endif}
 
 
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry)@br
@@ -669,12 +675,12 @@ procedure timeParsePartsOld(const input,mask:RawByteString; outHour, outMinutes,
 //**Reads a time string given a certain mask (@see dateTimeParsePartsTry).@br This function checks, if the time is valid.
 function timeParse(const input,mask:RawByteString): TTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
-function timeFormatOld(const mask: RawByteString; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; deprecated;
+function timeFormatOld(const mask: RawByteString; const h, n, s: integer; const secondFraction: double = 0; const timezone: TDateTime = Nan): RawByteString; {$ifdef HASDeprecated}deprecated;{$endif}
 
 
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br
 procedure dateParsePartsNew(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PInteger = nil);
-procedure dateParsePartsOLD(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil); deprecated;
+procedure dateParsePartsOLD(const input,mask:RawByteString; outYear, outMonth, outDay: PInteger; outtimezone: PDateTime = nil); {$ifdef HASDeprecated}deprecated;{$endif}
 //**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br This function checks, if the date is valid.
 function dateParse(const input,mask:RawByteString): longint;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
@@ -788,8 +794,8 @@ procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDE
 {%END-REPEAT}
 
 
-function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} inline; deprecated; {$ENDIF}
-function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} inline; deprecated; {$ENDIF}
+function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} inline; {$ENDIF} {$ifdef HASDeprecated}deprecated;{$endif}
+function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} inline; {$ENDIF} {$ifdef HASDeprecated}deprecated;{$endif}
 
 implementation
 
@@ -803,6 +809,17 @@ begin
   else result := 0;
 end;
 
+{$ENDIF}
+
+{$IFNDEF HASISNAN}
+function IsNan(const d: double): boolean;
+var data: array[0..1] of longword absolute d;
+const LO = 0; HI = 1;
+begin
+  //sign := (PQWord(@d)^ shr 63) <> 0;
+  result := ((data[HI] and $7FF00000) = $7FF00000) and
+            ((data[LO] <> 0) or (data[HI] and not $FFF00000 <> 0));
+end;
 {$ENDIF}
 
 //========================array functions========================
@@ -1235,7 +1252,7 @@ begin
         c2 := ord(p2[i]);
         if c1 in [97..122] then dec(c1, 32);
         if c2 in [97..122] then dec(c2, 32);
-        if c1 <> c2 then exit(false);
+        if c1 <> c2 then begin result := false; exit; end;
       end;
 end;
 
@@ -2005,7 +2022,7 @@ begin
   end;
 end;
 
-procedure strSwapEndianWord(str: PWord; countofword: SizeInt);
+procedure strSwapEndianWord(str: PWord; countofword: SizeInt);  overload;
 begin
   while countofword > 0 do begin
     PWord(str)^ := SwapEndian(PWord(str)^);
@@ -2014,14 +2031,14 @@ begin
   end;
 end;
 
-procedure strSwapEndianWord(var str: RawByteString);
+procedure strSwapEndianWord(var str: RawByteString);     overload;
 begin
   UniqueString(str);
   assert(length(str) and 1 = 0);
   strSwapEndianWord(pointer(str), length(str) div 2);
 end;
 
-procedure strSwapEndianDWord(str: PDWord; countofdword: SizeInt);
+procedure strSwapEndianDWord(str: PDWord; countofdword: SizeInt); overload;
 begin
   while countofdword > 0 do begin
     PDWord(str)^ := SwapEndian(PDWord(str)^);
@@ -2030,7 +2047,7 @@ begin
   end;
 end;
 
-procedure strSwapEndianDWord(var str: RawByteString);
+procedure strSwapEndianDWord(var str: RawByteString); overload;
 begin
   UniqueString(str);
   assert(length(str) and 3 = 0);
@@ -2062,7 +2079,10 @@ end;
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 begin
   case e of
-    CP_ACP: result := DefaultSystemCodePage;
+    CP_ACP: result := {$IFDEF FPC_HAS_CPSTRING}DefaultSystemCodePage
+                      {$else}{$ifdef windows}GetACP
+                      {$else}CP_UTF8
+                      {$endif}{$endif};
     else result := e;
   end;
 end;
@@ -2224,10 +2244,10 @@ function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 begin
   result := Ord(source^);
   inc(source);
-  if result and %1111100000000000 = %1101100000000000 then begin
+  if result and $f800 = $d800 then begin
     //this might return nonsense, if the string ends with an incomplete surrogate
     //However, as the string should be 0-terminated, this should be safe
-    result := ((result and %0000001111111111) shl 10) or (ord(source^) and %0000001111111111);
+    result := ((result and $03ff) shl 10) or (ord(source^) and $03ff);
     inc(source);
     inc(result, $10000);
   end;
@@ -2288,7 +2308,7 @@ begin
   end;
 end;
 
-
+{$IFDEF fpc}
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 var
   destptr: PInteger;
@@ -2419,7 +2439,7 @@ begin
      end;
   end;
 end;
-
+{$endif}
 
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 begin
@@ -2507,7 +2527,7 @@ begin
   end;
 end;
 
-
+{$IFDEF fpc}
 function strEncodingFromName(str: RawByteString): TSystemCodePage;
 begin
   case UpperCase(str) of
@@ -2522,7 +2542,7 @@ begin
     else result:=CP_NONE;
   end;
 end;
-
+{$ENDIF}
 function strEncodingFromBOMRemove(var str: string): TSystemCodePage;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
@@ -2544,7 +2564,13 @@ begin
 end;
 
 function strUpperCaseSpecialUTF8(codePoint: integer): string;
-const block: array[0..465] of byte = ( $53, $53, $46, $46, $46, $49, $46, $4C, $46, $46, $49, $46, $46, $4C, $53, $54, $53, $54, $D4, $B5, $D5, $92, $D5, $84, $D5, $86, $D5, $84, $D4, $B5, $D5, $84, $D4, $BB, $D5, $8E, $D5, $86, $D5, $84, $D4, $BD, $CA, $BC, $4E, $CE, $99, $CC, $88, $CC, $81, $CE, $A5, $CC, $88, $CC, $81, $4A, $CC, $8C, $48, $CC, $B1, $54, $CC, $88, $57, $CC, $8A, $59, $CC, $8A, $41, $CA, $BE, $CE, $A5, $CC, $93, $CE, $A5, $CC, $93, $CC, $80, $CE, $A5, $CC, $93, $CC, $81, $CE, $A5, $CC, $93, $CD, $82, $CE, $91, $CD, $82, $CE, $97, $CD, $82, $CE, $99, $CC, $88, $CC, $80, $CE, $99, $CC, $88, $CC, $81, $CE, $99, $CD, $82, $CE, $99, $CC, $88, $CD, $82, $CE, $A5, $CC, $88, $CC, $80, $CE, $A5, $CC, $88, $CC, $81, $CE, $A1, $CC, $93, $CE, $A5, $CD, $82, $CE, $A5, $CC, $88, $CD, $82, $CE, $A9, $CD, $82, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC, $8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC, $8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $A8, $CE, $99, $E1, $BC, $A9, $CE, $99, $E1, $BC, $AA, $CE, $99, $E1, $BC, $AB, $CE, $99, $E1, $BC, $AC, $CE, $99, $E1, $BC, $AD, $CE, $99, $E1, $BC, $AE, $CE, $99, $E1, $BC, $AF, $CE, $99, $E1, $BC, $A8, $CE, $99, $E1, $BC, $A9, $CE, $99, $E1, $BC, $AA, $CE, $99, $E1, $BC, $AB, $CE, $99, $E1, $BC, $AC, $CE, $99, $E1, $BC, $AD, $CE, $99, $E1, $BC, $AE, $CE, $99, $E1, $BC, $AF, $CE, $99, $E1, $BD, $A8, $CE, $99, $E1, $BD, $A9, $CE, $99, $E1, $BD, $AA, $CE, $99, $E1, $BD, $AB, $CE, $99, $E1, $BD, $AC, $CE, $99, $E1, $BD, $AD, $CE, $99, $E1, $BD, $AE, $CE, $99, $E1, $BD, $AF, $CE, $99, $E1, $BD, $A8, $CE, $99, $E1, $BD, $A9, $CE, $99, $E1, $BD, $AA, $CE, $99, $E1, $BD, $AB, $CE, $99, $E1, $BD, $AC, $CE, $99, $E1, $BD, $AD, $CE, $99, $E1, $BD, $AE, $CE, $99, $E1, $BD, $AF, $CE, $99, $CE, $91, $CE, $99, $CE, $91, $CE, $99, $CE, $97, $CE, $99, $CE, $97, $CE, $99, $CE, $A9, $CE, $99, $CE, $A9, $CE, $99, $E1, $BE, $BA, $CE, $99, $CE, $86, $CE, $99, $E1, $BF, $8A, $CE, $99, $CE, $89, $CE, $99, $E1, $BF, $BA, $CE, $99, $CE, $8F, $CE, $99, $CE, $91, $CD, $82, $CE, $99, $CE, $97, $CD, $82, $CE, $99, $CE, $A9, $CD, $82, $CE, $99);
+const block: array[0..465] of byte = ( $53, $53, $46, $46, $46, $49, $46, $4C, $46, $46, $49, $46, $46, $4C, $53, $54, $53, $54, $D4, $B5, $D5, $92, $D5, $84, $D5, $86, $D5, $84, $D4, $B5, $D5, $84, $D4, $BB, $D5, $8E, $D5, $86, $D5, $84, $D4, $BD, $CA, $BC, $4E, $CE, $99, $CC, $88, $CC, $81, $CE, $A5, $CC, $88, $CC, $81, $4A, $CC, $8C, $48, $CC, $B1, $54, $CC, $88,
+$57, $CC, $8A, $59, $CC, $8A, $41, $CA, $BE, $CE, $A5, $CC, $93, $CE, $A5, $CC, $93, $CC, $80, $CE, $A5, $CC, $93, $CC, $81, $CE, $A5, $CC, $93, $CD, $82, $CE, $91, $CD, $82, $CE, $97, $CD, $82, $CE, $99, $CC, $88, $CC, $80, $CE, $99, $CC, $88, $CC, $81, $CE, $99, $CD, $82, $CE, $99, $CC, $88, $CD, $82, $CE, $A5, $CC, $88, $CC, $80, $CE, $A5, $CC, $88, $CC, $81, $CE,
+$A1, $CC, $93, $CE, $A5, $CD, $82, $CE, $A5, $CC, $88, $CD, $82, $CE, $A9, $CD, $82, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC, $8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC,
+$8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $A8, $CE, $99, $E1, $BC, $A9, $CE, $99, $E1, $BC, $AA, $CE, $99, $E1, $BC, $AB, $CE, $99, $E1, $BC, $AC, $CE, $99, $E1, $BC, $AD, $CE, $99, $E1, $BC, $AE, $CE, $99, $E1, $BC, $AF, $CE, $99, $E1, $BC, $A8, $CE, $99, $E1, $BC, $A9, $CE, $99, $E1,
+$BC, $AA, $CE, $99, $E1, $BC, $AB, $CE, $99, $E1, $BC, $AC, $CE, $99, $E1, $BC, $AD, $CE, $99, $E1, $BC, $AE, $CE, $99, $E1, $BC, $AF, $CE, $99, $E1, $BD, $A8, $CE, $99, $E1, $BD, $A9, $CE, $99, $E1, $BD, $AA, $CE, $99, $E1, $BD, $AB, $CE, $99, $E1, $BD, $AC, $CE, $99, $E1, $BD, $AD, $CE, $99, $E1, $BD, $AE, $CE, $99, $E1, $BD, $AF, $CE, $99, $E1, $BD, $A8, $CE, $99,
+$E1, $BD, $A9, $CE, $99, $E1, $BD, $AA, $CE, $99, $E1, $BD, $AB, $CE, $99, $E1, $BD, $AC, $CE, $99, $E1, $BD, $AD, $CE, $99, $E1, $BD, $AE, $CE, $99, $E1, $BD, $AF, $CE, $99, $CE, $91, $CE, $99, $CE, $91, $CE, $99, $CE, $97, $CE, $99, $CE, $97, $CE, $99, $CE, $A9, $CE, $99, $CE, $A9, $CE, $99, $E1, $BE, $BA, $CE, $99, $CE, $86, $CE, $99, $E1, $BF, $8A, $CE, $99, $CE,
+$89, $CE, $99, $E1, $BF, $BA, $CE, $99, $CE, $8F, $CE, $99, $CE, $91, $CD, $82, $CE, $99, $CE, $97, $CD, $82, $CE, $99, $CE, $A9, $CD, $82, $CE, $99);
 var special: integer;
 begin
   special := 0;
@@ -3038,12 +3064,10 @@ end;
 
 function utf8toSys(const filename: RawByteString): RawByteString;
 begin
-{$if defined(windows) and not defined(FPC_HAS_CPSTRING)}
-  result :=  Utf8ToAnsi(filename);
-{$else}
   result := filename;
-{$endif}
-  //lazarus's version works better, but we cannot have a lcl dependency here
+  {$IFnDEF FPC_HAS_CPSTRING}{$ifdef windows}
+   result :=  Utf8ToAnsi(result);
+  {$endif}{$endif}
 end;
 
 function strLoadFromFileUTF8(filename: RawByteString): RawByteString;
@@ -3288,6 +3312,9 @@ begin
   else
     result := strResolveURIReal(rel, base);
 end;
+{$IFnDEF fpc}
+const AllowDirectorySeparators=['/','\'];
+{$endif}
 
 function fileNameExpand(const rel: string): string;
 begin
@@ -3749,14 +3776,14 @@ begin
   result := (year mod 4 = 0) and ((year mod 100 <> 0) or (year mod 400 = 0))
 end;
 
-function dateWeekOfYear(const date:TDateTime):word;
+function dateWeekOfYear(const date:TDateTime):word; overload;
 var month, day, year: word;
 begin
   DecodeDate(date,year,month,day);
   result := dateWeekOfYear(year,month,day);
 end;
 
-function dateWeekOfYear(year, month, day: integer): word;
+function dateWeekOfYear(year, month, day: integer): word;overload;
 //ISO Week after Claus T�ndering  http://www.tondering.dk/claus/cal/week.php#weekno
 var a,b,c,s,e,f,g,d,n: longint;
     startOfYear: boolean;
@@ -4095,16 +4122,6 @@ end;
 
 const TryAgainWithRoundedSeconds: RawByteString = '<TryAgainWithRoundedSeconds>';
 
-{$IFNDEF HASISNAN}
-function IsNan(const d: double): boolean;
-var data: array[0..1] of longword absolute d;
-const LO = 0; HI = 1;
-begin
-  //sign := (PQWord(@d)^ shr 63) <> 0;
-  result := ((data[HI] and $7FF00000) = $7FF00000) and
-            ((data[LO] <> 0) or (data[HI] and not $FFF00000 <> 0));
-end;
-{$ENDIF}
 
 function dateTimeFormatInternal(const mask: RawByteString; const y, m, d, h, n, s, nanoseconds, timezone: integer): RawByteString;
 var mp: integer;
@@ -4296,6 +4313,7 @@ begin
     Result := dateTimeFormatInternal(mask, y,m,d,h,n,s, 0, timezone);
   end;
 end;
+
 
 function dateTimeFormatOLD(const mask: RawByteString; y, m, d, h, n, s: integer; const secondFraction: double; const timezone: TDateTime): RawByteString;
 var
