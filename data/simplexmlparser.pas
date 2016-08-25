@@ -49,7 +49,7 @@ type
 //**@param textRead Event to be called when text between tags is read
 //**@param outputEncoding Encoding to be used in the parameters passed to the event
 procedure parseXML(xml:string; enterTag:TEnterTagEvent; leaveTag: TLeaveTagEvent; textRead: TTextEvent;
-                   outputEncoding: TEncoding);
+                   outputEncoding: TSystemCodePage);
 
 function getProperty(propertyName: string; properties:TProperties; const def: string = ''):string;
 procedure addProperty(propertyName,value: string;var properties:TProperties);
@@ -68,7 +68,7 @@ public
   leaveTag: TLeaveTagEvent;
   textRead: TTextEvent;
   
-  fileEncoding,outputEncoding: TEncoding;
+  fileEncoding,outputEncoding: TSystemCodePage;
   function enterTagEvent (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
   function leaveTagEvent(tagName: pchar; tagNameLen: longint):TParsingResult;
   function textEvent(text: pchar; textLen: longint; flags: TTextFlags):TParsingResult;
@@ -121,13 +121,13 @@ begin
 end;
 
 procedure parseXML(xml:string; enterTag: TEnterTagEvent; leaveTag: TLeaveTagEvent;
-  textRead: TTextEvent;outputEncoding: TEncoding);
+  textRead: TTextEvent;outputEncoding: TSystemCodePage);
 var handler: THTMLEventHandler;
 begin
   handler:=THTMLEventHandler.Create;
   try
     handler.outputEncoding:=outputEncoding;
-    handler.fileEncoding:=eUnknown;
+    handler.fileEncoding:=CP_NONE;
     handler.enterTag:=enterTag;
     handler.leaveTag:=leaveTag;
     handler.textRead:=textRead;
@@ -169,4 +169,4 @@ begin
 end;
 
 end.
-
+
