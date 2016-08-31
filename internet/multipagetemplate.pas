@@ -1391,7 +1391,7 @@ begin
   internet:=ainternet;
   parser:=THtmlTemplateParser.create;
   parser.KeepPreviousVariables:=kpvKeepValues;
-  setTemplate(atemplate);
+  if atemplate<>nil then setTemplate(atemplate);
   retryOnConnectionFailures := true;
   queryCache := TXQMapStringObject.Create;
   queryCache.OwnsObjects := false;
