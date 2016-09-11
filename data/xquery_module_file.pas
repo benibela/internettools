@@ -507,13 +507,13 @@ end;
 function writeOrAppendText(const args: TXQVArray; append: boolean; text: string): IXQValue;
 var
   data: String;
-  enc: TEncoding;
+  enc: TSystemCodePage;
 begin
   data := text;
   if length(args) = 3 then begin
     enc := strEncodingFromName(args[2].toString);
-    if enc = eUnknown then raise EXQEvaluationException.create(error_unknown_encoding, 'Unknown encoding: '+args[2].toString, XMLNamespace_Expath_File, args[2]);
-    data := strChangeEncoding(data, eUTF8, enc);
+    if enc = CP_NONE then raise EXQEvaluationException.create(error_unknown_encoding, 'Unknown encoding: '+args[2].toString, XMLNamespace_Expath_File, args[2]);
+    data := strChangeEncoding(data, CP_UTF8, enc);
   end;
   result := writeOrAppendSomething(args[0], append, data);
 end;
@@ -844,13 +844,13 @@ end;
 function read_text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
 var
   data: rawbytestring;
-  enc: TEncoding;
+  enc: TSystemCodePage;
 begin
   data := readFromFile(normalizePath(args[0]));
   if length(args) = 1 then result := xqvalue(data)
   else begin
     enc := strEncodingFromName(args[1].toString);
-    if enc = eUnknown then raiseFileError(error_unknown_encoding, error_unknown_encoding, args[1]);
+    if enc = CP_NONE then raiseFileError(error_unknown_encoding, error_unknown_encoding, args[1]);
     result := xqvalue(strChangeEncoding(data,  enc, eUTF8));
   end;
 end;
