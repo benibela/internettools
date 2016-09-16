@@ -771,29 +771,30 @@ end;
 procedure TInternetAccess.parseHeadersForCookies();
 var i,mark:longint;
     header, name, value:string;
-    ci: Integer;
+    ci, headerlen: Integer;
 begin
   for ci := 0 to lastHTTPHeaders.Count - 1 do
     case parseHeaderLineKind(lastHTTPHeaders[ci]) of
       iahSetCookie: begin
         header := parseHeaderLineValue(lastHTTPHeaders[ci]);
+        headerlen := length(header);
         //Name getrimmt finden
         i := 1;
-        while header[i] = ' ' do i+=1;
+        while (i <= headerlen) and (header[i] = ' ') do i+=1;
         mark:=i;
-        while not (header[i] in ['=',' ',#0]) do i+=1;
+        while (i <= headerlen) and not (header[i] in ['=',' ']) do i+=1;
         name:=copy(header,mark,i-mark);
 
         //Wert finden
-        while not (header[i] in ['=',#0]) do i+=1;
+        while (i <= headerlen) and not (header[i] = '=') do i+=1;
         i+=1;
         mark:=i;
-        if header[i]='"' then begin//quoted-str allowed??
+        if (i <= headerlen) and (header[i]='"') then begin//quoted-str allowed??
           i+=1;
-          while not (header[i] in ['"', #0]) do i+=1;
+          while (i <= headerlen) and not (header[i] = '"') do i+=1;
           i+=1;
         end else
-          while not (header[i] in [';', #13, #10,#0]) do i+=1;
+          while (i <= headerlen) and not (header[i] in [';', #13, #10]) do i+=1;
         value:=copy(header,mark,i-mark);
 
         setCookie(name,value);
