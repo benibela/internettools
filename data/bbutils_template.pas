@@ -2435,7 +2435,7 @@ begin
      else begin
        SetLength(dest, len);
        for i := 0 to len - 1 do
-         dest[i+1] := widechar(source[i]);
+         dest[i+1] := widechar(byte(source[i]));
      end;
   end;
 end;
