@@ -77,7 +77,7 @@ uses synautil,ssl_openssl_lib,bbutils{$ifndef WINDOWS},netdb{$endif};
 
 { TSynapseInternetAccess }
 
-{$ifdef WINDOWS}
+{$if defined(WINDOWS) or defined(android)}
 function checkEtcResolv(): boolean;
 begin
   result := false;
@@ -278,7 +278,7 @@ defaultInternetAccessClass := TSynapseInternetAccess;
 {$ENDIF}
 
 
-{$ifndef WINDOWS}
+{$if not (defined(WINDOWS) or defined(android))}
 InitCriticalSection(resolvConfCS);
 finalization
 DoneCriticalsection(resolvConfCS);
