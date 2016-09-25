@@ -13,7 +13,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, bbutils, xquery_json, xquery__regex;
+uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex;
 
 procedure equal(const s1, s2, testname: string);
 begin
@@ -3256,11 +3256,8 @@ begin
   t('form-combine($f, {"foo": 17}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'17'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   t('form-combine($f, {"foo": {"value": 17, "headers": "Content-Type: image/png"}}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: image/png'#13#10#13#10'17'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   RandSeed:=123;
-  {$ifdef cpu32}
-  randomboundary := baseboundary + 'H';
-  {$else}
-  randomboundary := baseboundary + 'S';
-  {$endif}
+  randomboundary := baseboundary + TMIMEMultipartData.randomLetter;
+  RandSeed:=123;
   t('form(//form[4], {"foo": "---------------------------1212jhjg2ypsdofx0235p2z5as09", "t": {"value": 17123, "filename": "xyz"}}).post', #13#10'--'+randomboundary+''#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'---------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'--'+randomboundary+''#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--'+randomboundary+''#13#10'Content-Disposition: form-data; name="t"; filename="xyz"'#13#10#13#10'17123'#13#10'--'+randomboundary+'--');
   t('($f := form(//form[4], {"foo": {"type": "text/html"}, "Y": {"headers": ("a: 1", "b: 2")}, "new": {"type": "text/html", "headers": "Content-Type: override"}})).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: text/html'#13#10#13#10'bar'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10'a: 1'#13#10'b: 2'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="new"'#13#10'Content-Type: override'#13#10#13#10#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   RandSeed:=123;
@@ -3270,11 +3267,10 @@ begin
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');
 
-  {$ifdef cpu32}
-  {$else}
-//  t('join((random(), random(), random(), random(10), random(10), random(10.5)))', '0.286139338742942 0.428470924962312 0.226851454935968 0 3 5.15674879238941');
-//  t('join((random(), random-seed(123), random(),  random-seed(123), random(), random(10), random(10), random(10.5)))', '0.423106460599229 0.69646918727085 0.69646918727085 1 0 7.25429093954153');
-  {$endif}
+  t('join(for $r in (random(), random(), random()) return if ($r >= 0 and $r < 1) then "O" else "F")', 'O O O');
+  t('join(for $r in (random(10), random(10), random(10.5)) return if ($r >= 0 and $r < 10) then "O" else "F")', 'O O O');
+  t('(random(), random-seed(123), random())[last()]  = (random-seed(123), random())[last()]', 'true');
+
 
   //Newer tests
 

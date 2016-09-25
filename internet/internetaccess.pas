@@ -89,6 +89,7 @@ type
     procedure clear;
 
     class function HeaderForBoundary(const boundary: string): string; static;
+    class function randomLetter: Char; static;
   end;
 
   TInternetAccess = class;
@@ -488,9 +489,6 @@ begin
 end;
 
 function TMIMEMultipartData.compose(out boundary: string; boundaryHint: string): string;
-
-//const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?'; //all allowed
-const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-'; //might be preferable to use those only
 var joinedHeaders: TStringArray;
     encodedData: TStringArray;
     i: Integer;
@@ -523,7 +521,7 @@ begin
         if not ok then break;
       end;
       if not ok then
-        boundary += ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
+        boundary += randomLetter;
     until ok or (length(boundary) >= 70 {max length});
     if not ok then
       if length(boundaryHint) <= 16 then boundary := boundaryHint
@@ -569,6 +567,13 @@ end;
 class function TMIMEMultipartData.HeaderForBoundary(const boundary: string): string;
 begin
   result := 'Content-Type: ' + ContentTypeMultipart + '; boundary=' + boundary;
+end;
+
+class function TMIMEMultipartData.randomLetter: Char;
+//const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?'; //all allowed
+const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-'; //might be preferable to use those only
+begin
+  result := ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
 end;
 
 { EInternetException }
