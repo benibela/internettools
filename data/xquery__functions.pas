@@ -981,7 +981,11 @@ var
   f: xqfloat;
 begin
   requiredArgCount(args, 1, 2);
-  if args[0].isUndefined then exit(xqvalue);
+  case args[0].getSequenceCount of
+    0: exit(xqvalue);
+    1: ;
+    else raiseXPTY0004TypeError(args[0], 'numeric?');
+  end;
   baseType := getBaseType(args[0]);
   if length(args) = 1 then prec := 0
   else prec := getReasonablePrecision(args[1]);
