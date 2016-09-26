@@ -1595,10 +1595,11 @@ begin
   TXQTermFlowerGroup(result).collation := collation;
   SetLength(TXQTermFlowerGroup(result).vars, length(vars) );
   for i:= 0 to high(vars) do
-    TXQTermFlowerGroup(result).vars[i] := TXQTermVariable(vars[i]);
+    TXQTermFlowerGroup(result).vars[i] := TXQTermVariable(vars[i].clone);
   SetLength(TXQTermFlowerGroup(result).seqtypes, length(seqtypes) );
   for i:= 0 to high(seqtypes) do
-    TXQTermFlowerGroup(result).seqtypes[i] := TXQTermSequenceType(seqtypes[i]);
+    if seqtypes[i] <> nil then
+      TXQTermFlowerGroup(result).seqtypes[i] := TXQTermSequenceType(seqtypes[i].clone);
 end;
 
 destructor TXQTermFlowerGroup.destroy;
