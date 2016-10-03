@@ -72,7 +72,7 @@ interface
 
 uses
   Classes, SysUtils,math//,LCLProc
-  {$IFDEF Win32}
+  {$IFDEF windows}
   , windows
   {$ENDIF};
 
@@ -870,7 +870,7 @@ procedure intSieveDivisorCount(n: integer; var divcount: TLongintArray);
 
 
 //--------------------Time functions-----------------------------------
-{$IFDEF Win32}
+{$IFDEF windows}
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
 function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 {$ENDIF}
@@ -5547,7 +5547,7 @@ end;
 
 
 //========================date/time functions========================
-{$IFDEF Win32}
+{$IFDEF windows}
 function dateTimeToFileTime(const date: TDateTime): TFileTime;
 var sysTime: TSYSTEMTIME;
     temp: TFILETIME;
