@@ -3954,6 +3954,7 @@ begin
   else delta := 1;
   for mi := 0 to associatedModules.Count - 1 do begin
     m := TXQTermModule(TXQuery(associatedModules[mi]).FTerm);
+    if m = nil then continue; //otherwise it crashes with variables accessing other variables in the same imported module
     for i := 0 to high(m.children) - delta do begin
       if not (m.children[i] is TXQTermDefineVariable) then continue;
       w := TXQTermDefineVariable(m.children[i]).getVariable;
