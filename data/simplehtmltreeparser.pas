@@ -1972,7 +1972,9 @@ begin
   result:=prContinue;
 
   if tagName^ = '?' then begin //processing instruction
-    processingInstruction(tagName+1, properties[high(properties)].value + properties[high(properties)].valueLen - tagName, []);
+    if length(properties) > 0 then tagNameLen := properties[high(properties)].value + properties[high(properties)].valueLen - tagName
+    else tagNameLen -= 1;
+    processingInstruction(tagName+1, tagNameLen, []);
     exit;
   end;
 
