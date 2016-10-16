@@ -231,7 +231,6 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitVariable(pt: PXQTerm);
   var v: TXQTermVariable;
     q: TXQuery;
-    modu: TXQTermModule;
     replacement: TXQTermVariableGlobal;
     declaration: TXQTermDefineVariable;
   begin

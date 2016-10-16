@@ -3382,7 +3382,7 @@ var
   end;
 begin
   result := '?';
-  delta := PtrUInt(addr);
+  delta := {%H-}PtrUInt(addr);
   for i := low(terms) to high(terms) do
     checkAddr( TMethod(@terms[i].evaluate).Code,  terms[i].ClassName);
 

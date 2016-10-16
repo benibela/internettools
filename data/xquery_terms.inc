@@ -50,6 +50,7 @@ end;
 function TXQTerm.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
+  result := nil;
   raise EXQEvaluationException.create('pxp:INTERNAL', debugTermToString + ' cannot be evaluated');
 end;
 
@@ -1580,6 +1581,7 @@ end;
 
 procedure TXQTermFlowerGroup.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
 begin
+  ignore(visitor);
 end;
 
 function TXQTermFlowerGroup.getContextDependencies: TXQContextDependencies;
