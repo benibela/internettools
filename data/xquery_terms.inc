@@ -1094,6 +1094,8 @@ function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v^, context) then
           raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v^.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       Context.temporaryVariables.push(TXQTermVariable(children[pos]), v^);
+
+      Context.temporaryVariables.push(v^);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then exit(not isEvery);
       Context.temporaryVariables.pop;
     end;

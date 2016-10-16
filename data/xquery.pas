@@ -1307,18 +1307,18 @@ type
     procedure addOrdered(list: TXQVList);
   end;
 
+  {$define TRACK_STACK_VARIABLE_NAMES}
   TXQEvaluationStack = class(TXQVCustomList)
   private
-    debugNames: array of string;
+    {$ifdef TRACK_STACK_VARIABLE_NAMES}debugNames: array of string;{$endif}
   public
     procedure push(const value: ixqvalue);
     procedure pop();
     procedure popTo(newCount: integer);
     function top(i: integer = 0): IXQValue;
 
-    procedure push(const name: TXQTermVariable; const v: ixqvalue);
-    function top(const name: TXQTermVariable; i: integer = 0): IXQValue;
-    function hasVariable(const name: TXQTermVariable; out v: ixqvalue): boolean;
+    procedure push(const name: TXQTermVariable; const v: ixqvalue); inline;
+    function top(const name: TXQTermVariable; i: integer = 0): IXQValue; inline;
   end;
 
   (***
@@ -6362,31 +6362,23 @@ end;
 
 procedure TXQEvaluationStack.push(const name: TXQTermVariable; const v: ixqvalue);
 begin
+  {$ifdef TRACK_STACK_VARIABLE_NAMES}
   if fcount >= length(debugNames) then
    setlength(debugNames, length(debugNames) + 128);
   debugNames[fcount] := name.value;
+  {$endif}
   push(v);
 end;
 
 function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
 begin
   result := top(i);
+  {$ifdef TRACK_STACK_VARIABLE_NAMES}
   if debugNames[count - i - 1] <> name.value then
     raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+  {$endif}
 end;
 
-function TXQEvaluationStack.hasVariable(const name: TXQTermVariable; out v: ixqvalue): boolean;
-var
-  i: Integer;
-begin
-  for i := 0 to count - 1 do
-    if debugNames[i] = name.value then begin
-     result := true;;
-     v := fbuffer[i];
-     exit;
-    end;
-  result := false;
-end;
 
 
 
