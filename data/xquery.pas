@@ -1316,6 +1316,7 @@ type
     procedure pop();
     procedure popTo(newCount: integer);
     function top(i: integer = 0): IXQValue;
+    function topptr(i: integer = 0): PIXQValue; inline;
 
     procedure push(const name: TXQTermVariable; const v: ixqvalue); inline;
     function top(const name: TXQTermVariable; i: integer = 0): IXQValue; inline;
@@ -6334,7 +6335,8 @@ end;
 
 procedure TXQEvaluationStack.push(const value: ixqvalue);
 begin
-  reserve(fcount + 1);
+  if fcount >= fcapacity then
+    reserve(fcount + 1);
   PPointer(fbuffer)[fcount] := value;
   value._AddRef;
   fcount += 1;
@@ -6348,15 +6350,25 @@ begin
 end;
 
 procedure TXQEvaluationStack.popTo(newCount: integer);
+var
+  i: Integer;
 begin
   assert(newCount <= fcount);
-  Count := newCount;
+  for i := newCount to fcount - 1 do
+    fbuffer[i]._Release;
+  FillChar(fbuffer[newCount], sizeof(fbuffer[newCount]) * (fcount - newCount), 0);
+  fcount := newCount;
 end;
 
 function TXQEvaluationStack.top(i: integer): IXQValue;
 begin
   assert((i >= 0) and (count - i - 1 >= 0));
   result := fbuffer[count - i - 1];
+end;
+
+function TXQEvaluationStack.topptr(i: integer): PIXQValue;
+begin
+  result := @fbuffer[count - i - 1];
 end;
 
 
