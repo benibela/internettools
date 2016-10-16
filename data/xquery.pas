@@ -1307,6 +1307,19 @@ type
     procedure addOrdered(list: TXQVList);
   end;
 
+  TXQEvaluationStack = class(TXQVCustomList)
+  private
+    debugNames: array of string;
+  public
+    procedure push(const value: ixqvalue);
+    procedure pop();
+    procedure popTo(newCount: integer);
+    function top(i: integer = 0): IXQValue;
+
+    procedure push(const name: TXQTermVariable; const v: ixqvalue);
+    function top(const name: TXQTermVariable; i: integer = 0): IXQValue;
+    function hasVariable(const name: TXQTermVariable; out v: ixqvalue): boolean;
+  end;
 
   (***
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
@@ -1995,6 +2008,9 @@ type
   { TXQTermTryCatch }
 
   TXQTermTryCatch = class(TXQTerm)
+  private
+    infoVars: array[0..6] of TXQTermVariable;
+  public
     body: TXQTerm;
     catches: array of record
       tests: array of record
@@ -2722,10 +2738,6 @@ type
     procedure reserve(newcap: integer);
   public
     property count: integer read varcount;
-  end;
-
-  TXQEvaluationStack = class(TXQVariableChangeLog)
-    function top(i: integer = 0): IXQValue;
   end;
 
 
@@ -6320,11 +6332,60 @@ begin
 end;
 
 
+procedure TXQEvaluationStack.push(const value: ixqvalue);
+begin
+  reserve(fcount + 1);
+  PPointer(fbuffer)[fcount] := value;
+  value._AddRef;
+  fcount += 1;
+end;
+
+procedure TXQEvaluationStack.pop;
+begin
+  assert(fcount > 0);
+  fbuffer[fcount-1] := nil;
+  dec(fcount);
+end;
+
+procedure TXQEvaluationStack.popTo(newCount: integer);
+begin
+  assert(newCount <= fcount);
+  Count := newCount;
+end;
 
 function TXQEvaluationStack.top(i: integer): IXQValue;
 begin
   assert((i >= 0) and (count - i - 1 >= 0));
-  result := varstorage[count - i - 1].value;
+  result := fbuffer[count - i - 1];
+end;
+
+
+procedure TXQEvaluationStack.push(const name: TXQTermVariable; const v: ixqvalue);
+begin
+  if fcount >= length(debugNames) then
+   setlength(debugNames, length(debugNames) + 128);
+  debugNames[fcount] := name.value;
+  push(v);
+end;
+
+function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
+begin
+  result := top(i);
+  if debugNames[count - i - 1] <> name.value then
+    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+end;
+
+function TXQEvaluationStack.hasVariable(const name: TXQTermVariable; out v: ixqvalue): boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to count - 1 do
+    if debugNames[i] = name.value then begin
+     result := true;;
+     v := fbuffer[i];
+     exit;
+    end;
+  result := false;
 end;
 
 
