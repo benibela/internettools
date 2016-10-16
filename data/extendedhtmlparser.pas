@@ -1404,6 +1404,7 @@ var xpathText: TTreeNode;
    regex: String;
    name: String;
    props: TStringArray;
+   tempa: TXQVArray;
   begin
     attribs := templateStart.templateAttributes;
 
@@ -1411,8 +1412,10 @@ var xpathText: TTreeNode;
     value:=performPXPEvaluation(templateStart.source);
 
     regex := attribs.Values['regex'];
-    if regex<>'' then
-      value := xqFunctionExtract(xqvalueArray([value, xqvalue(regex), xqvalue(StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)), xqvalue('i')]));
+    if regex<>'' then begin
+      tempa := xqvalueArray([value, xqvalue(regex), xqvalue(StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)), xqvalue('i')]);
+      value := xqFunctionExtract(length(tempa), @tempa[0]);
+    end;
 
 
 
@@ -2130,7 +2133,7 @@ begin
 end;
 
 
-function xqFunctionMatches(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionMatches(const context: TXQEvaluationContext; argc: sizeint; argv: PIXQValue): IXQValue;
 var temp: THtmlTemplateParser;
     template, html: IXQValue;
     cols: TXQVariableChangeLog;
@@ -2138,7 +2141,7 @@ var temp: THtmlTemplateParser;
     i: Integer;
     list: TXQVList;
 begin
-  requiredArgCount(args, 2);
+  requiredArgCount(argc, 2);
   list := TXQVList.create();
   try
     temp := THtmlTemplateParser.create; //TODO: optimize
@@ -2152,11 +2155,11 @@ begin
       temp.FQueryContext.staticContext := temp.QueryEngine.StaticContext;
       temp.KeepPreviousVariables:=kpvForget;
       temp.OutputEncoding:=context.staticContext.stringEncoding;
-      for template in args[0] do begin
+      for template in argv[0] do begin
         if template is TXQValueString then temp.parseTemplate(template.toString)
         else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
         else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.debugAsStringWithTypeAnnotation());
-        for html in args[1] do begin
+        for html in argv[1] do begin
           if not (html is TXQValueNode) then
             raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.debugAsStringWithTypeAnnotation());
           temp.FHtmlTree := html.toNode;

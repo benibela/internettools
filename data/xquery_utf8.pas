@@ -56,12 +56,11 @@ begin
 end;
 
 
-function xqFunctionString_length(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionString_length(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: String;
 begin
-  requiredArgCount(args, 0, 1);
-  if length(args) = 1 then temp := args[0].toString
+  if argc = 1 then temp := args[0].toString
   else if context.SeqValue <> nil then temp := context.SeqValue.toString
   else if context.ParentElement <> nil then temp := xqvalue(context.ParentElement).toString
   else raise EXQEvaluationException.create('XPDY0002', 'No context item');
@@ -70,26 +69,23 @@ begin
 end;
 
 
-function xqFunctionSubstring(const args: TXQVArray): IXQValue;
+function xqFunctionSubstring(argc: SizeInt; args: PIXQValue): IXQValue;
 var s:string;
     from, len: integer;
 begin
-  requiredArgCount(args, 2,3);
   s:=args[0].toString;
-  xpathRangeDefinition(args, length(s), from, len);
+  xpathRangeDefinition(argc, args, length(s), from, len);
   result := xqvalue(strCopyUTF8(s,from,len));
 end;
 
 
-function xqFunctionTranslate(const args: TXQVArray): IXQValue;
+function xqFunctionTranslate(argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i,pos, cp: Integer;
  resstr: String;
  mapIterator, transIterator: TStrIterator;
  found: Boolean;
 begin
-  requiredArgCount(args, 3);
-
   resstr := '';
   mapIterator := strIterator(args[1].toString);
   transIterator := strIterator(args[2].toString);
@@ -115,15 +111,14 @@ end;
 
 
 
-function xqFunctionNormalizeUnicode(const args: TXQVArray): IXQValue;
+function xqFunctionNormalizeUnicode(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   method: String;
   p: pchar;
 begin
-  requiredArgCount(args, 1, 2);
   if args[0].toString = '' then exit(xqvalue(''));
   method := 'NFC';
-  if length(args) = 2 then method := trim(UpperCase(args[1].toString));
+  if argc = 2 then method := trim(UpperCase(args[1].toString));
 
   p := pchar(args[0].toString);
   case method of
@@ -140,12 +135,11 @@ begin
   Freemem(p);
 end;
 
-function xqFunctionString_to_codepoints(const args: TXQVArray): IXQValue;
+function xqFunctionString_to_codepoints(argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: string;
  i, cp: Integer;
  resseq: TXQValueSequence;
 begin
-  requiredArgCount(args,1);
   temp := args[0].toString;
   if temp = '' then exit(xqvalue);
   resseq := TXQValueSequence.create(length(temp));
@@ -218,15 +212,13 @@ begin
   end;
 end;
 
-function xqFunctionUpper_Case(const args: TXQVArray): IXQValue;
+function xqFunctionUpper_Case(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqvalue(strUpperUtf8(args[0].toString));
 end;
 
-function xqFunctionLower_case(const args: TXQVArray): IXQValue;
+function xqFunctionLower_case(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqvalue(strLowerUtf8(args[0].toString));
 end;
 

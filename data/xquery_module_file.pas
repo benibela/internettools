@@ -402,22 +402,22 @@ begin
   result := FileExists(Filename) and not DirectoryExists(Filename); //does this work?
 end;
 
-function exists(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function exists(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(FileExists(normalizePath(args[0])));
 end;
 
-function is_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function is_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(DirectoryExists(normalizePath(args[0])));
 end;
 
-function is_file(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function is_file(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(FileExistsAsTrueFile(args[0].toString));
 end;
 
-function last_modified(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function last_modified(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: LongInt;
   dateTime: TDateTime;
@@ -428,7 +428,7 @@ begin
   result := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
 end;
 
-function size(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function size(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   code: String;
   path: String;
@@ -489,28 +489,27 @@ begin
   result := xqvalue();
 end;
 
-function writeOrAppendSerialized(const args: TXQVArray; append: boolean): IXQValue;
+function writeOrAppendSerialized(argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
 var
   temp: TXQueryEngine;
   data: IXQValue;
 begin
-  requiredArgCount(args, 2, 3);
   temp := TXQueryEngine.create;
   temp.VariableChangelog.add('data', args[1]);
-  if length(args) = 3 then temp.VariableChangelog.add('args', args[2])
+  if argc = 3 then temp.VariableChangelog.add('args', args[2])
   else temp.VariableChangelog.add('args', xqvalue());
   data := temp.evaluateXQuery3('serialize($data, $args)'); //todo call serialization directly, handle encoding
   temp.free;
   result := writeOrAppendSomething(args[0], append, data.toString);
 end;
 
-function writeOrAppendText(const args: TXQVArray; append: boolean; text: string): IXQValue;
+function writeOrAppendText(argc: SizeInt; args: PIXQValue; append: boolean; text: string): IXQValue;
 var
   data: String;
   enc: TSystemCodePage;
 begin
   data := text;
-  if length(args) = 3 then begin
+  if argc = 3 then begin
     enc := strEncodingFromName(args[2].toString);
     if enc = CP_NONE then raise EXQEvaluationException.create(error_unknown_encoding, 'Unknown encoding: '+args[2].toString, XMLNamespace_Expath_File, args[2]);
     data := strChangeEncoding(data, CP_UTF8, enc);
@@ -518,42 +517,42 @@ begin
   result := writeOrAppendSomething(args[0], append, data);
 end;
 
-function append(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function append(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := writeOrAppendSerialized(args, true);
+  result := writeOrAppendSerialized(argc, args, true);
 end;
-function append_Binary(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function append_Binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
 end;
-function append_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function append_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := writeOrAppendText(args, true, args[1].toString);
+  result := writeOrAppendText(argc, args, true, args[1].toString);
 end;
-function append_Text_Lines(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function append_Text_Lines(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := writeOrAppendText(args, true, args[1].toJoinedString(LineEnding) + LineEnding);
+  result := writeOrAppendText(argc, args, true, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
-function write(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function write(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := writeOrAppendSerialized(args, false);
+  result := writeOrAppendSerialized(argc, args, false);
 end;
-function write_Binary(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function write_Binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   offset: int64;
 begin
   offset := -1;
-  if length(args) >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := writeOrAppendSomething(args[0], length(args) >= 3, (args[1] as TXQValueString).toRawBinary, offset);
+  if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
+  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueString).toRawBinary, offset);
 end;
-function write_Text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function write_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := writeOrAppendText(args, false, args[1].toString);
+  result := writeOrAppendText(argc, args, false, args[1].toString);
 end;
-function write_Text_Lines(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function write_Text_Lines(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := writeOrAppendText(args, false, args[1].toJoinedString(LineEnding) + LineEnding);
+  result := writeOrAppendText(argc, args, false, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
 
@@ -578,12 +577,11 @@ end;
 
 
 
-function copy(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function copy(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   source, dest: String;
   copier: TDirCopier;
 begin
-  requiredArgCount(args,1,2);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
   if source = dest then raiseFileError(Error_Io_Error, 'source = dest', args[0]);
@@ -609,7 +607,7 @@ begin
   result := xqvalue();
 end;
 
-function create_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function create_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
@@ -619,12 +617,11 @@ begin
   result := xqvalue();
 end;
 
-function create_temp_dir(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function create_temp_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
-  requiredArgCount(args, 2, 3);
-  if length(args) = 3 then begin
+  if argc = 3 then begin
     dir := normalizePath(args[2]);
     if not DirectoryExists(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
   end
@@ -634,12 +631,11 @@ begin
   result := xqvalue(dir);
 end;
 
-function create_temp_file(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function create_temp_file(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
-  requiredArgCount(args, 2, 3);
-  if length(args) = 3 then begin
+  if argc = 3 then begin
     dir := normalizePath(args[2]);
     if not DirectoryExists(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
   end
@@ -680,7 +676,7 @@ begin
     TDirDeleter.checkResult(SysUtils.DeleteFile(current), current);
 end;
 
-function delete(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function delete(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
   recursive: Boolean;
@@ -688,7 +684,7 @@ var
   i: Integer;
 begin
   path := normalizePath(args[0]);
-  recursive := (length(args) = 2) and args[1].toBoolean;
+  recursive := (argc = 2) and args[1].toBoolean;
   if not FileExists(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
   if not DirectoryExists(path) then begin
     TDirDeleter.checkResult(SysUtils.DeleteFile(path), path)
@@ -762,22 +758,20 @@ begin
   end;
 end;
 
-function list(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function list(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   mask: String;
 begin
-  requiredArgCount(args,1,3);
-  if Length(args) >= 3 then mask := args[2].toString
+  if argc >= 3 then mask := args[2].toString
   else mask := '*';
-  result := myList(args[0], true, (length(args) >= 2) and args[1].toBoolean, mask)
+  result := myList(args[0], true, (argc >= 2) and args[1].toBoolean, mask)
 end;
 
-function move(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function move(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   source: String;
   dest: String;
 begin
-  requiredArgCount(args,1,2);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
 
@@ -826,7 +820,7 @@ end;
 
 
 
-function read_binary(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function read_binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   from: int64;
   len: int64;
@@ -835,19 +829,19 @@ begin
   from := 0;
   len := -1;
   rangeErr := false;
-  if length(args) >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
-  if length(args) >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
+  if argc >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
+  if argc >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
   if rangeErr then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
 end;
 
-function read_text(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function read_text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   data: rawbytestring;
   enc: TSystemCodePage;
 begin
   data := readFromFile(normalizePath(args[0]));
-  if length(args) = 1 then result := xqvalue(data)
+  if argc = 1 then result := xqvalue(data)
   else begin
     enc := strEncodingFromName(args[1].toString);
     if enc = CP_NONE then raiseFileError(error_unknown_encoding, error_unknown_encoding, args[1]);
@@ -855,7 +849,7 @@ begin
   end;
 end;
 
-function name(const args: TXQVArray): IXQValue;
+function name(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
   lastSep: LongInt;
@@ -868,7 +862,7 @@ begin
 end;
 
 
-function resolve_path(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function resolve_path(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
 begin
@@ -876,20 +870,20 @@ begin
   result := xqvalue(path);
 end;
 
-function parent(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function parent(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
 begin
-  path := strBeforeLast(resolve_path(context,args).toString, AllowDirectorySeparators);
+  path := strBeforeLast(resolve_path(context,argc, args).toString, AllowDirectorySeparators);
   result := xqvalue(path);
 end;
 
-function children(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function children(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   Result := myList(args[0], false, false);
 end;
 
-function path_to_native(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function path_to_native(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
@@ -899,27 +893,27 @@ begin
   result := xqvalue(dir);
 end;
 
-function path_to_uri(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function path_to_uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(fileNameExpandToURI(normalizePath(args[0])));
 end;
 
-function dir_separator(const args: TXQVArray): IXQValue;
+function dir_separator(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(DirectorySeparator);
 end;
 
-function line_separator(const args: TXQVArray): IXQValue;
+function line_separator(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(LineEnding);
 end;
 
-function path_separator(const args: TXQVArray): IXQValue;
+function path_separator(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(PathSeparator);
 end;
 
-function temp_dir(const args: TXQVArray): IXQValue;
+function temp_dir(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(GetTempDir());
 end;

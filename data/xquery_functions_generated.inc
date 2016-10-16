@@ -20,42 +20,36 @@ begin
 end;
 
 
-function xqFunctionYear_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionYear_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqFunctionSomethingFrom_Datetime(args[0], 1);
 end;
 
-function xqFunctionMonth_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionMonth_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqFunctionSomethingFrom_Datetime(args[0], 2);
 end;
 
-function xqFunctionDay_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionDay_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqFunctionSomethingFrom_Datetime(args[0], 3);
 end;
 
-function xqFunctionHours_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionHours_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqFunctionSomethingFrom_Datetime(args[0], 4);
 end;
 
-function xqFunctionMinutes_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionMinutes_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1);
   result := xqFunctionSomethingFrom_Datetime(args[0], 5);
 end;
 
 
 
-function xqFunctionSeconds_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionSeconds_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 var v: IXQValue;
 begin
-  requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
   with v.getInternalDateTimeData^ do begin
@@ -64,11 +58,10 @@ begin
   end;
 end;
 
-function xqFunctionTimezone_From_Datetime(const args: TXQVArray): IXQValue;
+function xqFunctionTimezone_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 var tempCorrectlyInitialized: TXQValueDateTimeData;
      v: IXQValue;
 begin
-  requiredArgCount(args, 1);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
   if v.getInternalDateTimeData^.timezone = high(Integer) then exit(xqvalue);

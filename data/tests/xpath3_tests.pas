@@ -170,7 +170,7 @@ begin
   t('let $x := 1, $f := function() { ( $foobar := concat($x, "23"), get("foobar")) } return  ($f(), x">{$foobar}<")', '123 123 >123<'); //how do we plan to handle side effects?
 
   //Named Function References
-  t('(let $f := concat#3 return $f)("a","b","c")', 'abc');
+  t('(let $f := concat#3 return $f)("a","b","c")', 'abc');  //if this test fails after refactoring variables, remember functions references create variable terms directly and have their own stack offset calculation
   t('(let $f := abs#1 return $f)(-1234)', '1234');
   t('function ($temp) { (let $f := abs#1 return $f)(-1234) } (0)', '1234');
   t('(let $f := function-lookup(xs:QName("fn:concat"), 3) return $f)("a","b","c")', 'abc');

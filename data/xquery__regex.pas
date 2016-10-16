@@ -74,7 +74,7 @@ function regexprreencode(regexpr: string; flags: TWrappedRegExprFlags): string;
 
 function wregexprParseInternal(const pattern: string; flags: TWrappedRegExprFlags): TWrappedRegExpr;
 function wregexprParse(pattern: string; flags: TWrappedRegExprFlags): TWrappedRegExpr;
-function wregexprParse(const args: TXQVArray; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr;
+function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr;
 function wregexprClone(regexpr: TWrappedRegExpr): TWrappedRegExpr;
 procedure wregexprFree(wregexp: TWrappedRegExpr);
 
@@ -82,13 +82,13 @@ function wregexprMatches(regexpr: TWrappedRegExpr; input: string): Boolean; //mi
 function wregexprExtract(regexpr: TWrappedRegExpr; input: string; out matches: TWrappedMatchArray): boolean; //might be removed in future
 
 //XQuery standard function
-function xqFunctionReplace(const args: TXQVArray): IXQValue;
-function xqFunctionMatches(const args: TXQVArray): IXQValue;
-function xqFunctionTokenize(const args: TXQVArray): IXQValue;
-function xqFunctionAnalyze_String(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionReplace(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMatches(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionTokenize(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionAnalyze_String(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
 
 //My extension function
-function xqFunctionExtract(const args: TXQVArray): IXQValue;
+function xqFunctionExtract(argc: SizeInt; argv: PIXQValue): IXQValue;
 
 const UsingFLRE = {$IFDEF USE_FLRE}true{$ELSE}false{$endif} ;
 
@@ -580,15 +580,15 @@ begin
   end;
 end;
 
-function wregexprParse(const args: TXQVArray; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr;
+function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr;
 var
   flags: TWrappedRegExprFlags;
   c: Char;
 begin
   flags := [];
   if all <> nil then all^ := false;
-  if high(args) >= flagsPos then begin
-    for c in args[flagsPos].toString do
+  if argc > flagsPos then begin
+    for c in argv[flagsPos].toString do
       case c of
       's': Include(flags, wrfSingleLine);
       'm': Include(flags, wrfMultiLine);
@@ -597,19 +597,19 @@ begin
       'q': Include(flags, wrfQuote);
       '!': include(flags, wrfSkipSyntaxNormalization);
       else if (c = '*') and (all <> nil) then all^ := true
-      else raise EXQEvaluationException.create('FORX0001', 'Invalid flag ' + c + ' in ' + args[flagsPos].debugAsStringWithTypeAnnotation());
+      else raise EXQEvaluationException.create('FORX0001', 'Invalid flag ' + c + ' in ' + argv[flagsPos].debugAsStringWithTypeAnnotation());
       end;
   end;
 
   if toescape <> nil then toescape^ := wrfQuote in flags;
 
-  result := wregexprParse(args[1].toString, flags);
+  result := wregexprParse(argv[1].toString, flags);
   if not allowEmptyMatch then begin
     if result.
       {$IF defined(USE_SOROKINS_REGEX)}Exec{$ELSEIF defined(USE_FLRE)}Test{$ENDIF}
       ('') then begin
         wregexprFree(result);
-        raise EXQEvaluationException.create('FORX0003', 'Regexp must not match the empty string: '+args[1].toString);
+        raise EXQEvaluationException.create('FORX0003', 'Regexp must not match the empty string: '+argv[1].toString);
       end;
   end;
 end;
@@ -775,23 +775,22 @@ end;
 
 {$ENDIF}
 
-function xqFunctionReplace(const args: TXQVArray): IXQValue;
+function xqFunctionReplace(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
  regEx: TWrappedRegExpr;
  noescape: Boolean;
  {$IFDEF USE_FLRE}replacer: TReplaceCallback;{$ENDIF}
 begin
-  requiredArgCount(args, 3,4);
   {$IFDEF USE_FLRE}replacer := nil;{$ENDIF}
-  regEx:=wregexprParse(args, 3, false, @noescape);
+  regEx:=wregexprParse(argc, argv, 3, false, @noescape);
   try
     try
     {$IFDEF USE_SOROKINS_REGEX}
-    result := xqvalue(regEx.Replace(args[0].toString, args[2].toString, not noescape));
+    result := xqvalue(regEx.Replace(argv[0].toString, argv[2].toString, not noescape));
     {$ENDIF}
     {$IFDEF USE_FLRE}
-    replacer := TReplaceCallback.create(args[2].toString, noescape);
-    result := xqvalue(regEx.UTF8ReplaceCallback(args[0].toString, @replacer.callback));
+    replacer := TReplaceCallback.create(argv[2].toString, noescape);
+    result := xqvalue(regEx.UTF8ReplaceCallback(argv[0].toString, @replacer.callback));
     {$ENDIF}
     except
       on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
@@ -804,20 +803,19 @@ begin
 end;
 
 
-function xqFunctionMatches(const args: TXQVArray): IXQValue;
+function xqFunctionMatches(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
  regEx: TWrappedRegExpr;
 begin
-  requiredArgCount(args, 2,3);
-  regEx:=wregexprParse(args, 2, true);
+  regEx:=wregexprParse(argc, argv, 2, true);
   try
-    result := xqvalue(wregexprMatches(regEx, args[0].toString))
+    result := xqvalue(wregexprMatches(regEx, argv[0].toString))
   finally
     wregexprFree(regEx);
   end;
 end;
 
-function xqFunctionTokenize(const args: TXQVArray): IXQValue;
+function xqFunctionTokenize(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   regEx: TWrappedRegExpr;
   input: String;
@@ -830,12 +828,11 @@ var
   {$ENDIF}
   list: TXQVList;
 begin
-  requiredArgCount(args, 2, 3);
-  input := args[0].toString;
+  input := argv[0].toString;
   if input = '' then
     exit(xqvalue);
 
-  regex := wregexprParse(args, 2, false);
+  regex := wregexprParse(argc, argv, 2, false);
   try
     try
       {$IFDEF USE_SOROKINS_REGEX}
@@ -871,7 +868,7 @@ end;
 
 
 
-function xqFunctionAnalyze_String(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionAnalyze_String(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   regEx: TWrappedRegExpr;
   input: String;
@@ -914,13 +911,12 @@ var
   end;
 
 begin
-  requiredArgCount(args, 2, 3);
-  input := args[0].toString;
+  input := argv[0].toString;
   curPos := 1;
   if input <> '' then begin
-    regex := wregexprParse(args, 2, false);
-    if (high(args) >= 2) and strContains(args[2].toString, 'q') then nesting := nil
-    else nesting := regexprGetGroupNesting(args[1].toString);
+    regex := wregexprParse(argc, argv, 2, false);
+    if (argc > 2) and strContains(argv[2].toString, 'q') then nesting := nil
+    else nesting := regexprGetGroupNesting(argv[1].toString);
     try
       try
         {$IFDEF USE_SOROKINS_REGEX}
@@ -966,7 +962,7 @@ begin
 end;
 
 
-function xqFunctionExtract(const args: TXQVArray): IXQValue;
+function xqFunctionExtract(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
  regEx: TWrappedRegExpr;
  matches: array of integer;
@@ -979,17 +975,16 @@ var
  {$ENDIF}
  resseq: TXQValueSequence;
 begin
-  requiredArgCount(args, 2,4);
-  input := args[0].toString;
-  regEx := wregexprParse(args, 3, true, nil, @all);
+  input := argv[0].toString;
+  regEx := wregexprParse(argc,argv, 3, true, nil, @all);
   //debugLogMatch
   try
-    if length(args) < 3 then begin
+    if argc < 3 then begin
       SetLength(matches, 1);
       matches[0] := 0;
     end else begin
-      SetLength(matches, args[2].getSequenceCount);
-      for i := 0 to high(matches) do matches[i] := args[2].get(i+1).toInt64;
+      SetLength(matches, argv[2].getSequenceCount);
+      for i := 0 to high(matches) do matches[i] := argv[2].get(i+1).toInt64;
     end;
     resseq := TXQValueSequence.create();
     result := resseq;

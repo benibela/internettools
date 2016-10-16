@@ -936,8 +936,9 @@ type
 
     function toBooleanEffective: boolean; override;
 
-    function evaluate(const outerContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
-    function evaluateInContext(var inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluate(const outerContext: TXQEvaluationContext; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    function evaluateInContext(var inContext: TXQEvaluationContext; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
+    procedure contextOverrideParameterNames(const inContext: TXQEvaluationContext; count: integer);
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
@@ -1326,12 +1327,12 @@ type
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQBasicFunction = function (const args: TXQVArray): IXQValue;
+  TXQBasicFunction = function (argc: SizeInt; argv: PIXQValue): IXQValue;
   (***
     @abstract(Function, taking some TXQValue-arguments and returning a new TXQValue which can depend on the current context state)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
   *)
-  TXQComplexFunction = function (const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+  TXQComplexFunction = function (const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
   (***
     @abstract(Binary operator of TXQValues)
     It should not modify the values passed in the args in case there are other references, but it may assign one of them to result.
@@ -1735,6 +1736,7 @@ type
     constructor create(const anamespace, alocalname: string; args: array of TXQTerm; const staticContext: TXQStaticContext = nil);
     destructor destroy; override;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;
     procedure assignWithoutChildren(source: TXQTermNamedFunction);
     function clone: TXQTerm; override;
@@ -1757,6 +1759,7 @@ type
   TXQTermDynamicFunctionCall = class (TXQTermWithChildren)
     constructor create(func: TXQTerm = nil; arg: TXQTerm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
@@ -2817,7 +2820,7 @@ var XQGlobalTrimNodes: boolean = true;
 var XQGlobalUseIDfromDTD: boolean = false;
 
 
-type TXQDebugTracingEvent = procedure (term: TXQTerm; const context: TXQEvaluationContext; entering: boolean; const args: TXQVArray) of object;
+type TXQDebugTracingEvent = procedure (term: TXQTerm; const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue) of object;
 
 //**Experimental event to trace the evaluation of a query
 var XQOnGlobalDebugTracing: TXQDebugTracingEvent;
@@ -2887,11 +2890,11 @@ function strIterator(const s: RawByteString): TStrIterator;
 //**Escapes for an URL (internally used)
 function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
 //**Checks the length of the args array (internally used)
-procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
+procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint = -2);
 procedure requiredArgType(const v: IXQValue; typ: TXSType);
 function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
 //**Calculates starting position / length from a range definition (checks for things like NaN, INF, ...) (internally used)
-procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
+procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 function xqvalueAtomize(const v: IXQValue): IXQValue;
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;  //needed for switch, tests
@@ -2974,7 +2977,7 @@ end;
 var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators: INamespace;
 function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
 
-function xqFunctionConcat(const args: TXQVArray): IXQValue;
+function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 function xqvalueCastableAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -3628,12 +3631,12 @@ begin
 end;
 
 
-procedure requiredArgCount(const args: TXQVArray; minc: integer; maxc: integer = -2);
+procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint);
 begin
   if maxc = -2 then maxc := minc;
-  if (length(args) >= minc) and (length(args) <= maxc) then exit;
-  if minc = maxc then raise EXQEvaluationException.Create('XPST0017', IntToStr(length(args)) + ' arguments passed, need exactly '+IntToStr(minc))
-  else raise EXQEvaluationException.Create('XPST0017', IntToStr(length(args)) + ' arguments passed, need between '+IntToStr(minc)+ ' and ' + inttostr(maxc));
+  if (argc >= minc) and (argc <= maxc) then exit;
+  if minc = maxc then raise EXQEvaluationException.Create('XPST0017', IntToStr(argc) + ' arguments passed, need exactly '+IntToStr(minc))
+  else raise EXQEvaluationException.Create('XPST0017', IntToStr(argc) + ' arguments passed, need between '+IntToStr(minc)+ ' and ' + inttostr(maxc));
 end;
 procedure requiredArgType(const v: IXQValue; typ: TXSType);
 begin
@@ -3727,7 +3730,7 @@ begin
 
 end;
 
-procedure xpathRangeDefinition(args: TXQVArray; const maxLen: longint; out from, len: integer);
+procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
   temp: BigDecimal;
   temp64: Int64;
@@ -3740,7 +3743,7 @@ begin
         exit;
       end else if isNegInf(args[1].toFloat) then begin
         from := 1;
-        if length(args) <= 2 then len := maxLen
+        if argc <= 2 then len := maxLen
         else len := 0;
         exit;
       end;
@@ -3759,7 +3762,7 @@ begin
 
   if from > maxLen then begin len := 0; exit; end;
 
-  if length(args) = 3 then begin
+  if argc = 3 then begin
     case args[2].kind of
       pvkInt64: begin
         temp64 := args[2].toInt64;
@@ -3789,12 +3792,12 @@ begin
   if len < 0 then len := 0;
 end;
 
-function xqFunctionConcat(const args: TXQVArray): IXQValue;
+function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
 var temp:string;
  i: Integer;
 begin
   temp:='';
-  for i:=0 to high(args) do begin
+  for i:=0 to argc-1 do begin
     case args[i].kind of
       pvkSequence: if args[i].getSequenceCount > 1 then raiseXPTY0004TypeError(args[i], 'singleton');
       pvkFunction: raiseFOTY0013TypeError(args[i]);
@@ -5071,7 +5074,7 @@ begin
   result := TXQValueFloat.Create(v);
 end;
 
-function xqvalue(const v: bigdecimal): IXQValue;
+function xqvalue(const v: BigDecimal): IXQValue;
 begin
   result := TXQValueDecimal.Create(v);
 end;
@@ -6386,7 +6389,9 @@ function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQVal
 begin
   result := top(i);
   {$ifdef TRACK_STACK_VARIABLE_NAMES}
-  if debugNames[count - i - 1] <> name.value then
+  if (debugNames[count - i - 1] <> name.value)
+  //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
+     then
     raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
   {$endif}
 end;
@@ -8313,6 +8318,7 @@ GlobalInterpretedNativeFunctionStaticContext.copyNamespaceInherit:=true;
 GlobalInterpretedNativeFunctionStaticContext.copyNamespacePreserve:=true;
 GlobalInterpretedNativeFunctionStaticContext.stringEncoding:=CP_UTF8;
 GlobalInterpretedNativeFunctionStaticContext.jsonPXPExtensions:=true;
+globalUnnamedVariable := TXQTermVariable.create('placeholder!',nil);
 
 
 //Constructors (xs: namespace, not fn:)
@@ -8351,6 +8357,7 @@ xs.free;
 collations.Clear;
 collations.Free;
 nativeModules.free;
+globalUnnamedVariable.free;
 globalTypeParsingContext.staticContext.Free;
 globalTypeParsingContext.free;
 baseSchema.free;

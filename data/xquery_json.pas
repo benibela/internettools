@@ -51,23 +51,21 @@ implementation
 uses jsonscanner, simplehtmltreeparser, bbutils;
 
 
-function xqFunctionIsNull(const args: TXQVArray): IXQValue;
+function xqFunctionIsNull(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 1, 1);
   result := args[0];
   xqvalueSeqSqueeze(result);
   result := xqvalue(result is TXQValueJSONNull);
 end;
 
-function xqFunctionNull(const args: TXQVArray): IXQValue;
+function xqFunctionNull(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  requiredArgCount(args, 0, 0);
   result := TXQValueJSONNull.Create();
 end;
 
 
 
-function xqFunctionObject(const args: TXQVArray): IXQValue;
+function xqFunctionObject(argc: SizeInt; args: PIXQValue): IXQValue;
 var resobj: TXQValueObject;
     procedure merge(another: TXQValueObject);
     var
@@ -86,7 +84,7 @@ begin
   //requiredArgCount(args, 1);
   resobj := TXQValueObject.create();
   try
-    for i := 0 to high(args) do
+    for i := 0 to argc-1 do
       for v in args[i] do begin
         if not (v is TXQValueObject) then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.debugAsStringWithTypeAnnotation());
         {if resobj.prototype = nil then resobj.prototype := v //that would be faster, but then it serializes the properties of the first object at the end
@@ -250,15 +248,13 @@ begin
 end;
 
 
-function xqFunctionParseJson(const args: TXQVArray): IXQValue; //must be simple due to being in retrieve
+function xqFunctionParseJson(argc: SizeInt; args: PIXQValue): IXQValue; //must be simple due to being in retrieve
 var
   multipleTopLevelItems: Boolean;
   value: TXQValue;
 begin
-  requiredArgCount(args, 1, 2);
-
   multipleTopLevelItems := true;
-  if (length(args) = 2) and (args[1] is TXQValueObject) and ((args[1] as TXQValueObject).hasProperty('jsoniq-multiple-top-level-items', @value)) then begin
+  if (argc = 2) and (args[1] is TXQValueObject) and ((args[1] as TXQValueObject).hasProperty('jsoniq-multiple-top-level-items', @value)) then begin
     if (value.getSequenceCount > 2) or not (value.get(1) is TXQValueBoolean) then
       raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+value.debugAsStringWithTypeAnnotation()+' for property jsoniq-multiple-top-level-items');
     multipleTopLevelItems:=value.toBoolean;
@@ -267,50 +263,45 @@ begin
   result := parseJSON(args[0].toString, multipleTopLevelItems);
 end;
 
-function xqFunctionSerialize_Json(const args: TXQVArray): IXQValue;
+function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   a: IXQValue;
 begin
-  requiredArgCount(args, 1);
   a := args[0];
   result := xqvalue(a.jsonSerialize(tnsXML));
 end;
 
-function xqFunctionJSON_Doc(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionJSON_Doc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
   data: String;
   contenttype: string;
-  temp: TXQVarray;
+  temp: IXQValue;
 begin
-  requiredArgCount(args, 1);
   url := args[0].toString;
   if url = '' then exit(xqvalue);
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
-  setlength(temp, 1);
-  temp[0] := xqvalue(data);
-  result := xqFunctionParseJson(temp);
+  temp := xqvalue(data);
+  result := xqFunctionParseJson(1, @temp);
 end;
 
-function xqFunctionJSON(const context: TXQEvaluationContext; const args: TXQVArray): IXQValue;
+function xqFunctionJSON(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   s: String;
 begin
-  requiredArgCount(args, 1);
   s := args[0].toString;
   if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then
-     result := xqFunctionJSON_Doc(context, args)
+     result := xqFunctionJSON_Doc(context, argc, args)
    else
-     result := xqFunctionParseJson(args);
+     result := xqFunctionParseJson(argc, args);
 end;
 
-function xqFunctionKeys(const args: TXQVArray): IXQValue;
+function xqFunctionKeys(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
   res: TStringList;
 begin
-  requiredArgCount(args, 1);
   res := TStringList.Create;
   for v in args[0] do
     if v is TXQValueObject then
@@ -320,14 +311,13 @@ begin
 end;
 
 
-function xqFunctionMembers(const args: TXQVArray): IXQValue;
+function xqFunctionMembers(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
   ara: TXQValueJSONArray;
   i: Integer;
   list: TXQVList;
 begin
-  requiredArgCount(args, 1);
   list := TXQVList.create();
   for v in args[0] do
     if v is TXQValueJSONArray then begin
@@ -338,11 +328,10 @@ begin
   xqvalueSeqSqueezed(result, list)
 end;
 
-function xqFunctionSize(const args: TXQVArray): IXQValue;
+function xqFunctionSize(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   a: IXQValue;
 begin
-  requiredArgCount(args, 1);
   a := args[0];
   if (a.kind = pvkSequence) and (a.getSequenceCount = 1) then a := a.get(1);
   if a.getSequenceCount = 0 then exit(xqvalue());

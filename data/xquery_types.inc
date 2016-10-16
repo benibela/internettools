@@ -380,10 +380,13 @@ var tempContext: TXQEvaluationContext;
     f: TInternetToolsFormat;
     p: PChar;
     l: Integer;
+    tempv: IXQValue;
   begin
     f := guessFormat(data, uri, contenttype);
-    if (f = itfJSON) and (defaultQueryEngine.ParsingOptions.AllowJSON) then
-      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(xqvalueArray([xqvalue(data)])));
+    if (f = itfJSON) and (defaultQueryEngine.ParsingOptions.AllowJSON) then begin
+      tempv := xqvalue(data);
+      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(1, @tempv));
+    end;
     if f = itfXML then begin
       if data = '' then exit(TXQValueString.create(baseSchema.untypedAtomic, ''));
       //default
@@ -429,7 +432,7 @@ begin
   result := resseq;
   for i := 1 to getSequenceCount do begin
     v := get(i);
-    if v.kind = pvkNode then handle(resolveHTMLCallback(tempContext, xqvalueArray([v])))
+    if v.kind = pvkNode then handle(resolveHTMLCallback(tempContext, 1, @V))
     else handle(v);
   end;
   xqvalueSeqSqueeze(result);
@@ -2119,48 +2122,55 @@ begin
 end;
 
 
-function TXQValueFunction.evaluate(const outerContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
+function TXQValueFunction.evaluate(const outerContext: TXQEvaluationContext; const term: TXQTerm): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
-  j, stackSize: Integer;
+  j: Integer;
   temp: IXQValue;
+  evilkids: PIXQValue;
 begin
   tempcontext := context;
-  if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
   tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
-  stackSize := tempcontext.temporaryVariables.Count;
-  try
-    for j := 0 to high(parameters) do begin
-      temp := args[j];
-      TXQAbstractFunctionInfo.convertType(temp, parameters[j].seqtype, context, term);
-      tempcontext.temporaryVariables.push(parameters[j].variable, temp);
-    end;
-    result := body.evaluate(tempcontext);
-    TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
-  finally
-    tempcontext.temporaryVariables.popTo(stackSize);
+  if length(parameters) > 0 then begin
+    evilkids := outercontext.temporaryVariables.topptr(high(parameters));
+    for j := 0 to high(parameters) do
+      TXQAbstractFunctionInfo.convertType(evilkids[j], parameters[j].seqtype, context, term);
   end;
+  result := body.evaluate(tempcontext);
+  TXQAbstractFunctionInfo.convertType(result, resulttype, context, term);
 end;
 
-function TXQValueFunction.evaluateInContext(var inContext: TXQEvaluationContext; const args: TXQVArray; const term: TXQTerm): IXQValue;
+function TXQValueFunction.evaluateInContext(var inContext: TXQEvaluationContext; const term: TXQTerm): IXQValue;
 var
-  j, stackSize: Integer;
+  j: Integer;
   temp: IXQValue;
+  evilkids: PIXQValue;
 begin
-  if length(args) <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(length(args)) + ' <> ' + inttostr(length(parameters)));
-  stackSize := inContext.temporaryVariables.Count;
-  try
-    for j := 0 to high(parameters) do begin
-      temp := args[j];
-      TXQAbstractFunctionInfo.convertType(temp, parameters[j].seqtype, inContext, term);
-      inContext.temporaryVariables.push(parameters[j].variable, temp);
-    end;
-    result := body.evaluate(inContext);
-    TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
-  finally
-    inContext.temporaryVariables.popTo(stackSize);
+  if length(parameters) > 0 then begin
+    evilkids := inContext.temporaryVariables.topptr(high(parameters));
+    for j := 0 to high(parameters) do
+      TXQAbstractFunctionInfo.convertType(evilkids[j], parameters[j].seqtype, inContext, term);
   end;
+  result := body.evaluate(inContext);
+  TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
+end;
+
+procedure TXQValueFunction.contextOverrideParameterNames(const inContext: TXQEvaluationContext; count: integer);
+{$IFDEF TRACK_STACK_VARIABLE_NAMES}
+var
+  stack: TXQEvaluationStack;
+  i: Integer;
+{$endif}
+begin
+  if count <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(count) + ' <> ' + inttostr(length(parameters)));
+  {$IFDEF TRACK_STACK_VARIABLE_NAMES}
+  if length(parameters) = 0 then exit;
+  stack := inContext.temporaryVariables;
+  if length(stack.debugNames) < stack.fcapacity then SetLength(stack.debugNames, stack.fcapacity);
+  for i := 0 to high(parameters) do
+    stack.debugNames[stack.fcount - high(parameters) - 1 + i] := parameters[i].variable.value;
+  {$endif}
 end;
 
 function TXQValueFunction.directClone: TXQValue;

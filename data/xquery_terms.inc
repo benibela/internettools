@@ -968,7 +968,7 @@ begin
   setlength(fresult.parameters, length(arguments) - 1);
   for i := 0 to high(f.parameters) do begin
     tempvar := TXQTermVariable.create(IntToStr(i)+'.');
-    tempvar.index := high(f.parameters) - i;
+    tempvar.index := high(f.parameters);
     TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
     fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
     fresult.parameters[i].seqtype := TXQTermSequenceType(arguments[i].clone);
@@ -1094,8 +1094,6 @@ function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
         if not TXQTermSequenceType(children[pos+typeDelta]).instanceOf(v^, context) then
           raiseEvaluationError('XPTY0004', 'Invalid type for variable '+ v^.toString+ ' expected ' + TXQTermSequenceType(children[pos+typeDelta]).serialize);
       Context.temporaryVariables.push(TXQTermVariable(children[pos]), v^);
-
-      Context.temporaryVariables.push(v^);
       if evaluateSomeEvery(pos+2+typeDelta) <> (isEvery) then exit(not isEvery);
       Context.temporaryVariables.pop;
     end;
@@ -2436,60 +2434,96 @@ end;
 function TXQTermNamedFunction.evaluate(var context: TXQEvaluationContext): IXQValue;
 //{$define checkreturntypes}  there is no point in testing the return type for native functions. but it might spot internal inconsistencies
 var
-  evilkids: TXQVArray;
+  evilkids: PIXQValue;
   t: TXSType;
+  argcount, i, stacksize: Integer;
+  stack: TXQEvaluationStack;
   {$ifdef checkreturntypes}version: Integer;{$endif}
 begin
-  evaluateChildren(context, evilkids);
-  assert((kind = xqfkUnknown) or (func <> nil));
+  //evaluateChildren(context, evilkids);
+  stack := context.temporaryVariables;
+  stacksize := stack.Count;
+  argcount := length(children);
 
-  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
-  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) and (length(evilkids) > 0) then
-    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(@evilkids[0], length(evilkids), context, self)
-   {$ifdef checkreturntypes}
-   else
-    version := -1{$endif};
+  try
+    assert((kind = xqfkUnknown) or (func <> nil));
+
+    for i:=0 to high(children) do
+      stack.push(children[i].evaluate(context));
+
+    evilkids := stack.topptr(high(children)); //can only get this pointer here as children evaluate might change the stack base
+
+
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, argcount, evilkids);
+    if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) and (argcount > 0) then
+      {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(@evilkids[0], argcount, context, self)
+     {$ifdef checkreturntypes}
+     else
+      version := -1{$endif};
 
 
 
-  case kind of
-    xqfkBasic:
-      result := TXQBasicFunctionInfo(func).func(evilkids);
-    xqfkComplex:
-      result := TXQComplexFunctionInfo(func).func(context, evilkids);
-    xqfkWrappedOperator: begin
-      if length(evilkids) <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + name.localname);
-      result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
-    end;
-    xqfkTypeConstructor: begin
-      if length(evilkids) <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
-      case evilkids[0].getSequenceCount of
-        0: result := xqvalue();
-        1: begin
-          t := TXSType(TObject(func));
-          if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(evilkids[0])
-          else result := (t as TXSQNameType).cast(evilkids[0], context);
-        end
-        else raiseEvaluationError('XPTY0004', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
+    case kind of
+      xqfkBasic:
+        result := TXQBasicFunctionInfo(func).func(argcount, evilkids);
+      xqfkComplex:
+        result := TXQComplexFunctionInfo(func).func(context, argcount, evilkids);
+      xqfkWrappedOperator: begin
+        if argcount <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + name.localname);
+        result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
+      end;
+      xqfkTypeConstructor: begin
+        if argcount <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
+        case evilkids[0].getSequenceCount of
+          0: result := xqvalue();
+          1: begin
+            t := TXSType(TObject(func));
+            if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(evilkids[0])
+            else result := (t as TXSQNameType).cast(evilkids[0], context);
+          end
+          else raiseEvaluationError('XPTY0004', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
+        end;
+      end;
+      xqfkNativeInterpreted: begin
+        init(context.staticContext);
+        interpretedFunction.contextOverrideParameterNames(context, argcount);
+        result := interpretedFunction.evaluateInContext(context, self);
+      end;
+      xqfkUnknown: begin
+        init(context.staticContext);
+        interpretedFunction.contextOverrideParameterNames(context, argcount);
+        result := interpretedFunction.evaluate(context, self);
       end;
     end;
-    xqfkNativeInterpreted: begin
-      init(context.staticContext);
-      result := interpretedFunction.evaluateInContext(context, evilkids, self);
-    end;
-    xqfkUnknown: begin
-      init(context.staticContext);
-      result := interpretedFunction.evaluate(context, evilkids, self);
-    end;
-  end;
 
-  {$ifdef checkreturntypes}
-  if version <> -1 then begin
-    if not func.versions[version].returnType.instanceOf(result, context) then
-      raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.debugAsStringWithTypeAnnotation()+' does not have type '+func.versions[version].returnType.serialize);
+    {$ifdef checkreturntypes}
+    if version <> -1 then begin
+      if not func.versions[version].returnType.instanceOf(result, context) then
+        raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.debugAsStringWithTypeAnnotation()+' does not have type '+func.versions[version].returnType.serialize);
+    end;
+    {$endif}
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
+  finally
+    stack.popTo(stacksize);
   end;
-  {$endif}
-  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+end;
+
+var globalUnnamedVariable: TXQTermVariable;
+
+function TXQTermNamedFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  tempvar: TXQTermVariable;
+  i: Integer;
+begin
+  result := xqtvaContinue;
+  tempvar := globalUnnamedVariable;
+  for i := 0 to high(children) do begin
+    result := visitor.simpleTermVisit(@children[i], self);
+    case result of xqtvaAbort: exit; end;
+    visitor.declare(@tempvar);
+  end;
+  for i := high(children) downto 0 do
+    visitor.undeclare(@tempvar);
 end;
 
 function TXQTermNamedFunction.getContextDependencies: TXQContextDependencies;
@@ -2646,11 +2680,11 @@ var
   func: IXQValue;
   index: IXQValue;
   ara: TXQValueJSONArray;
-  i: Integer;
+  i, stackSize: Integer;
   sl: TStringList;
-  evilkids: TXQVArray;
   resultSeq: TXQVList;
   v: PIXQValue;
+  funcref: TXQValueFunction;
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -2660,12 +2694,18 @@ begin
   if (func.kind = pvkSequence) and (func.getSequenceCount = 1) then func := func.get(1);
 
   if func is TXQValueFunction then begin
-    setlength(evilkids, length(children)-1);
-    for i:=1 to high(children) do
-      evilkids[i-1] := children[i].evaluate(context);
-    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
-    result := (func as TXQValueFunction).evaluate(context, evilkids, self);
-    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+    stackSize := context.temporaryVariables.Count;
+    try
+      for i:=1 to high(children) do
+        context.temporaryVariables.push(children[i].evaluate(context));
+      funcref := func as TXQValueFunction;
+      if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, length(children)-1, context.temporaryVariables.topptr(high(children)-1));
+      funcref.contextOverrideParameterNames(context, high(children));
+      result := funcref.evaluate(context, self);
+      if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
+    finally
+      context.temporaryVariables.popTo(stackSize);
+    end;
     exit;
   end;
 
@@ -2707,6 +2747,23 @@ begin
         raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
     end;
   xqvalueSeqSqueezed(result, resultSeq)
+end;
+
+function TXQTermDynamicFunctionCall.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  tempvar: TXQTermVariable;
+  i: Integer;
+begin
+  result := visitor.simpleTermVisit(@children[0], self);
+  case result of xqtvaAbort: exit; end;
+  tempvar := globalUnnamedVariable;
+  for i := 1 to high(children) do begin
+    result := visitor.simpleTermVisit(@children[i], self);
+    case result of xqtvaAbort: exit; end;
+    visitor.declare(@tempvar);
+  end;
+  for i := high(children) downto 1 do
+    visitor.undeclare(@tempvar);
 end;
 
 function TXQTermDynamicFunctionCall.getContextDependencies: TXQContextDependencies;
@@ -2751,7 +2808,7 @@ var evilkids: array[0..1] of IXQValue;
 begin
   evilkids[0] := children[0].evaluate(context);
   evilkids[1] := children[1].evaluate(context);
-  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, evilkids);
+  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, 2, @evilkids[0]);
   if context.staticContext.strictTypeChecking  then begin
     if xqofCastUntypedToString in op.flags then begin
       for i := 0 to high(evilkids) do
@@ -2767,7 +2824,7 @@ begin
     op.checkOrConvertTypes(@evilkids[0], 2, context, self);
   end;
   result := op.func(context, evilkids[0], evilkids[1]);
-  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+  if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
 end;
 
 function TXQTermBinaryOp.debugTermToString: string;
@@ -4077,14 +4134,15 @@ end;
 
 
 
-function makeNumberedVariable(i: integer): TXQTermVariable;
+function makeNumberedVariable(i: integer; index: integer = -1): TXQTermVariable;
 var temp: string;
 begin
   SetLength(temp, sizeof(i)+1);
   temp[1] := '0';
   move(i, temp[2], sizeof(i));
   result := TXQTermVariable.create(temp, XMLNamespaceURL_MyExtensionOperators);
-  result.index := i;
+  if index < 0 then index := i;
+  result.index := index;
 end;
 
 constructor TXQTermDefineFunction.createReference(const fun: TXQTermNamedFunction; arity: integer);
@@ -4097,7 +4155,7 @@ begin
   for i := 1 to arity do begin
     children[i-1] := TXQTermDefineVariable.create(makeNumberedVariable(i));
     fun.children[i-1] := makeNumberedVariable(i);
-    TXQTermVariable(fun.children[i-1]).index := arity - i;
+    TXQTermVariable(fun.children[i-1]).index := arity - 1;
   end;
   children[high(children)] := fun;
   kind := xqtdfNamedReference;
@@ -4362,7 +4420,7 @@ var
   f: TXQTermNamedFunction;
   version: PXQFunctionParameterTypes;
   j: Integer;
-  i: Integer;
+  i, stacksize: Integer;
 begin
   version := findNamedFunctionVersion(context);
   f := TXQTermNamedFunction(children[high(children)]);
@@ -4375,23 +4433,35 @@ begin
 
   setlength(result.parameters, parameterCount);
   j := 0;
-  for i := 0 to high(f.children) do
-    if isPseudoVariable(f.children[i]) then begin
-      TXQTermNamedFunction(result.body).push(makeNumberedVariable(parameterCount - j - 1));
-      result.parameters[j].variable := makeNumberedVariable(parameterCount - j - 1);
-      if version <> nil then
-        result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
-       else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
-        result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
-       end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
-        if f.interpretedFunction.parameters[i].seqtype <> nil then
-          result.parameters[j].seqtype := TXQTermSequenceType(f.interpretedFunction.parameters[i].seqtype.clone);
-       end else if f.kind = xqfkTypeConstructor then begin
-         result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
-       end;
-      inc(j);
-     end else
-      TXQTermNamedFunction(result.body).push(TXQTermConstant.create(f.children[i].evaluate(context)));
+  try
+    stacksize := context.temporaryVariables.Count;
+    for i := 0 to high(f.children) do begin
+      if isPseudoVariable(f.children[i]) then begin
+        //Parameter index, e.g.
+        //v0 v1 v2 v3 | v0 n v1 n n v2
+        // 3  2  1 0 <--/    |       |
+        //    4  3 2     1 0<|       |
+        //       6 5     4 3  2 1 0<-|
+        TXQTermNamedFunction(result.body).push(makeNumberedVariable(parameterCount - j - 1, parameterCount - j - 1 + i));
+        result.parameters[j].variable := makeNumberedVariable(parameterCount - j - 1);
+        if version <> nil then
+          result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
+         else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
+          result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
+         end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
+          if f.interpretedFunction.parameters[i].seqtype <> nil then
+            result.parameters[j].seqtype := TXQTermSequenceType(f.interpretedFunction.parameters[i].seqtype.clone);
+         end else if f.kind = xqfkTypeConstructor then begin
+           result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
+         end;
+        inc(j);
+       end else
+        TXQTermNamedFunction(result.body).push(TXQTermConstant.create(f.children[i].evaluate(context)));
+       context.temporaryVariables.push(xqvalue); //if this was a normal call, parameters would be pushed, so the offsets in the terms expect them
+    end;
+  finally
+    context.temporaryVariables.popTo(stackSize);
+  end;
   assert(j = parameterCount);
   result.ownsTerms := true;
   if version <> nil then
@@ -4407,7 +4477,7 @@ end;
 function TXQTermDefineFunction.defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
 var
   j: Integer;
-  i: Integer;
+  i, stackSize: Integer;
   ch: array of TXQTerm;
 begin
   ch := (children[0] as TXQTermWithChildren).children;
@@ -4416,16 +4486,22 @@ begin
   copyAnnotations(result.annotations, f.annotations);
   result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
   setlength(result.parameters, parameterCount);
-  j := 0;
-  for i := 0 to high(f.parameters) do begin
-    if isPseudoVariable(ch[i+1]) then begin
-      TXQTermDynamicFunctionCall(result.body).push(makeNumberedVariable(parameterCount - j - 1));
-      result.parameters[j].variable := TXQTermVariable(makeNumberedVariable(parameterCount - j - 1));
-      if f.parameters[i].seqtype <> nil then
-        result.parameters[j].seqtype := TXQTermSequenceType(f.parameters[i].seqtype.clone);
-      inc(j);
-     end else
-      TXQTermDynamicFunctionCall(result.body).push(TXQTermConstant.create(ch[i+1].evaluate(context)));
+  try
+    stackSize := context.temporaryVariables.Count;
+    j := 0;
+    for i := 0 to high(f.parameters) do begin
+      if isPseudoVariable(ch[i+1]) then begin
+        TXQTermDynamicFunctionCall(result.body).push(makeNumberedVariable(parameterCount - j - 1, parameterCount - j - 1 + i ));
+        result.parameters[j].variable := TXQTermVariable(makeNumberedVariable(parameterCount - j - 1));
+        if f.parameters[i].seqtype <> nil then
+          result.parameters[j].seqtype := TXQTermSequenceType(f.parameters[i].seqtype.clone);
+        inc(j);
+       end else
+        TXQTermDynamicFunctionCall(result.body).push(TXQTermConstant.create(ch[i+1].evaluate(context)));
+       context.temporaryVariables.push(xqvalue); //if this was a normal call, parameters would be pushed, so the offsets in the terms expect them
+    end;
+  finally
+    context.temporaryVariables.popTo(stackSize);
   end;
   assert(j = parameterCount);
   result.ownsTerms := true;
@@ -4461,12 +4537,12 @@ var
   nsprefix: String;
 begin
   try
-    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, true, nil);
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, 0, nil);
     result := body.evaluate(context);
-    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+    if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
   except
     on e: EXQEvaluationException do begin
-      if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, false, nil);
+      if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
       if e.namespace <> nil then begin
         ns := e.namespace.getURL;
         nsprefix := e.namespace.getPrefix;

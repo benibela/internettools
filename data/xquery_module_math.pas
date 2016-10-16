@@ -80,14 +80,13 @@ begin
 end;
 
 
-function mathPi(const args: TXQVArray): IXQValue;
+function mathPi(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqv(pi);
 end;
 
-function singleArgMath(const args: TXQVArray; out f: xqfloat; out v: IXQValue): boolean; inline;
+function singleArgMath(args: PIXQValue; out f: xqfloat; out v: IXQValue): boolean; inline;
 begin
-  requiredArgCount(args, 0, 1);
   if args[0].isUndefined then begin
     v := xqvalue();
     exit(false);
@@ -96,7 +95,7 @@ begin
   result := true;
 end;
 
-function singleArgMathNIZ(const args: TXQVArray; out f: xqfloat; out v: IXQValue): boolean; inline;
+function singleArgMathNIZ(args: PIXQValue; out f: xqfloat; out v: IXQValue): boolean; inline;
 begin
   result := singleArgMath(args, f, v);
   if result then begin
@@ -111,7 +110,7 @@ begin
   end;
 end;
 
-function singleArgMathNIN(const args: TXQVArray; out f: xqfloat; out v: IXQValue): boolean; inline;
+function singleArgMathNIN(args: PIXQValue; out f: xqfloat; out v: IXQValue): boolean; inline;
 begin
   result := singleArgMath(args, f, v);
   if result then begin
@@ -126,7 +125,7 @@ begin
   end;
 end;
 
-function singleArgMathNNN(const args: TXQVArray; out f: xqfloat; out v: IXQValue): boolean; inline;
+function singleArgMathNNN(args: PIXQValue; out f: xqfloat; out v: IXQValue): boolean; inline;
 begin
   result := singleArgMath(args, f, v);
   if result then
@@ -136,7 +135,7 @@ begin
     end;
 end;
 
-function mathExp(const args: TXQVArray): IXQValue;
+function mathExp(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -144,7 +143,7 @@ begin
     result := xqv(exp(f));
 end;
 
-function mathExp10(const args: TXQVArray): IXQValue;
+function mathExp10(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -152,7 +151,7 @@ begin
     result := xqv(power(10, f));
 end;
 
-function mathLog(const args: TXQVArray): IXQValue;
+function mathLog(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -162,7 +161,7 @@ begin
     else result := xqv(NaN);
 end;
 
-function mathLog10(const args: TXQVArray): IXQValue;
+function mathLog10(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -172,7 +171,7 @@ begin
     else result := xqv(NaN);
 end;
 
-function mathSqrt(const args: TXQVArray): IXQValue;
+function mathSqrt(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -182,28 +181,28 @@ begin
 end;
 
 
-function mathSin(const args: TXQVArray): IXQValue;
+function mathSin(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
   if singleArgMathNNN(args, f, result) then
     result := xqv(sin(f));
 end;
-function mathCos(const args: TXQVArray): IXQValue;
+function mathCos(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
   if singleArgMathNNN(args, f, result) then
     result := xqv(cos(f));
 end;
-function mathTan(const args: TXQVArray): IXQValue;
+function mathTan(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
   if singleArgMathNNN(args, f, result) then
     result := xqv(tan(f));
 end;
-function mathASin(const args: TXQVArray): IXQValue;
+function mathASin(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -211,7 +210,7 @@ begin
     result := xqv(arcsin(f));
   except on e: EMathError do result := xqv(NaN); end;
 end;
-function mathAcos(const args: TXQVArray): IXQValue;
+function mathAcos(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -219,7 +218,7 @@ begin
     result := xqv(arccos(f));
   except on e: EMathError do result := xqv(NaN); end;
 end;
-function mathAtan(const args: TXQVArray): IXQValue;
+function mathAtan(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -240,7 +239,7 @@ begin
     else exit(xqv(Infinity));
 end;
 
-function mathPow(const args: TXQVArray): IXQValue;
+function mathPow(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
   bd: BigDecimal;
@@ -255,7 +254,6 @@ var
   end;
 
 begin
-  requiredArgCount(args, 2);
   if args[0].isUndefined then exit(xqvalue);
   a := args[0].toFloat;
   if IsNan(a) then begin
@@ -288,12 +286,11 @@ begin
   end;
 end;
 
-function mathAtan2(const args: TXQVArray): IXQValue;
+function mathAtan2(argc: SizeInt; args: PIXQValue): IXQValue;
 var
   a: xqfloat;
   b: xqfloat;
 begin
-  requiredArgCount(args, 2);
   a := args[0].toFloat;
   b := args[1].toFloat;
   if IsNan(a) or IsNan(b) then exit(xqv(NaN));

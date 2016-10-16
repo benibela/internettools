@@ -223,6 +223,7 @@ begin
   m('declare %local:annotation(1,2,3) function local:test($a as xs:integer) { $a + 1 }; (local:test#1)(?)(?)(10) ', '11');
   m('%local:annotation(1,2,3) function ($a, $b, $c, $d) { $a + $b } ! .(?, ?, 0, 0) ! .(10, 2)', '12');
   m('function () { function ($a, $b) { function ($t) { function ($x, $y) { $a + $x + $y } ($t, $b) } } (1000, 100) (10) } () ', '1110');
+  m('function () { function ($a, $local:b) { %local:annotation(1,2,3) function ($x as xs:integer, $y) as xs:float { $a + $x + $y } (?, $local:b) } (1000, 100) (10) } () ', '1110');
   m('function () { function ($a, $local:a) { %local:annotation(1,2,3) function ($x as xs:integer, $y) as xs:float { $a + $x + $y } (?, $local:a) } (1000, 100) (10) } () ', '1110');
 
   //function tests
