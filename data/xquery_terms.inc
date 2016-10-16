@@ -1797,7 +1797,7 @@ var
 
       function checkCondition(at: integer; const condition: TXQTermFlowerWindowVarsAndCondition; forceTrue: boolean = false): boolean;
       var
-        oldIndex, stackSize: Integer;
+        oldIndex: Integer;
       begin
         oldIndex := variableIndex;
         stackSizes[stackSizeIndex] := context.temporaryVariables.Count;
@@ -3243,9 +3243,6 @@ begin
 end;
 
 function TXQTermVariable.evaluate(var context: TXQEvaluationContext): IXQValue;
-var
-  err: String;
-  i: Integer;
 begin
   if index >= 0 then begin
     {if (context.temporaryVariables.count - 1 - index < 0) or
@@ -4166,8 +4163,7 @@ var
   temp: TXQValueFunction;
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
   i: Integer;
-  tempterm: TXQTermFlower;
-  dfv, tempv: IXQValue;
+  dfv: IXQValue;
 begin
 
   case kind of

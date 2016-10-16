@@ -3614,7 +3614,6 @@ end;
 function xqFunctionFold(const context: TXQEvaluationContext; left: boolean; args: PIXQValue): IXQValue;
 var
   func: TXQValueFunction;
-  newv: ixqvalue;
   count: Integer;
   v: PIXQValue;
   i, stacksize: Integer;

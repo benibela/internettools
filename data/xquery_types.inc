@@ -2126,7 +2126,6 @@ function TXQValueFunction.evaluate(const outerContext: TXQEvaluationContext; con
 var
   tempcontext: TXQEvaluationContext;
   j: Integer;
-  temp: IXQValue;
   evilkids: PIXQValue;
 begin
   tempcontext := context;
@@ -2144,7 +2143,6 @@ end;
 function TXQValueFunction.evaluateInContext(var inContext: TXQEvaluationContext; const term: TXQTerm): IXQValue;
 var
   j: Integer;
-  temp: IXQValue;
   evilkids: PIXQValue;
 begin
   if length(parameters) > 0 then begin
