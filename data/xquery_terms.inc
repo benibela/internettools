@@ -3995,7 +3995,7 @@ end;
 type
   TXQTerm_VisitorReplaceKnownVariables = class(TXQTerm_VisitorTrackKnownVariables)
     context: PXQEvaluationContext;
-    uncertainVariables: TXQVariableChangeLog; //pattern variables cannot be are not know statically
+    //uncertainVariables: TXQVariableChangeLog; //pattern variables cannot be are not know statically
     patterns: array of TXQTermPatternMatcher;
     function visit(term: PXQTerm): TXQTerm_VisitAction; override;
     function leave(term: PXQTerm): TXQTerm_VisitAction; override;
@@ -4040,7 +4040,7 @@ begin
       else if v.index = -2 then replace(term, TXQTermConstant.create(v.evaluate(context^)))
       else raisePXPInternalError;
 
-    end else if length(patterns) > 0 then begin
+    end(* else if length(patterns) > 0 then begin
       {not sure what to do with these
       selfdefined := false;
       with patterns[high(patterns)] do
@@ -4050,7 +4050,7 @@ begin
       if uncertainVariables = nil then uncertainVariables := TXQVariableChangeLog.create();
       if not uncertainVariables.hasVariable(TXQTermVariable(term^), temp) then
         uncertainVariables.add(TXQTermVariable(term^), tempValue);
-    end;
+    end*);
   end else if term^ is TXQTermPatternMatcher then begin
     SetLength(patterns, length(patterns) + 1);
     patterns[high(patterns)] := TXQTermPatternMatcher(term^);
@@ -4067,7 +4067,7 @@ end;
 
 destructor TXQTerm_VisitorReplaceKnownVariables.Destroy;
 begin
-  uncertainVariables.Free;
+  //uncertainVariables.Free;
   inherited Destroy;
 end;
 
@@ -4141,7 +4141,7 @@ begin
       tempVisitor.declare(@temp.parameters[i].variable);
     tempVisitor.context := @context;
     tempVisitor.simpleTermVisit(@temp.body, nil);
-    if tempVisitor.uncertainVariables <> nil then begin
+    {if tempVisitor.uncertainVariables <> nil then begin
       tempterm := TXQTermFlower.Create;
       setlength(tempterm.children, tempVisitor.uncertainVariables.count + 1);
       for i := 0 to tempVisitor.uncertainVariables.count - 1 do begin
@@ -4156,7 +4156,7 @@ begin
       end;
       tempterm.children[high(tempterm.children)] := temp.body;
       temp.body := tempterm;
-    end;
+    end; }
   finally
     tempVisitor.free;
   end;
