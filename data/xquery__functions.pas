@@ -3625,28 +3625,25 @@ begin
   stack := context.temporaryVariables;
   stacksize := stack.Count;
 
-  try
-    stack.push(args[1]);
-    stack.push(args[1]);
-    func.contextOverrideParameterNames(context, 2);
-    if left then begin
-      //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
-      for v in args[0].GetEnumeratorPtrUnsafe do begin
-        stack.topptr(0)^ := v^;
-        stack.topptr(1)^ := func.evaluate(context, nil);
-      end;
-      result := stack.topptr(1)^;
-    end else begin
-      // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
-      for i := count downto 1 do begin
-        stack.topptr(1)^ := args[0].get(i);
-        stack.topptr(0)^ := func.evaluate(context, nil);
-      end;
-      result := stack.topptr(0)^;
+  stack.push(args[1]);
+  stack.push(args[1]);
+  func.contextOverrideParameterNames(context, 2);
+  if left then begin
+    //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
+    for v in args[0].GetEnumeratorPtrUnsafe do begin
+      stack.topptr(0)^ := v^;
+      stack.topptr(1)^ := func.evaluate(context, nil);
     end;
-  finally
-    stack.popTo(stacksize);
+    result := stack.topptr(1)^;
+  end else begin
+    // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
+    for i := count downto 1 do begin
+      stack.topptr(1)^ := args[0].get(i);
+      stack.topptr(0)^ := func.evaluate(context, nil);
+    end;
+    result := stack.topptr(0)^;
   end;
+  stack.popTo(stacksize);
 end;
 
 
@@ -3677,22 +3674,19 @@ begin
 
   stack := context.temporaryVariables;
   stacksize := stack.Count;
-  try
-    count := min(seq1.getSequenceCount, seq2.getSequenceCount);
-    stack.push(args^);
-    stack.push(args^);
-    func.contextOverrideParameterNames(context, 2);
-    resseq := TXQValueSequence.create(count);
-    for i := 1 to count do begin
-      stack.topptr(1)^ := seq1.get(i);
-      stack.topptr(0)^ := seq2.get(i);
-      resseq.add(func.evaluate(context, nil));
-    end;
-    result := resseq;
-    xqvalueSeqSqueeze(result);
-  finally
-    stack.popTo(stackSize);
+  count := min(seq1.getSequenceCount, seq2.getSequenceCount);
+  stack.push(args^);
+  stack.push(args^);
+  func.contextOverrideParameterNames(context, 2);
+  resseq := TXQValueSequence.create(count);
+  for i := 1 to count do begin
+    stack.topptr(1)^ := seq1.get(i);
+    stack.topptr(0)^ := seq2.get(i);
+    resseq.add(func.evaluate(context, nil));
   end;
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+  stack.popTo(stackSize);
 end;
 
 

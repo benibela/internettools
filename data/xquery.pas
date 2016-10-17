@@ -4913,14 +4913,20 @@ begin
 end;
 
 function TXQuery.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  stackSize: Integer;
 begin
   if fterm = nil then exit(xqvalue());
-  if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
-    exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
+  stackSize := context.temporaryVariables.Count;
+  try
+    if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
+      exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
-  context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
-
-  result := fterm.evaluate(context);
+    context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
+    result := fterm.evaluate(context);
+  finally
+    context.temporaryVariables.popTo(stackSize);
+  end;
 end;
 
 function TXQuery.evaluate(const contextItem: IXQValue): IXQValue;
