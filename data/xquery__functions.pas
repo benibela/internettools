@@ -28,7 +28,6 @@ unit xquery__functions;
 {$modeswitch advancedrecords}
 {$H+}
 {$DEFINE ALLOW_EXTERNAL_DOC_DOWNLOAD}
-
 interface
 
 uses
@@ -852,7 +851,7 @@ begin
   end;
 end;
 
-function xqFunctionAbs(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionAbs({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   baseType: TXSType;
 begin
@@ -865,7 +864,7 @@ begin
   end;
 end;
 
-function xqFunctionCeiling(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCeiling({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   baseType: TXSType;
   v: xqfloat;
@@ -884,7 +883,7 @@ begin
   end;
 end;
 
-function xqFunctionFloor(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFloor({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   baseType: TXSType;
   v: xqfloat;
@@ -1409,7 +1408,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function xqFunctionUri_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var names, values: array of TStringArray;
     used: array of array of boolean;
     rep: Integer;
@@ -1668,7 +1667,7 @@ begin
   end;
 end;
 
-function xqFunctionCodepoints_to_string(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCodepoints_to_string({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: string;
  v: PIXQValue;
  codepoint: integer;
@@ -1684,7 +1683,7 @@ begin
   result := xqvalue(temp);
 end;
 
-function xqFunctionString_to_codepoints(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionString_to_codepoints({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: string;
  i: Integer;
  cp: Integer;
@@ -1738,23 +1737,23 @@ end;
 
 
 
-function xqFunctionString_join(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionString_join({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(args[0].toJoinedString(args[1].toString));
 end;
 
-function xqFunctionString_join_Nosep(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionString_join_Nosep({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(args[0].toJoinedString(''));
 end;
 
-function xqFunctionJoin(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionJoin({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if argc = 1 then result := xqvalue(args[0].toJoinedString())
   else result := xqvalue(args[0].toJoinedString(args[1].toString));
 end;
 
-function xqFunctionSubstring(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSubstring({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var s:string;
 var from, len: integer;
 
@@ -1764,7 +1763,7 @@ begin
   result := xqvalue(copy(s,from,len));
 end;
 
-function xqFunctionString_length(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionString_length(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: String;
 begin
@@ -1774,7 +1773,7 @@ begin
   result := xqvalue(length(temp));
 end;
 
-function xqFunctionNormalize_space(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNormalize_space(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: string;
 begin
   if argc > 0 then temp := args[0].toString
@@ -1782,17 +1781,17 @@ begin
   result := xqvalue(strTrimAndNormalize(temp));
 end;
 
-function xqFunctionUpper_Case(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUpper_Case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(UpperCase(args[0].toString));
 end;
 
-function xqFunctionLower_case(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionLower_case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(LowerCase(args[0].toString));
 end;
 
-function xqFunctionCompare(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCompare(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   collation: TXQCollation;
 begin
@@ -1802,14 +1801,14 @@ begin
   result := xqvalue(collation.compare(args[0].toString, args[1].toString));
 end;
 
-function xqFunctionCodePoint_Equal(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCodePoint_Equal({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if args[0].isUndefined  or args[1].isUndefined then exit(xqvalue);
   result := xqvalue(args[0].toString = args[1].toString);
 end;
 
 
-function xqFunctionContains(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionContains(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var s, t: string;
   collation: TXQCollation;
 begin
@@ -1821,7 +1820,7 @@ begin
   else result := xqvalue(collation.contains(s,t));
 end;
 
-function xqFunctionStarts_with(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionStarts_with(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   collation: TXQCollation;
 begin
@@ -1830,7 +1829,7 @@ begin
   result := xqvalue(collation.startsWith(args[0].toString,args[1].toString));
 end;
 
-function xqFunctionEnds_with(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionEnds_with(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   collation: TXQCollation;
 begin
@@ -1839,7 +1838,7 @@ begin
   result := xqvalue(collation.endsWith(args[0].toString, args[1].toString));
 end;
 
-function xqFunctionSubstring_before(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSubstring_before(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var a,b: string;
   collation: TXQCollation;
 begin
@@ -1851,7 +1850,7 @@ begin
   else result := xqvalue(copy(a,1,collation.indexOf(a,b)-1));
 end;
 
-function xqFunctionSubstring_after(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSubstring_after(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var a,b: string;
     i:integer;
     collation: TXQCollation;
@@ -1871,7 +1870,7 @@ end;
 
 
 
-function xqFunctionSplitEqual(const cxt: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSplitEqual(const cxt: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   searched: String;
   list: String;
@@ -1894,7 +1893,7 @@ end;
 
 
 
-function xqFunctionTranslate(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTranslate({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  temp3: String;
  temp: String;
@@ -1916,7 +1915,7 @@ begin
 
 end;
 
-function xqFunctionRandom(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionRandom(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   requiredArgCount(argc, 0, 1);
@@ -1925,7 +1924,7 @@ begin
   else exit(xqvalue(xqfloat(Random * args[0].toFloat)));
 end;
 
-function xqFunctionRandom_Seed(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionRandom_Seed(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   requiredArgCount(argc, 0, 1);
@@ -1934,14 +1933,14 @@ begin
   result := xqvalue();
 end;
 
-function xqFunctionSleep(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSleep({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 1);
   sleep(args[0].toInt64);
   result := xqvalue;
 end;
 
-function xqFunctionEval(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionEval(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var term: TXQuery;
   model: TXQParsingModel;
 begin
@@ -1968,14 +1967,14 @@ begin
   end;
 end;
 
-function xqFunctionCSS(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCSS(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 1);
   if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:css without a xquery engine (e.g. from an interpreted function in a native module)');
   result := context.staticContext.sender.evaluateCSS3(args[0].toString, context.contextNode(false));
 end;
 
-function xqFunctionGet(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionGet(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 1, 2);
   if context.hasGlobalVariable(args[0].toString, result, context.findNamespaceURL('', xqdnkUnknown)) then exit;
@@ -1983,7 +1982,7 @@ begin
   else exit(xqvalue());
 end;
 
-function xqFunctionIs_Nth(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionIs_Nth({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   i,a,b,n: int64;
 begin
@@ -1999,7 +1998,7 @@ begin
   end;
 end;
 
-function xqFunctionType_of(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionType_of({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   t: TXSType;
   f: TXQValueFunction;
@@ -2022,14 +2021,14 @@ begin
   end else result := xqvalue(args[0].typeName);
 end;
 
-function xqFunctionGet_Property(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionGet_Property({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 2);
   if not (args[0] is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object');
   result := args[0].getProperty(args[1].toString);
 end;
 
-function xqFunctionObject(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionObject({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   seq: TXQVList;
   i: Integer;
@@ -2052,42 +2051,42 @@ begin
 end;
 
 //Boolean functions
-function xqFunctionBoolean(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionBoolean({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(args[0].toBooleanEffective);
 end;
 
-function xqFunctionTrue(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTrue({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := xqvalueTrue;
 end;
 
-function xqFunctionFalse(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFalse({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   //todo: boolean('true') = false in xpath :(
   result := xqvalueFalse;
 end;
 
-function xqFunctionNot(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNot({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(not args[0].toBooleanEffective);
 end;
 
 //Datetime functions
-function xqFunctionParse_datetime(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_datetime({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := TXQValueDateTime.create(baseSchema.dateTime, args[0].toString, args[1].toString);
 end;
-function xqFunctionParse_date(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_date({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := TXQValueDateTime.create(baseSchema.date, args[0].toString, args[1].toString);
 end;
-function xqFunctionParse_time(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_time({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := TXQValueDateTime.create(baseSchema.time, args[0].toString, args[1].toString);
 end;
 
-function xqFunctionDateTime(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDateTime({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   resdt: TXQValueDateTime;
   dt0, dt1: PXQValueDateTimeData;
@@ -2117,7 +2116,7 @@ end;
 
 
 
-function xqFunctionYear_From_Duration(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionYear_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dt: IXQValue;
 begin
@@ -2127,7 +2126,7 @@ begin
   result := xqvalue(dt.getInternalDateTimeData^.toMonths() div 12);
 end;
 
-function xqFunctionMonth_From_Duration(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionMonth_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dt: IXQValue;
 begin
@@ -2151,28 +2150,28 @@ begin
   else  result := xqvalue( tempValue.seconds + shifted10(bigdecimal(tempValue.microsecs), -6) );
 end;
 
-function xqFunctionDay_From_Duration(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDay_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := getCanonicalValueFromDayTimeDuration(3, args);
 end;
 
-function xqFunctionHours_From_Duration(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionHours_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := getCanonicalValueFromDayTimeDuration(4, args);
 end;
 
-function xqFunctionMinutes_From_Duration(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionMinutes_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := getCanonicalValueFromDayTimeDuration(5, args);
 end;
 
-function xqFunctionSeconds_From_Duration(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSeconds_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := getCanonicalValueFromDayTimeDuration(6, args);
 end;
 
 
-function xqFunctionAdjustDateTimeToTimeZone(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionAdjustDateTimeToTimeZone(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 const SCALE: int64 = 60 * MicroSecsPerSec;
 var tz: integer;
   resdt: TXQValueDateTime;
@@ -2202,7 +2201,7 @@ begin
   end;
 end;
 
-function xqFunctionImplicit_Timezone(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionImplicit_Timezone(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if context.staticContext.ImplicitTimezoneInMinutes = high(Integer) then exit(xqvalue);
   result := TXQValueDateTime.create(baseSchema.dayTimeDuration);
@@ -2212,13 +2211,13 @@ begin
   end;
 end;
 
-function xqFunctionCurrent_Datetime(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCurrent_Datetime(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := TXQValueDateTime.create(baseSchema.dateTime, context.staticContext.CurrentDateTime); //stable during evaluation
   if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then result.getInternalDateTimeData^.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
-function xqFunctionCurrent_Date(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCurrent_Date(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var
   temp: IXQValue;
 begin
@@ -2227,7 +2226,7 @@ begin
   if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then result.getInternalDateTimeData^.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
-function xqFunctionCurrent_Time(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCurrent_Time(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var
   temp: IXQValue;
 begin
@@ -2236,20 +2235,20 @@ begin
   if (context.staticContext.ImplicitTimezoneInMinutes <> high(integer)) then result.getInternalDateTimeData^.timezone := context.staticContext.ImplicitTimezoneInMinutes;
 end;
 
-function xqFunctionTrace(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTrace(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := args[0];
   if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnTrace) then context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], args[1]);
 end;
 
 
-function xqFunctionStatic_Base_Uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionStatic_Base_Uri(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if context.staticContext.baseURI <> '' then result := baseSchema.anyURI.createValue(context.staticContext.baseURI)
   else result := xqvalue();
 end;
 
-function xqFunctionBase_Uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionBase_Uri(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var uri: string;
   node: TTreeNode;
   temp: String;
@@ -2277,7 +2276,7 @@ begin
   (result as TXQValueString).str :=  uri; // by pass validation
 end;
 
-function xqFunctionDocument_Uri(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDocument_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -2288,7 +2287,7 @@ begin
   result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
 end;
 
-function xqFunctionDocument_Uri0(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDocument_Uri0(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -2298,7 +2297,7 @@ begin
   result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
 end;
 
-function xqFunctionRoot(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionRoot(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: TTreeNode;
 begin
@@ -2309,7 +2308,7 @@ begin
   else result := xqvalue(temp);
 end;
 
-function xqFunctionLang(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionLang(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
   rlang, testlang: string;
@@ -2334,7 +2333,7 @@ end;
 
 
 
-function xqFunctionResolve_QName(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionResolve_QName(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 
 var
   name, nsprefix: String;
@@ -2357,7 +2356,7 @@ begin
   result := TXQValueQName.create(nsurl, nsprefix, name);
 end;
 
-function xqFunctionQName(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionQName({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   qname: String;
 begin
@@ -2371,7 +2370,7 @@ begin
   end else result := TXQValueQName.create(args[0].toString, qname)
 end;
 
-function xqFunctionPrefix_From_QName(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionPrefix_From_QName({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   splitted: TXQValueQName;
 begin
@@ -2382,7 +2381,7 @@ begin
   result := TXQValueString.create(baseSchema.NCName, splitted.prefix);
 end;
 
-function xqFunctionLocal_Name_From_QName(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionLocal_Name_From_QName({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   splitted: TXQValueQName;
 begin
@@ -2392,7 +2391,7 @@ begin
   result := TXQValueString.create(baseSchema.NCName, splitted.local);
 end;
 
-function xqFunctionNamespace_URI_from_QName(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNamespace_URI_from_QName({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   splitted: TXQValueQName;
 begin
@@ -2402,7 +2401,7 @@ begin
   result := baseSchema.anyURI.createValue(splitted.url);
 end;
 
-function xqFunctionNamespace_URI_For_Prefix(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNamespace_URI_For_Prefix({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: TNamespaceList;
   tempns: INamespace;
@@ -2418,7 +2417,7 @@ begin
   temp.free;
 end;
 
-function xqFunctionIn_Scope_prefixes(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionIn_Scope_prefixes({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   namespaces: TNamespaceList;
   resseq: TXQValueSequence;
@@ -2472,7 +2471,7 @@ begin
 end;
 {$ENDIF}
 
-function xqFunctionResolve_Uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionResolve_Uri(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var rel, base: string;
 begin
   if argc = 2 then base := args[1].toString
@@ -2491,27 +2490,27 @@ end;
 
 
 
-function xqFunctionEncode_For_Uri(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionEncode_For_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(urlHexEncode(args[0].toString));
 end;
 
-function xqFunctionIri_To_Uri(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionIri_To_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(urlHexEncode(args[0].toString, [#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`']));
 end;
-function xqFunctionEscape_Html_Uri(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionEscape_Html_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(urlHexEncode(args[0].toString, [#32..#126]));
 end;
 
-function xqFunctionDecode_Uri(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDecode_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(urlHexDecode(args[0].toString));
 end;
 
 
-function xqFunctionDoc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDoc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
   node: TTreeNode;
@@ -2554,7 +2553,7 @@ begin
   result := xqvalue(node);
 end;
 
-function xqFunctionDoc_Available(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDoc_Available(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
 begin
@@ -2574,7 +2573,7 @@ begin
   {$endif}
 end;
 
-function xqFunctionCollection(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionCollection(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var url: string;
 begin
   if (argc = 0) or (args[0].isUndefined) then url := ''
@@ -2584,7 +2583,7 @@ begin
   if result = nil then raise EXQEvaluationException.create('FODC0002', 'No collection entry for ' + url);
 end;
 
-function xqFunctionUri_Collection(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUri_Collection(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var url: string;
 begin
   if (argc = 0) or (args[0].isUndefined) then url := ''
@@ -2594,7 +2593,7 @@ begin
   if result = nil then raise EXQEvaluationException.create('FODC0002', 'No uri collection entry for ' + url);
 end;
 
-function xqFunctionConcatenate(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionConcatenate({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i: Integer;
  resseq: TXQValueSequence;
@@ -2605,7 +2604,7 @@ begin
   result := resseq;
 end;
 
-function xqFunctionIndex_of(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionIndex_of(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   collationOverride: TXQCollation;
   function equal(const a,b: IXQValue): boolean; inline;
@@ -2636,18 +2635,18 @@ begin
   end;
 end;
 
-function xqFunctionExists(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionExists({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(not args[0].isUndefined);
 end;
 
-function xqFunctionEmpty(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionEmpty({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(args[0].isUndefined);
 end;
 
 
-function xqFunctionDistinct_values(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDistinct_values(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i: Integer;
  v: PIXQValue;
@@ -2675,7 +2674,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function xqFunctionInsert_before(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionInsert_before({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  index: Integer;
  a: PIXQValue;
@@ -2697,7 +2696,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function xqFunctionRemove(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionRemove({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i, count: Integer;
  iterator: TXQValueEnumeratorPtrUnsafe;
@@ -2723,7 +2722,7 @@ begin
   xqvalueSeqSqueezed(result, list);
 end;
 
-function xqFunctionreverse(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionreverse({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   list: TXQVList;
 begin
@@ -2734,7 +2733,7 @@ begin
   result := TXQValueSequence.create(list);
 end;
 
-function xqFunctionsubsequence(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionsubsequence({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var from,len,oldlen: Integer;
  resseq: TXQValueSequence;
  resseqseq: TXQVList;
@@ -2764,26 +2763,26 @@ begin
   result := resseq;
 end;
 
-function xqFunctionUnordered(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUnordered({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := args[0];
 end;
 
-function xqFunctionZero_or_one(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionZero_or_one({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if args[0].getSequenceCount > 1 then
     raise EXQEvaluationException.Create('FORG0003', 'Sequence contains more than one element');
   result := args[0];
 end;
 
-function xqFunctionOne_or_more(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionOne_or_more({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if args[0].getSequenceCount = 0 then
     raise EXQEvaluationException.Create('FORG0004', 'Sequence contains no element');
   result := args[0];
 end;
 
-function xqFunctionexactly_one(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionexactly_one({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if args[0].getSequenceCount <> 1 then
     raise EXQEvaluationException.Create('FORG0005', 'Sequence contains not one element');
@@ -2791,7 +2790,7 @@ begin
 end;
 
 
-function xqFunctionDeep_equal(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDeep_equal(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if argc = 3 then
     result := xqvalue(xqvalueDeep_equal(context, args[0], args[1], TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)))
@@ -2799,7 +2798,7 @@ begin
     result := xqvalue(xqvalueDeep_equal(context, args[0], args[1], context.staticContext.collation));
 end;
 
-function xqFunctioncount(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctioncount({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(args[0].getSequenceCount);
 end;
@@ -2828,7 +2827,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function xqFunctionProduct(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionProduct(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: PIXQValue;
 begin
@@ -2923,7 +2922,7 @@ begin
 end;
 
 
-function xqFunctionSum(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSum({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  tempf: xqfloat;
  tempd: BigDecimal;
@@ -3013,7 +3012,7 @@ begin
   end;
 end;
 
-function xqFunctionavg(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionavg({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var tempf: xqfloat;
     tempf2: xqfloat;
     tempd: BigDecimal;
@@ -3065,7 +3064,7 @@ begin
   end;
 end;
 
-function xqFunctionminmax(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; const asmin: boolean): IXQValue;
+function xqFunctionminmax(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; const asmin: boolean): IXQValue;
 procedure raiseError;
 begin
   raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:min/max');
@@ -3193,18 +3192,18 @@ begin
   end;
 end;
 
-function xqFunctionmin(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionmin(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionminmax(context, argc, args, true);
 end;
 
-function xqFunctionmax(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionmax(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionminmax(context, argc, args, false);
 end;
 
 
-function xqFunctionDefault_Collation(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDefault_Collation(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if strBeginsWith(context.staticContext.collation.id, 'http://') then result := xqvalue(context.staticContext.collation.id)
   else result := xqvalue(MY_NAMESPACE_PREFIX_URL + context.staticContext.collation.id);
@@ -3212,7 +3211,7 @@ end;
 
 
 
-function simpleNode(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): TTreeNode;
+function simpleNode(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): TTreeNode;
 begin
   if argc = 0 then exit(context.contextNode())
   else if args[0].isUndefined then exit(nil)
@@ -3220,7 +3219,7 @@ begin
 end;
 
 
-function xqFunctionNilled(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNilled(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -3233,7 +3232,7 @@ begin
   ignore(context);
 end;
 
-function xqFunctionNode_name(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNode_name(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -3249,7 +3248,7 @@ begin
 end;
 
 
-function simpleNodeName(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): string;
+function simpleNodeName(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): string;
 var
   node: TTreeNode;
 begin
@@ -3259,7 +3258,7 @@ begin
   result := node.getNodeName();
 end;
 
-function xqFunctionName(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionName(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   s: String;
 begin
@@ -3267,7 +3266,7 @@ begin
   result := xqvalue(s);
 end;
 
-function xqFunctionLocal_Name(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionLocal_Name(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   s: String;
 begin
@@ -3276,7 +3275,7 @@ begin
   result := xqvalue(s);
 end;
 
-function xqFunctionNamespace_URI(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNamespace_URI(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -3290,7 +3289,7 @@ begin
   result := baseSchema.anyURI.createValue('')
 end;
 
-function xqFunctionPosition(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionPosition(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if context.SeqValue <> nil then result := xqvalue(context.SeqIndex)
   else if context.ParentElement <> nil then result := xqvalue(1)
@@ -3298,14 +3297,14 @@ begin
 
 end;
 
-function xqFunctionLast(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionLast(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if context.SeqValue <> nil then result := xqvalue(context.SeqLength)
   else if context.ParentElement <> nil then result := xqvalue(1)
   else context.raiseXPDY0002ContextItemAbsent;
 end;
 
-function xqFunctionId_Common(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; parentElement: boolean): IXQValue;
+function xqFunctionId_Common(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; parentElement: boolean): IXQValue;
 var sl: TStringList;
 procedure addSplitted(s: string);
 var
@@ -3375,18 +3374,18 @@ begin
 end;
 
 
-function xqFunctionId(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionId(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionId_Common(context, argc, args, false);
 end;
 
-function xqFunctionElement_With_Id(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionElement_With_Id(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionId_Common(context, argc, args, true);
 end;
 
 
-function xqFunctionIdRef(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionIdRef(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 
 var sl: TStringList;
   function matchesSearchedId(const s: string): boolean;
@@ -3478,12 +3477,12 @@ end;
 
 //========================================XPATH/XQUERY 3.0 ONLY FUNCTIONS=========================================
 
-function xqFunctionHead(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionHead({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := args[0].get(1);
 end;
 
-function xqFunctionTail(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTail({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   len: Integer;
   seq: TXQValueSequence;
@@ -3498,7 +3497,7 @@ begin
   result := seq;
 end;
 
-function xqFunctionHas_Children(const context: TXQEvaluationContext;  argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionHas_Children(const context: TXQEvaluationContext;  {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var n: TTreeNode;
 begin
   if argc = 0 then n := context.contextNode()
@@ -3507,7 +3506,7 @@ begin
   result := xqvalue(n.getFirstChild() <> nil);
 end;
 
-function xqFunctionPath(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionPath(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
   function path(n: TTreeNode): string;
     function getPosition(checkValue: boolean): integer;
     var cur: TTreeNode;
@@ -3565,7 +3564,7 @@ begin
 end;
 
 
-function xqFunctionFunction_lookup(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFunction_lookup(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   qname: TXQValueQName;
   temp: TXQTermDefineFunction;
@@ -3590,7 +3589,7 @@ begin
   temp.free;
 end;
 
-function xqFunctionFunction_name(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFunction_name({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: TXQValueFunction;
 begin
@@ -3600,7 +3599,7 @@ begin
   result := TXQValueQName.create(f.namespaceURL, f.namespacePrefix, f.name);
 end;
 
-function xqFunctionFunction_arity(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFunction_arity({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: TXQValueFunction;
 begin
@@ -3651,18 +3650,18 @@ begin
 end;
 
 
-function xqFunctionFold_left(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFold_left(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionFold(context, true, args);
 end;
 
-function xqFunctionFold_right(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFold_right(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionFold(context, false, args);
 end;
 
 
-function xqFunctionFor_each_pair(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFor_each_pair(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   seq1: TXQValue;
   seq2: TXQValue;
@@ -3697,7 +3696,7 @@ begin
 end;
 
 
-function xqFunctionEnvironment_Variable(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionEnvironment_Variable({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   name: String;
   i: Integer;
@@ -3710,7 +3709,7 @@ begin
   result := xqvalue();
 end;
 
-function xqFunctionAvailable_Environment_Variables(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionAvailable_Environment_Variables({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var
   i: Integer;
   resseq: TXQValueSequence;
@@ -3722,7 +3721,7 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function xqFunctionParse_Common(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; typ: string): IXQValue;
+function xqFunctionParse_Common(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; typ: string): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -3737,17 +3736,17 @@ begin
   result := xqvalue(node);
 end;
 
-function xqFunctionParse_XML(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_XML(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionParse_Common(context, argc, args, 'xml');
 end;
 
-function xqFunctionParse_XML_Fragment(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_XML_Fragment(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionParse_Common(context, argc, args, 'xml-external-parsed-entity');
 end;
 
-function xqFunctionParse_HTML(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_HTML(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionParse_Common(context, argc, args, 'html');
 end;
@@ -3828,7 +3827,7 @@ begin
 end;
 
 
-function xqFunctionSerialize(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: PIXQValue;
   arg: IXQValue;
@@ -3937,7 +3936,7 @@ begin
   result := xqvalue(strres);
 end;
 
-function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
   data: String;
@@ -3981,7 +3980,7 @@ begin
 end;
 
 
-function xqFunctionUnparsed_Text_Available(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUnparsed_Text_Available(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalueTrue;
   try
@@ -3992,7 +3991,7 @@ begin
 end;
 
 
-function xqFunctionGenerateId(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionGenerateId(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   node: TTreeNode;
 begin
@@ -4397,7 +4396,7 @@ function formatUnicodeInteger(arabic, primaryFormat: string; family: integer): s
     end;
   end;
 
-function xqFunctionFormat_Integer(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFormat_Integer(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 
 
 var shortLang: String;
@@ -4576,7 +4575,7 @@ begin
 end;
 
 
-function xqFunctionFormat_DateTimeC(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; allowDate, allowTime: boolean): IXQValue;
+function xqFunctionFormat_DateTimeC(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; allowDate, allowTime: boolean): IXQValue;
 
 const monthNamesEnglish: array[1..12] of string = ('January', 'February', 'March','April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December');
       monthNamesGerman: array[1..12] of string = ('Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember');
@@ -4965,22 +4964,22 @@ begin
   result := xqvalue(formatted);
 end;
 
-function xqFunctionFormat_DateTime(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFormat_DateTime(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionFormat_DateTimeC(context, argc, args, true, true);
 end;
-function xqFunctionFormat_Date(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFormat_Date(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionFormat_DateTimeC(context, argc, args, true, false);
 end;
-function xqFunctionFormat_Time(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFormat_Time(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionFormat_DateTimeC(context, argc, args, false, true);
 end;
 
 type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentItself, spInExponent, spInSuffix);
 
-function xqFunctionFormat_Number(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionFormat_Number(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   data: ^TXQDecimalFormatPropertyData;
   picture: String;

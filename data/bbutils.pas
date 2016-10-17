@@ -1085,6 +1085,9 @@ procedure ignore(const intentionallyUnusedParameter: string); overload; {$IFDEF 
 procedure ignore(const intentionallyUnusedParameter: boolean); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //** Ignores the parameter to suppress warnings
+procedure ignore(const intentionallyUnusedParameter: integer); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+//** Ignores the parameter to suppress warnings
 procedure ignore(const intentionallyUnusedParameter: Int64); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //** Ignores the parameter to suppress warnings
@@ -6756,6 +6759,13 @@ end;
 
 
 procedure ignore(const intentionallyUnusedParameter: boolean); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+begin
+
+end;
+
+
+
+procedure ignore(const intentionallyUnusedParameter: integer); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
 
 end;

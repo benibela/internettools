@@ -1436,7 +1436,7 @@ begin
       if pos^ = '<' then begin
         clause.pattern := parsePatternMatcher();
       end else begin
-        if pos^ = '$' then begin clause.variable := TXQTermVariable(parseVariable); expect('as'); end;
+        if pos^ = '$' then begin clause.variable := {%H-}TXQTermVariable(parseVariable); expect('as'); end;
         clause.typ := parseSequenceTypeUnion();
       end;
       expect('return');
@@ -1448,7 +1448,7 @@ begin
     skipWhitespaceAndComment();
     clause := TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
     result.push(clause);
-    if pos^ = '$' then clause.variable := TXQTermVariable(parseVariable);
+    if pos^ = '$' then clause.variable := {%H-}TXQTermVariable(parseVariable);
     expect('return');
     clause.expr := parse();
   except

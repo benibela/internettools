@@ -788,7 +788,7 @@ function arrayBinarySearch(a: T__ArrayType__; value: T__ElementType__; choosen: 
 {%END-REPEAT}
 
 
-{%REPEAT T_Ignore, [string, boolean, Int64, TObject, pointer]}
+{%REPEAT T_Ignore, [string, boolean, integer, Int64, TObject, pointer]}
 //** Ignores the parameter to suppress warnings
 procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 {%END-REPEAT}
@@ -4804,7 +4804,7 @@ end;
 {%END-REPEAT}
 
 {$HINTS OFF}
-{%REPEAT T_Ignore, [string, boolean, Int64, TObject, pointer]}
+{%REPEAT T_Ignore, [string, boolean, integer, Int64, TObject, pointer]}
 procedure ignore(const intentionallyUnusedParameter: T_Ignore); overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
 

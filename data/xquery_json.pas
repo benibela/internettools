@@ -51,21 +51,21 @@ implementation
 uses jsonscanner, simplehtmltreeparser, bbutils;
 
 
-function xqFunctionIsNull(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionIsNull({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := args[0];
   xqvalueSeqSqueeze(result);
   result := xqvalue(result is TXQValueJSONNull);
 end;
 
-function xqFunctionNull(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNull({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := TXQValueJSONNull.Create();
 end;
 
 
 
-function xqFunctionObject(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionObject({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var resobj: TXQValueObject;
     procedure merge(another: TXQValueObject);
     var
@@ -227,7 +227,6 @@ var
   end;
 
 var
-  value: TXQValue;
   resseq: TXQValueSequence;
 
 begin
@@ -248,7 +247,7 @@ begin
 end;
 
 
-function xqFunctionParseJson(argc: SizeInt; args: PIXQValue): IXQValue; //must be simple due to being in retrieve
+function xqFunctionParseJson({%H-}argc: SizeInt; args: PIXQValue): IXQValue; //must be simple due to being in retrieve
 var
   multipleTopLevelItems: Boolean;
   value: TXQValue;
@@ -263,7 +262,7 @@ begin
   result := parseJSON(args[0].toString, multipleTopLevelItems);
 end;
 
-function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSerialize_Json({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   a: IXQValue;
 begin
@@ -271,7 +270,7 @@ begin
   result := xqvalue(a.jsonSerialize(tnsXML));
 end;
 
-function xqFunctionJSON_Doc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionJSON_Doc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
   data: String;
@@ -286,7 +285,7 @@ begin
   result := xqFunctionParseJson(1, @temp);
 end;
 
-function xqFunctionJSON(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionJSON(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   s: String;
 begin
@@ -297,7 +296,7 @@ begin
      result := xqFunctionParseJson(argc, args);
 end;
 
-function xqFunctionKeys(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionKeys({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
   res: TStringList;
@@ -311,7 +310,7 @@ begin
 end;
 
 
-function xqFunctionMembers(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionMembers({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
   ara: TXQValueJSONArray;
@@ -328,7 +327,7 @@ begin
   xqvalueSeqSqueezed(result, list)
 end;
 
-function xqFunctionSize(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   a: IXQValue;
 begin

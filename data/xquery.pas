@@ -1467,10 +1467,10 @@ type
 
   TXQTerm_Visitor = class
     parent: TXQTerm;
-    procedure declare(intentionallyUnusedParameter: PXQTermVariable); virtual;
-    procedure undeclare(intentionallyUnusedParameter: PXQTermVariable); virtual;
-    function visit (intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
-    function leave (intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
+    procedure declare({%H-}intentionallyUnusedParameter: PXQTermVariable); virtual;
+    procedure undeclare({%H-}intentionallyUnusedParameter: PXQTermVariable); virtual;
+    function visit ({%H-}intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
+    function leave ({%H-}intentionallyUnusedParameter: PXQTerm): TXQTerm_VisitAction; virtual;
 
     class function startVisiting(term: PXQTerm): TXQTerm_VisitAction;
     function simpleTermVisit (term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction; //do not call, for internal use
@@ -1498,7 +1498,7 @@ type
     function toQueryCommand: TXQPathMatchingStep; virtual;
     procedure addToQueryList(var path: TXQPathMatching); virtual;
 
-    function visitchildren(intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
+    function visitchildren({%H-}intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
     function clone: TXQTerm; virtual;
   end;
   TXQTermClass = class of TXQTerm;
@@ -2619,7 +2619,7 @@ public
   function xqvalue(v: xqfloat):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(const v: BigDecimal):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   function xqvalue(const v: string):IXQValue; inline; //**< Creates a string IXQValue
-  function xqvalue(intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
+  function xqvalue({%H-}intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates a node TXQValue
   function xqvalue(sl: TStringList): IXQValue; //**< Creates a sequence of strings (does *not* free the list)
   function xqvalue(const sl: array of string): IXQValue; //**< Creates a sequence of untyped strings

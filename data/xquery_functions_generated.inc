@@ -22,26 +22,31 @@ end;
 
 function xqFunctionYear_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(argc);
   result := xqFunctionSomethingFrom_Datetime(args[0], 1);
 end;
 
 function xqFunctionMonth_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(argc);
   result := xqFunctionSomethingFrom_Datetime(args[0], 2);
 end;
 
 function xqFunctionDay_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(argc);
   result := xqFunctionSomethingFrom_Datetime(args[0], 3);
 end;
 
 function xqFunctionHours_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(argc);
   result := xqFunctionSomethingFrom_Datetime(args[0], 4);
 end;
 
 function xqFunctionMinutes_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(argc);
   result := xqFunctionSomethingFrom_Datetime(args[0], 5);
 end;
 
@@ -50,6 +55,7 @@ end;
 function xqFunctionSeconds_From_Datetime(argc: SizeInt; args: PIXQValue): IXQValue;
 var v: IXQValue;
 begin
+  ignore(argc);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
   with v.getInternalDateTimeData^ do begin
@@ -62,6 +68,7 @@ function xqFunctionTimezone_From_Datetime(argc: SizeInt; args: PIXQValue): IXQVa
 var tempCorrectlyInitialized: TXQValueDateTimeData;
      v: IXQValue;
 begin
+  ignore(argc);
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
   if v.getInternalDateTimeData^.timezone = high(Integer) then exit(xqvalue);
