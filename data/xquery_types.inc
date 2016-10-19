@@ -155,6 +155,42 @@ begin
   raise EXQEvaluationException.create('XQST0052', 'Cannot create an instance of the abstract base type anyType (TXQValue)');
 end;
 
+type TNewinstanceFunc = function: tobject of object;
+class function TXQValue.newinstance: tobject;
+var k: TXQValueKind;
+  hackMethod: TMethod;
+begin
+  k := classKind;
+  if commonValues[k] <> nil then begin
+    result := commonValues[k];
+    commonValues[k] := txqvalue(result).ffreelist;
+    //A normal object needs to be cleaned up and initialized. We do the clean up in the destructor and can skip it here
+    //hackMethod := tmethod(@CleanupInstance);
+    //hackMethod.Data := result;
+    //TProcedureOfObject(hackMethod)();
+    //InitInstance(result);
+  end else begin
+    hackMethod.Data := self;
+    hackMethod.Code := @TObject.newinstance;
+    result := TNewinstanceFunc(hackMethod)();
+  end;
+end;
+
+procedure TXQValue.AfterConstruction;
+begin
+  //TInterfacedObject has a hack to allow the constructor to pass self as interface to non-const parameters.
+  //We do not do this, so this override disables it.
+end;
+
+procedure TXQValue.FreeInstance;
+var
+  k: TXQValueKind;
+begin
+  k := classKind;
+  ffreelist := commonValues[k];
+  commonValues[k] := self;
+end;
+
 function TXQValue.kind: TXQValueKind;
 begin
   result := classKind;
@@ -726,6 +762,13 @@ begin
   ftypeAnnotation := atypeAnnotation;
   value := avalue.toDecimal;
 end;
+
+destructor TXQValueDecimal.Destroy;
+begin
+  value.digits := nil;
+  inherited Destroy;
+end;
+
 {$ImplicitExceptions on}
 
 class function TXQValueDecimal.classKind: TXQValueKind;
@@ -793,6 +836,12 @@ constructor TXQValueString.create(atypeAnnotation: TXSType; const value: IXQValu
 begin
   ftypeAnnotation := atypeAnnotation;
   str := value.toString;
+end;
+
+destructor TXQValueString.Destroy;
+begin
+  str := '';
+  inherited Destroy;
 end;
 
 {$ImplicitExceptions on}
@@ -901,6 +950,14 @@ begin
     url := (value as TXQValueQName).url;
     local := (value as TXQValueQName).local;
   end else raise EXQEvaluationException.create('XPTY0004', 'Cannnot cast '+value.debugAsStringWithTypeAnnotation()+' to xs:QName');
+end;
+
+destructor TXQValueQName.Destroy;
+begin
+  prefix := '';
+  url := '';
+  local := '';
+  inherited Destroy;
 end;
 
 class function TXQValueQName.classKind: TXQValueKind;
@@ -1742,6 +1799,7 @@ end;
 destructor TXQValueObject.Destroy;
 begin
   values.Free;
+  prototype := nil;
   inherited Destroy;
 end;
 
@@ -2092,6 +2150,14 @@ constructor TXQValueFunction.create(aterm: TXQTerm);
 begin
   body := aterm;
   ftypeAnnotation := baseSchema.function_;
+end;
+
+procedure TXQValueFunction.FreeInstance;
+var hackMethod: TMethod;
+begin
+  hackMethod.Code := @TObject.FreeInstance;
+  hackMethod.Data := self;
+  TProcedureOfObject(hackMethod)();
 end;
 
 destructor TXQValueFunction.Destroy;

@@ -403,9 +403,16 @@ type
   See IXQValue for an actual description
   *)
   TXQValue = class(TInterfacedObject, IXQValue)
+  private
+    ffreelist: TXQValue;
+  public
     ftypeAnnotation: TXSType;
     constructor create(atypeAnnotation: TXSType); virtual;
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); virtual;
+
+    class function newinstance : tobject;override;
+    procedure AfterConstruction; override;
+    procedure FreeInstance;override;
 
     function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you can't define class functions in the interface, but we need to do calculations with types itself)
     function typeName: string;      //**< XPath type name (actually just wraps typeAnnotation.name)
@@ -571,6 +578,7 @@ type
     constructor create(const v: BigDecimal); reintroduce; virtual;
     constructor create(atypeannotation: TXSType; const v: BigDecimal); reintroduce; virtual;
     constructor create(atypeAnnotation: TXSType; const avalue: IXQValue); override;
+    destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
 
@@ -596,6 +604,7 @@ type
     constructor create(const astr: string = ''); reintroduce; virtual;
     constructor create(atypeAnnotation: TXSType; const astr: string);
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
+    destructor Destroy; override;
 
     class function canCreateFromString(const v: string): boolean; virtual;
 
@@ -625,6 +634,7 @@ type
     constructor create(const aurl, aprefixedLocal: string);
     constructor create(const ns: INamespace; const alocal: string);
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
+    destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
 
@@ -930,6 +940,7 @@ type
     annotations: TXQAnnotations;
 
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
+    procedure FreeInstance; override;
     destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
@@ -2527,6 +2538,7 @@ public
 
   private
     FLastQuery: IXQuery;
+    FCreationThread: SizeInt;
   protected
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
@@ -5027,6 +5039,22 @@ end;
 
 
 var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
+threadvar commonValues: array[TXQValueKind] of TXQValue;
+
+procedure freeCommonCaches;
+var k: TXQValueKind;
+  v, w: TXQValue;
+begin
+  for k := low(commonValues) to high(commonValues) do begin
+    v := commonValues[k];
+    while v <> nil do begin
+      w := v.ffreelist;
+      Freemem(pointer(v));
+      v := w;
+    end;
+  end;
+  FillChar(commonValues, sizeof(commonValues), 0);
+end;
 
 function xqvalue: IXQValue;
 begin
@@ -6582,6 +6610,8 @@ begin
   result.globallyDeclaredVariables := FDefaultVariableHeap;
 end;
 
+threadvar runningEngines: integer;
+
 constructor TXQueryEngine.create;
 begin
   self.CurrentDateTime:=now;
@@ -6610,12 +6640,15 @@ begin
   FDefaultVariableHeap := TXQVariableChangeLog.create();
   FModules := TInterfaceList.Create;
   FPendingModules := TInterfaceList.Create;
+  inc(runningEngines);
+  FCreationThread := GetThreadID;
 end;
 
 destructor TXQueryEngine.Destroy;
 var
   i: Integer;
 begin
+  ;
   VariableChangelog.Free;
   VariableChangelogUndefined.free;
   FDefaultVariableHeap.Free;
@@ -6634,6 +6667,12 @@ begin
   FPendingModules.Free;
   FParserVariableVisitor.free;
   StaticContext.Free;
+  //We need to call freeCommonCaches on every thread.
+  //We cannot know when the thread ends, so we do it with the last engine on the thread
+  dec(runningEngines);
+  if runningEngines = 0 then freeCommonCaches;
+  if FCreationThread <> GetThreadID then //otherwise the runningEngines counter above would fail
+    raise EXQException.create('pxp:INTERNAL', 'A TXQueryEngine must be destroyed in the thread that created it');
   inherited Destroy;
 end;
 
@@ -8370,5 +8409,9 @@ baseSchema.free;
 baseJSONiqSchema.free;
 GlobalInterpretedNativeFunctionStaticContext.Free;
 GlobalStaticNamespaces.Free;
+commonValuesUndefined := nil;
+commonValuesTrue := nil;
+commonValuesFalse := nil;
+freeCommonCaches;
 end.
 
