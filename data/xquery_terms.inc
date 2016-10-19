@@ -3233,23 +3233,17 @@ begin
 end;
 
 function TXQTermVariable.evaluate(var context: TXQEvaluationContext): IXQValue;
-begin
-  if index >= 0 then begin
-    {if (context.temporaryVariables.count - 1 - index < 0) or
-        (context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name <> value) then begin
-      err := 'Var mismatch: '+value+'('+IntToStr(index)+')' + ' <> '+context.temporaryVariables.varstorage[context.temporaryVariables.count - 1 - index].name + LineEnding;
-      err += 'Vars on stack: ';
-      for i := 0 to context.temporaryVariables.count - 1 do
-        err += context.temporaryVariables.varstorage[i].name + ' ';
-
-      raise EXQEvaluationException.create('PXP:INTERNAL',err);
-    end;}
-    result := context.temporaryVariables.top(self, index);
-    exit;
+  procedure fail;
+  begin
+    raise EXQEvaluationException.create('pxp:INTERNAL', 'Variable without index: ' + value);
   end;
-  if index = -2 then
-    exit(context.getGlobalVariable(value, namespace));
-  raise EXQEvaluationException.create('pxp:INTERNAL', 'Variable without index: ' + value);
+
+begin
+  if index >= 0 then
+    result := context.temporaryVariables.top(self, index)
+  else if index = -2 then
+    result := context.getGlobalVariable(value, namespace)
+  else fail;
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;

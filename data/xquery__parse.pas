@@ -239,6 +239,8 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     if (v.value[1] = '0') and (v.namespace = XMLNamespaceURL_MyExtensionOperators)  then exit; //special case for xqts test hof-25, do not check variables inserted during partial application
     v.index := overridenVariables.indexOf(v.value,v.namespace);
     if v.index >= 0 then begin
+      assert(overridenVariables.getName(v.index) = v.value);
+      v.value := overridenVariables.getName(v.index); //ensure that local variables have an unique pointer representatino
       v.index := overridenVariables.count - v.index - 1;
       exit;
     end;

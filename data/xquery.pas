@@ -6420,13 +6420,18 @@ begin
 end;
 
 function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
+  procedure fail;
+  begin
+    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+  end;
+
 begin
   result := top(i);
   {$ifdef TRACK_STACK_VARIABLE_NAMES}
   if (debugNames[count - i - 1] <> name.value)
   //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
-     then
-    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+     then fail;
+
   {$endif}
 end;
 
