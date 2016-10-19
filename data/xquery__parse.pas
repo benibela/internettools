@@ -2353,17 +2353,20 @@ begin
       skipWhitespaceAndComment();
       if (pos^ in [#0,',',')',']','}','=','!','>','[','|','+',';']) or ((pos^ = '<') and (parsingModel in [xqpmXPath2, xqpmXPath3])) then begin
         if word = '//' then raiseSyntaxError('Invalid //');
-        exit(TXQTermNodeMatcher.Create('/')) //leading lone slash (see standard#parse-note-leading-lone-slash)
+        exit(TXQTermNodeMatcher.Create(xqnmdRoot)) //leading lone slash (see standard#parse-note-leading-lone-slash)
       end;
-      exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create('/'), parseValue()));
+      exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create(xqnmdRoot), parseValue()));
     end;
 
     '0'..'9': exit(TXQTermConstant.createNumber(nextToken()));
     '.': begin
       word := nextToken();
-      if (word = '.') or (word = '..') then exit(TXQTermNodeMatcher.Create(word))
-      else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermConstant.createNumber(word))
-      else raiseParsingError('XPST0003', 'Unknown term: '+word);
+      case word of
+        '.': exit(TXQTermNodeMatcher.Create(xqnmdContextItem));
+        '..': exit(TXQTermNodeMatcher.Create(xqnmdParent));
+        else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermConstant.createNumber(word))
+        else raiseParsingError('XPST0003', 'Unknown term: '+word);
+      end;
     end;
 
     '<': begin
@@ -2418,8 +2421,6 @@ begin
           end;
 
           if isKindTestFunction(word) then begin
-            result := TXQTermNodeMatcher.Create(word, true);
-            TXQTermNodeMatcher(result).namespaceCheck := xqnmNone;
             if axis = '' then
               case word of
                 'attribute', 'schema-attribute': axis := 'attribute';
@@ -2428,7 +2429,7 @@ begin
                   raiseParsingError('XQST0134', 'No namespace axis');
                 end;
               end;
-            TXQTermNodeMatcher(result).axis:=axis;
+            result := TXQTermNodeMatcher.Create(axis, word, true);
             skipWhitespaceAndComment();
             if pos^ <> ')' then begin
               with TXQTermNodeMatcher(result) do begin
@@ -2452,7 +2453,7 @@ begin
                           else ok := false;
                         end;
                       if ( ((TXQTermNodeMatcher(children[0]).select = '*')
-                              or ((TXQTermNodeMatcher(children[0]).namespaceCheck = xqnmNone) and (word <> 'document-node' { nested function has no namespace }) ))
+                              or ((not TXQTermNodeMatcher(children[0]).queryCommand.namespaceChecked) and (word <> 'document-node' { nested function has no namespace }) ))
                             and (word <> 'element') and (word <> 'attribute') ) then ok := false;
                     end;
                     if not ok then
@@ -2539,13 +2540,10 @@ begin
 
     //if (not staticContext.useLocalNamespaces) and (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*'))  then
     //  namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
-    result := TXQTermNodeMatcher.Create();
-    TXQTermNodeMatcher(result).select := word;
-    if namespaceMode = xqnmPrefix then namespaceURL := namespacePrefix;
+    result := TXQTermNodeMatcher.Create(axis, word);
 
-    TXQTermNodeMatcher(result).namespaceCheck := namespaceMode;
-    TXQTermNodeMatcher(result).namespaceURLOrPrefix := namespaceURL;
-    TXQTermNodeMatcher(result).axis:=axis;
+    if namespaceMode = xqnmPrefix then namespaceURL := namespacePrefix;
+    TXQTermNodeMatcher(result).setNamespace(namespaceMode, namespaceURL);
   except
     result.free;
     raise;
@@ -2747,11 +2745,12 @@ begin
           expect(':=');
           result := astroot;
           if result is TXQTermNodeMatcher then begin
-            case TXQTermNodeMatcher(astroot).namespaceCheck of
-              xqnmNone: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select);
-              xqnmURL: result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).namespaceURLOrPrefix);
-              xqnmPrefix: result := TXQTermPendingEQNameToken.create('', TXQTermNodeMatcher(astroot).namespaceURLOrPrefix, TXQTermNodeMatcher(astroot).select, xqnmPrefix, xqptVariable);
-            end;
+            if qmCheckNamespaceURL in TXQTermNodeMatcher(astroot).queryCommand.matching then
+              result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix)
+             else if qmCheckNamespacePrefix in TXQTermNodeMatcher(astroot).queryCommand.matching then
+              result := TXQTermPendingEQNameToken.create('', TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix, TXQTermNodeMatcher(astroot).select, xqnmPrefix, xqptVariable)
+             else
+              result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select);
             FreeAndNil(astroot);
             astroot := result; //only astroot should contain allocated objects that need to be freed in case of a subsequent parsing error
             if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) then
@@ -3792,8 +3791,8 @@ function TJSONLiteralReplaceVisitor.visit(t: PXQTerm): TXQTerm_VisitAction;
 begin
   result := xqtvaContinue;
   if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0)
-     and ((TXQTermNodeMatcher(t^).namespaceCheck <> xqnmNone {this would be *:true})
-     and (TXQTermNodeMatcher(t^).namespaceURLOrPrefix = ''))
+     and ((TXQTermNodeMatcher(t^).queryCommand.namespaceChecked) //todo, this only should check for prefixes
+     and (TXQTermNodeMatcher(t^).queryCommand.namespaceURLOrPrefix = ''))
      and not (parent is TXQTermMap)
      then begin
     case TXQTermNodeMatcher(t^).select of
@@ -4155,12 +4154,12 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   procedure visitNodeMatcher(n: TXQTermNodeMatcher);
   begin
-    if not staticContext.useLocalNamespaces and (n.namespaceCheck = xqnmPrefix) then begin
-      n.namespaceCheck := xqnmURL;
-      if n.axis = 'attribute' then
-        n.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.namespaceURLOrPrefix, xqdnkUnknown)
+    if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in n.queryCommand.matching) then begin
+      n.queryCommand.matching := n.queryCommand.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
+      if n.queryCommand.typ = qcAncestor then
+        n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkUnknown)
        else
-        n.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.namespaceURLOrPrefix, xqdnkElementType);
+        n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkElementType);
     end;
     if n.func and strBeginsWith(n.select, 'schema-') then begin
       visitNodeMatcher(n.children[0] as TXQTermNodeMatcher);

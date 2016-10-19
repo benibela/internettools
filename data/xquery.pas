@@ -1420,10 +1420,12 @@ type
   end;
 
 
-  TXQPathMatchingAxis = (qcSameNode, qcDirectParent, qcDirectChild, qcSameOrDescendant, qcDescendant, qcFollowing, qcFollowingSibling,
+  TXQPathMatchingAxis = (qcSameNode, qcDirectParent, qcDirectChildImplicit,  qcDirectChild, qcSameOrDescendant, qcDescendant, qcFollowing, qcFollowingSibling,
                           qcAncestor, qcPrecedingSibling, qcPreceding, qcSameOrAncestor,
                           qcDocumentRoot,
-                          qcFunctionSpecialCase);
+                          qcFunctionSpecialCase,
+                          qcAttribute
+                          );
   TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument,
                          qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild);
   TXQPathMatchingKinds = set of TXQPathMatchingKind;
@@ -1435,6 +1437,8 @@ type
     filters: array of TXQTerm; //**< expressions a matched node must satisfy
     requiredType: TXQTermSequenceType;
     function serialize: string;
+    function clone: TXQPathMatchingStep;
+    function namespaceChecked: boolean;
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
     qcSameNode: (matching: TXQPathMatchingKinds;); //**< Which nodes match the query command. If this is [], _nothing_ is found! The elements of the set [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute] match nodes of a certain type, qmValue activates the value field.
     qcFunctionSpecialCase: (specialCase: TXQTerm; );   //**< Term used for qcFunctionSpecialCase
@@ -1689,13 +1693,17 @@ type
   end;
 
   { TXQTermNodeMatcher }
+  TXQTermNodeMatcherDirect = (xqnmdRoot, xqnmdParent, xqnmdContextItem);
   TXQTermNodeMatcher = class(TXQTermWithChildren)
-    axis, namespaceURLOrPrefix, select: string;
-    namespaceCheck: TXQNamespaceMode;
+    queryCommand: TXQPathMatchingStep;
+    //namespaceURLOrPrefix,
+    select: string;
+    //namespaceCheck: TXQNamespaceMode;
     func: boolean;
-    constructor Create();
-    constructor Create(const avalue: string; asfunction: boolean = false);
-    constructor Create(const aaxis: string; const anamespaceMode: TXQNamespaceMode; const anamespaceUrlOrPrefix, aLocalPart: string);
+    constructor Create(direct: TXQTermNodeMatcherDirect);
+    constructor Create(const aaxis: string; const avalue: string; asfunction: boolean = false);
+    procedure setNamespace(namespaceCheck: TXQNamespaceMode; namespaceURLOrPrefix: string);
+
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
@@ -1703,7 +1711,6 @@ type
     function clone: TXQTerm; override;
 
     function toQueryCommand: TXQPathMatchingStep; override;
-    procedure assignNamespaceToMatchingStep(var step: TXQPathMatchingStep);
   end;
 
   { TXQTermFilterSequence }
@@ -3090,6 +3097,7 @@ begin
        qcSameNode: result := 'self::';
        qcDirectParent: result := 'parent::';
        qcDirectChild: result := 'child::';
+       qcDirectChildImplicit: result := '';
        qcSameOrDescendant: result := 'same-or-descendant::';
        qcDescendant: result := 'descendant::';
        qcFollowing: result := 'following::';
@@ -3119,6 +3127,27 @@ begin
   end;
   for i := 0 to high(filters) do
     result += '[' + filters[i].ToString + ']';
+end;
+
+function TXQPathMatchingStep.clone: TXQPathMatchingStep;
+var
+  i: Integer;
+begin
+  result.typ := typ;
+  result.namespaceURLOrPrefix := namespaceURLOrPrefix;
+  result.value:=value;
+  result.filters:=filters;
+  SetLength(result.filters, length(result.filters));
+  for i := 0 to high(result.filters) do result.filters[i]:= result.filters[i].clone;
+  if requiredType = nil then result.requiredType:=nil
+  else result.requiredType:=TXQTermSequenceType(requiredType.clone);
+  if typ = qcFunctionSpecialCase then result.specialCase :=specialCase
+  else result.matching:=matching;
+end;
+
+function TXQPathMatchingStep.namespaceChecked: boolean;
+begin
+  result := [qmCheckNamespaceURL,qmCheckNamespacePrefix] * matching <> [];
 end;
 
 constructor TXQDecimalFormat.Create;
@@ -5313,7 +5342,6 @@ begin
 
   if (result.matching = [qmProcessingInstruction])  then begin
     if children[0] is TXQTermNodeMatcher then begin;
-      if TXQTermNodeMatcher(children[0]).axis <> '' then raise EXQEvaluationException.Create('XPST0003', 'axis within element test is not allowed');
       result.value := TXQTermNodeMatcher(children[0]).select;
     end else if children[0] is TXQTermConstant then
       result.value:=strTrimAndNormalize(TXQTermConstant(children[0]).value.toString)
@@ -5322,10 +5350,10 @@ begin
   end else if (select = 'element') or (select = 'attribute') or (select = 'schema-element')or (select = 'schema-attribute')  then begin
     if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('XPST0003', 'Invalid node test.');
     if TXQTermNodeMatcher(children[0]).select <> '*' then begin
-      Include(result.matching, qmValue);
+      result.matching := result.matching + [qmValue] + [qmValue, qmCheckNamespacePrefix, qmCheckNamespaceURL] * TXQTermNodeMatcher(children[0]).queryCommand.matching;
       result.value:=TXQTermNodeMatcher(children[0]).select;
-      TXQTermNodeMatcher(children[0]).assignNamespaceToMatchingStep(result);
-    end else if TXQTermNodeMatcher(children[0]).namespaceCheck <> xqnmNone then raise EXQEvaluationException.Create('XPST0003', 'Namespace:* not allowed in element test') ;
+      result.namespaceURLOrPrefix:=TXQTermNodeMatcher(children[0]).queryCommand.namespaceURLOrPrefix;
+    end else if TXQTermNodeMatcher(children[0]).queryCommand.namespaceChecked then raise EXQEvaluationException.Create('XPST0003', 'Namespace:* not allowed in element test') ;
     if length(children) <= 1 then exit;
     if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('XPST0003', 'Invalid type attribute: '+children[1].ToString);
     result.requiredType := children[1] as TXQTermSequenceType;
@@ -6964,8 +6992,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
 
   function newReadAttrib(name: string): TXQTerm;
   begin
-    result := TXQTermNodeMatcher.Create(name);
-    TXQTermNodeMatcher(result).axis := 'attribute';
+    result := TXQTermNodeMatcher.Create('attribute', name);
   end;
 
 //CSS Literal Parsing
@@ -7121,23 +7148,23 @@ var pos: pchar;
 
     begin
       if elementName <> '*' then begin
-        if axis <> '' then result := TXQTermNodeMatcher.Create(axis + '::'+elementName)
-        else result := newMap(TXQTermNodeMatcher.Create('..'), TXQTermNodeMatcher.Create(elementName));
+        if axis <> '' then result := TXQTermNodeMatcher.Create(axis, elementName)
+        else result := newMap(TXQTermNodeMatcher.Create(xqnmdParent), TXQTermNodeMatcher.Create('',elementName));
       end else begin
-        if axis <> '' then axisTerm := TXQTermNodeMatcher.Create(axis+'::*')
-        else axisTerm := newMap(TXQTermNodeMatcher.Create('..'), TXQTermNodeMatcher.Create('*'));
+        if axis <> '' then axisTerm := TXQTermNodeMatcher.Create(axis, '*')
+        else axisTerm := newMap(TXQTermNodeMatcher.Create(xqnmdParent), TXQTermNodeMatcher.Create('', '*'));
         result := TXQTermFlower.Create();
         TXQTermFlower(result).push(TXQTermFlowerFor.Create);
         with TXQTermFlowerFor(TXQTermFlower(result).children[high(TXQTermFlower(result).children)]) do begin
           loopvar := TXQTermVariable.create('__csstemp');
           //TXQTermFlower(result).vars[0].sequenceTyp := nil;
-          expr := newFunction('name', [TXQTermNodeMatcher.Create('.')]);
+          expr := newFunction('name', []);
         end;
         tempv := TXQTermVariable.Create('__csstemp');
         tempv.index := 0;
         TXQTermFlower(result).push(TXQTermFilterSequence.create(
           axisTerm,
-          newBinOp(newFunction('name', [TXQTermNodeMatcher.Create('.')]), '=', tempv)
+          newBinOp(newFunction('name', []), '=', tempv)
         ));
       end;
     end;
@@ -7160,7 +7187,7 @@ var pos: pchar;
                            '=', //is newFunction('lang', [TXQTermNodeMatcher.Create('.')]) better? didn't work through
                            TXQTermFilterSequence.Create(
                                                   newMap(
-                                                     TXQTermNodeMatcher.Create('ancestor-or-self::*'),
+                                                     TXQTermNodeMatcher.Create('ancestor-or-self', '*'),
                                                      newReadAttrib('lang')
                                                   ),
                                                   newFunction('last', [])
@@ -7174,7 +7201,7 @@ var pos: pchar;
           '.': result := classs;
           '[': result := attrib;
           ':': result := pseudoOrNegation(elementName);
-          else result := TXQTermNodeMatcher.Create('self::'+namespacedIdent);
+          else result := TXQTermNodeMatcher.Create('self',namespacedIdent);
         end;
         result := newFunction('not', [result]);
       end else if striequal(t, 'nth-child') or striequal(t, 'nth-last-child') or striequal(t, 'nth-of-type') or striequal(t, 'nth-last-of-type') then begin
@@ -7225,9 +7252,9 @@ var pos: pchar;
 
 
         if striequal(t, 'nth-child') then
-          result := isNth(newFunction('count', [TXQTermNodeMatcher.Create('preceding-sibling::*')]), a,b-1)
+          result := isNth(newFunction('count', [TXQTermNodeMatcher.Create('preceding-sibling', '*')]), a,b-1)
         else if striequal(t, 'nth-last-child') then
-          result := isNth(newFunction('count', [TXQTermNodeMatcher.Create('following-sibling::*')]), a,b-1)
+          result := isNth(newFunction('count', [TXQTermNodeMatcher.Create('following-sibling', '*')]), a,b-1)
         else if striequal(t, 'nth-of-type') then
           result := isNth(newFunction('count', allOfSameType('preceding-sibling')), a,b-1)
         else if striequal(t, 'nth-last-of-type') then
@@ -7237,15 +7264,15 @@ var pos: pchar;
       skipSpace;
       expect(')')
     end else begin
-      if striEqual(t, 'root') then result := newBinOp(TXQTermNodeMatcher.Create('..'),'is', TXQTermNodeMatcher.Create('/'))
-      else if striEqual(t, 'first-child') then result := newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling::*')])
-      else if striEqual(t, 'last-child') then result := newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling::*')])
+      if striEqual(t, 'root') then result := newBinOp(TXQTermNodeMatcher.Create(xqnmdParent),'is', TXQTermNodeMatcher.Create(xqnmdRoot))
+      else if striEqual(t, 'first-child') then result := newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling', '*')])
+      else if striEqual(t, 'last-child') then result := newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling', '*')])
       else if striEqual(t, 'first-of-type') then result := newFunction('empty', [allOfSameType('preceding-sibling')])
       else if striEqual(t, 'last-of-type') then  result := newFunction('empty', [allOfSameType('following-sibling')])
-      else if striEqual(t, 'only-child') then    result := TXQTermIf.createLogicOperation(false, newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling::*')]), newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling::*')]))
+      else if striEqual(t, 'only-child') then    result := TXQTermIf.createLogicOperation(false, newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling', '*')]), newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling', '*')]))
       else if striEqual(t, 'only-of-type') then  result := newBinOp(newFunction('count', [allOfSameType('')]), '=', newOne)
-      else if striEqual(t, 'empty') then         result := newFunction('not', [TXQTermNodeMatcher.Create('node', true)])
-      else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self::a'), newFunction('exists', newReadAttrib('href')))
+      else if striEqual(t, 'empty') then         result := newFunction('not', [TXQTermNodeMatcher.Create('', 'node', true)])
+      else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self', 'a'), newFunction('exists', newReadAttrib('href')))
       else if striEqual(t, 'checked') then       result := newFunction('exists', [newReadAttrib('checked')])
       else if striEqual(t, 'enabled') or striEqual(t, 'disabled') or striEqual(t, 'visited') or striEqual(t, 'active') or striEqual(t, 'hover') or striEqual(t, 'focus') or striEqual(t, 'target')  then raiseParsingError('Unsupported pseudo class: '+t)
       else raiseParsingError('Unknown pseudo class: '+t);
@@ -7266,14 +7293,14 @@ var pos: pchar;
       //simple_selector_sequence
       elementName := namespacedIdent;
       if ((elementName = '*') or (elementName = '*:*')) and (axis = 'descendant-or-self') then axis := 'descendant';
-      if not adjacent then newMatch := TXQTermNodeMatcher.Create(axis + '::' + elementName)
+      if not adjacent then newMatch := TXQTermNodeMatcher.Create(axis, elementName)
       else begin
         newMatch:=TXQTermFilterSequence.Create(
                                      TXQTermFilterSequence.Create(
-                                                          TXQTermNodeMatcher.Create(axis+'::*'),
+                                                          TXQTermNodeMatcher.Create(axis,'*'),
                                                           newOne
                                      ),
-                                     TXQTermNodeMatcher.Create('self::'+elementName)
+                                     TXQTermNodeMatcher.Create('self',elementName)
                                      );
       end;
 
@@ -7577,14 +7604,14 @@ begin
           pvkObject, pvkArray: begin
             if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
             if (command.namespaceURLOrPrefix <> '') or (command.requiredType <> nil)
-               or not (command.typ in [qcDirectChild, qcDescendant, qcSameNode])
+               or not (command.typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant, qcSameNode])
                or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
                or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
                then
                  raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
             newList.Count:=0;
             case command.typ of
-              qcDirectChild: begin
+              qcDirectChild, qcDirectChildImplicit: begin
                 if qmValue in command.matching then begin //read named property
                   //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                   if tempKind = pvkObject then newList.add(n^.getProperty(command.value))
@@ -7898,7 +7925,7 @@ begin
       Include(nodeCondition.options, xqpncMatchStartNode);
       nodeCondition.endnode:=contextNode.next;
     end;
-    qcDirectChild: begin
+    qcDirectChild, qcDirectChildImplicit: begin
       nodeCondition.findOptions:=[tefoNoGrandChildren, tefoNoChildren];
       nodeCondition.initialFindOptions := [tefoNoGrandChildren];
     end;

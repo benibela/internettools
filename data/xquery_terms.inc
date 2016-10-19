@@ -2931,7 +2931,7 @@ begin
   //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
   last := high(path);
   if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
-      and (path[last].typ in [qcDirectChild, qcDescendant]) and (length(path[last].filters) = 0) then begin
+      and (path[last].typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant]) and (length(path[last].filters) = 0) then begin
     path[last - 1] := path[last];
     path[last - 1].typ := qcDescendant;
     SetLength(path, last);
@@ -2944,39 +2944,77 @@ begin
   TXQTermMap(Result).isDoubleSlash:=isDoubleSlash;
 end;
 
-
-constructor TXQTermNodeMatcher.Create;
+function getAxis(const axis: string): TXQPathMatchingAxis;
 begin
+   //forward
+   if (axis ='') then exit(qcDirectChildImplicit);
+   if (axis='child') then exit(qcDirectChild);
+   if axis='descendant' then exit(qcDescendant);
+   if axis='self' then exit(qcSameNode);
+   if axis='parent' then exit(qcDirectParent);
 
+   if axis='descendant-or-self' then exit(qcSameOrDescendant);
+   if axis='following-sibling' then exit(qcFollowingSibling);
+   if axis='following' then exit(qcFollowing);
+
+   //reverse
+   if axis='ancestor' then exit(qcAncestor);
+   if axis='preceding-sibling' then exit(qcPrecedingSibling);
+   if axis='preceding' then exit(qcPreceding);
+   if axis='ancestor-or-self' then exit(qcSameOrAncestor);
+
+   if axis='attribute' then exit(qcAttribute);
+   raise EXQEvaluationException.Create('XPST0003', 'Unknown axis: '+axis);  //todo move this to parsing
 end;
 
-constructor TXQTermNodeMatcher.Create(const avalue: string; asfunction: boolean);
+
+constructor TXQTermNodeMatcher.Create(direct: TXQTermNodeMatcherDirect);
+begin
+  case direct of
+    xqnmdRoot: begin
+      queryCommand.typ:=qcDocumentRoot;
+      select := '/';
+    end;
+    xqnmdContextItem: begin
+      queryCommand.typ:=qcSameNode; //same node /./
+      queryCommand.matching:=[qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
+      select := '.';
+    end;
+    xqnmdParent: begin
+      queryCommand.typ:=qcDirectParent; //parent /../
+      queryCommand.matching:=[qmDocument, qmElement];
+      select := '..';
+    end;
+  end;
+end;
+
+constructor TXQTermNodeMatcher.Create(const aaxis: string; const avalue: string; asfunction: boolean);
+var
+  namespaceURLOrPrefix: String;
+  namespaceCheck: TXQNamespaceMode;
 begin
   select := avalue;
-  if strContains(select,'::') then axis:=strSplitGet('::',select);
-  if strContains(select,':') then begin
-    namespaceURLOrPrefix:=strSplitGet(':',select);
-    if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
-    else namespaceCheck := xqnmPrefix;
-  end else if select <> '*' then namespaceCheck := xqnmPrefix
-  else namespaceCheck := xqnmNone;
+  queryCommand.typ := getAxis(aaxis);
+  if strContains(select,'::') then
+    raisePXPInternalError;
+  if not asfunction then begin
+    if strContains(select,':') then begin
+      namespaceURLOrPrefix:=strSplitGet(':',select);
+      if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
+      else namespaceCheck := xqnmPrefix;
+    end else if select <> '*' then namespaceCheck := xqnmPrefix
+    else namespaceCheck := xqnmNone;
+    if namespaceCheck <> xqnmNone then setNamespace(namespaceCheck, namespaceURLOrPrefix);
+  end;
   func := asfunction;
-end;
-
-constructor TXQTermNodeMatcher.Create(const aaxis: string; const anamespaceMode: TXQNamespaceMode; const anamespaceUrlOrPrefix, aLocalPart: string);
-begin
-  axis := aaxis;
-  namespaceCheck := anamespaceMode;
-  namespaceURLOrPrefix := anamespaceUrlOrPrefix;
-  select := aLocalPart;
 end;
 
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
-  else if func and (context.SeqValue = nil) and (axis = '') and (select = 'text') and (context.TextNode<>nil) then
+  else if func and (context.SeqValue = nil) and (queryCommand.typ = qcDirectChildImplicit) and (select = 'text') and (context.TextNode<>nil) then
     result := xqvalue(context.TextNode)
-  else if axis <> 'attribute' then begin
+  else if queryCommand.typ <> qcAttribute then begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context, true);
     xqvalueSeqSqueeze(result);
   end else result := evaluateAttribute(context);
@@ -2985,13 +3023,12 @@ end;
 function TXQTermNodeMatcher.evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
 var
   tempEl: TTreeNode;
-  testValue: Boolean;
+  testValue, nsCheck: Boolean;
   readvalue: String;
   readnamespace: String;
   temp: INamespace;
   i: Integer;
   attrib: TTreeAttribute;
-  nsCheck: TXQNamespaceMode;
   resseq: TXQValueSequence;
 begin
   tempEl := nil;
@@ -3007,16 +3044,18 @@ begin
   if length(children) > 0 then begin
     if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
     readvalue := TXQTermNodeMatcher(children[0]).select;
-    nsCheck := TXQTermNodeMatcher(children[0]).namespaceCheck;
-    readnamespace := TXQTermNodeMatcher(children[0]).namespaceURLOrPrefix;
+    queryCommand.matching := TXQTermNodeMatcher(children[0]).queryCommand.matching;
+    queryCommand.namespaceURLOrPrefix := TXQTermNodeMatcher(children[0]).queryCommand.namespaceURLOrPrefix;
   end else begin
     if func then readvalue := '*'
     else readvalue := select;
-    nsCheck := namespaceCheck;
-    readnamespace := namespaceURLOrPrefix;
   end;
-  if nsCheck = xqnmPrefix then begin
-    nsCheck := xqnmURL;
+  if qmCheckNamespaceURL in queryCommand.matching then begin
+    nsCheck := true;
+    readnamespace := queryCommand.namespaceURLOrPrefix;
+  end else if qmCheckNamespacePrefix in queryCommand.matching then begin
+    nsCheck := true;
+    readnamespace := queryCommand.namespaceURLOrPrefix;
     temp := context.findNamespace(readnamespace, xqdnkUnknown);
     if temp <> nil then readnamespace:=temp.getURL
     else if readnamespace <> '' then begin
@@ -3025,7 +3064,7 @@ begin
       else readnamespace:='';
       if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
     end;
-  end;
+  end else nsCheck := false;
 
   result := nil;
 
@@ -3035,7 +3074,7 @@ begin
   for i := 0 to tempel.attributes.Count - 1 do begin
     attrib := tempel.attributes.items[i];
     if      (not testValue or striEqual(attrib.value, readvalue))
-        and ((nsCheck <> xqnmURL) or ( attrib.getNamespaceURL() = readnamespace))
+        and ((not nsCheck ) or ( attrib.getNamespaceURL() = readnamespace))
         and not attrib.isNamespaceNode
         then
           xqvalueSeqConstruct(result, resseq, xqvalue(tempEl.attributes.Items[i]));
@@ -3052,12 +3091,10 @@ end;
 function TXQTermNodeMatcher.debugTermToString: string;
 begin
   result := '';
-  if axis <> '' then result += axis + '::';
-  case namespaceCheck of
-    xqnmNone: result += '*:';
-    xqnmPrefix: result += namespaceURLOrPrefix + ':';
-    xqnmURL: result += 'Q{'+namespaceURLOrPrefix+'}';
-  end;
+  if queryCommand.typ <> qcDirectChildImplicit then str(queryCommand.typ, result);
+  if qmCheckNamespaceURL in queryCommand.matching then result += 'Q{'+queryCommand.namespaceURLOrPrefix+'}'
+  else if qmCheckNamespacePrefix in queryCommand.matching then result += queryCommand.namespaceURLOrPrefix + ':'
+  else result += '*:';
   result += select;
 end;
 
@@ -3067,75 +3104,44 @@ var
 begin
   Result:=inherited clone;
   other := TXQTermNodeMatcher(result);
-  other.axis := axis;
-  other.namespaceURLOrPrefix := namespaceURLOrPrefix;
   other.select := select;
-  other.namespaceCheck := namespaceCheck;
   other.func := func;
+  other.queryCommand := queryCommand.clone;
 end;
 
 function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
-  function getAxis(const axis: string): TXQPathMatchingAxis;
-  begin
-     //forward
-     if (axis ='') or (axis='child') then exit(qcDirectChild);
-     if axis='descendant' then exit(qcDescendant);
-     if axis='self' then exit(qcSameNode);
-     if axis='parent' then exit(qcDirectParent);
-     //if axis='attribute' then exit(qcDescendant);
-     if axis='descendant-or-self' then exit(qcSameOrDescendant);
-     if axis='following-sibling' then exit(qcFollowingSibling);
-     if axis='following' then exit(qcFollowing);
-
-     //reverse
-     if axis='ancestor' then exit(qcAncestor);
-     if axis='preceding-sibling' then exit(qcPrecedingSibling);
-     if axis='preceding' then exit(qcPreceding);
-     if axis='ancestor-or-self' then exit(qcSameOrAncestor);
-     raise EXQEvaluationException.Create('XPST0003', 'Unknown axis: '+axis);  //todo move this to parsing
-  end;
 
 begin
-  if axis = 'attribute' then exit(inherited);
+  if queryCommand.typ = qcAttribute then exit(inherited);
+  result := queryCommand;
   if func then begin
     result := convertElementTestToPathMatchingStep(select, children);
-    result.typ:=getAxis(axis);
+    result.typ:=queryCommand.typ;
     exit;
   end;
   result.requiredType := nil;
   case select of
-    '/': result.typ := qcDocumentRoot;
-    '.': begin
-      result.typ:=qcSameNode; //same node /./
-      result.matching:=[qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
-    end;
-    '..': begin
-      result.typ:=qcDirectParent; //parent /../
-      result.matching:=[qmDocument, qmElement];
-    end;
+    '/','.','..': ;
     '*': begin
-      result.typ:=getAxis(axis); //any child /*/
-      result.matching:=[qmElement,qmAttribute];
-      assignNamespaceToMatchingStep(result);
+      result.matching:= result.matching + [qmElement,qmAttribute];
     end;
     else begin
-      result.typ := getAxis(axis);
-      result.matching := [qmValue,qmElement];
+      result.matching := result.matching+ [qmValue,qmElement];
       result.value:=select;
-      assignNamespaceToMatchingStep(result);
     end;
   end;
 end;
 
-procedure TXQTermNodeMatcher.assignNamespaceToMatchingStep(var step: TXQPathMatchingStep);
+procedure TXQTermNodeMatcher.setNamespace(namespaceCheck: TXQNamespaceMode; namespaceURLOrPrefix: string);
 begin
+  queryCommand.matching := queryCommand.matching - [qmCheckNamespacePrefix, qmCheckNamespaceURL];
   if namespaceCheck <> xqnmNone then begin
-    step.namespaceURLOrPrefix:=namespaceURLOrPrefix;
+    queryCommand.namespaceURLOrPrefix:=namespaceURLOrPrefix;
     case namespaceCheck of
-      xqnmPrefix: Include(step.matching, qmCheckNamespacePrefix);
-      xqnmURL: Include(step.matching, qmCheckNamespaceURL);
+      xqnmPrefix: Include(queryCommand.matching, qmCheckNamespacePrefix);
+      xqnmURL: Include(queryCommand.matching, qmCheckNamespaceURL);
     end;
-  end;
+  end
 end;
 
 { TXQTermNumber }
