@@ -1692,8 +1692,14 @@ type
   TXQTermPlaceholderVariable = class sealed(TXQTerm)
   end;
 
-  { TXQTermNodeMatcher }
-  TXQTermNodeMatcherDirect = (xqnmdRoot, xqnmdParent, xqnmdContextItem);
+  TXQTermContextItem = class(TXQTerm)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function debugTermToString: string; override;
+    function clone: TXQTerm; override;
+    function getContextDependencies: TXQContextDependencies; override;
+  end;
+
+    TXQTermNodeMatcherDirect = (xqnmdRoot, xqnmdParent);
   TXQTermNodeMatcher = class(TXQTermWithChildren)
     queryCommand: TXQPathMatchingStep;
     //namespaceURLOrPrefix,
@@ -3071,6 +3077,29 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+function TXQTermContextItem.evaluate(var context: TXQEvaluationContext): IXQValue;
+begin
+  if context.SeqValue <> nil then result := context.SeqValue
+  else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
+  else if context.RootElement <> nil then result := xqvalue(context.RootElement)
+  else context.raiseXPDY0002ContextItemAbsent();
+end;
+
+function TXQTermContextItem.debugTermToString: string;
+begin
+  Result:='.';
+end;
+
+function TXQTermContextItem.clone: TXQTerm;
+begin
+  Result:=TXQTermContextItem.Create;
+end;
+
+function TXQTermContextItem.getContextDependencies: TXQContextDependencies;
+begin
+  result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusPosition, xqcdFocusLast, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+end;
 
 
 

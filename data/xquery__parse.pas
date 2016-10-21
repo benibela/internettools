@@ -2287,6 +2287,7 @@ var
   namespaceMode: TXQNamespaceMode;
   marker: PChar;
   ok: boolean;
+  temptyp: TXQPathMatchingAxis;
 
 
 
@@ -2362,7 +2363,7 @@ begin
     '.': begin
       word := nextToken();
       case word of
-        '.': exit(TXQTermNodeMatcher.Create(xqnmdContextItem));
+        '.': exit(TXQTermContextItem.Create);
         '..': exit(TXQTermNodeMatcher.Create(xqnmdParent));
         else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermConstant.createNumber(word))
         else raiseParsingError('XPST0003', 'Unknown term: '+word);
@@ -2476,7 +2477,12 @@ begin
             if (word <> 'node') and (axis <> 'self') and ( (axis = 'attribute') <> (strContains(word, 'attribute')) ) then begin
               result.free;
               result := TXQTermSequence.create();
+            end else begin
+              temptyp :=TXQTermNodeMatcher(result).queryCommand.typ;
+              TXQTermNodeMatcher(result).queryCommand := convertElementTestToPathMatchingStep(TXQTermNodeMatcher(result).select, TXQTermNodeMatcher(result).children);
+              TXQTermNodeMatcher(result).queryCommand.typ := temptyp;
             end;
+
             exit;
           end;
           if axis <> '' then raiseParsingError('XPST0003', 'Not an kind/node test');

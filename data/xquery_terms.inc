@@ -2975,11 +2975,6 @@ begin
       queryCommand.typ:=qcDocumentRoot;
       select := '/';
     end;
-    xqnmdContextItem: begin
-      queryCommand.typ:=qcSameNode; //same node /./
-      queryCommand.matching:=[qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
-      select := '.';
-    end;
     xqnmdParent: begin
       queryCommand.typ:=qcDirectParent; //parent /../
       queryCommand.matching:=[qmDocument, qmElement];
@@ -2994,10 +2989,12 @@ var
   namespaceCheck: TXQNamespaceMode;
 begin
   select := avalue;
-  queryCommand.typ := getAxis(aaxis);
   if strContains(select,'::') then
     raisePXPInternalError;
-  if not asfunction then begin
+  func := asfunction;
+  if func then begin
+    queryCommand := convertElementTestToPathMatchingStep(select, children);
+  end else begin
     if strContains(select,':') then begin
       namespaceURLOrPrefix:=strSplitGet(':',select);
       if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
@@ -3005,14 +3002,20 @@ begin
     end else if select <> '*' then namespaceCheck := xqnmPrefix
     else namespaceCheck := xqnmNone;
     if namespaceCheck <> xqnmNone then setNamespace(namespaceCheck, namespaceURLOrPrefix);
+
+    //result.requiredType := nil;
+    if select = '*' then queryCommand.matching:= queryCommand.matching + [qmElement,qmAttribute]
+    else begin
+      queryCommand.matching := queryCommand.matching + [qmValue,qmElement];
+      queryCommand.value:=select;
+    end;
   end;
-  func := asfunction;
+  queryCommand.typ := getAxis(aaxis);
 end;
 
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if (select = '.') and (context.SeqValue <> nil) then result := context.SeqValue
-  else if func and (context.SeqValue = nil) and (queryCommand.typ = qcDirectChildImplicit) and (select = 'text') and (context.TextNode<>nil) then
+  if func and (context.SeqValue = nil) and (context.TextNode<>nil) and (queryCommand.typ = qcDirectChildImplicit) and (select = 'text') then
     result := xqvalue(context.TextNode)
   else if queryCommand.typ <> qcAttribute then begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context, true);
@@ -3114,22 +3117,6 @@ function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
 begin
   if queryCommand.typ = qcAttribute then exit(inherited);
   result := queryCommand;
-  if func then begin
-    result := convertElementTestToPathMatchingStep(select, children);
-    result.typ:=queryCommand.typ;
-    exit;
-  end;
-  result.requiredType := nil;
-  case select of
-    '/','.','..': ;
-    '*': begin
-      result.matching:= result.matching + [qmElement,qmAttribute];
-    end;
-    else begin
-      result.matching := result.matching+ [qmValue,qmElement];
-      result.value:=select;
-    end;
-  end;
 end;
 
 procedure TXQTermNodeMatcher.setNamespace(namespaceCheck: TXQNamespaceMode; namespaceURLOrPrefix: string);
