@@ -2946,29 +2946,10 @@ begin
   TXQTermMap(Result).isDoubleSlash:=isDoubleSlash;
 end;
 
-function getAxis(const axis: string): TXQPathMatchingAxis;
+constructor TXQTermNodeMatcher.Create;
 begin
-   //forward
-   if (axis ='') then exit(qcDirectChildImplicit);
-   if (axis='child') then exit(qcDirectChild);
-   if axis='descendant' then exit(qcDescendant);
-   if axis='self' then exit(qcSameNode);
-   if axis='parent' then exit(qcDirectParent);
 
-   if axis='descendant-or-self' then exit(qcSameOrDescendant);
-   if axis='following-sibling' then exit(qcFollowingSibling);
-   if axis='following' then exit(qcFollowing);
-
-   //reverse
-   if axis='ancestor' then exit(qcAncestor);
-   if axis='preceding-sibling' then exit(qcPrecedingSibling);
-   if axis='preceding' then exit(qcPreceding);
-   if axis='ancestor-or-self' then exit(qcSameOrAncestor);
-
-   if axis='attribute' then exit(qcAttribute);
-   raise EXQEvaluationException.Create('XPST0003', 'Unknown axis: '+axis);  //todo move this to parsing
 end;
-
 
 constructor TXQTermNodeMatcher.Create(direct: TXQTermNodeMatcherDirect);
 begin
@@ -2985,7 +2966,7 @@ begin
   end;
 end;
 
-constructor TXQTermNodeMatcher.Create(const aaxis: string; const avalue: string; asfunction: boolean);
+constructor TXQTermNodeMatcher.Create(const aaxis: string; const avalue: string);
 var
   namespaceURLOrPrefix: String;
   namespaceCheck: TXQNamespaceMode;
@@ -2993,25 +2974,21 @@ begin
   select := avalue;
   if strContains(select,'::') then
     raisePXPInternalError;
-  if asfunction then begin
+  if strContains(select,':') then begin
+    namespaceURLOrPrefix:=strSplitGet(':',select);
+    if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
+    else namespaceCheck := xqnmPrefix;
+  end else if select <> '*' then namespaceCheck := xqnmPrefix
+  else namespaceCheck := xqnmNone;
+  if namespaceCheck <> xqnmNone then setNamespace(namespaceCheck, namespaceURLOrPrefix);
 
-  end else begin
-    if strContains(select,':') then begin
-      namespaceURLOrPrefix:=strSplitGet(':',select);
-      if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
-      else namespaceCheck := xqnmPrefix;
-    end else if select <> '*' then namespaceCheck := xqnmPrefix
-    else namespaceCheck := xqnmNone;
-    if namespaceCheck <> xqnmNone then setNamespace(namespaceCheck, namespaceURLOrPrefix);
-
-    //result.requiredType := nil;
-    if select = '*' then queryCommand.matching:= queryCommand.matching + [qmElement,qmAttribute]
-    else begin
-      queryCommand.matching := queryCommand.matching + [qmValue,qmElement];
-      queryCommand.value:=select;
-    end;
+  //result.requiredType := nil;
+  if select = '*' then queryCommand.matching:= queryCommand.matching + [qmElement,qmAttribute]
+  else begin
+    queryCommand.matching := queryCommand.matching + [qmValue,qmElement];
+    queryCommand.value:=select;
   end;
-  queryCommand.typ := getAxis(aaxis);
+  setAxis(aaxis);
 end;
 
 destructor TXQTermNodeMatcher.Destroy;
@@ -3125,6 +3102,35 @@ begin
       xqnmURL: Include(queryCommand.matching, qmCheckNamespaceURL);
     end;
   end
+end;
+
+procedure TXQTermNodeMatcher.setAxis(const axis: string);
+  function getAxis(const axis: string): TXQPathMatchingAxis;
+  begin
+     //forward
+     case axis of
+     '': result := qcDirectChildImplicit;
+     'child': result :=  qcDirectChild;
+     'descendant': result := qcDescendant;
+     'self': result := qcSameNode;
+     'parent': result := qcDirectParent;
+
+     'descendant-or-self': result := qcSameOrDescendant;
+     'following-sibling': result := qcFollowingSibling;
+     'following': result := qcFollowing;
+
+     //reverse
+     'ancestor': result := qcAncestor;
+     'preceding-sibling': result := qcPrecedingSibling;
+     'preceding': result := qcPreceding;
+     'ancestor-or-self': result := qcSameOrAncestor;
+
+     'attribute': result := qcAttribute;
+     else raise EXQEvaluationException.Create('XPST0003', 'Unknown axis: '+axis);
+     end;
+  end;
+begin
+  queryCommand.typ := getAxis(axis);
 end;
 
 { TXQTermNumber }

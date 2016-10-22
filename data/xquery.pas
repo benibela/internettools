@@ -1427,6 +1427,7 @@ type
                           qcAttribute
                           );
   TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument,
+                         qmSchemaFail {schema matching is not supported},
                          qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild);
   TXQPathMatchingKinds = set of TXQPathMatchingKind;
   //***@abstract(Step of a query in a tree)
@@ -1704,10 +1705,12 @@ type
   TXQTermNodeMatcher = class(TXQTerm)
     queryCommand: TXQPathMatchingStep;
     select: string;
+    constructor Create();
     constructor Create(direct: TXQTermNodeMatcherDirect);
-    constructor Create(const aaxis: string; const avalue: string; asfunction: boolean = false);
+    constructor Create(const aaxis: string; const avalue: string);
     destructor Destroy; override;
     procedure setNamespace(namespaceCheck: TXQNamespaceMode; namespaceURLOrPrefix: string);
+    procedure setAxis(const axis: string);
 
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
@@ -7262,7 +7265,8 @@ var pos: pchar;
       else if striEqual(t, 'only-child') then    result := TXQTermIf.createLogicOperation(false, newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling', '*')]), newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling', '*')]))
       else if striEqual(t, 'only-of-type') then  result := newBinOp(newFunction('count', [allOfSameType('')]), '=', newOne)
       else if striEqual(t, 'empty') then         begin
-        result := TXQTermNodeMatcher.Create('', 'node', true);
+        result := TXQTermNodeMatcher.Create();
+        TXQTermNodeMatcher(Result).queryCommand.typ:=qcDirectChild;
         TXQTermNodeMatcher(Result).queryCommand.matching:=MATCH_ALL_NODES - [qmAttribute];
         result := newFunction('not', [result]);
       end else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self', 'a'), newFunction('exists', newReadAttrib('href')))

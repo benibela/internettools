@@ -949,15 +949,19 @@ end;
 procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
   function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
   begin
-    if select = 'node' then  exit(MATCH_ALL_NODES)
-    else if select = 'text' then exit([qmText])
-    else if select = 'comment' then exit([qmComment])
-    else if select = 'element' then exit([qmElement])
-    else if select = 'processing-instruction' then exit([qmProcessingInstruction])
-    else if select = 'document-node' then exit([qmDocument])
-    else if select = 'attribute' then exit([qmAttribute])
-    else if select = 'namespace-node' then exit([qmAttribute])
-    else raise EXQParsingException.Create('XPST0003', 'Unknown element test: '+select);
+    case select of
+    'node': result := MATCH_ALL_NODES;
+    'text': result := [qmText];
+    'comment': result := [qmComment];
+    'element': result := [qmElement];
+    'processing-instruction': result := [qmProcessingInstruction];
+    'document-node': result := [qmDocument];
+    'attribute': result := [qmAttribute];
+    'namespace-node': result := [qmAttribute];
+    'schema-attribute': result := [qmAttribute,qmSchemaFail];
+    'schema-element': result := [qmElement,qmSchemaFail];
+    else raiseParsingError('XPST0003', 'Unknown element test: '+select);
+    end;
   end;
 
   procedure parseEQNameToStep;
@@ -1012,7 +1016,7 @@ begin
         if pos^ = ',' then begin
           expect(',');
           kindTest.requiredType := parseSequenceType([xqstAllowValidationTypes, xqstNoMultiples]);
-          //only att has ?
+          if kindTest.requiredType.allowNone and (word = 'attribute') then raiseSyntaxError('? not allowed');
         end;
       end;
       'schema-element', 'schema-attribute': begin
@@ -1025,7 +1029,7 @@ begin
           'element', 'schema-element': parseKindTest(newword, kindTest);
           else raiseSyntaxError('need element');
         end;
-        kindTest.matching:=kindTest.matching * [qmCheckNamespacePrefix, qmCheckNamespaceURL, qmValue] + [qmDocument, qmCheckOnSingleChild];
+        kindTest.matching:=kindTest.matching * [qmCheckNamespacePrefix, qmCheckNamespaceURL, qmValue, qmSchemaFail] + [qmDocument, qmCheckOnSingleChild];
       end
       else raiseSyntaxError('No option allowed for matching test: '+word);
     end;
@@ -2378,7 +2382,6 @@ var
   namespaceMode: TXQNamespaceMode;
   marker: PChar;
   ok: boolean;
-  temptyp: TXQPathMatchingAxis;
 
 
 
@@ -2521,10 +2524,9 @@ begin
                   raiseParsingError('XQST0134', 'No namespace axis');
                 end;
               end;
-            result := TXQTermNodeMatcher.Create(axis, word, true);
-            temptyp := TXQTermNodeMatcher(result).queryCommand.typ;
+            result := TXQTermNodeMatcher.Create();
             parseKindTest(word, TXQTermNodeMatcher(result).queryCommand);
-            TXQTermNodeMatcher(result).queryCommand.typ := temptyp;
+            TXQTermNodeMatcher(result).setAxis(axis);
             if (word <> 'node') and (axis <> 'self') and ( (axis = 'attribute') <> (strContains(word, 'attribute')) ) then begin
               result.free;
               result := TXQTermSequence.create();
@@ -4209,13 +4211,15 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in n.queryCommand.matching) then begin
       n.queryCommand.matching := n.queryCommand.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
-      if n.queryCommand.typ = qcAncestor then
+      if n.queryCommand.typ = qcAttribute then
         n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkUnknown)
        else
         n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkElementType);
     end;
     if n.queryCommand.requiredType <> nil then
       visitSequenceType(n.queryCommand.requiredType, 'XPST0008');
+    if qmSchemaFail in n.queryCommand.matching then
+      raiseParsingError('XPST0008', 'Schema tests are not supported');
   end;
 
   procedure visitConstructor(c: TXQTermConstructor);
