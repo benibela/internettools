@@ -3847,7 +3847,7 @@ begin
      and ((TXQTermNodeMatcher(t^).queryCommand.typ = qcDirectChildImplicit))
      and ((TXQTermNodeMatcher(t^).queryCommand.namespaceChecked) //todo, this only should check for prefixes
      and (TXQTermNodeMatcher(t^).queryCommand.namespaceURLOrPrefix = ''))
-     and not (parent is TXQTermMap)
+     and not (parent is TXQTermPath)
      then begin
     case TXQTermNodeMatcher(t^).queryCommand.value of
       'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true', 0); end;
@@ -4151,9 +4151,30 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     visitAnnotations(f.annotations, false);
   end;
 
+  procedure visitPathStep(var step: TXQPathMatchingStep);
+  begin
+    if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in step.matching) then begin
+      step.matching := step.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
+      if step.typ = qcAttribute then
+        step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkUnknown)
+       else
+        step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkElementType);
+    end;
+    if step.requiredType <> nil then
+      visitSequenceType(step.requiredType, 'XPST0008');
+    if qmSchemaFail in step.matching then
+      raiseParsingError('XPST0008', 'Schema tests are not supported');
+  end;
+
+  procedure visitNodeMatcher(n: TXQTermNodeMatcher);
+  begin
+    visitPathStep(n.queryCommand);
+  end;
+
   function visitBinaryOp(b: TXQTermBinaryOp): TXQTerm;
   var
     st: TXQTermSequenceType;
+    i: Integer;
   begin
     if (b.op.func = @xqvalueCastAs) or (b.op.func = @xqvalueCastableAs) then begin
       st := b.children[1] as TXQTermSequenceType;
@@ -4184,10 +4205,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         b.children := nil;
         b.free;
       end;
-      '/', '//': result := TXQTermMap.create(b)
       else result := b;
     end;
   end;
+
 
   procedure visitFlower(f: TXQTermFlower);
   var
@@ -4206,20 +4227,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       end;
   end;
 
-  procedure visitNodeMatcher(n: TXQTermNodeMatcher);
-  begin
-    if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in n.queryCommand.matching) then begin
-      n.queryCommand.matching := n.queryCommand.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
-      if n.queryCommand.typ = qcAttribute then
-        n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkUnknown)
-       else
-        n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkElementType);
-    end;
-    if n.queryCommand.requiredType <> nil then
-      visitSequenceType(n.queryCommand.requiredType, 'XPST0008');
-    if qmSchemaFail in n.queryCommand.matching then
-      raiseParsingError('XPST0008', 'Schema tests are not supported');
-  end;
 
   procedure visitConstructor(c: TXQTermConstructor);
   begin
@@ -4327,10 +4334,27 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
     end;
   end;
 
+  function visitBinaryOp(b: TXQTermBinaryOp): TXQTerm;
+  begin
+    case b.op.name of
+      '/', '//': result := TXQTermPath.create(b);
+      else result := b;
+    end;
+  end;
+
+  function visitFilterSequence(t: TXQTermFilterSequence): TXQTerm;
+  begin
+    if (length(t.children) < 2) and (not (parent is TXQTermDefineVariable) or (TXQTermDefineVariable(parent).variable <> t)) then
+      raiseSyntaxError('[] not allowed');
+    if t.children[0] is TXQTermNodeMatcher then result := TXQTermPath.create(t) //this ensures the indices in filters are correct. i.e. in ancestors::*[$i] indices in reverse document order (opposite order of (ancestors::*)[$i])
+    else result := t;
+  end;
 begin
   if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
   else if t^ is TXQTermFlower then visitFlower(TXQTermFlower(t^))
   else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
+  else if t^ is TXQTermBinaryOp then t^ := visitBinaryOp(TXQTermBinaryOp(t^))
+  else if t^ is TXQTermFilterSequence then t^ := visitFilterSequence(TXQTermFilterSequence(t^))
   ;result := xqtvaContinue;
 end;
 

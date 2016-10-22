@@ -377,12 +377,22 @@ function TXQValue.filter(const q: string): IXQValue;
 var
   term: TXQuery;
   tempContext: TXQEvaluationContext;
+  list: TXQVList;
+  seq: TXQValueSequence;
+  tempFilter: TXQPathMatchingStepFilter;
 begin
-  result := self;
   term := defaultQueryEngine.parseTerm(q, xqpmXQuery3, defaultQueryEngine.StaticContext);
   try
     tempContext := defaultQueryEngine.getEvaluationContext();
-    TXQueryEngine.filterSequence(result, term.getTerm, tempContext);
+
+    tempFilter.filter := term.getTerm;
+    tempFilter.dependencies := tempFilter.filter.getContextDependencies;
+    list := TXQVList.create();
+    seq := TXQValueSequence.create(list);
+    result := seq;
+    TXQueryEngine.filterSequence(self, list, tempFilter, tempContext);
+    xqvalueSeqSqueeze(result);
+
   finally
     term.free;
   end;

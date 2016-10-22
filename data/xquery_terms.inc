@@ -84,18 +84,6 @@ begin
   raise EXQEvaluationException.Create('XPTY0004', s + ' GOT: '+ got.debugAsStringWithTypeAnnotation(), nil, got, self);
 end;
 
-function TXQTerm.toQueryCommand: TXQPathMatchingStep;
-begin
-  result.typ:=qcFunctionSpecialCase;
-  result.specialCase:=self;
-end;
-
-procedure TXQTerm.addToQueryList(var path: TXQPathMatching);
-begin
-  SetLength(path, length(path) + 1);
-  path[high(path)] := toQueryCommand;
-end;
-
 function TXQTerm.visitchildren(intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := xqtvaContinue;
@@ -345,16 +333,19 @@ begin
 end;
 
 function TXQTermFilterSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
+var temp: TXQPathMatchingStepFilter;
+  list: TXQVList;
+  seq: TXQValueSequence;
 begin
-  if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
-  if (children[0] is TXQTermNodeMatcher) then begin
-    result := TXQueryEngine.evaluateAccessList(self, context);
-  end else begin
-    result := children[0].evaluate(context);
-    TXQueryEngine.filterSequence(result, children[1], context);
-    if result = nil then result := xqvalue()
-    else xqvalueSeqSqueeze(result);
-  end;
+  list := TXQVList.create();
+  seq := TXQValueSequence.create(list);
+  result := seq;
+
+  temp.filter := children[1];
+  temp.dependencies := temp.filter.getContextDependencies;
+
+  TXQueryEngine.filterSequence(children[0].evaluate(context), list, temp, context);
+  xqvalueSeqSqueeze(result);
 end;
 
 function TXQTermFilterSequence.getContextDependencies: TXQContextDependencies;
@@ -368,22 +359,6 @@ begin
     result += children[i].getContextDependencies - ALL_CONTEXT_DEPENDENCIES_FOCUS; //since the focus are the sequence values there are no dependancies on the old focus
 end;
 
-function TXQTermFilterSequence.toQueryCommand: TXQPathMatchingStep;
-begin
-  if length(children) <> 2 then raiseEvaluationError('XPST0003', 'invalid [] construct');
-  result := children[0].toQueryCommand;
-  setlength(result.filters, length(result.filters)+1);
-  result.filters[high(result.filters)] := children[1];
-end;
-
-procedure TXQTermFilterSequence.addToQueryList(var path: TXQPathMatching);
-begin
-  if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
-
-  children[0].addToQueryList(path);
-  setlength(path[high(path)].filters, length(path[high(path)].filters) + 1);
-  path[high(path)].filters[high(path[high(path)].filters)] := children[1];
-end;
 
 { TXQTermDefineVariable }
 
@@ -2893,57 +2868,135 @@ end;
 
 
 
-constructor TXQTermMap.create(b: TXQTermBinaryOp);
+constructor TXQTermPath.create(b: TXQTerm);
 begin
-  isDoubleSlash := b.op.name = '//';
-  children := b.children;
-  b.children := nil;
-  b.free;
+  addToPath(b);
 end;
 
-function TXQTermMap.evaluate(var context: TXQEvaluationContext): IXQValue;
-begin
-  exit(TXQueryEngine.evaluateAccessList(self, context));
-end;
-
-function TXQTermMap.debugTermToString: string;
-begin
-  Result:='(' + children[0].debugTermToString() + IfThen(isDoubleSlash, '//', '/') + children[1].debugTermToString + ')';
-end;
-
-function TXQTermMap.getContextDependencies: TXQContextDependencies;
-begin
-  Result:=children[0].getContextDependencies +
-          ( children[1].getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast] );
-end;
-
-procedure TXQTermMap.addToQueryList(var path: TXQPathMatching);
+destructor TXQTermPath.Destroy;
 var
-  last: Integer;
+  i: Integer;
 begin
-  children[0].addToQueryList(path);
-  if isDoubleSlash then begin
-    setlength(path, length(path) + 1);
-    path[high(path)].typ:=qcSameOrDescendant;
-    path[high(path)].matching:=[qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction];
-  end;
-  children[1].addToQueryList(path);
+  for i := 0 to high(path) do path[i].destroy;
+  inherited Destroy;
+end;
 
-  //optimization
-  //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
-  last := high(path);
-  if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
-      and (path[last].typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant]) and (length(path[last].filters) = 0) then begin
-    path[last - 1] := path[last];
-    path[last - 1].typ := qcDescendant;
-    SetLength(path, last);
+function TXQTermPath.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  i: Integer;
+begin
+  result := TXQueryEngine.evaluateSingleStepQuery(path[0], context, high(path) = 0);
+  for i:=1 to high(path) do
+    result := TXQueryEngine.expandSequence(result, path[i], context, high(path) = i);
+
+  xqvalueSeqSqueeze(result);
+end;
+
+function TXQTermPath.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  i, j: Integer;
+begin
+  for i := 0 to high(path) do begin
+    if path[i].typ = qcFunctionSpecialCase then visitor.simpleTermVisit(@path[i].specialCase, self);
+    if path[i].requiredType <> nil then visitor.simpleTermVisit(@path[i].requiredType, self);
+    for j := 0 to high(path[i].filters) do
+      visitor.simpleTermVisit(@path[i].filters[j], self);
   end;
 end;
 
-function TXQTermMap.clone: TXQTerm;
+function TXQTermPath.debugTermToString: string;
+var
+  i: Integer;
+begin
+  result := '';
+  for i := 0 to high(path) do begin
+    if result <> '' then result += '/';
+    result += path[i].serialize;
+  end;
+end;
+
+function TXQTermPath.getContextDependencies: TXQContextDependencies;
+var
+  i, j: Integer;
+begin
+  if length(path) = 0 then exit([]);
+  if path[0].typ = qcFunctionSpecialCase then result := path[0].specialCase.getContextDependencies
+  else result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusPosition, xqcdFocusLast, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
+  for i := 0 to high(path) do begin
+    if path[i].typ = qcFunctionSpecialCase then result += path[i].specialCase.getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast];
+    for j := 0 to high(path[i].filters) do
+      result += path[i].filters[j].dependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast];
+  end;
+end;
+
+procedure TXQTermPath.addToPath(term: TXQTerm);
+var
+  last, len: Integer;
+  b: TXQTermBinaryOp;
+  isDoubleSlash: Boolean;
+  filter: TXQTermFilterSequence;
+  other: TXQTermPath;
+begin
+  if term is TXQTermNodeMatcher then begin
+    SetLength(path, length(path) + 1);
+    move(TXQTermNodeMatcher(term).queryCommand, path[high(path)], sizeof(path[high(path)]));
+    FillChar(TXQTermNodeMatcher(term).queryCommand, sizeof(TXQTermNodeMatcher(term).queryCommand), 0);
+    term.free;
+  end else if term is TXQTermBinaryOp then begin
+    b := TXQTermBinaryOp(term);
+    isDoubleSlash := b.op.name = '//';
+    addToPath(b.children[0]);
+    if isDoubleSlash then begin
+      setlength(path, length(path) + 1);
+      path[high(path)].typ:=qcSameOrDescendant;
+      path[high(path)].matching:=[qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction];
+    end;
+    addToPath(b.children[1]);
+
+    //optimization
+    //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
+    last := high(path);
+    if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
+        and (path[last].typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant]) and (length(path[last].filters) = 0) then begin
+      path[last - 1] := path[last];
+      path[last - 1].typ := qcDescendant;
+      SetLength(path, last);
+    end;
+    b.children := nil;
+    b.free;
+  end else if term is TXQTermFilterSequence then begin
+    filter := TXQTermFilterSequence(term);
+    addToPath(filter.children[0]);
+    if length(filter.children) > 1 then begin//fail later with a better message than range check error
+      setlength(path[high(path)].filters, length(path[high(path)].filters) + 1);
+      path[high(path)].filters[high(path[high(path)].filters)].filter := filter.children[1];
+      path[high(path)].filters[high(path[high(path)].filters)].dependencies := filter.children[1].getContextDependencies;
+    end;
+    filter.children := nil;
+    filter.free;
+  end else if term is TXQTermPath then begin
+    other := TXQTermPath(term);
+    len := length(path);
+    setlength(path, length(path) + length(other.path));
+    move(other.path[0], path[len], sizeof(other.path[0]) * length(other.path));
+    fillchar(other.path[0], sizeof(other.path[0]) * length(other.path), 0);
+    other.path := nil;
+    other.free;
+  end else begin
+    SetLength(path, length(path) + 1);
+    path[high(path)].typ := qcFunctionSpecialCase;
+    path[high(path)].specialCase:=term;
+  end;
+end;
+
+function TXQTermPath.clone: TXQTerm;
+var
+  i: Integer;
 begin
   Result := inherited;
-  TXQTermMap(Result).isDoubleSlash:=isDoubleSlash;
+  SetLength(TXQTermPath(Result).path, length(path));
+  for i := 0 to high(path) do
+    TXQTermPath(Result).path[i] := path[i].clone;
 end;
 
 constructor TXQTermNodeMatcher.Create;
@@ -3022,12 +3075,6 @@ begin
   Result:=inherited clone;
   other := TXQTermNodeMatcher(result);
   other.queryCommand := queryCommand.clone;
-end;
-
-function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
-
-begin
-  result := queryCommand;
 end;
 
 procedure TXQTermNodeMatcher.setNamespace(namespaceCheck: TXQNamespaceMode; namespaceURLOrPrefix: string);

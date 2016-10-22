@@ -1430,12 +1430,17 @@ type
                          qmSchemaFail {schema matching is not supported},
                          qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild);
   TXQPathMatchingKinds = set of TXQPathMatchingKind;
+  TXQPathMatchingStepFilter = record
+    filter: TXQTerm;
+    dependencies: TXQContextDependencies;
+  end;
+  TXQPathMatchingStepFilters = array of TXQPathMatchingStepFilter;
   //***@abstract(Step of a query in a tree)
   //***You can use it to use queries, but it is intended for internal use
   TXQPathMatchingStep = record
     namespaceURLOrPrefix: string; //**< Namespace the matched node must be in (only used if qmCheckNamespace is set)
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
-    filters: array of TXQTerm; //**< expressions a matched node must satisfy
+    filters: TXQPathMatchingStepFilters; //**< expressions a matched node must satisfy
     requiredType: TXQTermSequenceType;
     function serialize: string;
     function clone: TXQPathMatchingStep;
@@ -1511,9 +1516,6 @@ type
     procedure raiseEvaluationError(const errcode, s: string);
     procedure raiseTypeError0004(const s: string);
     procedure raiseTypeError0004(const s: string; const got: IXQValue);
-
-    function toQueryCommand: TXQPathMatchingStep; virtual;
-    procedure addToQueryList(var path: TXQPathMatching); virtual;
 
     function visitchildren({%H-}intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction; virtual;
     function clone: TXQTerm; virtual;
@@ -1715,8 +1717,6 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     function clone: TXQTerm; override;
-
-    function toQueryCommand: TXQPathMatchingStep; override;
   end;
 
   { TXQTermFilterSequence }
@@ -1725,9 +1725,6 @@ type
     constructor create(seq: TXQTerm; filter: TXQTerm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
-
-    function toQueryCommand: TXQPathMatchingStep; override;
-    procedure addToQueryList(var path: TXQPathMatching); override;
   end;
 
 
@@ -1807,13 +1804,17 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  TXQTermMap = class(TXQTermWithChildren)
-    isDoubleSlash: Boolean;
-    constructor create(b: TXQTermBinaryOp);
+  TXQTermPath = class(TXQTerm)
+  private
+    procedure addToPath(term: TXQTerm);
+  public
+    path: array of TXQPathMatchingStep;
+    constructor create(b: TXQTerm);
+    destructor Destroy; override;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function debugTermToString: string; override;
     function getContextDependencies: TXQContextDependencies; override;
-    procedure addToQueryList(var path: TXQPathMatching); override;
     function clone: TXQTerm; override;
   end;
 
@@ -2569,9 +2570,9 @@ public
     function parseXStringNullTerminated(str: string): TXQuery;
 
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
-    class procedure filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQTerm; termDependencies: TXQContextDependencies; var context: TXQEvaluationContext);
+    class procedure filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
-    class procedure filterSequence(var result: IXQValue; const filter: array of TXQTerm; var context: TXQEvaluationContext);
+    class procedure filterSequence(var result: IXQValue; const filter: TXQPathMatchingStepFilters; var context: TXQEvaluationContext);
 
     class function nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean; static;
     //** Gets the next node matching a query step (ignoring [] filter)
@@ -2583,9 +2584,6 @@ public
     class function expandSequence(const previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
     //** Initialize a query by performing the first step
     class function evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
-
-    //** Evaluates a path expression, created from the given term in the given context.
-    class function evaluateAccessList(term: TXQTerm; var context: TXQEvaluationContext): IXQValue;
 
   public
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there (internally used)
@@ -3156,7 +3154,7 @@ begin
    result += ')';
   end;
   for i := 0 to high(filters) do
-    result += '[' + filters[i].ToString + ']';
+    result += '[' + filters[i].filter.ToString + ']';
 end;
 
 function TXQPathMatchingStep.clone: TXQPathMatchingStep;
@@ -3168,10 +3166,10 @@ begin
   result.value:=value;
   result.filters:=filters;
   SetLength(result.filters, length(result.filters));
-  for i := 0 to high(result.filters) do result.filters[i]:= result.filters[i].clone;
+  for i := 0 to high(result.filters) do result.filters[i].filter:= result.filters[i].filter.clone;
   if requiredType = nil then result.requiredType:=nil
   else result.requiredType:=TXQTermSequenceType(requiredType.clone);
-  if typ = qcFunctionSpecialCase then result.specialCase :=specialCase
+  if typ = qcFunctionSpecialCase then result.specialCase :=specialCase.clone
   else result.matching:=matching;
 end;
 
@@ -3182,11 +3180,12 @@ end;
 
 procedure TXQPathMatchingStep.destroy;
 var
-  t: TXQTerm;
+  i: Integer;
 begin
-  for t in filters do t.free;
+  for i := 0 to high(filters) do filters[i].filter.free;
   requiredType.Free;
   requiredType := nil;
+  if typ = qcFunctionSpecialCase then specialCase.free;
 end;
 
 constructor TXQDecimalFormat.Create;
@@ -6968,7 +6967,7 @@ function TXQueryEngine.parseCSSTerm(css: string): TXQTerm;
   end;
   function newMap(left, right: TXQTerm): TXQTerm;
   begin
-    result := TXQTermMap.create(newBinOp(left, '/', right));
+    result := TXQTermPath.create(newBinOp(left, '/', right));
   end;
 
   function newFunction(f: string; args: array of TXQTerm): TXQTerm;
@@ -7352,25 +7351,26 @@ end;
 end;}
 
 
-class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQTerm; termDependencies: TXQContextDependencies; var context: TXQEvaluationContext);
+class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);
 var
  v: PIXQValue;
  i, backupA, backupB: Integer;
  value, backupItem: IXQValue;
  i64: Int64;
  oldParent: TTreeNode;
+ filterTerm: TXQTerm;
 begin
   outList.Count := 0;
   if (sequence = nil) or (sequence.getSequenceCount = 0) then exit;
 
 
-  if [xqcdFocusItem, xqcdFocusPosition] * termDependencies = [] then begin
-    if not (xqcdFocusLast in termDependencies) then value := filter.evaluate(context)
+  if [xqcdFocusItem, xqcdFocusPosition] * filter.dependencies = [] then begin
+    if not (xqcdFocusLast in filter.dependencies) then value := filter.filter.evaluate(context)
     else begin
       try
         context.getContextItem(backupItem, backupA, backupB);
         context.setContextItem(sequence.get(1), 1, sequence.getSequenceCount);
-        value := filter.evaluate(context)
+        value := filter.filter.evaluate(context)
       finally
         context.setContextItem(backupItem, backupA, backupB);
       end;
@@ -7393,10 +7393,11 @@ begin
 
     outList.reserve(context.SeqLength);
     i := 1;
+    filterTerm := filter.filter;
     for v in sequence.GetEnumeratorPtrUnsafe do begin
       context.SeqValue:=v^;
       context.SeqIndex:=i;
-      if sequenceFilterConditionSatisfied(filter.evaluate(context), i) then
+      if sequenceFilterConditionSatisfied(filterTerm.evaluate(context), i) then
         outList.add(v^);
       i+=1;
     end;
@@ -7406,7 +7407,7 @@ begin
   end;
 end;
 
-class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: array of TXQTerm; var context: TXQEvaluationContext);
+class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: TXQPathMatchingStepFilters; var context: TXQEvaluationContext);
 var i:integer;
   list1, list2, temp: TXQVList;
   seq1, seq2: IXQValue;
@@ -7422,11 +7423,11 @@ begin
   list1 := TXQVList.create();
   seq1 := TXQValueSequence.create(list1);
 
-  filterSequence(result, list1, filter[0], filter[0].getContextDependencies, context);
+  filterSequence(result, list1, filter[0], context);
   for i:=1 to high(filter) do begin
     xqswap(seq1, seq2);
     temp := list1; list1 := list2; list2 := temp;
-    filterSequence(seq2, list1, filter[i], filter[i].getContextDependencies, context);
+    filterSequence(seq2, list1, filter[i], context);
   end;
   result := seq1;
   xqvalueSeqSqueeze(result);
@@ -7469,7 +7470,7 @@ begin
   end;
 end;
 
-var filterDependencies: array of TXQContextDependencies;
+var
     newList2: TXQVList;
     newListSeq, newListSeq2: IXQValue;
 
@@ -7483,20 +7484,20 @@ var filterDependencies: array of TXQContextDependencies;
     //then list 1 is filtered and written list 2
     //then it swaps and list 2 filtered is again written in list 1
     //etc.
-    filterSequence(v, newList2, command.filters[0], filterDependencies[0], context);
+    filterSequence(v, newList2, command.filters[0], context);
     if length(command.filters) > 1 then begin
       i := 1;
       lastfilter := high(command.filters);
       lastfilter := lastfilter - lastfilter and 1;
       while i <= lastfilter do begin
         //technically this does not swap. It can considered to be the loop of the swap approach unrolled, so that it behaves as if it was swapping
-        filterSequence(newListSeq2, newList, command.filters[i], filterDependencies[i], context);
+        filterSequence(newListSeq2, newList, command.filters[i], context);
         inc(i);
-        filterSequence(newListSeq, newList2, command.filters[i], filterDependencies[i], context);
+        filterSequence(newListSeq, newList2, command.filters[i], context);
         inc(i);
       end;
       if length(command.filters) and 1 = 0 then begin
-        filterSequence(newListSeq2, newList, command.filters[high(command.filters)], filterDependencies[high(command.filters)], context);
+        filterSequence(newListSeq2, newList, command.filters[high(command.filters)], context);
         xqswap(newListSeq, newListSeq2);
         temp := newList;
         newList := newList2;
@@ -7527,9 +7528,6 @@ var
 
 begin
   if (previous = nil) or (previous.getSequenceCount = 0) then exit(previous);
-
-  SetLength(filterDependencies, length(command.filters));
-  for i := 0 to high(filterDependencies) do filterDependencies[i] := command.filters[i].getContextDependencies;
 
   resultSeq:=TXQValueSequence.create(previous.getSequenceCount);
   try
@@ -7708,28 +7706,7 @@ begin
   end;
 end;
 
-//Term matching representation:
-//  e.g. /a/b/c   is parsed right associative:
-//     /a    becomes the unary operator (/a)
-//     The remaining is read right associatively:  (  (/a)  /  b  ) / c
-// Filter become: tFilterSequence ([:]), e.g.
-//   a/b[x][y][z]/c
-//   =>  (  (/a)  /  ( b [:] x, y, z )  ) / c
-//   or:  (  (/a)  /  ( ( (b [:] x) [:] y) [:] z  )  ) / c
-class function TXQueryEngine.evaluateAccessList(term: TXQTerm; var context: TXQEvaluationContext): IXQValue;
-var
-  query: TXQPathMatching;
-  i:integer;
-begin
-  query := nil;
-  term.addToQueryList(query);
 
-  result := evaluateSingleStepQuery(query[0],context, high(query) = 0);
-  for i:=1 to high(query) do
-    result := expandSequence(result, query[i], context, high(query) = i);
-
-  xqvalueSeqSqueeze(result);
-end;
 
 class procedure TXQueryEngine.registerNativeModule(const module: TXQNativeModule);
 begin
