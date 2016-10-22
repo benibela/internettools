@@ -7815,7 +7815,7 @@ end;
 {$ImplicitExceptions off}
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
 begin
-  if not Assigned(node) or not (node.typ in nodeCondition.searchedTypes) then exit(false);
+  if not (node.typ in nodeCondition.searchedTypes) then exit(false); //I tried to move this to findNextNode, but then it fails //text() because it needs to continue through non-text nodes to find one. and sequencetype needs it, too
   if not (xqpncCheckOnSingleChild in nodeCondition.options) then begin
     if ((xqpncCheckValue in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
        or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL())) then
@@ -7838,34 +7838,61 @@ begin
   end;
   result := true;
 end;
+
+
 {$ImplicitExceptions on}
+
+function findNextNode(node: TTreeNode; const nodeCondition: TXQPathNodeCondition; findOptions: TTreeNodeFindOptions): TTreeNode; inline;
+//simplification of TTreeNode.findNext with only the relevant parts
+begin
+  if (tefoNoChildren in findOptions) and (node.typ in TreeNodesWithChildren) then result := node.reverse
+  else result := node.next;
+  if result <> nodeCondition.endnode then exit();
+  {this used to be in TTreeNode.findNext, but is not used here.
+   Does this mean tefoNoGrandChildren is not even used here?
+
+  if tefoNoGrandChildren in findOptions then begin
+    while (result <> nil) and (result <> nodeCondition.endnode) do begin
+      exit;
+      if result.typ in TreeNodesWithChildren then result := result.reverse
+      else result := result.next;
+    end;
+  end else begin
+    while (result <> nil) and (result <> nodeCondition.endnode) do begin
+      exit;
+      result := result.next;
+    end;
+  end;}
+  result := nil;
+end;
 
 class function TXQueryEngine.getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode;
 begin
   //TODO: allow more combinations than single type, or ignore types
-
-
   if (prev = nil) and (xqpncMatchStartNode in nodeCondition.options) then begin
+    if not assigned(nodeCondition.start) then exit(nil);
     if nodeMatchesQueryLocally(nodeCondition, nodeCondition.start) then
       exit(nodeCondition.start);
   end;
   case nodeCondition.iteration of
     qcnciNext: begin
-      if (prev = nil) or (prev = nodeCondition.start) then
-        prev := nodeCondition.start.findNext(tetOpen, '', nodeCondition.initialFindOptions + [tefoIgnoreType], nodeCondition.endnode)
-       else
-        prev := prev.findNext(tetOpen, '', nodeCondition.findOptions + [tefoIgnoreType], nodeCondition.endnode);
+      if (prev = nil) or (prev = nodeCondition.start) then begin
+        if not assigned(nodeCondition.start) then exit(nil);
+        prev := findNextNode(nodeCondition.start, nodeCondition, nodeCondition.initialFindOptions)
+       end else
+        prev := findNextNode(prev, nodeCondition, nodeCondition.findOptions);
 
       while (prev <> nil) do begin
         if nodeMatchesQueryLocally(nodeCondition, prev) then exit(prev);
-        prev := prev.findNext(tetOpen, '', nodeCondition.findOptions + [tefoIgnoreType], nodeCondition.endnode);
+        prev := findNextNode(prev, nodeCondition, nodeCondition.findOptions);
       end;
     end;
     qcnciParent: begin
       if (prev = nil) then prev := nodeCondition.start;
       while prev <> nil do begin
         prev := prev.getParent();
-        if (prev <> nil) and (nodeMatchesQueryLocally(nodeCondition, prev)) then exit(prev);
+        if (prev <> nil)
+           and (nodeMatchesQueryLocally(nodeCondition, prev)) then exit(prev);
       end;
     end;
     qcnciPreceding: begin
@@ -7876,7 +7903,8 @@ begin
           prev := prev.previous;
           nodeCondition.endnode := nodeCondition.endnode.getParent();
         end;
-        if (prev <> nil) and (nodeMatchesQueryLocally(nodeCondition, prev)) then exit(prev);
+        if (prev <> nil)
+           and (nodeMatchesQueryLocally(nodeCondition, prev)) then exit(prev);
       end;
     end;
   end;

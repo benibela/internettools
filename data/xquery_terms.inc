@@ -795,6 +795,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   function elementTest(): boolean;
   var nodeCondition: TXQPathNodeCondition;
     v: PIXQValue;
+    node: TTreeNode;
   begin
     //this is a sub function, so the f/initialization of nodeCondition is only done for tests that actually are element tests
     TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
@@ -807,7 +808,8 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
       nodeCondition.equalFunction := @context.staticContext.nodeCollation.equal;
     result := true;
     for v in ta.GetEnumeratorPtrUnsafe do begin
-      result := result and TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, v^.toNode);
+      node := v^.toNode;
+      result := result and assigned(node) and TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, v^.toNode);
       if not result then exit;
     end;
   end;
