@@ -3039,6 +3039,7 @@ begin
     queryCommand.value := '';
   end else begin
     queryCommand.matching := queryCommand.matching + [qmValue,qmElement];
+    queryCommand.valueHash := nodeNameHash(queryCommand.value);
   end;
   setAxis(aaxis);
 end;
@@ -3750,6 +3751,11 @@ var
     end;
   end;
 
+  procedure setTreeHash;
+  begin
+    if nameHash <> 0 then tree.hash := nameHash
+    else tree.hash := nodeNameHash(tree.value);
+  end;
 
   procedure setTreeNodeNameFromTerm(t: TXQTerm; defkind: TXQDefaultNamespaceKind);
 
@@ -3802,6 +3808,7 @@ var
       tqname := TXQTermEQNameToken(t);
       setTreeNodeNameFromQName(tqname.namespaceurl, tqname.namespaceprefix, tqname.localpart, defkind);
     end else setTreeNodeNameFromValue(t.evaluate(subcontext^), defkind);
+    setTreeHash;
     if (tree.typ = tetAttribute) and (tree.value = 'xmlns') and (tree.namespace = nil) then
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
   end;
@@ -3838,6 +3845,7 @@ begin
                 or nameValueEvaluated.isUndefined then begin
            tree.value := nameValueEvaluated.toString;
            if (tree.value <> '') and not baseSchema.isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
+           setTreeHash;
            tree.namespace := XMLNamespace_XMLNS;
         end else raiseTypeError0004('Invalid namespace prefix', nameValueEvaluated);
         for i:= 0 to high(children) do
@@ -3909,6 +3917,7 @@ begin
           if not baseSchema.isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
         end else raiseTypeError0004('Need NCName', nameValueEvaluated);
         if striEqual(tree.value, 'XML') then raiseEvaluationError('XQDY0064', '"XML" cannot be used as PI name');
+        setTreeHash;
         if length(children) = 0 then tree.addAttribute('', '')
         else begin
           tree.addAttribute('', strTrimLeft(valueToString(children[0].evaluate(subcontext^)), WHITE_SPACE));

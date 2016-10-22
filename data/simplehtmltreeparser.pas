@@ -152,6 +152,7 @@ TTreeNode = class
 //use the fields if you know what you're doing
   typ: TTreeNodeType; //**<open, close, text or comment node
   value: string; //**< tag name for open/close nodes, text for text/comment nodes
+  hash: cardinal; //**< nodeNameHash(value)
   attributes: TAttributeList;  //**<nil if there are no attributes
   next: TTreeNode; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeNode; //**< previous element (self.next.previous = self)
@@ -244,7 +245,7 @@ public
 
   constructor create(); virtual;
   constructor create(atyp: TTreeNodeType; avalue: string = ''); virtual;
-  class function createElementPair(anodename: string): TTreeNode;
+  class function createElementPair(const anodename: string): TTreeNode;
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
@@ -414,6 +415,7 @@ function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 function isInvalidUTF8(const s: string): boolean;
+function nodeNameHash(const s: RawByteString): cardinal;
 
 implementation
 uses xquery;
@@ -442,6 +444,39 @@ begin
   for i:=0 to high(a) do if striEqual(a[i], s) then exit(true);
   exit(false);
 end;
+
+{$PUSH}{$RangeChecks off}{$OverflowChecks off}
+function nodeNameHash(const s: RawByteString): cardinal;
+var
+  p, last: PByte;
+begin
+  if s = '' then exit(1);
+  p := pbyte(pointer(s));
+  last := p + length(s);
+  result := 0;
+  while p < last do begin
+    if p^ < 128  then begin //give the same hash independent of latin1/utf8 encoding and collation
+      result := result + p^;
+      if (p^ >= ord('a')) and (p^ <= ord('z')) then result := result - ord('a') + ord('A');
+      result := result + (result shl 10);
+      result := result xor (result shr 6);
+    end;
+    inc(p);
+  end;
+
+  result := result + (result shl 3);
+  result := result xor (result shr 11);
+  result := result + (result shl 15);
+end;
+function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
+var
+  i: Integer;
+begin
+  for i := 1 to length(s) do if s[i] >= #128 then exit(0);
+  result := nodeNameHash(s);
+end;
+
+{$POP}
 
 constructor THTMLOmittedEndTagInfo.create(somesiblings, someparents: array of string);
 var
@@ -844,17 +879,23 @@ begin
   tree := self;
   while tree <> nil do begin
     case tree.typ of
-      tetText, tetProcessingInstruction: tree.value := change(tree.value);
+      tetText: tree.value := change(tree.value);
       tetInternalDoNotUseCDATAText: begin
         tree.value:=strNormalizeLineEndings(strChangeEncoding(tree.value, from, toe));
         tree.typ := tetText;
       end;
       tetComment: tree.value:=strChangeEncoding(tree.value, from, toe);
+      tetProcessingInstruction: begin
+        tree.value:=trim(strNormalizeLineEndings(strChangeEncoding(tree.value, from, toe))); //line endings/trim needed?
+        tree.hash := nodeNameHash(tree.value);
+      end;
       tetDocument, tetOpen, tetClose: begin
         tree.value := change(tree.value);
+        if tree.hash = 0 then tree.hash := nodeNameHash(tree.value);
         if tree.attributes <> nil then
           for attrib in tree.attributes do begin
             attrib.value := change(attrib.value);
+            if attrib.hash = 0 then attrib.hash := nodeNameHash(attrib.value);
             attrib.realvalue := change(attrib.realvalue);
             if attrib.isNamespaceNode then attrib.realvalue := xmlStrWhitespaceCollapse(attrib.realvalue);
           end;
@@ -1519,6 +1560,7 @@ begin
   with source do begin
     result.typ := typ;
     result.value := value;
+    result.hash := hash;
     result.attributes := attributes;
     result.next := nil;
     result.previous := nil;
@@ -1665,12 +1707,15 @@ constructor TTreeNode.create(atyp: TTreeNodeType; avalue: string);
 begin
   self.typ := atyp;
   self.value := avalue;
+  if avalue <> '' then self.hash := nodeNameHash(avalue);
 end;
 
-class function TTreeNode.createElementPair(anodename: string): TTreeNode;
+class function TTreeNode.createElementPair(const anodename: string): TTreeNode;
 begin
   result := TTreeNodeClass(ClassType).create(tetOpen, anodename);
+  result.hash := nodeNameHash(anodename);
   result.reverse := TTreeNodeClass(ClassType).create(tetClose, anodename);
+  result.reverse.hash := nodeNameHash(anodename);
   result.reverse.reverse := result;
   result.next := Result.reverse;
   result.reverse.previous := Result;
@@ -1771,6 +1816,7 @@ begin
   if not FReadProcessingInstructions then exit;
   new := newTreeNode(tetProcessingInstruction, text, length(target));
   if content <> '' then new.addAttribute('', strNormalizeLineEndings(content));
+  new.hash := nodeNameHashCheckASCII(new.value);
   new.initialized;
   result := prContinue;
 end;
@@ -1814,6 +1860,7 @@ begin
   Assert(last<>nil);
   if last.typ = tetOpen then begin
     new := newTreeNode(tetClose, last.value, last.offset);
+    new.hash := nodeNameHashCheckASCII(new.value);
     //new := treeElementClass.create();
     //new.typ:=tetClose;
     //new.value:=last.value;
@@ -1848,6 +1895,7 @@ end;
 function TTreeParser.prependTag(const tag: string): TTreeNode;
 begin
   result := newTreeNode(tetOpen, tag, FCurrentElement.offset+1);
+  result.hash := nodeNameHashCheckASCII(result.value);
   if result.parent <> nil then
     result.namespace := result.parent.namespace;
   FElementStack.Add(result);
@@ -2021,9 +2069,11 @@ begin
            attrib.namespace := XMLNamespace_XMLNS;
          end;
       end;
-    for attrib in new.attributes do
+    for attrib in new.attributes do begin
       if pos(':', attrib.value) > 0 then
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
+      attrib.hash := nodeNameHashCheckASCII(attrib.value);
+    end;
     if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and (FCurrentTree.baseURI = '') and new.hasAttribute('href') then
       FCurrentTree.baseURI := strResolveURI(new.getAttribute('href'), FCurrentTree.documentURI);
   end;
@@ -2039,6 +2089,7 @@ begin
       if pos(':', strFromPchar(tagName, tagNameLen)) > 0 then
         new.value:=strFromPchar(tagName, tagNameLen);
     end;
+  new.hash := nodeNameHashCheckASCII(new.value);
 
   new.initialized;
 end;
@@ -2096,6 +2147,7 @@ begin
   new := nil;
   if (strliequal(tagName, last.getNodeName, tagNameLen)) then begin
     new := newTreeNode(tetClose, tagName, tagNameLen);
+    new.hash := nodeNameHashCheckASCII(new.value);
     new.reverse := last; last.reverse := new;
     FElementStack.Delete(FElementStack.Count-1);
     new.initialized;
@@ -2120,6 +2172,7 @@ begin
       for i:=match+1 to FElementStack.Count-1 do
         autoCloseLastTag();
       new := newTreeNode(tetClose, tagName, tagNameLen);
+      new.hash := nodeNameHashCheckASCII(new.value);
       last := TTreeNode(FElementStack[match]);
       last.reverse := new; new.reverse := last;
       FElementStack.Count:=match;
@@ -2140,6 +2193,7 @@ begin
             if (last.reverse <> last.next) or (parenDelta <> 0) then break; //do not allow nested auto closed elements (reasonable?)
             //remove old closing tag, and insert new one at the end
             new := newTreeNode(tetClose, tagName, tagNameLen);
+            new.hash := nodeNameHashCheckASCII(new.value);
             last.reverse.removeElementKeepChildren;
             last.reverse := new; new.reverse := last;
 
@@ -2404,6 +2458,7 @@ begin
   end;
   result := good < 10 * bad;
 end;
+
 
 function TTreeParser.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
 

@@ -979,6 +979,7 @@ procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQP
       end;
     end;
     kindTest.value := local;
+    kindTest.valueHash := nodeNameHash(kindTest.value);
     kindTest.matching += [qmValue];
   end;
 
@@ -1005,7 +1006,10 @@ begin
         if pos^ in ['"', ''''] then begin
           kindTest.value := xmlStrWhitespaceCollapse(parseString());
           if not baseSchema.isValidNCName(kindTest.value) then raiseParsingError('XPTY0004', 'Need NCName');
-        end else kindTest.value := nextTokenNCName();
+        end else begin
+          kindTest.value := nextTokenNCName();
+        end;
+        kindTest.valueHash := nodeNameHash(kindTest.value);
         include(kindTest.matching, qmValue) ;
       end;
       'element', 'attribute': begin
@@ -4285,9 +4289,21 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
           end;
       end;
     end;
+  var
+    temp: String;
   begin
     if (c.typ = tetOpen) and (c.ClassType = TXQTermConstructor) then
       checkForDuplicatedAttributes;
+    if c.nameValue is TXQTermEQNameToken then c.nameHash := nodeNameHash(TXQTermEQNameToken(c.nameValue).localpart)
+    else if c.nameValue is TXQTermConstant then begin
+      case TXQTermConstant(c.nameValue).value.kind of
+        pvkString, pvkQName: begin
+          temp := TXQTermConstant(c.nameValue).value.toString;
+          if pos(':', temp) > 0 then temp := strAfter(temp, ':');
+          c.nameHash := nodeNameHash(temp)
+        end;
+      end;
+    end;
     if c.implicitNamespaces <> nil then begin
       staticContext.defaultElementTypeNamespace := INamespace(changedDefaultsTypeNamespaces.Last);
       changedDefaultsTypeNamespaces.Delete(changedDefaultsTypeNamespaces.Count - 1);

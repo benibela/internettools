@@ -1440,6 +1440,7 @@ type
   TXQPathMatchingStep = record
     namespaceURLOrPrefix: string; //**< Namespace the matched node must be in (only used if qmCheckNamespace is set)
     value: string; //**< If @code(value <> ''), only nodes with the corresponding value are found (value = node-name for element node, value = text for text/comment nodes)
+    valueHash: cardinal;
     filters: TXQPathMatchingStepFilters; //**< expressions a matched node must satisfy
     requiredType: TXQTermSequenceType;
     function serialize: string;
@@ -1465,6 +1466,7 @@ type
     start,endnode: TTreeNode; //**< Start end node for the search
     searchedTypes: TTreeElementTypes; //**< Treeelement types matched by the query
     requiredValue: string; //**< Required node name (if checkValue)
+    requiredValueHash: cardinal;
     requiredNamespaceURL: string; //**< Required namespace (if checkNamespace)
     requiredType: TXQTermSequenceType;
     equalFunction: TStringComparisonFunc; //**< Function used to compare node values with the required values
@@ -2012,6 +2014,7 @@ type
   TXQTermConstructor = class(TXQTermWithChildren)
     typ: TTreeNodeType;
     nameValue: TXQTerm;
+    nameHash: cardinal;
     implicitNamespaces: TNamespaceList;
     constructor create(atype: TTreeNodeType; aname: txqterm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
@@ -3164,6 +3167,7 @@ begin
   result.typ := typ;
   result.namespaceURLOrPrefix := namespaceURLOrPrefix;
   result.value:=value;
+  result.valueHash:=valueHash;
   result.filters:=filters;
   SetLength(result.filters, length(result.filters));
   for i := 0 to high(result.filters) do result.filters[i].filter:= result.filters[i].filter.clone;
@@ -7583,7 +7587,7 @@ begin
 
           for i := 0 to oldnode.attributes.Count - 1 do begin
             attrib := oldnode.attributes.items[i];
-            if      (not (qmValue in command.matching) or striEqual(attrib.value, command.value))
+            if      (not (qmValue in command.matching) or ((attrib.hash = command.valueHash) and striEqual(attrib.value, command.value)))
                 and ((namespaceMatching = xqnmNone) or ( attrib.getNamespaceURL() = cachedNamespaceURL))
                 and not attrib.isNamespaceNode
                 then
@@ -7817,14 +7821,14 @@ class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPat
 begin
   if not (node.typ in nodeCondition.searchedTypes) then exit(false); //I tried to move this to findNextNode, but then it fails //text() because it needs to continue through non-text nodes to find one. and sequencetype needs it, too
   if not (xqpncCheckOnSingleChild in nodeCondition.options) then begin
-    if ((xqpncCheckValue in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue()))
+    if ((xqpncCheckValue in nodeCondition.options ) and ((node.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue())))
        or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL())) then
          exit(false);
   end else begin
     if node.next = node.reverse then exit(false); //no child
     if node.next.getNextSibling() <> nil then exit(false); //too many children
     if (node.next.typ <> tetOpen)
-       or ((xqpncCheckValue in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredValue, node.next.getValue()))
+       or ((xqpncCheckValue in nodeCondition.options ) and ((node.next.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.next.getValue())))
        or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.next.getNamespaceURL())) then
          exit(false);
   end;
@@ -7927,7 +7931,10 @@ begin
   nodeCondition.initialFindOptions:=[];
   nodeCondition.options:=[];
   nodeCondition.iteration := qcnciNext;
-  if (qmValue in command.matching) then Include(nodeCondition.options, xqpncCheckValue);
+  if (qmValue in command.matching) then begin
+    Include(nodeCondition.options, xqpncCheckValue);
+    nodeCondition.requiredValueHash := command.valueHash;
+  end;
   nodeCondition.requiredValue:=command.value;
   if (qmCheckNamespaceURL in command.matching) or (qmCheckNamespacePrefix in command.matching) then Include(nodeCondition.options, xqpncCheckNamespace);
   nodeCondition.requiredNamespaceURL:=command.namespaceURLOrPrefix; //is resolved later
