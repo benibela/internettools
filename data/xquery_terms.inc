@@ -347,7 +347,7 @@ end;
 function TXQTermFilterSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   if length(children) <> 2 then raiseEvaluationError('XPST0003', 'Invalid [] sequence filter');
-  if (children[0] is TXQTermNodeMatcher) and (TXQTermNodeMatcher(children[0]).select <> '.') then begin
+  if (children[0] is TXQTermNodeMatcher) then begin
     result := TXQueryEngine.evaluateAccessList(self, context);
   end else begin
     result := children[0].evaluate(context);
@@ -2954,14 +2954,10 @@ end;
 constructor TXQTermNodeMatcher.Create(direct: TXQTermNodeMatcherDirect);
 begin
   case direct of
-    xqnmdRoot: begin
-      queryCommand.typ:=qcDocumentRoot;
-      select := '/';
-    end;
+    xqnmdRoot: queryCommand.typ:=qcDocumentRoot;
     xqnmdParent: begin
       queryCommand.typ:=qcDirectParent; //parent /../
       queryCommand.matching:=[qmDocument, qmElement];
-      select := '..';
     end;
   end;
 end;
@@ -2971,22 +2967,23 @@ var
   namespaceURLOrPrefix: String;
   namespaceCheck: TXQNamespaceMode;
 begin
-  select := avalue;
-  if strContains(select,'::') then
+  queryCommand.value := avalue;
+  if strContains(queryCommand.value,'::') then
     raisePXPInternalError;
-  if strContains(select,':') then begin
-    namespaceURLOrPrefix:=strSplitGet(':',select);
+  if strContains(queryCommand.value,':') then begin
+    namespaceURLOrPrefix:=strSplitGet(':',queryCommand.value);
     if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
     else namespaceCheck := xqnmPrefix;
-  end else if select <> '*' then namespaceCheck := xqnmPrefix
+  end else if queryCommand.value <> '*' then namespaceCheck := xqnmPrefix
   else namespaceCheck := xqnmNone;
   if namespaceCheck <> xqnmNone then setNamespace(namespaceCheck, namespaceURLOrPrefix);
 
   //result.requiredType := nil;
-  if select = '*' then queryCommand.matching:= queryCommand.matching + [qmElement,qmAttribute]
-  else begin
+  if queryCommand.value = '*' then begin
+    queryCommand.matching:= queryCommand.matching + [qmElement,qmAttribute];
+    queryCommand.value := '';
+  end else begin
     queryCommand.matching := queryCommand.matching + [qmValue,qmElement];
-    queryCommand.value:=select;
   end;
   setAxis(aaxis);
 end;
@@ -3001,62 +2998,10 @@ function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValu
 begin
   if (queryCommand.matching = [qmText]) and (queryCommand.typ = qcDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then
     result := xqvalue(context.TextNode)
-  else if queryCommand.typ <> qcAttribute then begin
-    result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context, true);
+  else begin
+    result := TXQueryEngine.evaluateSingleStepQuery(queryCommand,context, true);
     xqvalueSeqSqueeze(result);
-  end else result := evaluateAttribute(context);
-end;
-
-function TXQTermNodeMatcher.evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
-var
-  tempEl: TTreeNode;
-  testValue, nsCheck: Boolean;
-  readvalue: String;
-  readnamespace: String;
-  temp: INamespace;
-  i: Integer;
-  attrib: TTreeAttribute;
-  resseq: TXQValueSequence;
-begin
-  tempEl := nil;
-  if context.SeqValue <> nil then begin
-    if context.SeqValue is TXQValueNode then tempEl := context.SeqValue.toNode
-  end else if context.ParentElement <> nil then tempEl := context.ParentElement
-  else raise EXQEvaluationException.create('XPDY0002', 'Need context item to read attributes');
-  if tempEl = nil then
-    raise EXQEvaluationException.create('XPTY0020', 'Need node as context item to read attributes');
-  if (tempEl.typ = tetProcessingInstruction) or (tempel.attributes = nil) then
-    exit(xqvalue);
-
-  testValue := qmValue in queryCommand.matching;
-  readvalue := queryCommand.value;
-  if qmCheckNamespaceURL in queryCommand.matching then begin
-    nsCheck := true;
-    readnamespace := queryCommand.namespaceURLOrPrefix;
-  end else if qmCheckNamespacePrefix in queryCommand.matching then begin
-    nsCheck := true;
-    readnamespace := queryCommand.namespaceURLOrPrefix;
-    temp := context.findNamespace(readnamespace, xqdnkUnknown);
-    if temp <> nil then readnamespace:=temp.getURL
-    else if readnamespace <> '' then begin
-      if not context.staticContext.useLocalNamespaces then raiseEvaluationError('XPST0081', 'Unknown namespace prefix: '+readnamespace+' for reading attribute: '+readvalue);
-      if (context.SeqValue<>nil) and (context.SeqValue.toNode <> nil) then readnamespace:=context.SeqValue.toNode.getNamespaceURL(readnamespace)
-      else readnamespace:='';
-      if readnamespace = '' then exit(xqvalue); //do not raise an exception if the namespace is unknown and the local namespace extension is enabled (so you can use unknown namespaces in css)
-    end;
-  end else nsCheck := false;
-
-  result := nil;
-  resseq := nil;
-  for i := 0 to tempel.attributes.Count - 1 do begin
-    attrib := tempel.attributes.items[i];
-    if      (not testValue or striEqual(attrib.value, readvalue))
-        and ((not nsCheck ) or ( attrib.getNamespaceURL() = readnamespace))
-        and not attrib.isNamespaceNode
-        then
-          xqvalueSeqConstruct(result, resseq, xqvalue(tempEl.attributes.Items[i]));
-  end;
-  if result = nil then result:=xqvalue();
+  end
 end;
 
 
@@ -3067,12 +3012,7 @@ end;
 
 function TXQTermNodeMatcher.debugTermToString: string;
 begin
-  result := '';
-  if queryCommand.typ <> qcDirectChildImplicit then str(queryCommand.typ, result);
-  if qmCheckNamespaceURL in queryCommand.matching then result += 'Q{'+queryCommand.namespaceURLOrPrefix+'}'
-  else if qmCheckNamespacePrefix in queryCommand.matching then result += queryCommand.namespaceURLOrPrefix + ':'
-  else result += '*:';
-  result += select;
+  result := queryCommand.serialize;
 end;
 
 function TXQTermNodeMatcher.clone: TXQTerm;
@@ -3081,14 +3021,12 @@ var
 begin
   Result:=inherited clone;
   other := TXQTermNodeMatcher(result);
-  other.select := select;
   other.queryCommand := queryCommand.clone;
 end;
 
 function TXQTermNodeMatcher.toQueryCommand: TXQPathMatchingStep;
 
 begin
-  if queryCommand.typ = qcAttribute then exit(inherited);
   result := queryCommand;
 end;
 

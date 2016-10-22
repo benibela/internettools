@@ -2527,8 +2527,8 @@ begin
   t('join($seq / . / e / .() / a )', '10');
   t('join($seq / . / e / a )', '10');
   t('join($seq[1] / *)', '1 2 3');
-  f('join($seq[1] / @*)', 'err:XPTY0020');
-  f('join($seq[1] / attribute::*)', 'err:XPTY0020');
+  f('join($seq[1] / @*)', 'err:XPTY0019');
+  f('join($seq[1] / attribute::*)', 'err:XPTY0019');
   t('join($seq[2] / *)', '4 5 6  '); //2 space because objects become empty strings
   t('join($seq / *)', '1 2 3 4 5 6  '); //2 space because objects become empty strings
 

@@ -1704,7 +1704,6 @@ type
   TXQTermNodeMatcherDirect = (xqnmdRoot, xqnmdParent);
   TXQTermNodeMatcher = class(TXQTerm)
     queryCommand: TXQPathMatchingStep;
-    select: string;
     constructor Create();
     constructor Create(direct: TXQTermNodeMatcherDirect);
     constructor Create(const aaxis: string; const avalue: string);
@@ -1713,7 +1712,6 @@ type
     procedure setAxis(const axis: string);
 
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
-    function evaluateAttribute(var context: TXQEvaluationContext): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     function clone: TXQTerm; override;
@@ -7391,14 +7389,13 @@ begin
     oldParent := context.ParentElement;
     context.getContextItem(backupItem, backupA, backupB);
     context.SeqLength:=sequence.getSequenceCount;
+    context.ParentElement := nil;
 
     outList.reserve(context.SeqLength);
     i := 1;
     for v in sequence.GetEnumeratorPtrUnsafe do begin
       context.SeqValue:=v^;
       context.SeqIndex:=i;
-      if v^.kind = pvkNode then context.ParentElement:=v^.toNode  //remove this?
-      else context.ParentElement := oldParent;
       if sequenceFilterConditionSatisfied(filter.evaluate(context), i) then
         outList.add(v^);
       i+=1;
@@ -7523,6 +7520,7 @@ var
   namespaceMatching: TXQNamespaceMode;
   tempList: TXQVList;
   pv: PIXQValue;
+  attrib: TTreeAttribute;
 
 
 
@@ -7566,73 +7564,93 @@ begin
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
     onlyNodes := false;
     for n in previous.GetEnumeratorPtrUnsafe do begin
-      if command.typ = qcFunctionSpecialCase then begin
-        if not (n^.kind in [pvkNode, pvkObject, pvkArray]) then
-          raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
-        newList.clear;
-        tempContext.SeqIndex += 1;
-        tempContext.SeqValue := n^;
-        if n^.kind = pvkNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
-        newList.add(command.specialCase.evaluate(tempContext));
-      end else begin
-        tempKind := n^.kind;
-        case tempKind of
-          pvkNode: begin
-            assert(n^.toNode <> nil);
-            oldnode := n^.toNode;
-            unifyQuery(oldnode, command, nodeCondition);
-            if namespaceMatching = xqnmURL then begin
-              nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
-              Include(nodeCondition.options, xqpncCheckNamespace);
-            end else exclude(nodeCondition.options, xqpncCheckNamespace);
-            newnode := getNextQueriedNode(nil, nodeCondition);
-            if newnode = nil then continue;
-            newList.count := 0;
-            while newnode <> nil do begin
-              if (namespaceMatching <> xqnmPrefix)
-                 or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
-                 or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
-              newList.add(xqvalue(newnode));
-              newnode := getNextQueriedNode(newnode, nodeCondition);
-            end;
-            if command.typ = qcPrecedingSibling then
-              newList.revert;
+      case command.typ of
+        qcFunctionSpecialCase: begin
+          if not (n^.kind in [pvkNode, pvkObject, pvkArray]) then
+            raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
+          newList.clear;
+          tempContext.SeqIndex += 1;
+          tempContext.SeqValue := n^;
+          if n^.kind = pvkNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
+          newList.add(command.specialCase.evaluate(tempContext));
+        end;
+        qcAttribute: begin
+          oldnode := n^.toNode;
+          if oldnode = nil then raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation());
+          if (oldnode.attributes = nil) or (oldnode.typ = tetProcessingInstruction) { a pi node has attributes internally but they are accessible} then continue;
+          if (namespaceMatching = xqnmPrefix) and (command.namespaceURLOrPrefix <> '')  then begin
+            cachedNamespaceURL := oldnode.getNamespaceURL(command.namespaceURLOrPrefix);
+            if cachedNamespaceURL = '' then continue;
           end;
-          pvkObject, pvkArray: begin
-            if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
-            if (command.namespaceURLOrPrefix <> '') or (command.requiredType <> nil)
-               or not (command.typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant, qcSameNode])
-               or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
-               or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
-               then
-                 raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
-            newList.Count:=0;
-            case command.typ of
-              qcDirectChild, qcDirectChildImplicit: begin
-                if qmValue in command.matching then begin //read named property
-                  //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
-                  if tempKind = pvkObject then newList.add(n^.getProperty(command.value))
-                  else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
-                    if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
-                    newList.add(pv^.getProperty(command.value));
-                  end;
-                end else begin
-                  //get all properties
-                  if tempKind = pvkObject then newList.add((n^ as TXQValueObject).enumerateValues())
-                  else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
-                    if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
-                    newList.add((pv^ as TXQValueObject).enumerateValues());
+
+          for i := 0 to oldnode.attributes.Count - 1 do begin
+            attrib := oldnode.attributes.items[i];
+            if      (not (qmValue in command.matching) or striEqual(attrib.value, command.value))
+                and ((namespaceMatching = xqnmNone) or ( attrib.getNamespaceURL() = cachedNamespaceURL))
+                and not attrib.isNamespaceNode
+                then
+                  newList.add(xqvalue(attrib));
+          end;
+        end else begin
+          tempKind := n^.kind;
+          case tempKind of
+            pvkNode: begin
+              assert(n^.toNode <> nil);
+              oldnode := n^.toNode;
+              unifyQuery(oldnode, command, nodeCondition);
+              if namespaceMatching = xqnmURL then begin
+                nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
+                Include(nodeCondition.options, xqpncCheckNamespace);
+              end else exclude(nodeCondition.options, xqpncCheckNamespace);
+              newnode := getNextQueriedNode(nil, nodeCondition);
+              if newnode = nil then continue;
+              newList.count := 0;
+              while newnode <> nil do begin
+                if (namespaceMatching <> xqnmPrefix)
+                   or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
+                   or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
+                newList.add(xqvalue(newnode));
+                newnode := getNextQueriedNode(newnode, nodeCondition);
+              end;
+              if command.typ = qcPrecedingSibling then
+                newList.revert;
+            end;
+            pvkObject, pvkArray: begin
+              if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
+              if (command.namespaceURLOrPrefix <> '') or (command.requiredType <> nil)
+                 or not (command.typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant, qcSameNode])
+                 or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
+                 or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
+                 then
+                   raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
+              newList.Count:=0;
+              case command.typ of
+                qcDirectChild, qcDirectChildImplicit: begin
+                  if qmValue in command.matching then begin //read named property
+                    //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
+                    if tempKind = pvkObject then newList.add(n^.getProperty(command.value))
+                    else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
+                      if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
+                      newList.add(pv^.getProperty(command.value));
+                    end;
+                  end else begin
+                    //get all properties
+                    if tempKind = pvkObject then newList.add((n^ as TXQValueObject).enumerateValues())
+                    else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
+                      if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
+                      newList.add((pv^ as TXQValueObject).enumerateValues());
+                    end;
                   end;
                 end;
+                qcDescendant:
+                  jsoniqDescendants(n^ as TXQValue, command.value);
+                qcSameNode:
+                  newList.add(n^);
               end;
-              qcDescendant:
-                jsoniqDescendants(n^ as TXQValue, command.value);
-              qcSameNode:
-                newList.add(n^);
-            end;
 
+            end;
+            else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
           end;
-          else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
         end;
       end;
 

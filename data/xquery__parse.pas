@@ -2381,7 +2381,6 @@ var
   axis: String;
   namespaceMode: TXQNamespaceMode;
   marker: PChar;
-  ok: boolean;
 
 
 
@@ -2800,11 +2799,11 @@ begin
           result := astroot;
           if result is TXQTermNodeMatcher then begin
             if qmCheckNamespaceURL in TXQTermNodeMatcher(astroot).queryCommand.matching then
-              result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select, TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix)
+              result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).queryCommand.value, TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix)
              else if qmCheckNamespacePrefix in TXQTermNodeMatcher(astroot).queryCommand.matching then
-              result := TXQTermPendingEQNameToken.create('', TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix, TXQTermNodeMatcher(astroot).select, xqnmPrefix, xqptVariable)
+              result := TXQTermPendingEQNameToken.create('', TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix, TXQTermNodeMatcher(astroot).queryCommand.value, xqnmPrefix, xqptVariable)
              else
-              result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).select);
+              result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).queryCommand.value);
             FreeAndNil(astroot);
             astroot := result; //only astroot should contain allocated objects that need to be freed in case of a subsequent parsing error
             if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) then
@@ -3850,7 +3849,7 @@ begin
      and (TXQTermNodeMatcher(t^).queryCommand.namespaceURLOrPrefix = ''))
      and not (parent is TXQTermMap)
      then begin
-    case TXQTermNodeMatcher(t^).select of
+    case TXQTermNodeMatcher(t^).queryCommand.value of
       'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true', 0); end;
       'false': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'false', 0); end;
       'null': if GlobalStaticNamespaces.namespaces['jn'] <> nil then begin t^.free; t^ := TXQTermNamedFunction.create(GlobalStaticNamespaces.namespaces['jn'].getURL, 'null', 0); end;
