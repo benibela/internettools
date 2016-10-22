@@ -5736,7 +5736,8 @@ begin
     end;
     pvkUndefined: ;
     else begin
-      reserve(fcount + 1);
+      if fcount = fcapacity then
+        reserve(fcount + 1);
       PPointer(fbuffer)[fcount] := value;
       value._AddRef;
       fcount += 1;
