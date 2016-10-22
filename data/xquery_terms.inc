@@ -693,6 +693,8 @@ var
   i: Integer;
 begin
   for i := 0 to high(arguments) do arguments[i].free;
+  if kind = tikElementTest then
+    nodeMatching.destroy;
   inherited destroy;
 end;
 
@@ -1000,7 +1002,7 @@ begin
   other.allowMultiple := allowMultiple;
   other.kind := kind;
   other.atomicTypeInfo := atomicTypeInfo;
-  other.nodeMatching := nodeMatching;
+  other.nodeMatching := nodeMatching.clone;
   SetLength(other.arguments, length(arguments));
   for i:=0 to high(arguments) do
     other.arguments[i] := arguments[i].clone as TXQTermSequenceType;
@@ -2991,9 +2993,8 @@ begin
   select := avalue;
   if strContains(select,'::') then
     raisePXPInternalError;
-  func := asfunction;
-  if func then begin
-    queryCommand := convertElementTestToPathMatchingStep(select, children);
+  if asfunction then begin
+
   end else begin
     if strContains(select,':') then begin
       namespaceURLOrPrefix:=strSplitGet(':',select);
@@ -3013,9 +3014,15 @@ begin
   queryCommand.typ := getAxis(aaxis);
 end;
 
+destructor TXQTermNodeMatcher.Destroy;
+begin
+  queryCommand.destroy;
+  inherited Destroy;
+end;
+
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if func and (context.SeqValue = nil) and (context.TextNode<>nil) and (queryCommand.typ = qcDirectChildImplicit) and (select = 'text') then
+  if (queryCommand.matching = [qmText]) and (queryCommand.typ = qcDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then
     result := xqvalue(context.TextNode)
   else if queryCommand.typ <> qcAttribute then begin
     result := TXQueryEngine.evaluateSingleStepQuery(toQueryCommand,context, true);
@@ -3044,15 +3051,8 @@ begin
   if (tempEl.typ = tetProcessingInstruction) or (tempel.attributes = nil) then
     exit(xqvalue);
 
-  if length(children) > 0 then begin
-    if not (children[0] is TXQTermNodeMatcher) then raiseEvaluationError('XPST0003', 'Invalid subtype');
-    readvalue := TXQTermNodeMatcher(children[0]).select;
-    queryCommand.matching := TXQTermNodeMatcher(children[0]).queryCommand.matching;
-    queryCommand.namespaceURLOrPrefix := TXQTermNodeMatcher(children[0]).queryCommand.namespaceURLOrPrefix;
-  end else begin
-    if func then readvalue := '*'
-    else readvalue := select;
-  end;
+  testValue := qmValue in queryCommand.matching;
+  readvalue := queryCommand.value;
   if qmCheckNamespaceURL in queryCommand.matching then begin
     nsCheck := true;
     readnamespace := queryCommand.namespaceURLOrPrefix;
@@ -3069,9 +3069,6 @@ begin
     end;
   end else nsCheck := false;
 
-  result := nil;
-
-  testValue := readvalue <> '*';
   result := nil;
   resseq := nil;
   for i := 0 to tempel.attributes.Count - 1 do begin
@@ -3108,7 +3105,6 @@ begin
   Result:=inherited clone;
   other := TXQTermNodeMatcher(result);
   other.select := select;
-  other.func := func;
   other.queryCommand := queryCommand.clone;
 end;
 

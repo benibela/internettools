@@ -576,7 +576,7 @@ begin
   t('<abc:element>123</abc:element> instance of element()', 'true');
   t('<abc:element>123</abc:element> instance of element(*)', 'true');
   t('<abc:element>123</abc:element> instance of element(element)', 'false');
-  t('<abc:element>123</abc:element> instance of element(*:element)', 'true');
+  //t('<abc:element>123</abc:element> instance of element(*:element)', 'true');
   t('<abc:element>123</abc:element> instance of element(abc:element)', 'true');
 
 

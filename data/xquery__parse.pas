@@ -94,6 +94,7 @@ protected
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
   function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
   function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
+  procedure parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parseSequenceTypeUnion(): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
@@ -945,6 +946,93 @@ begin
   end;
 end;
 
+procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
+  function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
+  begin
+    if select = 'node' then  exit(MATCH_ALL_NODES)
+    else if select = 'text' then exit([qmText])
+    else if select = 'comment' then exit([qmComment])
+    else if select = 'element' then exit([qmElement])
+    else if select = 'processing-instruction' then exit([qmProcessingInstruction])
+    else if select = 'document-node' then exit([qmDocument])
+    else if select = 'attribute' then exit([qmAttribute])
+    else if select = 'namespace-node' then exit([qmAttribute])
+    else raise EXQParsingException.Create('XPST0003', 'Unknown element test: '+select);
+  end;
+
+  procedure parseEQNameToStep;
+  var
+    namespaceUrl, namespacePrefix, local: string;
+  begin
+    case nextTokenEQName(namespaceUrl, namespacePrefix, local) of
+      xqnmPrefix: begin
+        kindTest.namespaceURLOrPrefix := namespacePrefix;
+        kindTest.matching += [qmCheckNamespacePrefix];
+      end;
+      xqnmURL: begin
+        kindTest.namespaceURLOrPrefix := namespaceUrl;
+        kindTest.matching += [qmCheckNamespaceURL];
+      end;
+    end;
+    kindTest.value := local;
+    kindTest.matching += [qmValue];
+  end;
+
+var
+  newword: String;
+begin
+  kindTest.typ:=qcDirectChild;
+  kindTest.matching:=convertElementTestToMatchingOptions(word);
+  if (kindTest.matching = [qmAttribute]) and (word = 'namespace-node') then begin
+    kindTest.matching := [qmAttribute, qmCheckNamespaceURL];
+    kindTest.namespaceURLOrPrefix := XMLNamespaceUrl_XMLNS;
+  end;
+  kindTest.requiredType := nil;
+
+  skipWhitespaceAndComment();
+  if pos^ = ')' then begin
+    case word of
+    'schema-element', 'schema-attribute': raiseSyntaxError('schema-* test need name arg');
+    end;
+  end else begin
+    skipWhitespaceAndComment();
+    case word of
+      'processing-instruction': begin
+        if pos^ in ['"', ''''] then begin
+          kindTest.value := xmlStrWhitespaceCollapse(parseString());
+          if not baseSchema.isValidNCName(kindTest.value) then raiseParsingError('XPTY0004', 'Need NCName');
+        end else kindTest.value := nextTokenNCName();
+        include(kindTest.matching, qmValue) ;
+      end;
+      'element', 'attribute': begin
+        if pos^ = '*' then expect('*')
+        else parseEQNameToStep;
+
+        skipWhitespaceAndComment();
+        if pos^ = ',' then begin
+          expect(',');
+          kindTest.requiredType := parseSequenceType([xqstAllowValidationTypes, xqstNoMultiples]);
+          //only att has ?
+        end;
+      end;
+      'schema-element', 'schema-attribute': begin
+        parseEQNameToStep;
+      end;
+      'document-node': begin
+        newword := nextToken();
+        expect('(');
+        case newword of
+          'element', 'schema-element': parseKindTest(newword, kindTest);
+          else raiseSyntaxError('need element');
+        end;
+        kindTest.matching:=kindTest.matching * [qmCheckNamespacePrefix, qmCheckNamespaceURL, qmValue] + [qmDocument, qmCheckOnSingleChild];
+      end
+      else raiseSyntaxError('No option allowed for matching test: '+word);
+    end;
+  end;
+  expect(')');
+end;
+
 function TXQParsingContext.parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
 var word: string;
   parens: Integer;
@@ -967,6 +1055,7 @@ begin
     hadNoNamespace := (nsprefix = '') and (namespaceMode <> xqnmURL);
   end else begin
     word := '%';
+    hadNoNamespace := true;
     inc(pos)
   end;
 
@@ -975,68 +1064,70 @@ begin
   try
     result.allowNone:=false;
     result.allowMultiple:=false;
-
+    result.kind:=tikAtomic;
+    result.atomicTypeInfo := nil;
     result.name:=word;
-    if hadNoNamespace and ((isKindTestFunction(word)) or (word = 'empty-sequence') or (word = 'item')) then begin
-      expect('(');
-
-      skipWhitespaceAndComment();
-      if pos^ = ')' then expect(')')
-      else begin
-        result.push(parse());
-        if nextToken() = ',' then begin
-          result.push(parseSequenceType([xqstAllowValidationTypes,xqstNoMultiples]));
-          expect(')');
-        end;
-      end;
-
-      if (word = 'empty-sequence') then begin
-        result.kind:=tikNone;
-        if (length(result.children) <> 0) or (parens > 0) then raiseParsingError('XPST0003', 'invalid sequence type');
-        exit
-      end else if word = 'item' then begin
-        result.kind:=tikAny;
-        if length(result.children) <> 0 then raiseParsingError('XPST0003', 'invalid sequence type');
-      end else begin
-         result.kind:=tikElementTest;
-         result.nodeMatching := convertElementTestToPathMatchingStep(word, result.children);
-      end;
-    end else if options.AllowJSON and hadNoNamespace and ((word = 'array') or (word = 'object') or (word = 'json-item') or (word = 'structured-item')) then begin
-      expect('('); expect(')');
+    if hadNoNamespace then begin
       case word of
-        'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
-        'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseSchema.structuredItem; end;
-        'array': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_; end;
-        'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
-        else raiseParsingError('XPST0003', 'WTF??');
-      end;
-    end else if hadNoNamespace and (word = 'function') or (word = '%') then begin
-      require3('function test');
-      if word = '%' then begin
-        result.atomicTypeInfo := TXSType(TObject(TXQAnnotationsInClass.Create)); //we do not need them, only check if they are valid. but for that we need to know the namespaces
-        TXQAnnotationsInClass(TObject(result.atomicTypeInfo)).annotations := parseAnnotations;
-        expect('function');
-      end;
-      result.kind:=tikFunctionTest;
-      expect('(');
-      skipWhitespaceAndComment();
-      if pos^ = '*' then begin
-        expect('*');
-        expect(')');
-      end else begin
-        while pos^ <> ')' do begin
-          SetLength(result.arguments, length(result.arguments) + 1);
-          result.arguments[high(result.arguments)] := parseSequenceType(flags);
-          skipWhitespaceAndComment();
-          if pos^ <> ')' then expect(',');
+        'empty-sequence': begin
+          expect('('); expect(')');
+          result.kind:=tikNone;
+          if parens > 0 then raiseSyntaxError('invalid sequence type');
+          exit;
         end;
-        expect(')');
-        expect('as');
-        SetLength(result.arguments, length(result.arguments) + 1);
-        result.arguments[high(result.arguments)] := parseSequenceType(flags);
+        'item': begin
+          expect('('); expect(')');
+          result.kind:=tikAny;
+        end;
+
+         'array', 'object', 'json-item', 'structured-item': begin
+           if options.AllowJSON and hadNoNamespace then begin
+             expect('('); expect(')');
+             case word of
+               'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
+               'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseSchema.structuredItem; end;
+               'array': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_; end;
+               'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
+               else raiseParsingError('XPST0003', 'WTF??');
+             end;
+           end
+         end;
+
+        'function', '%': begin
+          require3('function test');
+          if word = '%' then begin
+            result.atomicTypeInfo := TXSType(TObject(TXQAnnotationsInClass.Create)); //we do not need them, only check if they are valid. but for that we need to know the namespaces
+            TXQAnnotationsInClass(TObject(result.atomicTypeInfo)).annotations := parseAnnotations;
+            expect('function');
+          end;
+          result.kind:=tikFunctionTest;
+          expect('(');
+          skipWhitespaceAndComment();
+          if pos^ = '*' then begin
+            expect('*');
+            expect(')');
+          end else begin
+            while pos^ <> ')' do begin
+              SetLength(result.arguments, length(result.arguments) + 1);
+              result.arguments[high(result.arguments)] := parseSequenceType(flags);
+              skipWhitespaceAndComment();
+              if pos^ <> ')' then expect(',');
+            end;
+            expect(')');
+            expect('as');
+            SetLength(result.arguments, length(result.arguments) + 1);
+            result.arguments[high(result.arguments)] := parseSequenceType(flags);
+          end;
+        end;
+
+        else if isKindTestFunction(word) then begin
+          expect('(');
+          parseKindTest(word, result.nodeMatching);
+          result.kind:=tikElementTest;
+        end;
       end;
-    end else begin
-      result.kind:=tikAtomic;
+    end;
+    if (result.kind=tikAtomic) and (result.atomicTypeInfo = nil) then begin
       if not (xqstResolveNow in flags) then
         result.push(TXQTermPendingEQNameToken.Create(nsurl, nsprefix, word, namespaceMode, integer(flags)) )
        else begin
@@ -2431,58 +2522,13 @@ begin
                 end;
               end;
             result := TXQTermNodeMatcher.Create(axis, word, true);
-            skipWhitespaceAndComment();
-            if pos^ <> ')' then begin
-              with TXQTermNodeMatcher(result) do begin
-                case word of
-                  'processing-instruction': begin
-                    skipWhitespaceAndComment();
-                    if pos^ in ['"', ''''] then begin
-                      wordlookahead := xmlStrWhitespaceCollapse(parseString());
-                      if not baseSchema.isValidNCName(wordlookahead) then raiseParsingError('XPTY0004', 'Need NCName');
-                      push(TXQTermConstant.create(wordlookahead));
-                    end else push(TXQTermConstant.create(nextTokenNCName()))
-                  end;
-                  'element', 'schema-element', 'attribute', 'schema-attribute', 'document-node': begin
-                    push(parseValue());
-                    ok := children[0] is TXQTermNodeMatcher;
-                    if ok then begin
-                      if (TXQTermNodeMatcher(children[0]).func or (length(TXQTermNodeMatcher(children[0]).children) > 0)) then
-                        if word <> 'document-node' then ok := false
-                        else case TXQTermNodeMatcher(children[0]).select of
-                          'element', 'schema-element': ; //ok
-                          else ok := false;
-                        end;
-                      if ( ((TXQTermNodeMatcher(children[0]).select = '*')
-                              or ((not TXQTermNodeMatcher(children[0]).queryCommand.namespaceChecked) and (word <> 'document-node' { nested function has no namespace }) ))
-                            and (word <> 'element') and (word <> 'attribute') ) then ok := false;
-                    end;
-                    if not ok then
-                      raiseSyntaxError('Invalid test');
-                  end;
-                  else raiseSyntaxError('No option allowed for matching test: '+word);
-                end;
-              end;
-              skipWhitespaceAndComment();
-              if pos^ = ',' then begin
-                if (word <> 'element') and (word <> 'attribute') then
-                  raiseParsingError('XPST0003', 'Only one parameter is allowed for matching test '+word);
-                expect(',');
-                TXQTermNodeMatcher(result).push(parseSequenceType([xqstAllowValidationTypes, xqstNoMultiples]));
-              end;
-            end else case word of
-              'schema-element', 'schema-attribute': raiseSyntaxError('schema-* test need name arg');
-            end;
-            expect(')');
+            temptyp := TXQTermNodeMatcher(result).queryCommand.typ;
+            parseKindTest(word, TXQTermNodeMatcher(result).queryCommand);
+            TXQTermNodeMatcher(result).queryCommand.typ := temptyp;
             if (word <> 'node') and (axis <> 'self') and ( (axis = 'attribute') <> (strContains(word, 'attribute')) ) then begin
               result.free;
               result := TXQTermSequence.create();
-            end else begin
-              temptyp :=TXQTermNodeMatcher(result).queryCommand.typ;
-              TXQTermNodeMatcher(result).queryCommand := convertElementTestToPathMatchingStep(TXQTermNodeMatcher(result).select, TXQTermNodeMatcher(result).children);
-              TXQTermNodeMatcher(result).queryCommand.typ := temptyp;
             end;
-
             exit;
           end;
           if axis <> '' then raiseParsingError('XPST0003', 'Not an kind/node test');
@@ -3796,7 +3842,8 @@ end;
 function TJSONLiteralReplaceVisitor.visit(t: PXQTerm): TXQTerm_VisitAction;
 begin
   result := xqtvaContinue;
-  if (t^ is TXQTermNodeMatcher) and (length(TXQTermNodeMatcher(t^).children) = 0)
+  if (t^ is TXQTermNodeMatcher) //and (length(TXQTermNodeMatcher(t^).children) = 0)
+     and ((TXQTermNodeMatcher(t^).queryCommand.typ = qcDirectChildImplicit))
      and ((TXQTermNodeMatcher(t^).queryCommand.namespaceChecked) //todo, this only should check for prefixes
      and (TXQTermNodeMatcher(t^).queryCommand.namespaceURLOrPrefix = ''))
      and not (parent is TXQTermMap)
@@ -4167,12 +4214,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
        else
         n.queryCommand.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(n.queryCommand.namespaceURLOrPrefix, xqdnkElementType);
     end;
-    if n.func and strBeginsWith(n.select, 'schema-') then begin
-      visitNodeMatcher(n.children[0] as TXQTermNodeMatcher);
-      raise EXQParsingException.create('XPST0008', 'Schema tests are not supported');
-    end;
-    if (length(n.children) > 0) and (n.children[high(n.children)] is TXQTermSequenceType) then
-      visitSequenceType(TXQTermSequenceType(n.children[high(n.children)]), 'XPST0008');
+    if n.queryCommand.requiredType <> nil then
+      visitSequenceType(n.queryCommand.requiredType, 'XPST0008');
   end;
 
   procedure visitConstructor(c: TXQTermConstructor);

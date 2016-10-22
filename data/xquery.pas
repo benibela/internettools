@@ -1439,6 +1439,7 @@ type
     function serialize: string;
     function clone: TXQPathMatchingStep;
     function namespaceChecked: boolean;
+    procedure destroy;
     case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
     qcSameNode: (matching: TXQPathMatchingKinds;); //**< Which nodes match the query command. If this is [], _nothing_ is found! The elements of the set [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute] match nodes of a certain type, qmValue activates the value field.
     qcFunctionSpecialCase: (specialCase: TXQTerm; );   //**< Term used for qcFunctionSpecialCase
@@ -1699,15 +1700,13 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-    TXQTermNodeMatcherDirect = (xqnmdRoot, xqnmdParent);
-  TXQTermNodeMatcher = class(TXQTermWithChildren)
+  TXQTermNodeMatcherDirect = (xqnmdRoot, xqnmdParent);
+  TXQTermNodeMatcher = class(TXQTerm)
     queryCommand: TXQPathMatchingStep;
-    //namespaceURLOrPrefix,
     select: string;
-    //namespaceCheck: TXQNamespaceMode;
-    func: boolean;
     constructor Create(direct: TXQTermNodeMatcherDirect);
     constructor Create(const aaxis: string; const avalue: string; asfunction: boolean = false);
+    destructor Destroy; override;
     procedure setNamespace(namespaceCheck: TXQNamespaceMode; namespaceURLOrPrefix: string);
 
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
@@ -3000,7 +2999,7 @@ end;
 
 
 var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators: INamespace;
-function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
+
 
 function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
@@ -3038,6 +3037,7 @@ var
     chars: (ord('.'), ord(','), ord('-'), ord('%'), $2030, ord('0'), ord('#'), ord(';'), ord('e') );
     infinity: 'Infinity';
     nan: 'NaN');
+const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];
 
 implementation
 uses base64, strutils, xquery__regex, xquery__parse, xquery__functions;
@@ -3177,6 +3177,15 @@ end;
 function TXQPathMatchingStep.namespaceChecked: boolean;
 begin
   result := [qmCheckNamespaceURL,qmCheckNamespacePrefix] * matching <> [];
+end;
+
+procedure TXQPathMatchingStep.destroy;
+var
+  t: TXQTerm;
+begin
+  for t in filters do t.free;
+  requiredType.Free;
+  requiredType := nil;
 end;
 
 constructor TXQDecimalFormat.Create;
@@ -5342,57 +5351,9 @@ end;
 
 
 
-const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];
-
-function convertElementTestToMatchingOptions(select: string): TXQPathMatchingKinds;
-begin
-  if select = 'node' then  exit(MATCH_ALL_NODES)
-  else if select = 'text' then exit([qmText])
-  else if select = 'comment' then exit([qmComment])
-  else if select = 'element' then exit([qmElement])
-  else if select = 'processing-instruction' then exit([qmProcessingInstruction])
-  else if select = 'document-node' then exit([qmDocument])
-  else if select = 'attribute' then exit([qmAttribute])
-  else if select = 'namespace-node' then exit([qmAttribute])
-  else raise EXQParsingException.Create('XPST0003', 'Unknown element test: '+select);
-end;
 
 
-function convertElementTestToPathMatchingStep(const select: string; const children: TXQTermArray): TXQPathMatchingStep;
-begin
-  result.typ:=qcDirectChild;
-  result.matching:=convertElementTestToMatchingOptions(select);
-  if (result.matching = [qmAttribute]) and (select = 'namespace-node') then begin
-    result.matching := [qmAttribute, qmCheckNamespaceURL];
-    result.namespaceURLOrPrefix := XMLNamespaceUrl_XMLNS;
-  end;
-  Result.requiredType := nil;
-  if (length(children) = 0) then exit;
 
-  if (result.matching = [qmProcessingInstruction])  then begin
-    if children[0] is TXQTermNodeMatcher then begin;
-      result.value := TXQTermNodeMatcher(children[0]).select;
-    end else if children[0] is TXQTermConstant then
-      result.value:=strTrimAndNormalize(TXQTermConstant(children[0]).value.toString)
-    else raise EXQEvaluationException.Create('XPST0003', 'Invalid parameter for processing-instruction kind test: '+children[0].ToString);
-    include(result.matching, qmValue) ;
-  end else if (select = 'element') or (select = 'attribute') or (select = 'schema-element')or (select = 'schema-attribute')  then begin
-    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('XPST0003', 'Invalid node test.');
-    if TXQTermNodeMatcher(children[0]).select <> '*' then begin
-      result.matching := result.matching + [qmValue] + [qmValue, qmCheckNamespacePrefix, qmCheckNamespaceURL] * TXQTermNodeMatcher(children[0]).queryCommand.matching;
-      result.value:=TXQTermNodeMatcher(children[0]).select;
-      result.namespaceURLOrPrefix:=TXQTermNodeMatcher(children[0]).queryCommand.namespaceURLOrPrefix;
-    end else if TXQTermNodeMatcher(children[0]).queryCommand.namespaceChecked then raise EXQEvaluationException.Create('XPST0003', 'Namespace:* not allowed in element test') ;
-    if length(children) <= 1 then exit;
-    if not (children[1] is TXQTermSequenceType) then raise EXQEvaluationException.Create('XPST0003', 'Invalid type attribute: '+children[1].ToString);
-    result.requiredType := children[1] as TXQTermSequenceType;
-  end else if select = 'document-node' then begin
-    if not (children[0] is TXQTermNodeMatcher) then raise EXQEvaluationException.Create('XPST0003', 'Invalid option for document test');
-    if not (children[0] as TXQTermNodeMatcher).func or (  ((children[0] as TXQTermNodeMatcher).select <> 'element') and  ((children[0] as TXQTermNodeMatcher).select <> 'schema-element')) then raise EXQEvaluationException.Create('XPST0003', 'Invalid option for document(element) test');
-    result := convertElementTestToPathMatchingStep((children[0]as TXQTermNodeMatcher).select, (children[0] as TXQTermNodeMatcher).children);
-    result.matching:=result.matching * [qmCheckNamespacePrefix, qmCheckNamespaceURL, qmValue] + [qmDocument, qmCheckOnSingleChild];
-  end else raise EXQEvaluationException.Create('XPST0003', 'Children not allowed for element test "'+select+'"');
-end;
 
 {
 function qnameSplit(s: string): TStringArray;
@@ -7300,8 +7261,11 @@ var pos: pchar;
       else if striEqual(t, 'last-of-type') then  result := newFunction('empty', [allOfSameType('following-sibling')])
       else if striEqual(t, 'only-child') then    result := TXQTermIf.createLogicOperation(false, newFunction('empty', [TXQTermNodeMatcher.Create('preceding-sibling', '*')]), newFunction('empty', [TXQTermNodeMatcher.Create('following-sibling', '*')]))
       else if striEqual(t, 'only-of-type') then  result := newBinOp(newFunction('count', [allOfSameType('')]), '=', newOne)
-      else if striEqual(t, 'empty') then         result := newFunction('not', [TXQTermNodeMatcher.Create('', 'node', true)])
-      else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self', 'a'), newFunction('exists', newReadAttrib('href')))
+      else if striEqual(t, 'empty') then         begin
+        result := TXQTermNodeMatcher.Create('', 'node', true);
+        TXQTermNodeMatcher(Result).queryCommand.matching:=MATCH_ALL_NODES - [qmAttribute];
+        result := newFunction('not', [result]);
+      end else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self', 'a'), newFunction('exists', newReadAttrib('href')))
       else if striEqual(t, 'checked') then       result := newFunction('exists', [newReadAttrib('checked')])
       else if striEqual(t, 'enabled') or striEqual(t, 'disabled') or striEqual(t, 'visited') or striEqual(t, 'active') or striEqual(t, 'hover') or striEqual(t, 'focus') or striEqual(t, 'target')  then raiseParsingError('Unsupported pseudo class: '+t)
       else raiseParsingError('Unknown pseudo class: '+t);
