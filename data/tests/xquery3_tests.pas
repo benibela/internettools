@@ -140,7 +140,7 @@ begin
   t('let $animal := "Cow" return switch ($animal)   case "Cow" return "Moo"    case "Cat" return "Meow"    case "Duck" return "Quack"    default return "What''s that odd noise?" ', 'Moo');
   t('let $animal := "Human" return switch ($animal)   case "Cow" return "Moo"    case "Cat" return "Meow"    case "Duck" return "Quack"    default return "What''s that odd noise?" ', 'What''s that odd noise?');
 
-  m('xquery version "3.0"; declare %private function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'node()');
+  m('xquery version "3.0"; declare %private function local:foo($x as node()) {pxp:type-of($x)}; local:foo(<a>123</a>)', 'node()');
   f('declare %private %private function local:foo($x as node()) {type-of($x)}; local:foo(<a>123</a>)', 'err:XQST0106');
   f('declare %private %private variable $foo := 123; 0', 'err:XQST0116');
   f('declare %public %public variable $foo := 123; 0', 'err:XQST0116');

@@ -769,7 +769,8 @@ begin
   m('declare function test-importfunc3() external; test-importfunc3()', 'native!');
 
   m('declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', '420');
-  m('xquery version "1.0"; declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', '420');
+  f('xquery version "1.0"; declare variable $test-import1 external;  declare function test-importfunc2($a as integer, $b as integer) external; test-importfunc2($test-import1, 10)', 'XQST0045');
+  m('xquery version "1.0"; declare variable $test-import1 external;  declare function local:test-importfunc2($a as xs:integer, $b as xs:integer) external; local:test-importfunc2($test-import1, 10)', '420');
 
 
   m('declare namespace xx = "http://example.org"; let $i := <foo:bar xmlns:foo = "http://example.org"> <foo:bing> Lentils </foo:bing>  </foo:bar> return $i/xx:bing', 'Lentils'); //global trim trims returned values even if the tree contains the whitespace

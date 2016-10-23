@@ -140,6 +140,8 @@ protected
   procedure parseQuery(aquery: TXQuery); override;
   procedure parseQueryXStringOnly(aquery: TXQuery); override;
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); override;
+
+  function setXQueryVersion(code: string): boolean;
 end;
 
 implementation
@@ -2474,12 +2476,12 @@ begin
     end;
 
     '{': begin
-      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension (e.g. by including xquery_json), to create a json like object) ');
+      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like object) ');
       inc(pos);
       exit(parseJSONLikeObjectConstructor);
     end;
     '[': begin
-      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension (e.g. by including xquery_json), to create a json like array) ');
+      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like array) ');
       inc(pos);
       exit(parseJSONLikeArray());
     end;
@@ -3558,9 +3560,11 @@ begin
         'version': begin
           requireXQuery();
           temp := parseString();
-          if temp = '1.0' then parsingModel := xqpmXQuery1
-          else if (temp <> '3.0') or not isModel3 then
-            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 or 3.0');
+          if strBeginsWith(temp, '1.0') then parsingModel := xqpmXQuery1
+          else if strBeginsWith(temp, '3.0') and isModel3 then parsingModel := xqpmXQuery3
+          else temp := 'fail';
+          if not setXQueryVersion(temp) then
+            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 ' + ifthen(isModel3, ' (3.0 is disabled)', 'or 3.0'));
           token := nextToken(true);
           if token = 'encoding' then begin
             expect(token);
@@ -3839,6 +3843,84 @@ begin
     if not ((pos^ = 'n') and strlEqual(pos, 'none', 4)) then
       info.versions[i].returnType := parseSequenceType([xqstResolveNow]);
   end;
+end;
+
+function TXQParsingContext.setXQueryVersion(code: string): boolean;
+var
+  after: RawByteString;
+begin
+  case length(code) of
+    0,1,2: exit(false);
+    3: begin
+      with staticContext do begin
+        collation := TXQueryEngine.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint','');
+        defaultFunctionNamespace:=XMLNamespace_XPathFunctions;
+        defaultElementTypeNamespace:=nil;
+        defaultTypeNamespace:=nil;
+        stringEncoding:=CP_UTF8;
+        strictTypeChecking:=true;
+        useLocalNamespaces:=false;
+        //objectsRestrictedToJSONTypes: boolean;
+        jsonPXPExtensions:=false;
+      end;
+      with options do begin
+        AllowExtendedStrings:=false;
+        AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+        AllowJSON := false;
+        AllowJSONLiterals:=false;
+        StringEntities:=xqseDefault;
+      end;
+      exit(true);
+    end;
+    4: exit(false);
+  end;
+  if code[4] <> '-' then exit(false);
+  after := strAfter(code, '-');
+  case after of
+    'xidel', 'pxp', 'videlibri': begin
+      with staticContext do begin
+        collation := TXQueryEngine.getCollation('case-insensitive-clever','');
+        defaultFunctionNamespace:=XMLNamespace_MyExtensionsMerged;
+        defaultElementTypeNamespace:=nil;
+        defaultTypeNamespace:=XMLNamespace_XMLSchema;
+        stringEncoding:=CP_UTF8;
+        strictTypeChecking:=false;
+        useLocalNamespaces:=true;
+        jsonPXPExtensions:=true;
+      end;
+      with options do begin
+        AllowExtendedStrings:=true;
+        if length(after) <= 5 then AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation
+        else AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+        AllowJSON := AllowJSONDefaultInternal;
+        AllowJSONLiterals:=AllowJSONDefaultInternal;
+        StringEntities:=xqseDefault;
+      end;
+    end;
+    'jsoniq': begin
+      with staticContext do begin
+        collation := TXQueryEngine.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint','');
+        defaultFunctionNamespace:=XMLNamespace_XPathFunctions;
+        defaultElementTypeNamespace:=nil;
+        defaultTypeNamespace:=nil;
+        stringEncoding:=CP_UTF8;
+        strictTypeChecking:=true;
+        useLocalNamespaces:=false;
+        //objectsRestrictedToJSONTypes: boolean;
+        jsonPXPExtensions:=false;
+      end;
+      with options do begin
+        AllowExtendedStrings:=false;
+        AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+        AllowJSON := true;
+        AllowJSONLiterals:=true;
+        StringEntities:=xqseDefault;
+      end;
+    end;
+    'default': ;
+     else exit(false);
+  end;
+  result := true;
 end;
 
 

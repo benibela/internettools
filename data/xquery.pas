@@ -3005,7 +3005,7 @@ type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
 end;
 
 
-var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators: INamespace;
+var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: INamespace;
 
 
 function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
@@ -3524,7 +3524,7 @@ end;
 
 
 
-var   XMLNamespace_XMLSchema, XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_XQuery: INamespace;
+var   XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_XQuery: INamespace;
 
 
 function namespaceReverseLookup(const url: string): INamespace;
