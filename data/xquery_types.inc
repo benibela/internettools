@@ -2022,7 +2022,8 @@ begin
         result += LineEnding + newindent + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat, insertWhitespace, newindent);
         first := false;
       end else result += ',' + LineEnding + newindent + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat, insertWhitespace, newindent);
-    result += LineEnding + indent + '}';
+    if first then result += '}'
+    else result += LineEnding + indent + '}';
   end else begin
     result := '{';
     first := true;
