@@ -516,12 +516,12 @@ begin
   if ((length(v) = 3) and (v[1] in ['N','I'])) or ((length(v) = 4) and (v[3] = 'N')) then begin
     if pure then exit(xsceFORG0001);
     if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
-    if outv <> nil then
-      case v of
-        'NaN':  outv^ := TXQValueFloat.create(self, getNaN);
-        'INF', '+INF':  outv^ := TXQValueFloat.create(self, getPosInf);
-        '-INF':  outv^ := TXQValueFloat.create(self, getNegInf);
-      end;
+    case v of
+      'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNaN);
+      'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getPosInf);
+      '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNegInf);
+      else exit(xsceFORG0001);
+    end;
     exit(xsceNoError);
   end;
   if pure and striContains(v, 'e') then exit();

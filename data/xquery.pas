@@ -5797,11 +5797,14 @@ begin
 end;
 
 procedure TXQVList.add(node: TTreeNode);
+var
+  temp: TXQValueNode; //faster than ixqvalue
 begin
   if fcount = fcapacity then
     reserve(fcount + 1);
-  PPointer(fbuffer)[fcount] := IXQValue(TXQValueNode.create(node)); //the cast on the left side avoids the fpc_assign call and implicit ref counting; the cast on the right side ensures we get the correct pointer without a temporary variable.
-  IXQValue(PPointer(fbuffer)[fcount])._AddRef;
+  temp := TXQValueNode.create(node);
+  PPointer(fbuffer)[fcount] := IXQValue(temp); //the cast on the left side avoids the fpc_assign call and implicit ref counting; the cast on the right side ensures we get the correct pointer without a temporary variable.
+  temp._AddRef;
   fcount += 1;
 end;
 
