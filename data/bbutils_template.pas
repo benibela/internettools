@@ -287,7 +287,7 @@ function strliBeginsWith(const p:pansichar;l: longint;const expectedStart:RawByt
 
 
 //not length limited
-function strEqual(const s1,s2:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}//**< Tests if the strings are case-insensitive equal (same length and same characters)
+function strEqual(const s1,s2:RawByteString):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters)
 function striEqual(const s1,s2:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}//**< Tests if the strings are case-insensitive equal (same length and same characters)
 function strBeginsWith(const strToBeExaminated,expectedStart:RawByteString):boolean; overload; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
 function striBeginsWith(const strToBeExaminated,expectedStart:RawByteString):boolean; overload; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
@@ -1188,6 +1188,18 @@ begin
 end;
 
 //---------------------Comparison----------------------------
+
+function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
+begin
+  case e of
+    CP_ACP: result := {$IFDEF FPC_HAS_CPSTRING}DefaultSystemCodePage
+                      {$else}{$ifdef windows}GetACP
+                      {$else}CP_UTF8
+                      {$endif}{$endif};
+    else result := e;
+  end;
+end;
+
 //--Length-limited
 function strlEqual(const p1, p2: pansichar; const l: longint): boolean;
 begin
@@ -1309,7 +1321,22 @@ end;
 
 function strEqual(const s1, s2: RawByteString): boolean;
 begin
-  result:=s1 = s2; //faster than comparestr for identical strings, although it does encoding conversions
+  if pointer(s1) = pointer(s2) then begin
+    result := true;
+    exit;
+  end;
+  {$IFDEF FPC_HAS_CPSTRING}
+  if StringCodePage(s1) <> StringCodePage(s2) then
+    if strActualEncoding(StringCodePage(s1)) <> strActualEncoding(StringCodePage(s2)) then begin
+      result := s1 = s2; //this is slow due to encoding conversion
+      exit;
+    end;
+  {$ENDIF}
+  if length(s1) <> length(s2) then begin
+    result := false;
+    exit;
+  end;
+  result:=CompareByte(pchar(pointer(s1))^, pchar(pointer(s2))^, length(s1)) = 0;
 end;
 
 function striequal(const s1, s2: RawByteString): boolean;
@@ -2076,16 +2103,6 @@ begin
   end;
 end;
 
-function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
-begin
-  case e of
-    CP_ACP: result := {$IFDEF FPC_HAS_CPSTRING}DefaultSystemCodePage
-                      {$else}{$ifdef windows}GetACP
-                      {$else}CP_UTF8
-                      {$endif}{$endif};
-    else result := e;
-  end;
-end;
 
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteString;
 var len: longint;
