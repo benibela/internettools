@@ -955,7 +955,7 @@ function TXQValueString.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
   result := myStrToFloat(str);
-  if IsNan(result) and (str <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
+  if IsNan(result) and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
 function TXQValueString.toRawBinary: string;

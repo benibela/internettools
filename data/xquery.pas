@@ -4347,30 +4347,45 @@ var ak, bk: TXQValueKind;
       pvkFloat: raisePXPInternalError(); //float trigger floating point conversion
       pvkString, pvkNode: begin
         if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
-        result := v.toString;
+        result := trim(v.toString);
       end;
       else begin
         if strictTypeChecking then raiseXPTY0004TypeError(v, 'decimal');
-        result := v.toString;
+        result := trim(v.toString);
       end;
     end;
   end;
-  function vtod(k: TXQValueKind; v: txqvalue): BigDecimal; //faster implementation of cast
-  begin
-    case k of
-      pvkInt64, pvkBigDecimal: result := v.toDecimal; //always ok
-      else if not tryStrToBigDecimal(vtodecimalstr(k, v), @result) then raiseFORG0001InvalidConversion(v, 'decimal');
-    end;
-  end;
   function compareAsBigDecimals: integer;
+  var bda, bdb: BigDecimal;
+      temps: string;
   begin
-    result := compareBigDecimals(vtod(ak,a), vtod(bk,b));
+    case ak of
+      pvkInt64, pvkBigDecimal: bda := a.toDecimal; //always ok
+      else begin
+        temps := vtodecimalstr(ak, a);
+        if not tryStrToBigDecimal(temps, @result) then
+          if strContains(temps, 'N') then exit(compareCommonFloat())
+          else raiseFORG0001InvalidConversion(a, 'decimal');
+      end;
+    end;
+    case bk of
+      pvkInt64, pvkBigDecimal: bdb := b.toDecimal; //always ok
+      else begin
+        temps := vtodecimalstr(bk, b);
+        if not tryStrToBigDecimal(temps, @result) then
+          if strContains(temps, 'N') then exit(compareCommonFloat())
+          else raiseFORG0001InvalidConversion(b, 'decimal');
+      end;
+    end;
+    result := compareBigDecimals(bda, bdb);
   end;
-  function compareAsBigDecimals(i: TXQValue; const s: string): integer;
+  function compareAsBigDecimals(const i: TXQValue; const s: string): integer;
   var
     temp: BigDecimal;
   begin
-    if not tryStrToBigDecimal(s, @temp) then raiseFORG0001InvalidConversion(xqvalue(s), 'decimal');
+    if not tryStrToBigDecimal(s, @temp) then
+      if strContains(s, 'N') then exit(compareCommonFloat())
+      else raiseFORG0001InvalidConversion(xqvalue(s), 'decimal');
     result := compareBigDecimals(i.toInt64, temp);
   end;
 
@@ -4387,7 +4402,9 @@ var ak, bk: TXQValueKind;
     end else if bk = pvkInt64 then begin
       s := vtodecimalstr(ak, a);
       if length(s) >= MaxInt64LogDec then exit(-compareAsBigDecimals(b, s));
-        if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then exit(-compareAsBigDecimals(b, s));
+        if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then
+          if strContains(s, 'N') then exit(compareCommonFloat())
+          else exit(-compareAsBigDecimals(b, s));
       temp := temp - TXQValueInt64(b).value;
     end else raisePXPInternalError;
     result := compareInts(temp);
