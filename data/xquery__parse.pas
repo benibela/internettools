@@ -2826,7 +2826,7 @@ begin
             expect(word);
             parseDotOperator;
           end else
-            raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word);
+            raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word+ ' (possible missing comma , or closing parentheses)}] )' );
         end;
       end;
     end;
