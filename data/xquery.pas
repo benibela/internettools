@@ -366,7 +366,7 @@ type
     function getInternalDateTimeData: PXQValueDateTimeData;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated 'use toXQuery'; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
 
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
@@ -443,7 +443,7 @@ type
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated;
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; virtual;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; virtual;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
 
     function clone: IXQValue; virtual;
@@ -477,7 +477,7 @@ type
     function getSequenceCount: integer; override;
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     function map(const q: string): IXQValue; override;
@@ -510,7 +510,7 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
   end;
 
 
@@ -537,7 +537,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
 
     function clone: IXQValue; override;
   end;
@@ -565,7 +565,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
 
     function clone: IXQValue; override;
   end;
@@ -591,7 +591,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
 
     function clone: IXQValue; override;
   end;
@@ -730,7 +730,7 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence cannot contain another sequence, so they will be merged)
@@ -763,7 +763,7 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     //for internal use
@@ -849,7 +849,7 @@ type
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     class procedure prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess); static;
@@ -875,7 +875,7 @@ type
 
     function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueJSONArray;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence
@@ -892,7 +892,7 @@ type
 
     function toString: string; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
   end;
 

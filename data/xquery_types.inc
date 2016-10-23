@@ -33,7 +33,7 @@ begin
   TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
-function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   Result:='null';
@@ -371,7 +371,7 @@ begin
   end;
 end;
 
-function TXQValue.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValue.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   result := jsonStrEscape(toString);
@@ -603,7 +603,7 @@ begin
   result:=xqvalue(bool);
 end;
 
-function TXQValueBoolean.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueBoolean.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   if bool then result := 'true' else result := 'false';
@@ -677,7 +677,7 @@ begin
   result:=extended(value);
 end;
 
-function TXQValueInt64.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueInt64.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   Result:=IntToStr(value);
@@ -798,7 +798,7 @@ begin
   Result:=nan;
 end;
 
-function TXQValueFloat.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueFloat.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   Result:=toString;
@@ -874,7 +874,7 @@ begin
  Result:= getNaN;
 end;
 
-function TXQValueDecimal.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueDecimal.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   result := toString;
@@ -1634,16 +1634,25 @@ begin
   result := seqr;
 end;
 
-function TXQValueSequence.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueSequence.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 var
   i: Integer;
+  newindent: String;
 begin
   if seq.Count = 0 then exit('[]');
   if seq.Count = 1 then exit(seq[0].jsonSerialize(nodeFormat));
-  result := '[' + seq[0].jsonSerialize(nodeFormat);
-  for i := 1 to seq.Count-1 do
-    result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
-  result += ']';
+  if insertWhitespace then begin
+    newindent := indent + '  ';
+    result := '[' + LineEnding + newindent + seq[0].jsonSerialize(nodeFormat, insertWhitespace, newindent);
+    for i := 1 to seq.Count-1 do
+      result := result + ','+ LineEnding + newindent + seq[i].jsonSerialize(nodeFormat, insertWhitespace, newindent);
+    result += LineEnding + indent + ']';
+  end else begin
+    result := '[' + seq[0].jsonSerialize(nodeFormat);
+    for i := 1 to seq.Count-1 do
+      result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
+    result += ']';
+  end;
 end;
 
 function TXQValueSequence.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
@@ -1743,7 +1752,7 @@ begin
   result := TXQValueNode.Create(node);
 end;
 
-function TXQValueNode.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueNode.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   if node = nil then exit('null');
   case nodeFormat of
@@ -1998,19 +2007,32 @@ begin
   result.prototype := self;
 end;
 
-function TXQValueObject.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueObject.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 var
   prop: TXQProperty;
   first: Boolean;
+  newindent: String;
 begin
-  result := '{';
-  first := true;
-  for prop in getPropertyEnumerator do
-    if first then begin
-      result += jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
-      first := false;
-    end else result += ', ' + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
-  result += '}';
+  if insertWhitespace then begin
+    newindent := indent + '  ';
+    result := '{';
+    first := true;
+    for prop in getPropertyEnumerator do
+      if first then begin
+        result += LineEnding + newindent + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat, insertWhitespace, newindent);
+        first := false;
+      end else result += ',' + LineEnding + newindent + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat, insertWhitespace, newindent);
+    result += LineEnding + indent + '}';
+  end else begin
+    result := '{';
+    first := true;
+    for prop in getPropertyEnumerator do
+      if first then begin
+        result += jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
+        first := false;
+      end else result += ', ' + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
+    result += '}';
+  end;
 end;
 
 function TXQValueObject.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
@@ -2139,15 +2161,24 @@ begin
   if idx >= seq.Count then result.seq.add(newValue); //e.g. $a(1000) := ..
 end;
 
-function TXQValueJSONArray.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueJSONArray.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 var
   i: Integer;
+  newindent: String;
 begin
   if seq.Count = 0 then exit('[]');
-  result := '[' + seq[0].jsonSerialize(nodeFormat);
-  for i := 1 to seq.Count-1 do
-    result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
-  result += ']';
+  if insertWhitespace then begin
+    newindent := indent + '  ';
+    result := '[' + LineEnding + newindent + seq[0].jsonSerialize(nodeFormat, insertWhitespace, newindent);
+    for i := 1 to seq.Count-1 do
+      result := result + ','+ LineEnding + newindent + seq[i].jsonSerialize(nodeFormat, insertWhitespace, newindent);
+    result += LineEnding + indent + ']';
+  end else begin
+    result := '[' + seq[0].jsonSerialize(nodeFormat);
+    for i := 1 to seq.Count-1 do
+      result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
+    result += ']';
+  end;
 end;
 
 function TXQValueJSONArray.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string
@@ -2195,7 +2226,7 @@ begin
   result:='null';
 end;
 
-function TXQValueJSONNull.jsonSerialize(nodeFormat: TTreeNodeSerialization): string;
+function TXQValueJSONNull.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
 begin
   ignore(nodeFormat);
   Result:='null';
