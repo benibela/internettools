@@ -2572,6 +2572,7 @@ public
     function GetNativeModules: TStringList;
     function isAWeirdGlobalVariable(const namespace, local: string): boolean;
     procedure addAWeirdGlobalVariable(const namespace, local: string);
+    class procedure freeCommonCaches; static;
   protected
     function parseTerm(str:string; model: TXQParsingModel; context: TXQStaticContext = nil): TXQuery;
     function parseCSSTerm(css:string): TXQTerm;
@@ -5117,7 +5118,7 @@ end;
 var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
 threadvar commonValues: array[TXQValueKind] of TXQValue;
 
-procedure freeCommonCaches;
+class procedure TXQueryEngine.freeCommonCaches;
 var k: TXQValueKind;
   v, w: TXQValue;
 begin
@@ -8496,6 +8497,6 @@ GlobalStaticNamespaces.Free;
 commonValuesUndefined := nil;
 commonValuesTrue := nil;
 commonValuesFalse := nil;
-freeCommonCaches;
+TXQueryEngine.freeCommonCaches;
 end.
 

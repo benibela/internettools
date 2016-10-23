@@ -1940,6 +1940,12 @@ begin
   result := xqvalue;
 end;
 
+function xqFunctionGarbage_Collect(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  TXQueryEngineBreaker.freeCommonCaches;
+  TNamespace.freeCache;
+end;
+
 function xqFunctionEval(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var term: TXQuery;
   model: TXQParsingModel;
@@ -5288,6 +5294,7 @@ begin
   pxpold.registerFunction('random',0,1,@xqFunctionRandom, []);
   pxpold.registerFunction('random-seed',0,1,@xqFunctionRandom_Seed, []);
   pxpold.registerFunction('sleep',1,1,@xqFunctionSleep, []);
+  pxpold.registerFunction('garbage-collect',0,0,@xqFunctionGarbage_Collect, []);
   pxpold.registerFunction('eval',1,2,@xqFunctionEval, []);
   pxpold.registerFunction('css',1,1,@xqFunctionCSS, []);
   pxpold.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
