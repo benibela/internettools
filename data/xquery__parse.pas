@@ -821,9 +821,10 @@ begin
     prefix := localpart;
     inc(pos);
     marker := pos;
-    while not (pos^ in ['}', #0]) do inc(pos);
+    while not (pos^ in ['{', '}', #0]) do inc(pos);
     url := normalizeLineEnding(strFromPchar(marker, pos - marker));
     url := xmlStrWhitespaceCollapse(replaceEntitiesIfNeeded(url));
+    if url = XMLNamespaceUrl_XMLNS then raiseParsingError('XQST0070', 'Invalid namespace ' + url);
     inc(pos);
     if pos^ = '*' then begin
       inc(pos);
