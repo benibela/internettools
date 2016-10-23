@@ -7835,12 +7835,12 @@ begin
   end;
   if ((xqpncCheckValue in nodeCondition.options )
       and ((node.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.value))) then
-    exit(false);
+    exit();
   if xqpncCheckNamespace in nodeCondition.options  then
     if node.namespace = nil then begin
       if nodeCondition.requiredNamespaceURL <> '' then exit(); //do not call getNamespaceURL, because returning strings is slow
     end else
-      if node.namespace.equal(nodeCondition.requiredNamespaceURL) then exit();
+      if not node.namespace.equal(nodeCondition.requiredNamespaceURL) then exit();
   if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(node)) then begin
     if nodeCondition.requiredType.isSingleType() then
       case node.typ of
