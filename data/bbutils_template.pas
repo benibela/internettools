@@ -1309,7 +1309,7 @@ end;
 
 function strEqual(const s1, s2: RawByteString): boolean;
 begin
-  result:=CompareStr(s1,s2)=0;
+  result:=s1 = s2; //faster than comparestr for identical strings, although it does encoding conversions
 end;
 
 function striequal(const s1, s2: RawByteString): boolean;
