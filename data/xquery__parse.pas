@@ -3027,7 +3027,7 @@ begin
         break;
       end;
     if overriden >= oldFunctionCount then
-      raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].debugAsStringWithTypeAnnotation() + ' and '+sc.functions[overriden].debugAsStringWithTypeAnnotation());
+      raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and '+sc.functions[overriden].toXQuery());
     if sc.importedModules <> nil then
       for j := 0 to sc.importedModules.Count - 1 do begin
         otherModule := TXQueryBreaker(sc.importedModules.Objects[j]).getTerm as TXQTermModule;
@@ -3038,7 +3038,7 @@ begin
             if equalNamespaces(sc.functions[i].namespaceURL, otherFunction.name.namespaceURL)
                and (sc.functions[i].name = otherFunction.name.localname)
                and (length(sc.functions[i].parameters) = (otherFunction.parameterCount)) then
-                 raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].debugAsStringWithTypeAnnotation() + ' and imported '+otherFunction.debugTermToString());
+                 raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and imported '+otherFunction.debugTermToString());
           end;
       end;
     if overriden >= 0 then begin

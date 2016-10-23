@@ -234,6 +234,62 @@ begin
   result.add(self);
 end;
 
+function TXQValue.toXQuery: string;
+  function escapeToXQueryString(const s: string): string;
+  begin
+    result := StringReplace(s, '&', '&amp;', [rfReplaceAll]);
+    if pos('"', result) = 0 then exit('"' + result + '"');
+    if pos('''', result) = 0 then exit('''' + result + '''');
+    result := StringReplace(s, '"', '""', [rfReplaceAll]);
+    result := '"' + result + '"';
+  end;
+
+  function qualifiedTypeName(const arg: string; const ignoreDefault: string = ''): string;
+  begin
+    if typeAnnotation.schema.url <> XMLNamespaceURL_XMLSchema then
+       exit('Q{'+typeAnnotation.schema.url + '}' + typeName+'('+arg+')');
+    if typeName = ignoreDefault then exit(arg);
+    exit('xs:'+typeName+'('+escapeToXQueryString(toString)+')');
+  end;
+
+var
+  pv: PIXQValue;
+  first: Boolean;
+  enum: TXQValueEnumeratorPtrUnsafe;
+begin
+  case kind of
+    pvkUndefined:  result := '()';
+    pvkBoolean:    result := qualifiedTypeName(IfThen(toBoolean, 'true()', 'false()'), 'boolean');
+    pvkNull:       result := 'null';
+    pvkInt64:      result := qualifiedTypeName(toString, 'integer');
+    pvkFloat:      result := qualifiedTypeName(toString, '');
+    pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(IsIntegral(toDecimal), 'integer', 'decimal') );
+    pvkString:     result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
+    pvkQName, pvkDateTime:
+      result := qualifiedTypeName(escapeToXQueryString(toString), '' );
+
+    pvkNode:       result := toNode.outerXML();
+    pvkObject:     result := jsonSerialize(tnsXML);
+    pvkArray, pvkSequence:      begin
+      if kind = pvkSequence then begin
+        result := '(';
+        enum := GetEnumeratorPtrUnsafe;
+      end else begin
+        result := '[';
+        enum := (self as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe;
+      end;
+      first := true;
+      for pv in enum do begin
+        if not first then result += ', ';
+        result += pv^.toXQuery;
+        first := false;
+      end;
+      if kind = pvkSequence then result += ')' else result += ']';
+    end;
+    else result := 'serialization failed??';
+  end;
+end;
+
 function TXQValue.getSequenceCount: integer;
 begin
   result := 1;
@@ -2269,6 +2325,20 @@ begin
   result := directClone;
 end;
 
+function TXQValueFunction.toXQuery: string;
+var
+  i: Integer;
+begin
+  result := 'function (';
+  for i := 0 to high(parameters) do begin
+    if i <> 0 then result += ', ';
+    result += parameters[i].toString;
+  end;
+  result += ')';
+  if resulttype <> nil then result += ' as ' + resulttype.serialize;
+  if body <> nil then result += '{' + body.debugTermToString + '}';
+end;
+
 function TXQValueFunction.debugAsStringWithTypeAnnotation(textOnly: boolean): string;
 var
   i: Integer;
@@ -2277,7 +2347,7 @@ begin
   result := 'function (';
   for i := 0 to high(parameters) do begin
     if i <> 0 then result += ', ';
-    result += parameters[i].toString;
+    result += parameters[i].toString();
   end;
   result += ')';
   if resulttype <> nil then result += ' as ' + resulttype.debugTermToString;

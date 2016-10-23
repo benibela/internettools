@@ -2635,7 +2635,6 @@ var
   el: TTreeNode;
   attrib: TTreeAttribute;
   encMeta, encBOM: TSystemCodePage;
-  i: Integer;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;

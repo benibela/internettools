@@ -325,7 +325,7 @@ begin
 
   case dest.kind of
     pvkUndefined: exit('');
-    pvkNode: raise EXQEvaluationException.Create('pxp:ASSERT', 'Got '+dest.debugAsStringWithTypeAnnotation()+', but expected resolved url');
+    pvkNode: raise EXQEvaluationException.Create('pxp:ASSERT', 'Got '+dest.toXQuery()+', but expected resolved url');
     pvkObject: begin
       tempHeaders := defaultInternet.additionalHeaders.Text;
       TXQValueObject.prepareInternetRequest(dest, method, url, post, defaultInternet);

@@ -584,7 +584,7 @@ begin
       'q': Include(flags, wrfQuote);
       '!': include(flags, wrfSkipSyntaxNormalization);
       else if (c = '*') and (all <> nil) then all^ := true
-      else raise EXQEvaluationException.create('FORX0001', 'Invalid flag ' + c + ' in ' + argv[flagsPos].debugAsStringWithTypeAnnotation());
+      else raise EXQEvaluationException.create('FORX0001', 'Invalid flag ' + c + ' in ' + argv[flagsPos].toXQuery());
       end;
   end;
 

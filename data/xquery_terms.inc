@@ -81,7 +81,7 @@ end;
 
 procedure TXQTerm.raiseTypeError0004(const s: string; const got: IXQValue);
 begin
-  raise EXQEvaluationException.Create('XPTY0004', s + ' GOT: '+ got.debugAsStringWithTypeAnnotation(), nil, got, self);
+  raise EXQEvaluationException.Create('XPTY0004', s + ' GOT: '+ got.toXQuery(), nil, got, self);
 end;
 
 function TXQTerm.visitchildren(intentionallyUnusedParameter: TXQTerm_Visitor): TXQTerm_VisitAction;
@@ -552,7 +552,7 @@ begin
 
   if hasTypeDeclaration then
     if not sequenceType.instanceOf(result, context) then
-      raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +result.debugAsStringWithTypeAnnotation() + ' has not the correct type '+TXQTermSequenceType(children[0]).serialize);
+      raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +result.toXQuery() + ' has not the correct type '+TXQTermSequenceType(children[0]).serialize);
 end;
 
 function TXQTermDefineVariable.getContextDependencies: TXQContextDependencies;
@@ -926,7 +926,7 @@ var
   tempvar: TXQTermVariable;
 begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
-  //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.debugAsStringWithTypeAnnotation());
+  //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.toXQuery());
   if length(arguments) = 0 then exit(v);
   fun := v as TXQValueFunction;
   if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
@@ -1896,7 +1896,7 @@ var
         if (patternClause.sequenceTyp <> nil) then
           for i := 0 to log.count - 1 do
             if not (patternClause.sequenceTyp.instanceOf(log[i], context)) then
-              raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+patternClause.sequenceTyp.serialize+' got value '+log[i].debugAsStringWithTypeAnnotation());
+              raiseEvaluationError('XPTY0004', 'Invalid variable type, expected: type '+patternClause.sequenceTyp.serialize+' got value '+log[i].toXQuery());
 
         hasContextItem := patternClause.pattern.hasDefaultVariable;
 
@@ -2480,7 +2480,7 @@ begin
   {$ifdef checkreturntypes}
   if version <> -1 then begin
     if not func.versions[version].returnType.instanceOf(result, context) then
-      raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.debugAsStringWithTypeAnnotation()+' does not have type '+func.versions[version].returnType.serialize);
+      raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.toXQuery()+' does not have type '+func.versions[version].returnType.serialize);
   end;
   {$endif}
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
@@ -2700,7 +2700,7 @@ begin
           for i := 0 to ara.seq.Count-1 do
             resultSeq.add(ara.seq[i]);
         end;
-        else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v^.debugAsStringWithTypeAnnotation());
+        else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v^.toXQuery());
       end;
     end;
     xqvalueSeqSqueezed(result, resultSeq);
@@ -2720,7 +2720,7 @@ begin
         resultSeq.add(v^.getProperty(index.ToString));
       end;
       else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
-        raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.debugAsStringWithTypeAnnotation());
+        raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.toXQuery());
     end;
   xqvalueSeqSqueezed(result, resultSeq)
 end;
@@ -4165,7 +4165,7 @@ begin
     xqtdfDynamicPartialApplication: begin
       assert(children[0] is TXQTermDynamicFunctionCall);
       dfv := TXQTermDynamicFunctionCall(children[0]).children[0].evaluate(context);
-      if not (dfv is TXQValueFunction) then raiseEvaluationError('XPTY0004', 'Need function for partial application, got: '+dfv.debugAsStringWithTypeAnnotation());
+      if not (dfv is TXQValueFunction) then raiseEvaluationError('XPTY0004', 'Need function for partial application, got: '+dfv.toXQuery());
       temp := defineDynamicPartialApplication(context, dfv as TXQValueFunction);
     end;
   end;

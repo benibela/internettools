@@ -357,6 +357,7 @@ type
     function toNode: TTreeNode;  //**< Returns the value as node; or nil if it is no node
     function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single element, the array contains that element; if it is a sequence, the array contains each element of the sequence
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
+    function toXQuery: string; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
 
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
@@ -364,7 +365,7 @@ type
     function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData;
 
-    function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
+    function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated 'use toXQuery'; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
 
@@ -433,6 +434,7 @@ type
     function toNode: TTreeNode; virtual; //**< Returns the value as node, or nil if it is not a node
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single value, the array contains just this value; if it is a sequence, the array contains all members of the sequence
     function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toXQuery: string; virtual; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
 
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
@@ -440,7 +442,7 @@ type
     function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
 
-    function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
+    function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated;
     function jsonSerialize(nodeFormat: TTreeNodeSerialization): string; virtual;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
 
@@ -953,6 +955,7 @@ type
 
     function directClone: TXQValue;
     function clone: IXQValue; override;
+    function toXQuery: string; override;
     function debugAsStringWithTypeAnnotation(textOnly: boolean=true): string;
 
     procedure assignCopiedTerms(const func: TXQValueFunction); //for internal use
@@ -3353,9 +3356,9 @@ end;
 function TXQFunctionParameter.toString(def: string): string;
 begin
   if variable = nil then exit(def);
-  result += variable.ToString;
+  result := variable.ToString;
   if seqtype <> nil then
-    result += ' as ' + seqtype.debugTermToString;
+    result += ' as ' + seqtype.serialize;
 end;
 
 
@@ -3726,7 +3729,7 @@ end;
 procedure requiredArgType(const v: IXQValue; typ: TXSType);
 begin
   if not (v.instanceOf(typ)) then
-    raise EXQEvaluationException.create('XPTY0004', 'Expected '+typ.name+', got: '+v.debugAsStringWithTypeAnnotation());
+    raise EXQEvaluationException.create('XPTY0004', 'Expected '+typ.name+', got: '+v.toXQuery());
 end;
 
 
@@ -3753,7 +3756,7 @@ begin
   if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
   if v.kind <> pvkNode then
     if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.')
-    else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.debugAsStringWithTypeAnnotation());
+    else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.toXQuery());
   t := TXQValueNode.nodeTypeAnnotation(v.toNode);
   if t = baseSchema.untyped then t := baseSchema.untypedAtomic; //????
   result := t.createValue(v.toString);
@@ -3762,7 +3765,7 @@ end;
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
   procedure raiseFOTY0015(const v: IXQValue);
   begin
-    raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.debugAsStringWithTypeAnnotation() + ' passed to deep-equal')
+    raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.toXQuery() + ' passed to deep-equal')
   end;
 
 var i:integer;
@@ -3967,11 +3970,11 @@ end;
 
 procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
 begin
-  raise EXQEvaluationException.create('FORG0001', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to type '+convTo);
+  raise EXQEvaluationException.create('FORG0001', 'Invalid conversion from '+v.toXQuery()+' to type '+convTo);
 end;
 procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
 begin
-  raise EXQEvaluationException.create('XPTY0004', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to type '+convTo);
+  raise EXQEvaluationException.create('XPTY0004', 'Invalid conversion from '+v.toXQuery()+' to type '+convTo);
 end;
 procedure raiseXPTY0004TypeError(const v: IXQValue; const typ: TXSType);
 begin
@@ -3979,14 +3982,14 @@ begin
 end;
 procedure raiseFOTY0013TypeError(const v: IXQValue);
 begin
-  raise EXQEvaluationException.create('FOTY0013', 'Invalid conversion from '+v.debugAsStringWithTypeAnnotation()+' to atomic value');
+  raise EXQEvaluationException.create('FOTY0013', 'Invalid conversion from '+v.toXQuery()+' to atomic value');
 end;
 procedure raiseXQEvaluationError(const code, s: string; const data: IXQValue);
 var
   t: String;
 begin
   t := s;
-  if data <> nil then t += ' ; got: ' + data.debugAsStringWithTypeAnnotation();
+  if data <> nil then t += ' ; got: ' + data.toXQuery();
   raise EXQEvaluationException.create(code, t);
 end;
 procedure raiseInternalError(const s: string);
@@ -5429,7 +5432,7 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
     else
       if w.kind <> pvkFunction then errCode := 'XPTY0004'
       else errCode := 'FOTY0013';
-    term.raiseEvaluationError(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.debugAsStringWithTypeAnnotation());
+    term.raiseEvaluationError(errCode, 'Invalid type for function. Expected '+typ.serialize+' got '+w.toXQuery());
   end;
 
   procedure convert;
@@ -5533,7 +5536,7 @@ var
     errMessage += 'Got: ';
     for i := 0 to valueHigh do begin
       if i <> 0 then errMessage += ', ';
-      errMessage += values[i].debugAsStringWithTypeAnnotation();
+      errMessage += values[i].toXQuery();
     end;
     errMessage += LineEnding;
     errMessage += 'Expected: ';
@@ -6014,7 +6017,7 @@ begin
 
 
   if not (oldObj is TXQValueObject) then begin
-    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.debugAsStringWithTypeAnnotation()+LineEnding+'(when changing properites: '+strJoin(properties, '.')+')');
+    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(properties, '.')+')');
     newValue := (oldObj as TXQValueJSONArray).setImmutable(properties, value);
   end else newValue := (oldObj as TXQValueObject).setImmutable(properties, value);
 
@@ -6370,7 +6373,7 @@ begin
       if not parentLog.hasVariable(varstorage[i].name, temp, varstorage[i].namespaceURL) then
         raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but no variable of that name exists');
       if temp.kind <> pvkObject then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.debugAsStringWithTypeAnnotation()+' is not an object ');
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.toXQuery()+' is not an object ');
     end;
     result.varstorage[result.varCount] := varstorage[i];
     result.varCount += 1;
@@ -7587,7 +7590,7 @@ begin
       case command.typ of
         qcFunctionSpecialCase: begin
           if not (n^.kind in [pvkNode, pvkObject, pvkArray]) then
-            raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
+            raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery()); //continue;
           newList.clear;
           tempContext.SeqIndex += 1;
           tempContext.SeqValue := n^;
@@ -7596,7 +7599,7 @@ begin
         end;
         qcAttribute: begin
           oldnode := n^.toNode;
-          if oldnode = nil then raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation());
+          if oldnode = nil then raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery());
           if (oldnode.attributes = nil) or (oldnode.typ = tetProcessingInstruction) { a pi node has attributes internally but they are accessible} then continue;
           if (namespaceMatching = xqnmPrefix) and (command.namespaceURLOrPrefix <> '')  then begin
             cachedNamespaceURL := oldnode.getNamespaceURL(command.namespaceURLOrPrefix);
@@ -7650,14 +7653,14 @@ begin
                     //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                     if tempKind = pvkObject then newList.add(n^.getProperty(command.value))
                     else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
-                      if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
+                      if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.toXQuery()+'"');
                       newList.add(pv^.getProperty(command.value));
                     end;
                   end else begin
                     //get all properties
                     if tempKind = pvkObject then newList.add((n^ as TXQValueObject).enumerateValues())
                     else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
-                      if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.debugAsStringWithTypeAnnotation()+'"');
+                      if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.toXQuery()+'"');
                       newList.add((pv^ as TXQValueObject).enumerateValues());
                     end;
                   end;
@@ -7669,7 +7672,7 @@ begin
               end;
 
             end;
-            else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.debugAsStringWithTypeAnnotation()); //continue;
+            else raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery()); //continue;
           end;
         end;
       end;
@@ -7722,7 +7725,7 @@ begin
       if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
       else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')
-      else raise EXQEvaluationException.Create('XPTY0020', 'Expected node as context item, got: '+context.SeqValue.debugAsStringWithTypeAnnotation());
+      else raise EXQEvaluationException.Create('XPTY0020', 'Expected node as context item, got: '+context.SeqValue.toXQuery());
       result := expandSequence(result,query, context, lastExpansion);
     end;
   end;

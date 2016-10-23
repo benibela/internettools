@@ -273,7 +273,7 @@ var temp: TXQValue;
   err: TXSCastingError;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then raiseXSCEError(err, v.debugAsStringWithTypeAnnotation(), name);
+  if err <> xsceNoError then raiseXSCEError(err, v.toXQuery(), name);
   result := temp;
 end;
 
@@ -805,13 +805,13 @@ end;
 procedure TXSQNameType.castAllowed(const v: ixqvalue; const s: string; const context: TXQStaticContext);
 begin
   if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
-    raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.debugAsStringWithTypeAnnotation());
+    raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.toXQuery());
   if (v.kind <> pvkString) or ((not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic))) then
-    raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.debugAsStringWithTypeAnnotation());
+    raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.toXQuery());
   if self = baseSchema.NOTATION then
     raise EXQEvaluationException.create('XPST0080', 'Cannot cast to xs:NOTATION');
   if not (baseSchema.isValidQName(s)) then
-    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.debugAsStringWithTypeAnnotation());
+    raise EXQEvaluationException.create('FORG0001', 'Invalid string for cast: '+v.toXQuery());
 end;
 
 function TXSQNameType.cast(const v: IXQValue; const context: TXQEvaluationContext): IXQValue;
