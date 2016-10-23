@@ -156,7 +156,7 @@
     </Linking>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="16">
+    <Exceptions Count="15">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -202,9 +202,6 @@
       <Item15>
         <Name Value="EInvalidOp"/>
       </Item15>
-      <Item16>
-        <Name Value="RunError(200)"/>
-      </Item16>
     </Exceptions>
   </Debugging>
 </CONFIG>
