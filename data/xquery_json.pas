@@ -344,7 +344,7 @@ var jn, pxp, libjn: TXQNativeModule;
 
 initialization
   AllowJSONDefaultInternal := true;
-  XMLNamespace_JSONiqFunctions:=TNamespace.create('http://jsoniq.org/functions', 'jn');
+  XMLNamespace_JSONiqFunctions:=TNamespace.make('http://jsoniq.org/functions', 'jn');
   GlobalStaticNamespaces.add(XMLNamespace_JSONiqFunctions);
   //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/types', 'js');
   //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/function-library', 'libjn');
@@ -373,7 +373,7 @@ initialization
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
 
-  XMLNamespace_JSONiqLibraryFunctions:=TNamespace.create('http://jsoniq.org/function-library', 'libjn');
+  XMLNamespace_JSONiqLibraryFunctions:=TNamespace.make('http://jsoniq.org/function-library', 'libjn');
   libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
 //new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
   {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()',

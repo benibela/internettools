@@ -4,6 +4,7 @@ program QT3testsuite;
 
 uses
   //heaptrc,
+  //cmem,
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
@@ -737,7 +738,7 @@ function killPrefixes(tn: TTreeNode; ns: TStringList; mustExist: boolean): boole
             //writeln(stderr, 'Missing: ', n.namespace.getURL);
             exit(false);
           end;
-          ns.AddObject(n.namespace.getURL, TNamespace.create(n.namespace.getURL, 'prf'+IntToStr(ns.Count-1)));
+          ns.AddObject(n.namespace.getURL, TNamespace.make(n.namespace.getURL, 'prf'+IntToStr(ns.Count-1)));
         end;
         n.namespace := TNamespace(ns.Objects[ns.IndexOf(n.namespace.getURL)]);
       end;
@@ -1409,7 +1410,7 @@ begin
   u := xq.evaluateXPath2('*:namespace', e);
   if not u.isUndefined then begin
     if namespaces = nil then namespaces := TNamespaceList.Create;
-    for v in u do namespaces.add(TNamespace.Create(v.toNode['uri'], v.toNode['prefix']));
+    for v in u do namespaces.add(TNamespace.make(v.toNode['uri'], v.toNode['prefix']));
   end;
 
   sources := TSource.createMultiple(e);
@@ -1798,7 +1799,7 @@ begin
   xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
-  xq.StaticContext.defaultFunctionNamespace := TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
+  xq.StaticContext.defaultFunctionNamespace := TNamespace.make(XMLNamespaceURL_XPathFunctions, 'fn');
   xq.StaticContext.defaultTypeNamespace := nil;
   xq.StaticContext.useLocalNamespaces:=false;
   xq.AutomaticallyRegisterParsedModules := true;

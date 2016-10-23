@@ -514,7 +514,7 @@ begin
   if mode = xqnmPrefix then begin
     namespaceurl := staticContext.findNamespaceURLMandatory(namespaceprefix, kind);
   end;
-  result := namespaceurl;
+  result := TNamespace.uniqueUrl(namespaceurl);
 end;
 
 function TXQTermPendingEQNameToken.resolveAndFree(const staticContext: TXQStaticContext): TXQTerm;
@@ -577,7 +577,7 @@ begin
     TXQEQNameUnresolved(result).namespacePrefix := prefix;
   end else begin
     result := TXQEQName.Create;
-    result.namespaceURL := url;
+    result.namespaceURL := TNamespace.uniqueUrl(url);
     result.localname := local;
   end;
 end;
@@ -590,7 +590,7 @@ begin
     result.namespacePrefix := prefix;
   end else begin
     result := TXQEQNameWithPrefix.Create;
-    result.namespaceURL := url;
+    result.namespaceURL := TNamespace.uniqueUrl(url);
     result.localname := local;
     result.namespacePrefix := 'prf';
   end;
@@ -1729,7 +1729,7 @@ var
     url := xmlStrWhitespaceCollapse(url); //do this now or later?
     if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
       raiseParsingError('XQST0070', 'Invalid namespace declaration');
-    result.implicitNamespaces.add(TNamespace.create(url, prefix));
+    result.implicitNamespaces.add(TNamespace.make(url, prefix));
     attribute.Free;
   end;
 
@@ -3329,7 +3329,7 @@ var declarationDuplicateChecker: TStringList;
       while nextToken(true) = ',' do begin expect(','); parseString(); end;
     end;
     if (url <> XMLNamespaceURL_XMLSchema) then raiseParsingError('XQST0059', 'Unknown schema: ' + url);
-    staticContext.importedSchemas.add(TNamespace.Create(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
+    staticContext.importedSchemas.add(TNamespace.make(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
   end;
   procedure importModule; //has read import module
   var
@@ -3347,7 +3347,7 @@ var declarationDuplicateChecker: TStringList;
       expect('namespace'); moduleName:=nextTokenNCName(); expect('=');
       refuseForbiddenPrefix(moduleName);
     end;
-    moduleURL := parseNamespaceURI('','XQST0088');
+    moduleURL := TNamespace.uniqueUrl(parseNamespaceURI('','XQST0088'));
     at := nil;
     if nextToken(true) = 'at' then begin
       expect('at');
@@ -3371,7 +3371,7 @@ var declarationDuplicateChecker: TStringList;
         if nativeModule = nil then raiseParsingError('XQST0059', 'Unknown module: '+moduleURL);
         if moduleName <> '' then begin
           if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-          staticContext.namespaces.add(TNamespace.create(nativeModule.namespace.getURL, moduleName));
+          staticContext.namespaces.add(TNamespace.make(nativeModule.namespace.getURL, moduleName));
         end;
         exit;
       end;
@@ -3583,9 +3583,9 @@ begin
         '': pos := marker;
         'namespace': begin
           requireModule;
-          staticContext.moduleNamespace := TNamespace.create('', nextTokenNCName());
+          token := nextTokenNCName();
           expect('=');
-          (staticContext.moduleNamespace as TNamespace).url := parseNamespaceURI('', 'XQST0088');
+          staticContext.moduleNamespace := TNamespace.make(parseNamespaceURI('', 'XQST0088'), token);
           expect(';');
           token := nextToken(true);
           if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
@@ -3637,8 +3637,8 @@ begin
             'element', 'function': begin
               expect('namespace');
               checkForDuplicate('default '+token+' namespace', 'XQST0066');
-              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.Create(parseNamespaceURI('XQST0070',''), '')
-              else staticContext.defaultFunctionNamespace := TNamespace.Create(parseNamespaceURI('XQST0070',''), '')
+              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.make(parseNamespaceURI('XQST0070',''), '')
+              else staticContext.defaultFunctionNamespace := TNamespace.make(parseNamespaceURI('XQST0070',''), '')
             end;
             'decimal-format': declareDecimalFormat();
             else raiseParsingError('XPST0003', 'Unknown default value');
@@ -3689,7 +3689,7 @@ begin
            if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create
            else if staticContext.namespaces.lastIndexOfNamespacePrefix(nameSpaceName) >= oldNamespaceCount then
              raiseParsingError('XQST0033', 'Duplicated namespace declaration');
-           staticContext.namespaces.Add(TNamespace.create(nameSpaceURL, nameSpaceName));
+           staticContext.namespaces.Add(TNamespace.make(nameSpaceURL, nameSpaceName));
         end;
         else begin
           pos := marker;
@@ -4164,6 +4164,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
        else
         step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkElementType);
     end;
+    if qmCheckNamespaceURL in step.matching then step.namespaceURLOrPrefix := TNamespace.uniqueUrl(step.namespaceURLOrPrefix);
     if step.requiredType <> nil then
       visitSequenceType(step.requiredType, 'XPST0008');
     if qmSchemaFail in step.matching then

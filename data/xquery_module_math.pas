@@ -337,7 +337,7 @@ end;
 
 
 initialization
-  XMLNamespace_Math := TNamespace.create(XMLNamespaceURL_Math, 'math');
+  XMLNamespace_Math := TNamespace.make(XMLNamespaceURL_Math, 'math');
 
 finalization
   module.free;

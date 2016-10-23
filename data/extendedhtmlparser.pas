@@ -852,7 +852,7 @@ begin
         attributes.Delete(i);
       end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
         temp := TTemplateElement.createElementPair('s') as TTemplateElement;
-        temp.namespace := TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't');
+        temp.namespace := TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't');
         temp.templateType:=tetCommandShortRead;
         temp.reverse.namespace := temp.namespace;
         temp.templateReverse.templateType:=tetIgnore;
@@ -1799,8 +1799,8 @@ begin
   FTemplate := TTreeParser.Create;
   FTemplate.parsingModel:=pmStrict;
   FTemplate.treeNodeClass:=TTemplateElement;
-  FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
-  FTemplate.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
+  FTemplate.globalNamespaces.Add(TNamespace.make(HTMLPARSER_NAMESPACE_URL, 'template'));
+  FTemplate.globalNamespaces.Add(TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't'));
   FTemplate.trimText:=true;
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
@@ -1821,8 +1821,8 @@ begin
   FQueryEngine.ParsingOptions.StringEntities:=xqseIgnoreLikeXPath;
   //FQueryEngine.OnDefineVariable:=@defineXQVariable;
   //FQueryEngine.OnEvaluateVariable:=@evaluateXQVariable;
-  FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 'template'));
-  FQueryEngine.globalNamespaces.Add(TNamespace.Create(HTMLPARSER_NAMESPACE_URL, 't'));
+  FQueryEngine.globalNamespaces.Add(TNamespace.make(HTMLPARSER_NAMESPACE_URL, 'template'));
+  FQueryEngine.globalNamespaces.Add(TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't'));
   FQueryContext := FQueryEngine.getEvaluationContext(FQueryEngine.StaticContext);
 
   FVariableLog := FQueryEngine.VariableChangelog;

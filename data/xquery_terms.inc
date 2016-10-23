@@ -853,6 +853,13 @@ begin
   result := instanceOf(ta, temp);
 end;
 
+{$ImplicitExceptions off}
+function TXQTermSequenceType.instanceOf(const node: TTreeNode): boolean;
+begin
+  result := instanceof(xqvalue(node));
+end;
+{$ImplicitExceptions on}
+
 function TXQTermSequenceType.subtypeOf(tb: TXQTermSequenceType): boolean;
 begin
   if kind = tikNone then exit((tb.kind = tikNone) or tb.allowNone);
@@ -3564,7 +3571,7 @@ var
       subcontext^.namespaces.Add(result);
       exit;
     end;
-    result := TNamespace.Create(url, prefix);
+    result := TNamespace.make(url, prefix);
     subcontext^.namespaces.Add(result);
   end;
 
@@ -3593,12 +3600,12 @@ var
             if (namespaceIndex < 0) or not equalNamespaces(subcontext^.namespaces.items[namespaceIndex], kid.namespace) then begin
               //if the namespace prefix is not already correctly bound, we need to add it. But if we have already a namespace for that prefix, we need use another prefix
               //Also this does not actually create namespace nodes. Real namespace nodes might be inherited by the children, but these implicit namespaces nodes must not.
-              if namespaceIndex >= oldnamespacecount then kid.namespace := TNamespace.create(kid.namespace.getURL, chooseRandomPrefix());
+              if namespaceIndex >= oldnamespacecount then kid.namespace := TNamespace.make(kid.namespace.getURL, chooseRandomPrefix());
               subcontext^.namespaces.add(kid.namespace)
             end;
           end else begin
             if (tree.namespace <> nil) and (tree.namespace.getPrefix = kid.value) and (tree.namespace.getURL <> TTreeAttribute(kid).realvalue) then begin
-             tree.namespace := TNamespace.create(tree.namespace.getURL, chooseRandomPrefix());
+             tree.namespace := TNamespace.make(tree.namespace.getURL, chooseRandomPrefix());
               tree.addAttribute(tree.namespace.getPrefix, tree.namespace.getURL, XMLNamespace_XMLNS as TNamespace);
               needNamespaceList.add(tree.namespace);
             end;
@@ -3625,7 +3632,7 @@ var
         if (kid as TTreeAttribute).isNamespaceNode then begin
           if (kid.value = '') and ((tree.namespace = nil) or (tree.namespace.getPrefix = '')) and (TTreeAttribute(kid).realvalue <> namespaceGetURL(tree.namespace)) then
             raiseEvaluationError('XQDY0102', 'Namespace override');
-          needNamespaceList.addIfNewPrefixUrl(TNamespace.create(TTreeAttribute(kid).realvalue, kid.value));
+          needNamespaceList.addIfNewPrefixUrl(TNamespace.make(TTreeAttribute(kid).realvalue, kid.value));
         end;
       end;
       tetOpen, tetComment, tetText, tetProcessingInstruction:
@@ -3696,7 +3703,7 @@ var
               {if not tempNamespaces.hasNamespacePrefix('') then begin
                 v.toNode.getOwnNamespaces(tempNamespaces);
                 if not tempNamespaces.hasNamespacePrefix('') then
-                  kid.addNamespaceDeclaration(TNamespace.create('', ''), false);
+                  kid.addNamespaceDeclaration(TNamespace.make('', ''), false);
               end;}
               tempNamespaces.free;
             end;

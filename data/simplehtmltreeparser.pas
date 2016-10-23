@@ -5,16 +5,39 @@
 }
 unit simplehtmltreeparser;
 
-{$mode objfpc} {$H+}
-{$modeswitch advancedrecords}
+{$I ../internettoolsconfig.inc}
+
 interface
 
 uses
-  Classes, SysUtils, simplehtmlparser, bbutils;
+  Classes, SysUtils, simplehtmlparser, bbutils, contnrs,{$ifdef USE_FLRE}FLRE{$else}ghashmap{$endif};
 
 type
+TXQHashKeyString = {$ifdef USE_FLRE}TFLRERawByteString{$else}RawByteString{$endif};
+{$ifndef USE_FLRE}TXQHash = record
+  function hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
+end;{$endif}
+generic TXQHashmapStr<TValue> = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, TValue, TXQHash>{$endif})
+protected
+  function GetValue(const Key: TXQHashKeyString): TValue; inline;
+  procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
+public
+  procedure Add(const Key:TXQHashKeyString; const AValue:TValue); inline;
+  property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
+end;
+generic TXQHashmapStrOwning<TValue, TOwningList> = class(specialize TXQHashmapStr<TValue>)
+protected
+  owner: TOwningList;
+  procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
+public
+  constructor create;
+  destructor destroy; override;
+  procedure Add(const Key:TXQHashKeyString; const Value:TValue); inline;
+  property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
+end;
+TXQHashmapStrOwningObject = specialize TXQHashmapStrOwning<TObject, TObjectList>;
+TXQHashmapStrOwningInterface = specialize TXQHashmapStrOwning<IUnknown, TInterfaceList>;
 
-{ TAttributeMap }
 
 
 //**The type of a tree element. <Open>, text, or </close>
@@ -34,11 +57,16 @@ TTreeDocument = class;
 
 TStringComparisonFunc = function (const a,b: string): boolean of object;
 
+TNamespace = class;
+
 //** Namespace interface, storing url and prefix. (Interface, so it is ref-counted)
 INamespace = interface
+['{5F6DF5F2-548C-4F13-9BEA-CE59EBAE4CAB}']
   function getPrefix: string; //**< Returns the prefix
   function getURL: string; //**< Returns the url
   function serialize: string; //**< Returns a xmlns attribute declaring this namespace with url and prefix
+  function getSelf: TNamespace;
+  function equal(const ns: string): boolean;
 end;
 
 
@@ -46,13 +74,21 @@ end;
 
 //** Class implementing the INamespace interface
 TNamespace = class(TInterfacedObject, INamespace)
+public
   url: string;
   prefix: string;
   //** Creates a new namespace with url and prefix. (watch the argument order. It follows the XPath fn:QName function)
   constructor create(const aurl: string; aprefix: string);
+
+  class function make(const aurl: string; const aprefix: string): TNamespace; static;
+  class function uniqueUrl(const aurl: string): string; static;
+  class procedure freeCache; static;
+
   function getPrefix: string;
   function getURL: string;
   function serialize: string;
+  function getSelf: TNamespace;
+  function equal(const ns: string): boolean;
   destructor Destroy; override;
 end;
 
@@ -417,6 +453,7 @@ function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 function isInvalidUTF8(const s: string): boolean;
 function nodeNameHash(const s: RawByteString): cardinal;
 
+
 implementation
 uses xquery;
 
@@ -476,7 +513,71 @@ begin
   result := nodeNameHash(s);
 end;
 
+{$ifndef USE_FLRE}
+function TXQHash.hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
+begin
+  result := nodeNameHash(a) and (n-1);
+end;
+{$endif}
+
 {$POP}
+
+
+
+function TXQHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
+begin
+  {$ifdef USE_FLRE}
+  result := TValue(pointer(inherited GetValue(key)));
+  {$else}
+  if not inherited GetValue(key, result) then result := default(TValue);
+  {$endif}
+end;
+
+procedure TXQHashmapStr.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
+begin
+  {$ifdef USE_FLRE}
+  inherited SetValue(key, TFLRECacheHashMapData(pointer(AValue)) );
+  {$else}
+  insert(key, AValue);
+  {$endif}
+end;
+
+procedure TXQHashmapStr.Add(const Key: TXQHashKeyString; const AValue: TValue);
+begin
+  {$ifdef USE_FLRE}
+  inherited Add(key, TFLRECacheHashMapData(pointer(AValue)));
+  {$else}
+  insert(key, AValue);
+  {$endif}
+end;
+
+procedure TXQHashmapStrOwning.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
+var
+  old: TValue;
+begin
+  old := GetValue(key);
+  if old = AValue then exit;
+  if old <> nil then owner.remove(old);
+  add(key, Avalue);
+end;
+
+constructor TXQHashmapStrOwning.create;
+begin
+  inherited;
+  owner := TOwningList.create;
+end;
+
+destructor TXQHashmapStrOwning.destroy;
+begin
+  owner.free;
+  inherited destroy;
+end;
+
+procedure TXQHashmapStrOwning.Add(const Key: TXQHashKeyString; const Value: TValue);
+begin
+  owner.add(value);
+  inherited add(key, value);
+end;
 
 constructor THTMLOmittedEndTagInfo.create(somesiblings, someparents: array of string);
 var
@@ -559,8 +660,8 @@ end;
 
 function TTreeAttribute.toNamespace: INamespace;
 begin
-  if namespace = nil then result := TNamespace.Create(realvalue, '') //TODO: reuse
-  else result := TNamespace.Create(realvalue, value);
+  if namespace = nil then result := TNamespace.Make(realvalue, '') //TODO: reuse
+  else result := TNamespace.Make(realvalue, value);
 end;
 
 constructor TTreeAttribute.create(const aname, avalue: string; const anamespace: INamespace = nil);
@@ -774,12 +875,74 @@ begin
     result.Add(items[i]);
 end;
 
-{ TNamespace }
+type TNamespaceCache = class
+  uniqueUrl: string;
+  prefixes: TXQHashmapStrOwningInterface;
+  constructor Create;
+  destructor Destroy; override;
+end;
+
+constructor TNamespaceCache.Create;
+begin
+  prefixes := TXQHashmapStrOwningInterface.Create;
+end;
+
+destructor TNamespaceCache.Destroy;
+begin
+  prefixes.free;
+  inherited Destroy;
+end;
+
+threadvar globalNamespaceCache: TXQHashmapStrOwningObject;
+
+function TNamespace.getSelf: TNamespace;
+begin
+  result := self;
+end;
+
+function TNamespace.equal(const ns: string): boolean;
+begin
+  result := url = ns;
+end;
 
 constructor TNamespace.create(const aurl: string; aprefix: string);
 begin
   url := aurl;
   prefix := aprefix;
+end;
+
+function namespaceCache(const aurl: string): TNamespaceCache;
+begin
+  if globalNamespaceCache = nil then globalNamespaceCache := TXQHashmapStrOwningObject.Create();
+  result := TNamespaceCache(globalNamespaceCache[aurl]);
+  if result = nil then begin
+    result := TNamespaceCache.Create;
+    result.uniqueUrl := aurl;
+    globalNamespaceCache.Add(aurl, result);
+    //writeln(strFromPtr(pointer(aurl)), ' ',aurl);
+  end;
+end;
+
+class function TNamespace.make(const aurl: string; const aprefix: string): TNamespace;
+var cache : TNamespaceCache;
+  tempptr: Pointer;
+begin
+  cache := namespaceCache(aurl);
+  tempptr := pointer(cache.prefixes[aprefix]);
+  if tempptr = nil then begin
+    result := TNamespace.create(cache.uniqueUrl, aprefix);
+    cache.prefixes.Add(aprefix, result);
+  end else result := (IUnknown(tempptr) as INamespace).getSelf;
+end;
+
+class function TNamespace.uniqueUrl(const aurl: string): string;
+begin
+  result := namespaceCache(aurl).uniqueUrl;
+end;
+
+class procedure TNamespace.freeCache;
+begin
+  FreeAndNil(globalNamespaceCache);
 end;
 
 function TNamespace.getPrefix: string;
@@ -1464,7 +1627,7 @@ var known: TNamespaceList;
         if namespace <> nil then result += requireNamespace(namespace)
         else if known.hasNamespacePrefix('', temp) then
           if temp.getURL <> '' then begin
-            known.add(tNamespace.create('', ''));
+            known.add(TNamespace.Make('', ''));
             result += ' xmlns=""';
           end;
         if attributes <> nil then
@@ -2306,8 +2469,13 @@ end;
 procedure TTreeParser.pushNamespace(const url, prefix: string);
 var
   ns: INamespace;
+  nsurl: string;
 begin
-  ns := TNamespace.Create(url, prefix);
+  nsurl := strChangeEncoding(url, FXmlHeaderEncoding, FTargetEncoding);
+  nsurl := strDecodeHTMLEntities(nsurl, FTargetEncoding, false);
+  nsurl := xmlStrWhitespaceCollapse(nsurl);
+
+  ns := TNamespace.Make(nsurl, prefix);
   FCurrentNamespaces.Add(ns);
   FCurrentNamespaceDefinitions.Add(FCurrentElement);
   FCurrentAndPreviousNamespaces.Add(ns);
@@ -2564,12 +2732,6 @@ begin
   FTrees.Add(FCurrentTree);
   result := FCurrentTree;
   if FTargetEncoding <> CP_NONE then begin
-    for i := 0 to FCurrentAndPreviousNamespaces.Count - 1 do
-      with FCurrentAndPreviousNamespaces.Get(i) as TNamespace do begin
-        url := strChangeEncoding(url, FCurrentTree.FEncoding, FTargetEncoding);
-        url := strDecodeHTMLEntities(url, FTargetEncoding, false);
-        url := xmlStrWhitespaceCollapse(url);
-      end;
     FCurrentTree.setEncoding(FTargetEncoding, true, true);
   end else begin
      el := FCurrentTree.next;
@@ -2780,8 +2942,8 @@ end;
 
 
 initialization
-  XMLNamespace_XML := TNamespace.Create(XMLNamespaceUrl_XML, 'xml');
-  XMLNamespace_XMLNS := TNamespace.Create(XMLNamespaceUrl_XMLNS, 'xmlns');
+  XMLNamespace_XML := TNamespace.Make(XMLNamespaceUrl_XML, 'xml');
+  XMLNamespace_XMLNS := TNamespace.Make(XMLNamespaceUrl_XMLNS, 'xmlns');
 
   omittedEndTags:=THTMLOmittedEndTags.Create;
   omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['li'], ['ol', 'ul', 'menu' {only if @type in toolbar state}]));

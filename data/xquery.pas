@@ -1601,6 +1601,7 @@ type
     function castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
     function instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
     function instanceOf(const ta: IXQValue): boolean;
+    function instanceOf(const node: TTreeNode): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
   private
     function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
@@ -3450,17 +3451,17 @@ begin
   rawMessageLength := length(amessage);
   if strBeginsWith(aerrcode, 'pxp:') then begin
     delete(aerrcode, 1, 4);
-    namespace := TNamespace.create(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
+    namespace := TNamespace.make(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
   end else if strBeginsWith(aerrcode, 'x:') then begin
     delete(aerrcode, 1, 4);
-    namespace := TNamespace.create(XMLNamespaceURL_MyExtensionsNew, 'x');
+    namespace := TNamespace.make(XMLNamespaceURL_MyExtensionsNew, 'x');
   end else if strBeginsWith(aerrcode, 'err:') then begin
     delete(aerrcode, 1, 4);
-    namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err');
+    namespace := TNamespace.make(XMLNamespaceURL_XQTErrors, 'err');
   end else if strBeginsWith(aerrcode, 'jerr:') then begin
     delete(aerrcode, 1, 5);
-    namespace := TNamespace.create('http://jsoniq.org/errors', 'jerr');
-  end else if anamespace = nil then namespace := TNamespace.create(XMLNamespaceURL_XQTErrors, 'err')
+    namespace := TNamespace.make('http://jsoniq.org/errors', 'jerr');
+  end else if anamespace = nil then namespace := TNamespace.make(XMLNamespaceURL_XQTErrors, 'err')
   else namespace := anamespace;
   errorCode:=aerrcode;
   inherited create(messagePrefix + amessage);
@@ -3526,7 +3527,7 @@ function namespaceReverseLookup(const url: string): INamespace;
 begin
   if url = XMLNamespaceURL_XPathFunctions then result := XMLNamespace_XPathFunctions
   else if url = XMLNamespaceURL_MyExtensionsNew then result := XMLNamespace_MyExtensionsNew
-  else result := TNamespace.create(url, 'prefix');
+  else result := TNamespace.make(url, 'prefix');
 end;
 
 {$HINTS OFF}
@@ -6698,7 +6699,10 @@ begin
   //We need to call freeCommonCaches on every thread.
   //We cannot know when the thread ends, so we do it with the last engine on the thread
   dec(runningEngines);
-  if runningEngines = 0 then freeCommonCaches;
+  if runningEngines = 0 then begin
+   freeCommonCaches;
+   TNamespace.freeCache;
+  end;
   if FCreationThread <> GetThreadID then //otherwise the runningEngines counter above would fail
     raise EXQException.create('pxp:INTERNAL', 'A TXQueryEngine must be destroyed in the thread that created it');
   inherited Destroy;
@@ -7820,26 +7824,30 @@ end;
 {$ImplicitExceptions off}
 class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
 begin
-  if not (node.typ in nodeCondition.searchedTypes) then exit(false); //I tried to move this to findNextNode, but then it fails //text() because it needs to continue through non-text nodes to find one. and sequencetype needs it, too
+  result := false;
+  if not (node.typ in nodeCondition.searchedTypes) then exit(); //I tried to move this to findNextNode, but then it fails //text() because it needs to continue through non-text nodes to find one. and sequencetype needs it, too
   if not (xqpncCheckOnSingleChild in nodeCondition.options) then begin
-    if ((xqpncCheckValue in nodeCondition.options ) and ((node.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.getValue())))
-       or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.getNamespaceURL())) then
-         exit(false);
   end else begin
-    if node.next = node.reverse then exit(false); //no child
-    if node.next.getNextSibling() <> nil then exit(false); //too many children
-    if (node.next.typ <> tetOpen)
-       or ((xqpncCheckValue in nodeCondition.options ) and ((node.next.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.next.getValue())))
-       or ((xqpncCheckNamespace in nodeCondition.options ) and not nodeCondition.equalFunction(nodeCondition.requiredNamespaceURL, node.next.getNamespaceURL())) then
-         exit(false);
+    if node.next = node.reverse then exit(); //no child
+    if node.next.getNextSibling() <> nil then exit(); //too many children
+    if (node.next.typ <> tetOpen) then exit;
+    node := node.next //todo: does this affect requiredtype??
   end;
-  if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(xqvalue(node))) then begin
+  if ((xqpncCheckValue in nodeCondition.options )
+      and ((node.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.value))) then
+    exit(false);
+  if xqpncCheckNamespace in nodeCondition.options  then
+    if node.namespace = nil then begin
+      if nodeCondition.requiredNamespaceURL <> '' then exit(); //do not call getNamespaceURL, because returning strings is slow
+    end else
+      if node.namespace.equal(nodeCondition.requiredNamespaceURL) then exit();
+  if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(node)) then begin
     if nodeCondition.requiredType.isSingleType() then
       case node.typ of
         tetOpen: exit(baseSchema.untyped.derivedFrom(nodeCondition.requiredType.atomicTypeInfo));
         else exit(baseSchema.untypedAtomic.derivedFrom(nodeCondition.requiredType.atomicTypeInfo));
       end;
-    exit(false);
+    exit();
   end;
   result := true;
 end;
@@ -8394,14 +8402,14 @@ globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 globalTypeParsingContext.options.AllowJSON:=true;
 //namespaces
 GlobalStaticNamespaces:=TNamespaceList.Create;
-XMLNamespace_XPathFunctions:=TNamespace.create(XMLNamespaceURL_XPathFunctions, 'fn');
-XMLNamespace_XMLSchema:=TNamespace.create(XMLNamespaceURL_XMLSchema, 'xs');
-XMLNamespace_XMLSchemaInstance:=TNamespace.create(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
-XMLNamespace_XQueryLocalFunctions:=TNamespace.create(XMLNamespaceURL_XQueryLocalFunctions, 'local');
-XMLNamespace_MyExtensionsMerged:=TNamespace.create(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
-XMLNamespace_MyExtensionsNew:=TNamespace.create(XMLNamespaceURL_MyExtensionsNew, 'x');
-XMLNamespace_MyExtensionOperators:=TNamespace.create(XMLNamespaceURL_MyExtensionOperators, 'op');
-XMLNamespace_XQuery := TNamespace.create(XMLNamespaceURL_XQuery, '');
+XMLNamespace_XPathFunctions:=TNamespace.make(XMLNamespaceURL_XPathFunctions, 'fn');
+XMLNamespace_XMLSchema:=TNamespace.make(XMLNamespaceURL_XMLSchema, 'xs');
+XMLNamespace_XMLSchemaInstance:=TNamespace.make(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
+XMLNamespace_XQueryLocalFunctions:=TNamespace.make(XMLNamespaceURL_XQueryLocalFunctions, 'local');
+XMLNamespace_MyExtensionsMerged:=TNamespace.make(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
+XMLNamespace_MyExtensionsNew:=TNamespace.make(XMLNamespaceURL_MyExtensionsNew, 'x');
+XMLNamespace_MyExtensionOperators:=TNamespace.make(XMLNamespaceURL_MyExtensionOperators, 'op');
+XMLNamespace_XQuery := TNamespace.make(XMLNamespaceURL_XQuery, '');
 
 
 TXQueryEngine.registerCollation(TXQCollationCodepointInsensitiveClever.Create('case-insensitive-clever')); //first is default

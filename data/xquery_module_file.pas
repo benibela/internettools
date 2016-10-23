@@ -972,7 +972,7 @@ end;
 
 
 initialization
-  XMLNamespace_Expath_File := TNamespace.create('http://expath.org/ns/file', 'file');
+  XMLNamespace_Expath_File := TNamespace.make('http://expath.org/ns/file', 'file');
 
 finalization
   module.free;
