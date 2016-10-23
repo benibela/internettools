@@ -902,7 +902,7 @@ end;
 
 function TNamespace.equal(const ns: string): boolean;
 begin
-  result := url = ns;
+  result := strEqual(url, ns);
 end;
 
 constructor TNamespace.create(const aurl: string; aprefix: string);
@@ -2871,12 +2871,12 @@ end;
 
 function equalNamespaces(const ans, bns: INamespace): boolean;
 begin
-  result := (ans = bns) or ((ans <> nil) and (bns <> nil) and (ans.getURL = bns.getURL));
+  result := (ans = bns) or ((ans <> nil) and (bns <> nil) and strEqual(ans.getURL, bns.getURL));
 end;
 
 function equalNamespaces(const ans, bns: string): boolean;
 begin
-  result := ans = bns;
+  result := strEqual(ans, bns);
 end;
 
 function namespaceGetURL(const n: INamespace): string;

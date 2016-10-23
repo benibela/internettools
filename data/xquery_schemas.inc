@@ -513,9 +513,9 @@ var
 begin
   result := xsceFORG0001;
   pure := subType in  [xsstInteger, xsstDecimal];
-  if ((v = 'NaN') or (v = 'INF') or (v = '-INF') or (v = '+INF')) then begin
+  if ((length(v) = 3) and (v[1] in ['N','I'])) or ((length(v) = 4) and (v[3] = 'N')) then begin
     if pure then exit(xsceFORG0001);
-    if (v = '+INF') and (baseSchema.version = xsd10) then exit;
+    if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
     if outv <> nil then
       case v of
         'NaN':  outv^ := TXQValueFloat.create(self, getNaN);

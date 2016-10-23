@@ -1315,6 +1315,7 @@ type
     procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addOrdered(const node: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure add(node: TTreeNode);
     procedure add(list: TXQVList);
     procedure addOrdered(list: TXQVList);
   end;
@@ -5795,6 +5796,15 @@ begin
   end;
 end;
 
+procedure TXQVList.add(node: TTreeNode);
+begin
+  if fcount = fcapacity then
+    reserve(fcount + 1);
+  PPointer(fbuffer)[fcount] := IXQValue(TXQValueNode.create(node)); //the cast on the left side avoids the fpc_assign call and implicit ref counting; the cast on the right side ensures we get the correct pointer without a temporary variable.
+  IXQValue(PPointer(fbuffer)[fcount])._AddRef;
+  fcount += 1;
+end;
+
 procedure TXQVList.add(list: TXQVList);
 var
   i: Integer;
@@ -6452,7 +6462,7 @@ function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQVal
 begin
   result := top(i);
   {$ifdef TRACK_STACK_VARIABLE_NAMES}
-  if (debugNames[count - i - 1] <> name.value)
+  if not strEqual(debugNames[count - i - 1], name.value)
   //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
      then fail;
 
@@ -7596,7 +7606,7 @@ begin
                 and ((namespaceMatching = xqnmNone) or ( attrib.getNamespaceURL() = cachedNamespaceURL))
                 and not attrib.isNamespaceNode
                 then
-                  newList.add(xqvalue(attrib));
+                  newList.add(attrib);
           end;
         end else begin
           tempKind := n^.kind;
@@ -7616,7 +7626,7 @@ begin
                 if (namespaceMatching <> xqnmPrefix)
                    or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
                    or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
-                newList.add(xqvalue(newnode));
+                newList.add(newnode);
                 newnode := getNextQueriedNode(newnode, nodeCondition);
               end;
               if command.typ = qcPrecedingSibling then
