@@ -1151,6 +1151,9 @@ begin
   put('spec', 'XQ31+', false);
   put('spec', 'XQ31+ XP31+', false);
   put('spec', 'XP31+ XQ31+', false);
+  put('spec', 'XQ31 XP31', false);
+  put('spec', 'XP31 XQ31', false);
+  put('spec', 'XP31+ XQ31', false);
 
   put('spec', 'XT30+ XP31+ XQ31+', false);
   put('spec', 'XP31+ XQ31+ XT30+', false);
@@ -1180,6 +1183,7 @@ begin
   put('feature', 'fn-transform-XSLT30', false);
   put('feature', 'simple-uca-fallback', false);
   put('feature', 'olson-timezone', false);
+  put('feature', 'arbitraryPrecisionDecimal', true);
 
   put('unicode-normalization-form', 'NFD', true);
   put('unicode-normalization-form', 'NFKD', true);
@@ -1189,6 +1193,7 @@ begin
   put('unicode-version', '5.2', false);
   put('unicode-version', '6.0', false);
   put('unicode-version', '6.2', false);
+  put('unicode-version', '7.0', false);
 
   put('xml-version', '1.0', false);
   put('xml-version', '1.0:4-', false);
