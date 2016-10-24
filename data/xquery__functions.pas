@@ -4324,7 +4324,6 @@ begin
   result := charUnicodeZero(strDecodeUTF8Character(picture, temp)) > 0;
 end;
 
-
 function formatUnicodeInteger(arabic, primaryFormat: string; family: integer): string;
   var
     cp: Integer;
@@ -4748,7 +4747,7 @@ begin
               if minwidth > maxwidth then
                 raiseInvalidPictureFOFD1340('min > max');
 
-              if minwidth > 1 then begin
+              if (minwidth > 1) and (component <> 'f') then begin
                 tempcount := countDigits(format, @zerocp);
                 tempcountopt := strCount(format, '#');
                 if (tempcount + tempcountopt > 0) and (tempcount +tempcountopt < minwidth) then begin //actually presentation format
@@ -4757,12 +4756,16 @@ begin
                 end;
               end;
             end;
-          end else if pictured[picturedlength].format <> '' then begin
-            with pictured[picturedlength] do begin
-              minwidth := countDigits(format);
-              if minwidth > 0 then maxwidth:=minwidth + strCount(format, '#');
-            end;
-          end;
+          end else
+            with pictured[picturedlength] do
+              if (format <> '')  then begin
+                tempcount := countDigits(format);
+                if (tempcount >= 2) or (component <> 'f') then begin
+                  minwidth := tempcount;
+                  if minwidth > 0 then maxwidth:=minwidth + strCount(format, '#');
+                end;
+              end;
+
           if length(pictured[picturedlength].format) > 1 then begin
             if pictured[picturedlength].format[length(pictured[picturedlength].format)] in ['c','o','a','t'] then begin
               pictured[picturedlength].modifier := pictured[picturedlength].format[length(pictured[picturedlength].format)];
@@ -4832,16 +4835,36 @@ begin
         'f': begin
           //canonical microseconds e.g. 123456 , 050000 , 000001
           number := dateTime^.microsecs;
-          //round to max width
+          //picture trumps width
+          tempcount := countDigits(format, @zerocp);
+          if tempcount > pictured[i].minwidth then begin
+            pictured[i].minwidth := tempcount;
+            if tempcount > pictured[i].maxwidth then pictured[i].maxwidth := tempcount;
+          end;
+          //truncate to max width
           if pictured[i].maxwidth > 6 then pictured[i].maxwidth := 6
           else if pictured[i].maxwidth < 6 then
-             number := (number + powersOf10[6 - pictured[i].maxwidth] div 2) div powersOf10[6 - pictured[i].maxwidth];
+             number := (number {+ powersOf10[6 - pictured[i].maxwidth] div 2 xq3.1 says no rounding}) div powersOf10[6 - pictured[i].maxwidth];
           //cut off trailing zeros
           while (pictured[i].minwidth < pictured[i].maxwidth) and (number mod 10 = 0) do begin
             number := number div 10;
             pictured[i].maxwidth -= 1;
           end;
           pictured[i].minwidth := pictured[i].maxwidth;
+          //cut off trailing # in format
+          format := '';
+          tempcount := 0;
+          for j in strIterator(pictured[i].format) do begin
+            if j = ord('#') then begin
+              if tempcount = 0 then raiseInvalidPictureFOFD1340(pictured[i].format);
+              format += strGetUnicodeCharacter(zerocp);
+              inc(tempcount);
+            end else begin
+              format += strGetUnicodeCharacter(j);
+              if (j >= zerocp) and (j < zerocp + 10) then inc(tempcount);
+            end;
+            if tempcount >= pictured[i].minwidth then break;
+          end;
          end;
         'Z', 'z': begin
           if format = 'N' then format := '01:01';
