@@ -52,6 +52,8 @@ exception statement from your version.
 unit bbutils_template;
 {%END-REPEAT}
 
+{$define allowyearzero} //there is no year zero in the BC/AD calendar. But there is in ISO 8601:2004. Although this unit uses the Julian calendar, so it is wrong before years 1582 (Gregorian calendar) anyways
+
 {$DEFINE HASISNAN}
 
 {$IFDEF FPC}
@@ -4443,8 +4445,9 @@ function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
 var leap: boolean;
     century, yearincent: int64;
 begin
+  {$ifdef ALLOWYEARZERO} if year <= 0 then dec(year);{$endif}
   leap := dateIsLeapYear(year);
-  result := (year <> 0) and //jumps from -1 to 1
+  result := (year <> 0) and
             (month >= 1) and (month <= 12) and (day >= 1) and (day<=MonthDays[leap,month]);
   if not result then exit;
   dt := - DateDelta; // -693594
@@ -4486,6 +4489,7 @@ begin
     datei := -DateDelta - datei + 1;
     DecodeDate(datei, PWord(year)^, PWord(month)^, PWord(day)^);
     year^ := -year^;
+    {$ifdef ALLOWYEARZERO}inc(year^);{$endif}
     //year is correct, but days are inverted
     leap := dateIsLeapYear(year^);
     datei := datei +   DateMonthDaysCumSum[leap, 12] + 1 - 2 * (DateMonthDaysCumSum[leap,month^-1] + day^);

@@ -612,7 +612,7 @@ var ar8: array[0..100] of shortint;
     ai32: TLongintArray;
     sa: TStringArray;
     j: Integer;
-    y,m,d: integer;
+    y,m,d, allowYearZeroOffset: integer;
     ms: double;
     tz: TDateTime;
     order: TBinarySearchChoosen;
@@ -713,13 +713,14 @@ begin
 
   test(dateEncode(1,1,1), EncodeDate(1,1,1));
   test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
-  test(dateEncode(-1,12,31), EncodeDate(1,1,1)-1,'a');
-  test(dateEncode(-1,1,1), EncodeDate(1,1,1)-365,'b');
-  test(dateEncode(-2,1,1), EncodeDate(1,1,1)-2*365,'c');
-  test(dateEncode(-3,1,1), EncodeDate(1,1,1)-3*365,'d');
-  test(dateEncode(-4,3,1), EncodeDate(1,3,1)-4*365,'e');//pre leap
-  test(dateEncode(-4,1,1), EncodeDate(1,1,1)-4*365-1,'f');//leap
-  test(dateEncode(-5,1,1), EncodeDate(1,1,1)-5*365-1,'g');
+  allowYearZeroOffset := 1; //0 if not allowed
+  test(dateEncode(-1+allowYearZeroOffset,12,31), EncodeDate(1,1,1)-1,'a');
+  test(dateEncode(-1+allowYearZeroOffset,1,1), EncodeDate(1,1,1)-365,'b');
+  test(dateEncode(-2+allowYearZeroOffset,1,1), EncodeDate(1,1,1)-2*365,'c');
+  test(dateEncode(-3+allowYearZeroOffset,1,1), EncodeDate(1,1,1)-3*365,'d');
+  test(dateEncode(-4+allowYearZeroOffset,3,1), EncodeDate(1,3,1)-4*365,'e');//pre leap
+  test(dateEncode(-4+allowYearZeroOffset,1,1), EncodeDate(1,1,1)-4*365-1,'f');//leap
+  test(dateEncode(-5+allowYearZeroOffset,1,1), EncodeDate(1,1,1)-5*365-1,'g');
  { for i:=1 to 2100 do begin
     test(dateEncode(i,1,1), EncodeDate(i,1,1));
     test(dateEncode(i,2,1), EncodeDate(i,2,1));
