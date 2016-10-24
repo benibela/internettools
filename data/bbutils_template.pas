@@ -408,6 +408,8 @@ function strSplit(s:RawByteString;sep:RawByteString=',';includeEmpty:boolean=tru
 function strWrapSplit(const Line: RawByteString; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
 function strWrap(Line: RawByteString; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): RawByteString;
 
+function strReverse(s: string): string; //**< reverses a string. Assumes the encoding is utf-8
+
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
 //the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
 //If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
@@ -1911,6 +1913,26 @@ end;
 function strWrap(Line: RawByteString; MaxCol: Integer; const BreakChars: TCharSet): RawByteString;
 begin
   result := strJoin(strWrapSplit(line, MaxCol, BreakChars), LineEnding);
+end;
+
+function strReverse(s: string): string;
+var
+  oldlen, charlen: Integer;
+  len: sizeint;
+  p: PChar;
+  q: Pchar;
+begin
+  p := pointer(s);
+  len := length(s);
+  SetLength(result, len);
+  q := pointer(result) + len;
+  while len > 0 do begin
+    oldlen := len;
+    strDecodeUTF8Character(p, len);
+    charlen := oldlen - len;
+    q := q - charlen;
+    move((p-charlen)^, q^, charlen);
+  end;
 end;
 
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
