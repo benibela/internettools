@@ -102,7 +102,7 @@ var tempb: Boolean;
   func: String;
   untypedAtomic: String;
   xqv,xqw: IXQValue;
-  randomboundary: String;
+  randomboundary, bce1, bce2: String;
   iterator, iterator2: TXQValueEnumeratorPtrUnsafe;
 begin
   testid := 0;
@@ -2855,13 +2855,20 @@ begin
   t('op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))', 'P337D', '');
   t('(op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))) + dayTimeDuration("P1D")', 'P338D', '');
   t('dayTimeDuration("P1D") + (op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28")))', 'P338D', '');
-  t('xs:date("0001-01-01") - xs:date("-0001-12-31")', 'P1D', '');
-  t('xs:date("0001-01-01") + xs:dayTimeDuration("-P1D")', '-0001-12-31', '');
-  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P1M")', '-0001-12-01', '');
-  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P3M")', '-0001-10-01', '');
-  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P12M")', '-0001-01-01', '');
-  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P13M")', '-0002-12-01', '');
-  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P16M")', '-0002-09-01', '');
+  if baseSchema.version = xsd11 then begin
+    bce1 := '0000';
+    bce2 := '-0001';
+  end else begin
+    bce1 := '-0001';
+    bce2 := '-0002';
+  end;
+  t('xs:date("0001-01-01") - xs:date("'+bce1+'-12-31")', 'P1D', '');
+  t('xs:date("0001-01-01") + xs:dayTimeDuration("-P1D")', bce1+'-12-31', '');
+  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P1M")', bce1+'-12-01', '');
+  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P3M")', bce1+'-10-01', '');
+  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P12M")', bce1+'-01-01', '');
+  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P13M")', bce2+'-12-01', '');
+  t('xs:date("0001-01-01") + xs:yearMonthDuration("-P16M")', bce2+'-09-01', '');
   t('years-from-duration(xs:yearMonthDuration("-P16M"))', '-1', '');
   t('fn:seconds-from-duration(xs:dayTimeDuration("P3DT10H12.5S"))', '12.5', '');
   t('fn:seconds-from-duration(xs:dayTimeDuration("-PT256S"))', '-16', '');
@@ -3508,6 +3515,7 @@ begin
   t('xs:float(-1.2) = xs:double("INF")', 'false');
   t('xs:float(-1.2) >= xs:double("INF")', 'false');
   t('xs:float(-1.2) > xs:double("INF")', 'false');
+  t('123 < xs:untypedAtomic("       INF      ")', 'true');
   t('xs:float("INF") eq xs:double("INF")', 'true');
   t('xs:float("INF") eq xs:double("-INF")', 'false');
   t('xs:float("-INF") eq xs:double("INF")', 'false');

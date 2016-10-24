@@ -8493,7 +8493,7 @@ baseSchema.hide('numeric');
 
 
 
-InitCriticalSection(interpretedFunctionSynchronization)
+InitCriticalSection(interpretedFunctionSynchronization);
 finalization
 freeThreadVars;
 DoneCriticalsection(interpretedFunctionSynchronization);

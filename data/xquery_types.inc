@@ -1347,6 +1347,7 @@ begin
     setMonths(E, 25 - E.month, false);             //the first month B.C. is also "13" ( like 01.01|12.-0001)
     E.month:= 13 - E.month;                        //but now the months are running backwards, so invert from december <-> january
     E.year:=-E.year;
+    if baseSchema.version = xsd11 then inc(E.year);
   end;
 
   E.microsecs := S.microsecs + D.microsecs;
@@ -1366,7 +1367,7 @@ begin
       if e.month <= 0 then begin
         e.month:=12;
         e.year-=1;
-        if e.year = 0 then e.year -= 1;
+        if (e.year = 0) and (baseSchema.version = xsd10) then e.year -= 1;
       end;
       e.day := e.day + MonthDays[dateIsLeapYear(e.year), e.month];
     end else begin
