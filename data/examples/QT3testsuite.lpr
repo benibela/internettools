@@ -9,7 +9,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math,
-  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex,
+  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
   bbutils, math, rcmdline, internetaccess, mockinternetaccess;
   { you can add units after this }
 type
@@ -1607,6 +1607,9 @@ var e: TTreeNode;
     cat: TTreeDocument;
 begin
   cat := tree.parseTreeFromFile(fn);
+  if cat.getFirstChild().getAttribute('test-suite') = 'EXPATH' then begin
+    registerModuleFile;
+  end;
   basePath := strBeforeLast(cat.documentURI,'/');
   for v in xq.parseXPath2('/*:catalog/*:*').evaluate(cat) do begin
     e :=  v.toNode;
@@ -1820,6 +1823,8 @@ begin
 
   logger.loadCatalogue;
   loadCatalog('catalog.xml');
+
+
 
   logger.beginXQTS(testsets);
   for i := 0 to testsets.Count-1 do
