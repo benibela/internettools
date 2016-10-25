@@ -2803,6 +2803,7 @@ begin
         end;
         ':=': begin
           expect(':=');
+          if not options.AllowMutableVariables then raiseSyntaxError('Assignment not allowed');
           result := astroot;
           if result is TXQTermNodeMatcher then begin
             if qmCheckNamespaceURL in TXQTermNodeMatcher(astroot).queryCommand.matching then
@@ -3744,6 +3745,7 @@ begin
               'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI, 'XQST0038');
               'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
               'json': readBoolean(options.AllowJSON, temp);
+              'mutable-variables': readBoolean(options.AllowMutableVariables, temp);
               'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
                 case temp of
                   'on':  options.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
@@ -3870,6 +3872,7 @@ begin
         AllowJSON := false;
         AllowJSONLiterals:=false;
         StringEntities:=xqseDefault;
+        AllowMutableVariables := false;
       end;
       exit(true);
     end;
@@ -3896,6 +3899,7 @@ begin
         AllowJSON := AllowJSONDefaultInternal;
         AllowJSONLiterals:=AllowJSONDefaultInternal;
         StringEntities:=xqseDefault;
+        AllowMutableVariables := true;
       end;
     end;
     'jsoniq': begin
@@ -3916,6 +3920,7 @@ begin
         AllowJSON := true;
         AllowJSONLiterals:=true;
         StringEntities:=xqseDefault;
+        AllowMutableVariables := false;
       end;
     end;
     'default': ;

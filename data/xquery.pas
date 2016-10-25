@@ -2199,6 +2199,7 @@ type
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
     StringEntities: (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery); //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differently. This option lets you change the parsing behaviour.
     LineEndingNormalization: (xqlenNone, xqlenXML1, xqlenXML11); //**< If all line breaks (#$D or #$D,#$85,#$2028) should be replaced by #$A
+    AllowMutableVariables: boolean; //**< If $var := 123 without let should be allowed
   end;
 
 
@@ -6684,6 +6685,7 @@ begin
   ParsingOptions.AllowJSON:=AllowJSONDefaultInternal;
   ParsingOptions.AllowJSONLiterals:=true;
   ParsingOptions.LineEndingNormalization := xqlenXML1;
+  ParsingOptions.AllowMutableVariables := true;
   VariableChangelog := TXQVariableChangeLog.create();
   //OnEvaluateVariable := @VariableChangelog.evaluateVariable;
   //OnDefineVariable:= @VariableChangelog.defineVariable;
