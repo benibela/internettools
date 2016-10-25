@@ -389,13 +389,23 @@ begin
 end;
 
 function normalizePath(const path: IXQValue): string;
+var
+  i: Integer;
 begin
   result := path.toString;
   if strBeginsWith(result, 'file:///') then begin
     delete(result, 1, {$ifdef windows}8{$else}7{$endif});
+    result := urlHexDecode(result)
   end;
+  for i := 1 to length(result) do
+    if result[i] in AllowDirectorySeparators then result[i] := DirectorySeparator
 end;
 
+function suffixDirectoy(const s: string): string;
+begin
+  result := s;
+  if not strEndsWith(result, DirectorySeparator) and DirectoryExists(result) then result += DirectorySeparator;
+end;
 
 function FileExistsAsTrueFile(const Filename: string): boolean;
 begin
@@ -473,9 +483,11 @@ begin
       raiseFileError(errcode, 'Failed to open file for writing/appending', filename);
     end;
   end;
-  if offset >= 0 then f.Position := offset
-  else if append then f.position := f.size;
   try
+    if offset >= 0 then begin
+      f.Position := offset;
+      if offset > f.Size then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, filename);
+    end else if append then f.position := f.size;
     if length(data) > 0 then
       try
         f.WriteBuffer(data[1], length(data));
@@ -712,10 +724,15 @@ type TXQFileLister = class(TFileLister)
 end;
 
 procedure TXQFileLister.foundSomething(const dir, current: String; const search: TRawByteSearchRec);
+var
+  cur: String;
 begin
   inherited;
-  if (filter = nil) or wregexprMatches(filter, current) then
-    seq.add(xqvalue(current));
+  cur := current;
+  if ((faDirectory and search.Attr) <> 0) and not strEndsWith(cur, DirectorySeparator) then cur += DirectorySeparator;
+  if (filter = nil) or wregexprMatches(filter, current) then begin
+    seq.add(xqvalue(cur));
+  end;
 end;
 
 
@@ -856,7 +873,11 @@ var
 begin
   path := normalizePath(args[0]);
   lastSep := strlastIndexOf(path, AllowDirectorySeparators);
-  if lastSep <= 0 then path := ''
+  if lastsep = length(path) then begin
+    system.delete(path, length(path), 1);
+    lastSep := strlastIndexOf(path, AllowDirectorySeparators);
+  end;
+  if lastSep <= 0 then path := path
   else path := strCopyFrom(path, lastSep + 1);
   result := xqvalue(path);
 end;
@@ -867,7 +888,7 @@ var
   path: String;
 begin
   path := fileNameExpand(normalizePath(args[0]));
-  result := xqvalue(path);
+  result := xqvalue(suffixDirectoy(path));
 end;
 
 function parent(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -875,7 +896,8 @@ var
   path: String;
 begin
   path := strBeforeLast(resolve_path(context,argc, args).toString, AllowDirectorySeparators);
-  result := xqvalue(path);
+  if path = '' then exit(xqvalue);
+  result := xqvalue(suffixDirectoy(path));
 end;
 
 function children(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -887,15 +909,14 @@ function path_to_native(const context: TXQEvaluationContext; argc: SizeInt; args
 var
   dir: String;
 begin
-  dir := ResolveDots(fileNameExpand(normalizePath(args[0])));
-  if not strEndsWith(dir, DirectorySeparator) and DirectoryExists(dir) then dir += DirectorySeparator;
+  dir := suffixDirectoy(ResolveDots(fileNameExpand(normalizePath(args[0]))));
   if not FileExists(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
   result := xqvalue(dir);
 end;
 
 function path_to_uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := xqvalue(fileNameExpandToURI(normalizePath(args[0])));
+  result := xqvalue(urlHexEncode(fileNameExpandToURI(normalizePath(args[0])), URIForbiddenChars) );
 end;
 
 function dir_separator(argc: SizeInt; args: PIXQValue): IXQValue;

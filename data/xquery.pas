@@ -2922,6 +2922,7 @@ function strIterator(const s: RawByteString): TStrIterator;
 
 //**Escapes for an URL (internally used)
 function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
+const URIForbiddenChars = [#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`'];
 //**Checks the length of the args array (internally used)
 procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint = -2);
 procedure requiredArgType(const v: IXQValue; typ: TXSType);

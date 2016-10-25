@@ -2503,7 +2503,7 @@ end;
 
 function xqFunctionIri_To_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := xqvalue(urlHexEncode(args[0].toString, [#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`']));
+  result := xqvalue(urlHexEncode(args[0].toString, URIForbiddenChars));
 end;
 function xqFunctionEscape_Html_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
