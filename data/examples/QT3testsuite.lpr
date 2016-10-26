@@ -1609,6 +1609,7 @@ begin
   cat := tree.parseTreeFromFile(fn);
   if cat.getFirstChild().getAttribute('test-suite') = 'EXPATH' then begin
     registerModuleFile;
+    xq.ImplicitTimezoneInMinutes := GetLocalTimeOffset;
   end;
   basePath := strBeforeLast(cat.documentURI,'/');
   for v in xq.parseXPath2('/*:catalog/*:*').evaluate(cat) do begin

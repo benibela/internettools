@@ -34,6 +34,8 @@ uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math,
   {$ifdef unix},BaseUnix{$endif}
   {$ifdef windows},windows{$endif}
     ;
+function strFileName({normalized}path: string): string; forward;
+function myList(const path: IXQValue; relative, recurse: boolean; mask: string = '*'): IXQValue; forward;
 
 //////////////////////////////
 //copied from the LCL to reduce dependancies
@@ -414,28 +416,38 @@ end;
 
 function exists(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := xqvalue(FileExists(normalizePath(args[0])));
 end;
 
 function is_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := xqvalue(DirectoryExists(normalizePath(args[0])));
 end;
 
 function is_file(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := xqvalue(FileExistsAsTrueFile(args[0].toString));
 end;
 
 function last_modified(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  temp: LongInt;
   dateTime: TDateTime;
+  fn: String;
+  search: TRawByteSearchRec;
+  dt: TXQValueDateTime;
 begin
-  temp := FileAge(normalizePath(args[0]));
-  if temp < 0 then raiseFileError(ifthen(FileExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
-  dateTime := FileDateToDateTime(temp); //todo: time zone?
-  result := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
+  ignore(context);
+  fn := normalizePath(args[0]);
+  if FindFirst(fn, faAnyFile, search) <> 0 then
+    raiseFileError(ifthen(FileExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
+  dateTime := FileDateToDateTime(search.Time);
+  FindClose(search);
+  dt := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
+  dt.value.timezone:=GetLocalTimeOffset;;
+  result := dt;
 end;
 
 function size(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -444,6 +456,7 @@ var
   path: String;
   f: file of byte;
 begin
+  ignore(context);
   {$IOCHECKS ON}
   path := normalizePath(args[0]);
   if DirectoryExists(path) then exit(xqvalue(0));
@@ -531,39 +544,47 @@ end;
 
 function append(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendSerialized(argc, args, true);
 end;
 function append_Binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
 end;
 function append_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendText(argc, args, true, args[1].toString);
 end;
 function append_Text_Lines(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendText(argc, args, true, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
 function write(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendSerialized(argc, args, false);
 end;
 function write_Binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   offset: int64;
 begin
+  ignore(context);
   offset := -1;
   if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
   result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueString).toRawBinary, offset);
 end;
 function write_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendText(argc, args, false, args[1].toString);
 end;
 function write_Text_Lines(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := writeOrAppendText(argc, args, false, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
@@ -594,13 +615,15 @@ var
   source, dest: String;
   copier: TDirCopier;
 begin
+  ignore(context);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
   if source = dest then raiseFileError(Error_Io_Error, 'source = dest', args[0]);
   try
+    if DirectoryExists(dest) then dest := strAddPathSeparator(dest) + strFileName(source);
     if DirectoryExists(source) then begin
       if FileExists(dest) and not DirectoryExists(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
-      CreateDir(dest);
+      ForceDirectories(dest);
       copier := TDirCopier.Create;
       try
         copier.source := strAddPathSeparator(source);
@@ -621,11 +644,18 @@ end;
 
 function create_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  dir: String;
+  dir, code: String;
 begin
+  ignore(context);
   dir := normalizePath(args[0]);
-  if not ForceDirectories(dir) then
-    raiseFileError( IfThen(FileExistsAsTrueFile(dir), Error_Exists, Error_Io_Error), 'Failed to create directories', args[0] );
+  if not ForceDirectories(dir) then begin
+    code := Error_Io_Error;
+    repeat
+      if FileExistsAsTrueFile(dir) then begin code := Error_Exists; break; end;
+      dir := strBeforeLast(dir, DirectorySeparator);
+    until dir = '';
+    raiseFileError( code, 'Failed to create directories', args[0] );
+  end;
   result := xqvalue();
 end;
 
@@ -633,6 +663,7 @@ function create_temp_dir(const context: TXQEvaluationContext; argc: SizeInt; arg
 var
   dir: String;
 begin
+  ignore(context);
   if argc = 3 then begin
     dir := normalizePath(args[2]);
     if not DirectoryExists(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
@@ -647,6 +678,7 @@ function create_temp_file(const context: TXQEvaluationContext; argc: SizeInt; ar
 var
   dir: String;
 begin
+  ignore(context);
   if argc = 3 then begin
     dir := normalizePath(args[2]);
     if not DirectoryExists(dir) then raiseFileError(Error_NoDir, 'Invalid directory', args[2]);
@@ -695,6 +727,7 @@ var
   deleter: TDirDeleter;
   i: Integer;
 begin
+  ignore(context);
   path := normalizePath(args[0]);
   recursive := (argc = 2) and args[1].toBoolean;
   if not FileExists(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
@@ -713,7 +746,8 @@ begin
       deleter.free
     end;
   end
-  else  TDirDeleter.checkResult(RemoveDir(path), path);
+  else  if not RemoveDir(path) then
+    raiseFileError(ifthen(myList(args[0], false, false).getSequenceCount = 0, Error_Io_Error, Error_IsDir), 'Failed to delete ' + path);
   result := xqvalue();
 end;
 
@@ -779,6 +813,7 @@ function list(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValu
 var
   mask: String;
 begin
+  ignore(context);
   if argc >= 3 then mask := args[2].toString
   else mask := '*';
   result := myList(args[0], true, (argc >= 2) and args[1].toBoolean, mask)
@@ -789,9 +824,11 @@ var
   source: String;
   dest: String;
 begin
+  ignore(context);
   source := normalizePath(args[0]);
   dest := normalizePath(args[1]);
 
+  if DirectoryExists(dest) then dest := strAddPathSeparator(dest) + strFileName(source);
   if DirectoryExists(source) then begin
     if FileExists(dest) and not DirectoryExists(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
   end else if not FileExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
@@ -843,6 +880,7 @@ var
   len: int64;
   rangeErr: Boolean;
 begin
+  ignore(context);
   from := 0;
   len := -1;
   rangeErr := false;
@@ -857,21 +895,20 @@ var
   data: rawbytestring;
   enc: TSystemCodePage;
 begin
+  ignore(context);
   data := readFromFile(normalizePath(args[0]));
   if argc = 1 then result := xqvalue(data)
   else begin
     enc := strEncodingFromName(args[1].toString);
     if enc = CP_NONE then raiseFileError(error_unknown_encoding, error_unknown_encoding, args[1]);
-    result := xqvalue(strChangeEncoding(data,  enc, eUTF8));
+    result := xqvalue(strChangeEncoding(data,  enc, CP_UTF8));
   end;
 end;
 
-function name(argc: SizeInt; args: PIXQValue): IXQValue;
+function strFileName({normalized}path: string): string;
 var
-  path: String;
   lastSep: LongInt;
 begin
-  path := normalizePath(args[0]);
   lastSep := strlastIndexOf(path, AllowDirectorySeparators);
   if lastsep = length(path) then begin
     system.delete(path, length(path), 1);
@@ -879,7 +916,12 @@ begin
   end;
   if lastSep <= 0 then path := path
   else path := strCopyFrom(path, lastSep + 1);
-  result := xqvalue(path);
+  result := path;
+end;
+
+function name(argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  result := xqvalue(strFileName(normalizePath(args[0])));
 end;
 
 
@@ -887,6 +929,7 @@ function resolve_path(const context: TXQEvaluationContext; argc: SizeInt; args: 
 var
   path: String;
 begin
+  ignore(context);
   path := fileNameExpand(normalizePath(args[0]));
   result := xqvalue(suffixDirectoy(path));
 end;
@@ -895,6 +938,7 @@ function parent(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQVa
 var
   path: String;
 begin
+  ignore(context);
   path := strBeforeLast(resolve_path(context,argc, args).toString, AllowDirectorySeparators);
   if path = '' then exit(xqvalue);
   result := xqvalue(suffixDirectoy(path));
@@ -902,6 +946,7 @@ end;
 
 function children(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   Result := myList(args[0], false, false);
 end;
 
@@ -909,6 +954,7 @@ function path_to_native(const context: TXQEvaluationContext; argc: SizeInt; args
 var
   dir: String;
 begin
+  ignore(context);
   dir := suffixDirectoy(ResolveDots(fileNameExpand(normalizePath(args[0]))));
   if not FileExists(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
   result := xqvalue(dir);
@@ -916,6 +962,7 @@ end;
 
 function path_to_uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context);
   result := xqvalue(urlHexEncode(fileNameExpandToURI(normalizePath(args[0])), URIForbiddenChars) );
 end;
 
