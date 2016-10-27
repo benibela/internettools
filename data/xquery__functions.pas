@@ -1632,11 +1632,20 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+{$ImplicitExceptions off}
 function tryValueToInteger(const v: IXQValue; out outv: integer): boolean;
 var
   i64: Int64;
   f: xqfloat;
-  bd: BigDecimal;
+
+  function slowbd(): boolean;
+  var bd: BigDecimal;
+  begin
+    bd := v.toDecimal;
+    result := isLongint(bd);
+    if result then outv := BigDecimalToLongint(bd)
+  end;
+
 begin
   case v.kind of
     pvkInt64: begin
@@ -1650,13 +1659,10 @@ begin
       result := (f >= low(integer)) and (f <= high(Integer)) and (frac(f) = 0);
       if result then outv := trunc(f);
     end;
-    else begin
-      bd := v.toDecimal;
-      result := isLongint(bd);
-      if result then outv := BigDecimalToLongint(bd)
-    end;
+    else result := slowbd;
   end;
 end;
+{$ImplicitExceptions on}
 
 function isValidXMLCharacter(const codepoint: integer): boolean; inline;
 begin
@@ -1668,19 +1674,22 @@ begin
 end;
 
 function xqFunctionCodepoints_to_string({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var temp: string;
+var temp: TStrBuilder;
  v: PIXQValue;
  codepoint: integer;
  ok: Boolean;
 begin
-  temp := '';
-  for v in args[0].GetEnumeratorPtrUnsafe do begin
-    ok := tryValueToInteger(v^, codepoint);
-    if ok then ok := isValidXMLCharacter(codepoint);
-    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
-    temp += strGetUnicodeCharacter(v^.toInt64);
+  temp.init;
+  try
+    for v in args[0].GetEnumeratorPtrUnsafe do begin
+      ok := tryValueToInteger(v^, codepoint);
+      if ok then ok := isValidXMLCharacter(codepoint);
+      if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
+      temp.add(codepoint);
+    end;
+  finally
+    result := xqvalue(temp.final);
   end;
-  result := xqvalue(temp);
 end;
 
 function xqFunctionString_to_codepoints({%H-}argc: SizeInt; args: PIXQValue): IXQValue;

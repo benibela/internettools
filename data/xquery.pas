@@ -2920,6 +2920,15 @@ end;
  //** Str iterator for internal use. It will be moved to bbutils, once the interface has been decided upon
 function strIterator(const s: RawByteString): TStrIterator;
 
+type TStrBuilder = record
+  buffer: pointer;
+  len: sizeint;
+  procedure init;
+  function final: string;
+  procedure add(const s: string);
+  procedure add(const codepoint: integer);
+end;
+
 //**Escapes for an URL (internally used)
 function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
 const URIForbiddenChars = [#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`'];
@@ -3087,6 +3096,46 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+procedure TStrBuilder.init;
+var temp: string;
+begin
+  len := 0;
+  SetLength(temp, 100);
+  buffer := pointer(temp);
+  pointer(buffer) := nil;
+end;
+
+function TStrBuilder.final: string;
+begin
+  result := '';
+  pointer(result) := buffer;
+  buffer := nil;
+  if len <> Length(result) then setlength(result, len);
+end;
+
+procedure TStrBuilder.add(const s: string);
+var
+  newlen: sizeint;
+begin
+  newlen := len + length(s);
+  if newlen > length(string(buffer)) then
+    SetLength(string(buffer), max(2*length(string(buffer)), newlen));
+  move(pchar(s)^, (pchar(buffer) + len)^, length(s));
+  len := newlen;
+end;
+
+procedure TStrBuilder.add(const codepoint: integer);
+var
+  toadd, newlen: sizeint;
+begin
+  toadd := strGetUnicodeCharacterUTFLength(codepoint);
+  newlen := len + toadd;
+  if newlen > length(string(buffer)) then
+    SetLength(string(buffer), max(2*length(string(buffer)), newlen));
+  strGetUnicodeCharacterUTF(codepoint, pchar(buffer) + len);
+  len := newlen;
+end;
 
 function TXQTermContextItem.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
