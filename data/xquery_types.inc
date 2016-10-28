@@ -1542,11 +1542,16 @@ end;
 
 function TXQValueSequence.toJoinedString(const sep: string): string;
 var i: integer;
+    builder: TStrBuilder;
 begin
   if seq.count = 0 then exit('');
-  result := seq[0].toString;
-  for i := 1 to seq.count - 1 do
-    Result := Result + sep + seq[i].toString;
+  builder.init(@result);
+  builder.add(seq[0].toString);
+  for i := 1 to seq.count - 1 do begin
+    builder.add(sep);
+    builder.add(seq[i].toString);
+  end;
+  builder.final;
 end;
 
 function TXQValueSequence.toDateTime: TDateTime;

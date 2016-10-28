@@ -1675,21 +1675,20 @@ end;
 
 function xqFunctionCodepoints_to_string({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: TStrBuilder;
+  res: string;
  v: PIXQValue;
  codepoint: integer;
  ok: Boolean;
 begin
-  temp.init;
-  try
-    for v in args[0].GetEnumeratorPtrUnsafe do begin
-      ok := tryValueToInteger(v^, codepoint);
-      if ok then ok := isValidXMLCharacter(codepoint);
-      if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
-      temp.add(codepoint);
-    end;
-  finally
-    result := xqvalue(temp.final);
+  temp.init(@res);
+  for v in args[0].GetEnumeratorPtrUnsafe do begin
+    ok := tryValueToInteger(v^, codepoint);
+    if ok then ok := isValidXMLCharacter(codepoint);
+    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
+    temp.add(codepoint);
   end;
+  temp.final;
+  result := xqvalue(res);
 end;
 
 function xqFunctionString_to_codepoints({%H-}argc: SizeInt; args: PIXQValue): IXQValue;

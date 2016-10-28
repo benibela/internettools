@@ -1151,6 +1151,7 @@ type
     function tryCreateValue(const v: Int64; outv: PXQValue = nil): TXSCastingError; override; overload;
     function tryCreateValue(const v: xqfloat; outv: PXQValue = nil): TXSCastingError; override; overload;
     function tryCreateValue(const v: BigDecimal; outv: PXQValue = nil): TXSCastingError; override; overload;
+    function constraintsSatisfied(const v: int64): boolean;
     function constraintsSatisfied(const v: BigDecimal): boolean;
     constructor create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
     constructor create(const aname: string; aparent: TXSNumericType);
@@ -2921,10 +2922,10 @@ end;
 function strIterator(const s: RawByteString): TStrIterator;
 
 type TStrBuilder = record
-  buffer: pointer;
+  buffer: pstring;
   len: sizeint;
-  procedure init;
-  function final: string;
+  procedure init(abuffer:pstring);
+  procedure final;
   procedure add(const s: string);
   procedure add(const codepoint: integer);
 end;
@@ -3097,21 +3098,18 @@ var
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
-procedure TStrBuilder.init;
+procedure TStrBuilder.init(abuffer:pstring);
 var temp: string;
 begin
   len := 0;
-  SetLength(temp, 100);
-  buffer := pointer(temp);
-  pointer(buffer) := nil;
+  buffer := abuffer;
+  if buffer^ = '' then SetLength(buffer^, 100);
 end;
 
-function TStrBuilder.final: string;
+procedure TStrBuilder.final;
 begin
-  result := '';
-  pointer(result) := buffer;
-  buffer := nil;
-  if len <> Length(result) then setlength(result, len);
+  if len <> Length(buffer^) then
+    setlength(buffer^, len);
 end;
 
 procedure TStrBuilder.add(const s: string);
@@ -3119,9 +3117,9 @@ var
   newlen: sizeint;
 begin
   newlen := len + length(s);
-  if newlen > length(string(buffer)) then
-    SetLength(string(buffer), max(2*length(string(buffer)), newlen));
-  move(pchar(s)^, (pchar(buffer) + len)^, length(s));
+  if newlen > length(buffer^) then
+    SetLength(buffer^, max(2*length(buffer^), newlen));
+  move(pchar(s)^, (pointer(buffer^) + len)^, length(s));
   len := newlen;
 end;
 
@@ -3131,9 +3129,9 @@ var
 begin
   toadd := strGetUnicodeCharacterUTFLength(codepoint);
   newlen := len + toadd;
-  if newlen > length(string(buffer)) then
-    SetLength(string(buffer), max(2*length(string(buffer)), newlen));
-  strGetUnicodeCharacterUTF(codepoint, pchar(buffer) + len);
+  if newlen > length(buffer^) then
+    SetLength(buffer^, max(2*length(buffer^), newlen));
+  strGetUnicodeCharacterUTF(codepoint, pchar(pointer(buffer)^) + len);
   len := newlen;
 end;
 

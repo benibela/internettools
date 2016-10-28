@@ -278,20 +278,31 @@ begin
 end;
 
 function TXSType.createValue(const v: Int64): IXQValue;
+var err: TXSCastingError;
+  procedure fail;
+  begin
+    raiseXSCEError(err, IntToStr(v), name)
+  end;
+
 var temp: TXQValue;
-  err: TXSCastingError;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then raiseXSCEError(err, IntToStr(v), name);
+  if err <> xsceNoError then fail;
   result := temp;
 end;
 
 function TXSType.createValue(const v: xqfloat): IXQValue;
 var temp: TXQValue;
   err: TXSCastingError;
+
+procedure fail;
+begin
+  raiseXSCEError(err, FloatToStr(v), name);
+end;
+
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then raiseXSCEError(err, FloatToStr(v), name);
+  if err <> xsceNoError then fail;
   result := temp;
 end;
 
@@ -595,17 +606,36 @@ begin
     end;
 end;
 
+{$ImplicitExceptions off}
+function TXSNumericType.constraintsSatisfied(const v: int64): boolean;
+begin
+  result := constraintsSatisfied(BigDecimal(v));
+end;
+{$ImplicitExceptions on}
+
 function TXSNumericType.tryCreateValue(const v: xqfloat; outv: PXQValue): TXSCastingError;
+  function checkConstraints: boolean;
+  var
+    bd: BigDecimal;
+  begin
+    bd := FloatToBigDecimal(v);
+    result := constraintsSatisfied(bd);
+  end;
+
+  function tryWithBd(): TXSCastingError;
+  begin
+    result := tryCreateValue(FloatToBigDecimal(v), outv);
+  end;
+
 var
   sispure: Boolean;
-  bd: BigDecimal;
 begin
   result := xsceNoError;
   sispure := not IsNan(v) and not IsInfinite(v);
   case subType of
     xsstInteger, xsstDecimal: begin
       if not sispure then exit(xsceFOCA0002);
-      result := tryCreateValue(FloatToBigDecimal(v), outv);
+      result := tryWithBd
     end;
     xsstDouble, xsstFloat :  begin
       if not sispure then begin
@@ -618,8 +648,7 @@ begin
       end;
 
       if length(constrainingFacets) > 0 then begin
-        bd := FloatToBigDecimal(v);
-        if not constraintsSatisfied(bd) then exit(xsceFORG0001);
+        if not checkConstraints then exit(xsceFORG0001);
       end;
       if outv <> nil then
         case subType of
