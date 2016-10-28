@@ -3632,6 +3632,7 @@ var
   v: PIXQValue;
   i, stacksize: Integer;
   stack: TXQEvaluationStack;
+  seq: IXQValue;
 begin
   func := args[2] as TXQValueFunction;
   count := args[0].getSequenceCount;
@@ -3640,12 +3641,13 @@ begin
   stack := context.temporaryVariables;
   stacksize := stack.Count;
 
+  seq := args[0];
   stack.push(args[1]);
-  stack.push(args[1]);
+  stack.push(stack.top);
   func.contextOverrideParameterNames(context, 2);
   if left then begin
     //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
-    for v in args[0].GetEnumeratorPtrUnsafe do begin
+    for v in seq.GetEnumeratorPtrUnsafe do begin
       stack.topptr(0)^ := v^;
       stack.topptr(1)^ := func.evaluate(context, nil);
     end;
@@ -3653,7 +3655,7 @@ begin
   end else begin
     // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
     for i := count downto 1 do begin
-      stack.topptr(1)^ := args[0].get(i);
+      stack.topptr(1)^ := seq.get(i);
       stack.topptr(0)^ := func.evaluate(context, nil);
     end;
     result := stack.topptr(0)^;
@@ -3690,8 +3692,8 @@ begin
   stack := context.temporaryVariables;
   stacksize := stack.Count;
   count := min(seq1.getSequenceCount, seq2.getSequenceCount);
-  stack.push(args^);
-  stack.push(args^);
+  stack.push(args[0]);
+  stack.push(stack.top);
   func.contextOverrideParameterNames(context, 2);
   resseq := TXQValueSequence.create(count);
   for i := 1 to count do begin
