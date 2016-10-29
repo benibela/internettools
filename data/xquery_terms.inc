@@ -176,6 +176,23 @@ begin
     tr.children[i] := children[i].clone;
 end;
 
+var globalUnnamedVariable: TXQTermVariable;
+
+function TXQTermWithChildrenOnStack.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
+var
+  tempvar: TXQTermVariable;
+  i: Integer;
+begin
+  result := xqtvaContinue;
+  tempvar := globalUnnamedVariable;
+  for i := 0 to high(children) do begin
+    result := visitor.simpleTermVisit(@children[i], self);
+    case result of xqtvaAbort: exit; end;
+    visitor.declare(@tempvar);
+  end;
+  for i := high(children) downto 0 do
+    visitor.undeclare(@tempvar);
+end;
 
 { TXQTerm_Visitor }
 
@@ -998,31 +1015,36 @@ function TXQTermSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
   tempSeq: TXQValueSequence;
-  evilkids: TXQVArray;
-  targetLength: Integer;
+  targetLength, ccount, stacksize: Integer;
+  stack: TXQEvaluationStack;
+  evilkids: PIXQValue;
 begin
-  if length(children) = 0 then exit(xqvalue);
-  if length(children) = 1 then exit(children[0].evaluate(context));
-  SetLength(evilkids, length(children));
+  ccount := length(children);
+  if ccount = 0 then exit(xqvalue);
+  if ccount = 1 then exit(children[0].evaluate(context));
+  stack := context.temporaryVariables;
+  stacksize := stack.Count;
   targetLength := 0;
-  //precompute target length (at the cost of temporary higher memory usage and worse cache performance)
-  for i := 0 to high(children) do begin
-    evilkids[i] := children[i].evaluate(context);
-    targetLength += evilkids[i].getSequenceCount;
+  for i := 0 to ccount - 1 do begin
+    stack.push(children[i].evaluate(context));
+    targetLength += stack.topptr()^.getSequenceCount;
   end;
-  tempSeq := TXQValueSequence.create(targetLength);
-  try
-    for i := 0 to high(children) do
-      tempSeq.add(evilkids[i]);
-    result := tempSeq;
-    case tempseq.seq.count of
-      0: result := xqvalue;
-      1: result := result.get(1);//cannot use tempSeq.seq[0]; as result :=  tempSeq.seq[0]; becomes result.deref; result := tempSeq.seq[0]; result.addref; but deref deletes tempSeq
+  evilkids := stack.topptr(ccount - 1);
+  case targetLength of
+    0: result := xqvalue;
+    1: for i := 0 to ccount - 1 do
+      if not evilkids[i].isUndefined then begin
+        result := evilkids[i];
+        break;
+      end;
+    else begin
+      tempSeq := TXQValueSequence.create(targetLength);
+      result := tempSeq;
+      for i := 0 to ccount - 1 do
+        tempSeq.add(evilkids[i]);
     end;
-  except
-    tempSeq.free;
-    raise;
   end;
+  stack.popTo(stacksize);
 end;
 
 function TXQTermSequence.getContextDependencies: TXQContextDependencies;
@@ -2464,23 +2486,6 @@ begin
   stack.popTo(stacksize);
 end;
 
-var globalUnnamedVariable: TXQTermVariable;
-
-function TXQTermNamedFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
-var
-  tempvar: TXQTermVariable;
-  i: Integer;
-begin
-  result := xqtvaContinue;
-  tempvar := globalUnnamedVariable;
-  for i := 0 to high(children) do begin
-    result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
-    visitor.declare(@tempvar);
-  end;
-  for i := high(children) downto 0 do
-    visitor.undeclare(@tempvar);
-end;
 
 function TXQTermNamedFunction.getContextDependencies: TXQContextDependencies;
 
@@ -2792,21 +2797,26 @@ end;
 
 function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
 
-var evilkids: array[0..1] of IXQValue;
-  i: Integer;
+var
+  i, oldsize: Integer;
+  stack: TXQEvaluationStack;
+  evilkids: PIXQValue;
 begin
-  evilkids[0] := children[0].evaluate(context);
-  evilkids[1] := children[1].evaluate(context);
+  stack := context.temporaryVariables;
+  oldsize := stack.Count;
+  stack.push(children[0].evaluate(context));
+  stack.push(children[1].evaluate(context));
+  evilkids := stack.topptr(1);
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, 2, @evilkids[0]);
   if context.staticContext.strictTypeChecking  then begin
     if xqofCastUntypedToString in op.flags then begin
-      for i := 0 to high(evilkids) do
+      for i := 0 to 1 do
         case evilkids[i].kind of
           pvkNode: evilkids[i] := xqvalue(evilkids[i].toString);
           pvkString: if evilkids[i].instanceOf(baseSchema.untypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
         end;
     end else if xqofCastUntypedToDouble in op.flags then
-      for i := 0 to high(evilkids) do
+      for i := 0 to 1 do
         case evilkids[i].kind of
           pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
         end;
@@ -2814,6 +2824,7 @@ begin
   end;
   result := op.func(context, evilkids[0], evilkids[1]);
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
+  stack.popTo(oldsize);
 end;
 
 function TXQTermBinaryOp.debugTermToString: string;
@@ -3492,14 +3503,14 @@ var
   v: IXQValue;
   i, j: Integer;
   operand: IXQValue;
-  seq: TXQTermSequence;
+  seq: TXQTermWithChildren;
 begin
   v := children[0].evaluate(context);
   if v.getSequenceCount > 1 then raiseXPTY0004TypeError(v, 'singleton');
   v := xqvalueAtomize(v);
   for i:=1 to high(children) - 1 do begin
-    if not (children[i] is TXQTermSequence) then raiseEvaluationError('XPST0003', 'Invalid case clause');
-    seq := TXQTermSequence(children[i]);
+    if not (children[i] is TXQTermWithChildren) then raiseEvaluationError('XPST0003', 'Invalid case clause');
+    seq := TXQTermWithChildren(children[i]);
     for j := 0 to high(seq.children) - 1 do begin
       operand := xqvalueAtomize(seq.children[j].evaluate(context));
       if operand.getSequenceCount > 1 then raiseXPTY0004TypeError(operand, 'Sequences are not allowed as case operands in a switch statement');
@@ -4548,6 +4559,7 @@ begin
             break;
           end;
         if matches then begin
+          context.temporaryVariables.popTo(stackSize);
           context.temporaryVariables.push(infoVars[0], TXQValueQName.create(ns, nsprefix, e.errorCode));
           context.temporaryVariables.push(infoVars[1], xqvalue(e.rawMessage));
           if e.value = nil then e.value := xqvalue();

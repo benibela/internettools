@@ -385,6 +385,9 @@ begin
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000")) } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 error function called');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000"), "sometext") } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 sometext');
   m('declare namespace err = "http://www.w3.org/2005/xqt-errors"; try { fn:error(xs:QName("err:FOER0000"), "foo", "bar") } catch * { join(($err:code, $err:description, $err:value)) }', 'err:FOER0000 foo bar');
+  m('join(for $t in 0 to 3 return try {    0 div 0   } catch * {    $t   })','0 1 2 3');
+
+
 
   //typeswitch's sequence type unions
   m('typeswitch (123) case xs:string | xs:integer return "union" default return "flag" ', 'union');

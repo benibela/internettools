@@ -755,7 +755,7 @@ begin
       xsstFloat: result := FloatToBigDecimal(single(value), bdffShortest);
     end;
   except
-    on EConvertError do raise EXQEvaluationException.Create('FOAR0002', 'Float ' + debugAsStringWithTypeAnnotation()+  ' cannot be cast to decimal');
+    on EConvertError do raise EXQEvaluationException.Create('FOAR0002', 'Float ' + toXQuery()+  ' cannot be cast to decimal');
   end;
 end;
 
@@ -933,7 +933,7 @@ begin
   if ftypeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]) then
     result := length(str) > 0
    else
-    raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+debugAsStringWithTypeAnnotation() + ' to boolean.');
+    raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
 end;
 
 {$ImplicitExceptions off}
@@ -1015,7 +1015,7 @@ begin
     prefix := (value as TXQValueQName).prefix;
     url := (value as TXQValueQName).url;
     local := (value as TXQValueQName).local;
-  end else raise EXQEvaluationException.create('XPTY0004', 'Cannnot cast '+value.debugAsStringWithTypeAnnotation()+' to xs:QName');
+  end else raise EXQEvaluationException.create('XPTY0004', 'Cannnot cast '+value.toXQuery()+' to xs:QName');
 end;
 
 destructor TXQValueQName.Destroy;
@@ -1293,8 +1293,8 @@ end;
 
 procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
 begin
-  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + debugAsStringWithTypeAnnotation())
-  else if IsInfinite(fac) then raise EXQEvaluationException.create('FODT0002', 'Cannot multiply INF * ' + debugAsStringWithTypeAnnotation());
+  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + toXQuery())
+  else if IsInfinite(fac) then raise EXQEvaluationException.create('FODT0002', 'Cannot multiply INF * ' + toXQuery());
        setMonths(value, integer(xqround(value.toMonths * fac)), true);
   setDayTime(value, xqround(value.toDayTime * fac));
   truncateRange();
@@ -1302,8 +1302,8 @@ end;
 
 procedure TXQValueDateTime.divideComponents(fac: xqfloat);
 begin
-  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + debugAsStringWithTypeAnnotation())
-  else if fac = 0 then raise EXQEvaluationException.create('FODT0002', 'Cannot divide duration by zero: ' + debugAsStringWithTypeAnnotation());
+  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + toXQuery())
+  else if fac = 0 then raise EXQEvaluationException.create('FODT0002', 'Cannot divide duration by zero: ' + toXQuery());
   setMonths(value, integer(xqround(value.toMonths / fac)), true);
   setDayTime(value, xqround(value.toDayTime / fac));
   truncateRange();

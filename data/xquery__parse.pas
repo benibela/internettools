@@ -1564,7 +1564,7 @@ end;
 function TXQParsingContext.parseSwitch: TXQTermSwitch;
 var
   word: String;
-  tempSeq: TXQTermSequence;
+  tempSeq: TXQTermWithChildren;
 begin
   requireXQuery3('for switch statement');
   expect('(');
@@ -1576,7 +1576,7 @@ begin
   if word <> 'case' then raiseSyntaxError('Need at least one case');
   while word = 'case' do begin
     skipWhitespaceAndComment();
-    tempSeq := TXQTermSequence.Create;
+    tempSeq := TXQTermWithChildren.Create;
     result.push(tempSeq);
     while word = 'case' do begin
       tempSeq.push(parse());

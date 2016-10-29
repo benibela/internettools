@@ -1549,6 +1549,9 @@ type
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function clone: TXQTerm; override;
   end;
+  TXQTermWithChildrenOnStack = class(TXQTermWithChildren)
+    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
+  end;
 
   { TXQTermNumber }
 
@@ -1566,7 +1569,7 @@ type
 
   { TXQTermSequence }
 
-  TXQTermSequence = class(TXQTermWithChildren)
+  TXQTermSequence = class(TXQTermWithChildrenOnStack)
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -1759,7 +1762,7 @@ type
 
   { TXQTermNamedFunction }
 
-  TXQTermNamedFunction = class(TXQTermWithChildren)
+  TXQTermNamedFunction = class(TXQTermWithChildrenOnStack)
     name: TXQEQName;
     kind: TXQTermNamedFunctionKind;
     func: TXQAbstractFunctionInfo;
@@ -1770,7 +1773,6 @@ type
     constructor create(const anamespace, alocalname: string; args: array of TXQTerm; const staticContext: TXQStaticContext = nil);
     destructor destroy; override;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
-    function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;
     procedure assignWithoutChildren(source: TXQTermNamedFunction);
     function clone: TXQTerm; override;
@@ -1804,7 +1806,7 @@ type
 
   { TXQTermBinaryOp }
 
-  TXQTermBinaryOp = class(TXQTermWithChildren)
+  TXQTermBinaryOp = class(TXQTermWithChildrenOnStack)
     op: TXQOperatorInfo;
     constructor create(const aop: string; arg1: TXQTerm = nil; arg2: TXQTerm = nil);
     constructor create(arg1: TXQTerm; const aop: string; arg2: TXQTerm);
@@ -3107,6 +3109,7 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
 
 function TXQFunctionParameterTypes.serialize: string;
 var
@@ -7297,7 +7300,7 @@ var pos: pchar;
         tempv.index := 0;
         TXQTermFlower(result).push(TXQTermFilterSequence.create(
           axisTerm,
-          newBinOp(newFunction('name', []), '=', tempv)
+          newBinOp(tempv, '=', newFunction('name', []))
         ));
       end;
     end;

@@ -1945,7 +1945,7 @@ var
 begin
   func1 := TXQTermConstant.create('func-result');
   v1 := TXQTermVariable.Create('a'); v1.index := 1;
-  v2 := TXQTermVariable.Create('b'); v2.index := 0;
+  v2 := TXQTermVariable.Create('b'); v2.index := 1;
   func2 := TXQTermBinaryOp.create('*', v1, v2);;
   func3 := TTermExtension.Create;
 end;
