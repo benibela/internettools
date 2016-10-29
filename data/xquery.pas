@@ -1751,7 +1751,7 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkWrappedOperator, xqfkTypeConstructor, xqfkUnknown); //"unknown" means unitialized or user-defined
+  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkTypeConstructor, xqfkUnknown); //"unknown" means unitialized or user-defined
 
   { TXQTermNamedFunction }
 
@@ -7867,7 +7867,7 @@ begin
     'local': result := XMLNamespace_XQueryLocalFunctions;
     'pxp': result := XMLNamespace_MyExtensionsMerged;
     'x': result := XMLNamespace_MyExtensionsNew;
-    'op': result := XMLNamespace_MyExtensionOperators;
+    //'op': result := XMLNamespace_MyExtensionOperators;
     else result := nil;
   end;
 end;

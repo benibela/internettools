@@ -2449,10 +2449,6 @@ begin
       result := TXQBasicFunctionInfo(func).func(argcount, evilkids);
     xqfkComplex:
       result := TXQComplexFunctionInfo(func).func(context, argcount, evilkids);
-    xqfkWrappedOperator: begin
-      if argcount <> 2 then raiseEvaluationError('XPST0003', 'Need two arguments for function: op:' + name.localname);
-      result := TXQOperatorInfo(func).func(context, evilkids[0], evilkids[1]);
-    end;
     xqfkTypeConstructor: begin
       if argcount <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
       case evilkids[0].getSequenceCount of
@@ -2511,7 +2507,6 @@ begin
   case kind of
     xqfkBasic:             result := getChildrenContextDependencies + []; //all basic functions are pure
     xqfkComplex:           result := getChildrenContextDependencies + TXQComplexFunctionInfo(func).contextDependencies;
-    xqfkWrappedOperator:   result := getChildrenContextDependencies + TXQOperatorInfo(func).contextDependencies;
     xqfkNativeInterpreted: result := getChildrenContextDependencies + TXQInterpretedFunctionInfo(func).contextDependencies;
     xqfkTypeConstructor:   result := getChildrenContextDependencies;
     else                   Result := ALL_CONTEXT_DEPENDENCIES;
@@ -2582,7 +2577,6 @@ begin
       aindex := module.binaryOpFunctions.IndexOf(alocalname);
       if aindex >= 0 then begin
         afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
-        akind := xqfkWrappedOperator;
         exit(true);
       end;
     end;
@@ -4319,7 +4313,7 @@ begin
 
   result := nil;
   case f.kind  of
-    xqfkBasic, xqfkComplex, xqfkWrappedOperator:
+    xqfkBasic, xqfkComplex:
       for i := 0 to high(f.func.versions) do
         if length(f.func.versions[i].types) = length(f.children) then
           exit(@f.func.versions[i]);

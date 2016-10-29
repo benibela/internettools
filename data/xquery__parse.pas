@@ -4033,7 +4033,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     end;
   end;
 
-  procedure lookupNamedFunction(f: TXQTermNamedFunction);
+  procedure lookupNamedFunction(var f: TXQTermNamedFunction);
     function suggestions(localname: string): string;
     function strSimilar(const s, ref: string): boolean;
     begin
@@ -4108,6 +4108,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       schema: TXSSchema;
       i: Integer;
       otherModuleStaticContext: TXQStaticContext;
+      binop: TXQTermBinaryOp;
     begin
       module := TXQueryEngine.findNativeModule(anamespace);
 
@@ -4140,7 +4141,11 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         if argcount = 2 then begin
           f.func := module.findBinaryOp(alocalname, model);
           if f.func <> nil then begin
-            f.kind:=xqfkWrappedOperator;
+            binop := TXQTermBinaryOp.create(TXQOperatorInfo(f.func));
+            binop.children := f.children;
+            f.children := nil;
+            f.free;
+            txqterm(f) := binop;
             exit(true);
           end;
         end;
@@ -4206,12 +4211,12 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     raiseParsingError('XPST0017', 'unknown function: ' + name + ' #' + IntToStr(length(f.children)) + suggestions(f.name.localname));
   end;
 
-  function visitNamedFunction(f: TXQTermNamedFunction): TXQTerm;
+  function visitNamedFunction(var f: TXQTermNamedFunction): TXQTerm;
   begin
-    result := f;
     lookupNamedFunction(f);
+    result := f;
     with f do
-      if (kind = xqfkTypeConstructor) and (length(children) = 1) then
+      if (ClassType = TXQTermNamedFunction) and (kind = xqfkTypeConstructor) and (length(children) = 1) then
         result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
   end;
 

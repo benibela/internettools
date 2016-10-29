@@ -2001,6 +2001,8 @@ begin
   t('xs:time("11:12:00") - xs:dayTimeDuration("P3DT1H15M")', '09:57:00', '');
   t('xs:time("08:20:00-05:00") - xs:dayTimeDuration("P23DT10H10M")', '22:10:00-05:00', '');
   t('xs:date("2000-10-30") - xs:yearMonthDuration("P1Y2M")', '1999-08-30', '');
+  if ps.StaticContext.namespaces = nil then ps.StaticContext.namespaces := TNamespaceList.create;
+  ps.StaticContext.namespaces.add(XMLNamespace_MyExtensionOperators);
   t('op:subtract-yearMonthDuration-from-date(xs:date("2000-02-29Z"), xs:yearMonthDuration("P1Y"))', '1999-02-28Z', '');
   t('op:subtract-yearMonthDuration-from-date(xs:date("2000-10-31-05:00"), xs:yearMonthDuration("P1Y1M"))', '1999-09-30-05:00', '');
   t('op:subtract-yearMonthDuration-from-dateTime(xs:dateTime("2000-10-30T11:12:00"), xs:yearMonthDuration("P1Y2M"))', '1999-08-30T11:12:00', '');
