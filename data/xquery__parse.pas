@@ -96,7 +96,7 @@ protected
   function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
   procedure parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
-  function parseSequenceTypeUnion(): TXQTermSequenceType;
+  function parseSequenceTypeUnion(const flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
   function replaceEntitiesAlways(s: string): string;
   function replaceEntitiesIfNeeded(const s: string): string; inline;
@@ -139,7 +139,7 @@ protected
   procedure parseQuery(aquery: TXQuery; onlySpecialString: boolean);
   procedure parseQuery(aquery: TXQuery); override;
   procedure parseQueryXStringOnly(aquery: TXQuery); override;
-  procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); override;
+  procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); override;
 
   function setXQueryVersion(code: string): boolean;
 end;
@@ -1168,11 +1168,11 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseSequenceTypeUnion: TXQTermSequenceType;
+function TXQParsingContext.parseSequenceTypeUnion(const flags: TXQSequenceTypeFlags): TXQTermSequenceType;
 var
   temp: TXQTermSequenceType;
 begin
-  result := parseSequenceType([]);
+  result := parseSequenceType(flags);
   if isModel3 and (nextToken(true) = '|') then begin
     temp := result;
     result := TXQTermSequenceType.create();
@@ -1181,7 +1181,7 @@ begin
       result.push(temp);
       while nextToken(true) = '|' do begin
         expect('|');
-        result.push(parseSequenceType([]));
+        result.push(parseSequenceType(flags));
       end;
     except
       result.free;
@@ -1541,7 +1541,7 @@ begin
         clause.pattern := parsePatternMatcher();
       end else begin
         if pos^ = '$' then begin clause.variable := {%H-}TXQTermVariable(parseVariable); expect('as'); end;
-        clause.typ := parseSequenceTypeUnion();
+        clause.typ := parseSequenceTypeUnion([]);
       end;
       expect('return');
       clause.expr := parse;
@@ -3812,10 +3812,11 @@ begin
   parseQuery(aquery, false);
 end;
 
-procedure TXQParsingContext.parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string);
-var i, j: integer;
+procedure TXQParsingContext.parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
+var i, j, lastargcount: integer;
 begin
   SetLength(info.versions, length(typeChecking));
+  lastargcount := -1;
   for i:= 0 to high(typeChecking) do begin
     //AllowJSON:=AllowJSONDefaultInternal; //todo: improve json modularization?
     str:=typeChecking[i];
@@ -3836,7 +3837,7 @@ begin
           ',': expect(',');
         end;
         expect('$'); nextTokenNCName(); expect('as');
-        info.versions[i].types[j] := parseSequenceType([xqstResolveNow]);
+        info.versions[i].types[j] := parseSequenceTypeUnion([xqstResolveNow]);
       end;
     end;
     expect(')');
@@ -3845,6 +3846,9 @@ begin
     skipWhitespaceAndComment();
     if not ((pos^ = 'n') and strlEqual(pos, 'none', 4)) then
       info.versions[i].returnType := parseSequenceType([xqstResolveNow]);
+    if (length(info.versions[i].types) <= lastargcount) and not op then
+      raise EXQParsingException.create('pxp:INTERNAL', 'info arg count');
+    lastargcount := length(info.versions[i].types);
   end;
 end;
 
@@ -4172,8 +4176,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         if schema <> nil then begin
           t := schema.findType(alocalname);
           if (t <> nil) and not (baseSchema.isAbstractType(t)) and not (baseSchema.isValidationOnlyType(t)) then begin
-            f.kind:=xqfkTypeConstructor;
-            f.func := TXQAbstractFunctionInfo(TObject(t));
+            f.func :=  TXQAbstractFunctionInfo(TObject(t));
+            f := f.convertToTypeConstructor;
             exit(true)
           end;
         end;
@@ -4215,9 +4219,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     lookupNamedFunction(f);
     result := f;
-    with f do
-      if (ClassType = TXQTermNamedFunction) and (kind = xqfkTypeConstructor) and (length(children) = 1) then
-        result := staticallyCastQNameAndNotation(TXQTermNamedFunction(result), TXSType(TObject(func)), staticContext);
+    if (f.ClassType = TXQTermNamedFunction) and (f.func <> nil) then begin
+      if staticContext.strictTypeChecking then f.version := f.func.getVersion(length(f.children));
+    end else if (f.ClassType = TXQTermNamedFunctionTypeConstructor) and (length(f.children) = 1) then
+     result := staticallyCastQNameAndNotation(TXQTermNamedFunctionTypeConstructor(result), TXSType(TObject(f.func)), staticContext);
   end;
 
   procedure visitDefineFunction(f: TXQTermDefineFunction);
@@ -4272,7 +4277,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   function visitBinaryOp(b: TXQTermBinaryOp): TXQTerm;
   var
     st: TXQTermSequenceType;
-    i: Integer;
   begin
     if (b.op.func = @xqvalueCastAs) or (b.op.func = @xqvalueCastableAs) then begin
       st := b.children[1] as TXQTermSequenceType;

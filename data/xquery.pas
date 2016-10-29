@@ -1362,6 +1362,9 @@ type
     name: string;
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
+    function serialize: string;
+    procedure raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm; const addendum: string);
+    procedure checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm);
   end;
   PXQFunctionParameterTypes = ^TXQFunctionParameterTypes;
 
@@ -1382,6 +1385,7 @@ type
     class procedure convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm); static;
     //used for native functions (which should be robust enough to handle different types on the Pascal side)
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
+    function getVersion(arity: integer): PXQFunctionParameterTypes;
     function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
   private
@@ -1751,7 +1755,7 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkTypeConstructor, xqfkUnknown); //"unknown" means unitialized or user-defined
+  TXQTermNamedFunctionKind = (xqfkBasic, xqfkComplex, xqfkNativeInterpreted, xqfkUnknown, xqfkTypeConstructor); //"unknown" means unitialized or user-defined
 
   { TXQTermNamedFunction }
 
@@ -1759,6 +1763,7 @@ type
     name: TXQEQName;
     kind: TXQTermNamedFunctionKind;
     func: TXQAbstractFunctionInfo;
+    version: PXQFunctionParameterTypes;
     constructor Create;
 //    constructor create(const akind: TXQTermNamedFunctionKind; const afunc: TXQAbstractFunctionInfo);
     constructor create(const anamespace, alocalname: string; arity: integer; const staticContext: TXQStaticContext = nil);
@@ -1774,11 +1779,16 @@ type
     //for internal usage
     class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 
+    function convertToTypeConstructor: TXQTermNamedFunction;
   public
   //internally used
     interpretedFunction: TXQValueFunction;
     functionStaticContext: TXQStaticContext; //used for variable cycle detection
     procedure init(const context: TXQStaticContext);
+  end;
+  TXQTermNamedFunctionTypeConstructor = class(TXQTermNamedFunction)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
   end;
 
   { TXQDynamicFunctionCall }
@@ -2902,7 +2912,7 @@ protected
   binaryOpLists: TXQMapStringObject;
   binaryOpFunctions: TXQMapStringObject;
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
-  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+  procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
 end;
 
 //**Returns a "..." string for use in json (internally used)
@@ -3003,7 +3013,7 @@ protected
  pos: pchar;
  procedure parseQuery(aquery: TXQuery); virtual; abstract;
  procedure parseQueryXStringOnly(aquery: TXQuery); virtual; abstract;
- procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string); virtual; abstract;
+ procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); virtual; abstract;
 
 end;
 
@@ -3097,6 +3107,60 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
+function TXQFunctionParameterTypes.serialize: string;
+var
+  j: Integer;
+begin
+  result := '(';
+  for j := 0 to high(types) do begin
+    if j <> 0 then result += ', ';
+    result += types[j].serialize;
+  end;
+  result += ')';
+  if returnType <> nil then result += ' as ' + returnType.serialize
+end;
+
+procedure TXQFunctionParameterTypes.raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
+  term: TXQTerm; const addendum: string);
+var
+  errCode, errMessage: String;
+  i: Integer;
+begin
+  errCode := 'XPTY0004';
+  for i := 0 to high(types) do
+    if not (types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
+     errCode := 'FOTY0013'; //wtf?
+     break;
+    end else if (context.staticContext.model in PARSING_MODEL3) and (types[i].kind = tikAtomic) and (types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
+     errCode := 'XPTY0117'; //wtf?
+     break;
+    end;
+  errMessage := 'Invalid types for function '+name+'.'+LineEnding;
+  errMessage += 'Got: ';
+  for i := 0 to high(types) do begin
+    if i <> 0 then errMessage += ', ';
+    errMessage += values[i].toXQuery();
+  end;
+  errMessage += LineEnding;
+  errMessage += 'Expected: ' + serialize;
+  errMessage += addendum;
+  term.raiseEvaluationError(errCode, errMessage);
+end;
+
+procedure TXQFunctionParameterTypes.checkOrConvertTypes(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
+  term: TXQTerm);
+var
+  j: Integer;
+begin
+  for j := 0 to count -1 do
+    if types[j].kind <> tikFunctionTest then begin
+      if not TXQAbstractFunctionInfo.checkType(values[j], types[j], context) then
+        raiseErrorMessage(values, count, context, term, '');
+    end else
+      TXQAbstractFunctionInfo.convertType(values[j], types[j], context, term);
+end;
+
 
 procedure TStrBuilder.init(abuffer:pstring);
 var temp: string;
@@ -5575,6 +5639,15 @@ begin
   end;
 end;
 
+function TXQAbstractFunctionInfo.getVersion(arity: integer): PXQFunctionParameterTypes;
+var
+  i: Integer;
+begin
+  for i := 0 to high(versions) do
+    if length(versions[i].types) = arity then exit(@versions[i]);
+  result := nil;
+end;
+
 
 function TXQAbstractFunctionInfo.checkOrConvertTypes(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm): integer;
 var
@@ -5582,43 +5655,20 @@ var
   matches: Boolean;
 
   procedure makeErrorMessage;
-  var i, j: integer;
-      errCode: String;
-      errMessage: String;
+  var errMessage: String;
+    i: Integer;
   begin
     //print a nice error message
     //nested procedure, because using strings in the outer function would create a pointless exception frame
     if countMatch = -1 then
       term.raiseEvaluationError('XPST0017', 'Failed to find function (mismatched argument count)'); //todo: move to static evaluation
-    errCode := 'XPTY0004';
-    for i := 0 to valueHigh do
-      if not (versions[countMatch].types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
-       errCode := 'FOTY0013'; //wtf?
-       break;
-      end else if (context.staticContext.model in PARSING_MODEL3) and (versions[countMatch].types[i].kind = tikAtomic) and (versions[countMatch].types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
-       errCode := 'XPTY0117'; //wtf?
-       break;
-      end;
-    errMessage := 'Invalid types for function '+versions[0].name+'.'+LineEnding;
-    errMessage += 'Got: ';
-    for i := 0 to valueHigh do begin
-      if i <> 0 then errMessage += ', ';
-      errMessage += values[i].toXQuery();
-    end;
-    errMessage += LineEnding;
-    errMessage += 'Expected: ';
-    for i := countMatch to high(versions) do begin
+    errMessage:= '';
+    for i := 0 to high(versions) do begin
       if length(versions[i].types) <> count then continue;
-      if i <> countMatch then errMessage += LineEnding + 'or ';
-      errMessage += '(';
-      for j := 0 to high(versions[i].types) do begin
-        if j <> 0 then errMessage += ', ';
-        errMessage += versions[i].types[j].serialize;
-      end;
-      errMessage += ')';
+      if i = countMatch then continue;
+      errMessage += LineEnding + 'or ' + versions[i].serialize;
     end;
-
-    term.raiseEvaluationError(errCode, errMessage);
+    versions[countMatch].raiseErrorMessage(values, count, context, term, errMessage);
   end;
 
 var i, j: integer;
@@ -8166,7 +8216,7 @@ begin
   temp := TXQBasicFunctionInfo.Create;
   temp.func := func;
   basicFunctions.AddObject(name, temp);
-   parseTypeChecking(temp, typeChecking);
+   parseTypeChecking(temp, typeChecking, false);
   if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
   if minArgCount <> high(Integer) then begin
      temp.minArgCount := minArgCount;
@@ -8188,7 +8238,7 @@ begin
   temp.func := func;
   temp.contextDependencies:=contextDependencies;
   complexFunctions.AddObject(name, temp);
-  parseTypeChecking(temp, typeChecking);
+  parseTypeChecking(temp, typeChecking, false);
   if length(temp.versions) > 0 then temp.versions[0].name:=name; //just for error printing
   if minArgCount <> high(Integer) then begin
      temp.minArgCount:=minArgCount;
@@ -8211,7 +8261,7 @@ begin
   temp.source:='function ' + typeDeclaration + '{' +  func + '}';
   temp.contextDependencies:=contextDependencies;
   interpretedFunctions.AddObject(name, temp);
-  parseTypeChecking(temp, [typeDeclaration]);
+  parseTypeChecking(temp, [typeDeclaration], false);
   temp.versions[0].name:=name; //just for error printing
   temp.guessArgCount;
 end;
@@ -8245,7 +8295,7 @@ begin
     list.AddObject(result.name, (result));
     result.followedBy := strCopyFrom(name, spacepos+1);
   end;
-  parseTypeChecking(result, typeChecking);
+  parseTypeChecking(result, typeChecking, true);
   for i := 0 to high(result.versions) do
     binaryOpFunctions.AddObject(result.versions[i].name, TObject(result));
 end;
@@ -8312,9 +8362,9 @@ end;
 
 var globalTypeParsingContext: TXQParsingContext;
 
-procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
 begin
-  globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking);
+  globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking, op);
 end;
 
 class function TXQNativeModule.findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;

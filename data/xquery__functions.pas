@@ -3583,12 +3583,15 @@ var
   qname: TXQValueQName;
   temp: TXQTermDefineFunction;
   arity: Int64;
+  namedf: TXQTermNamedFunction;
   //funcbody: TXQTermNamedFunction;
 begin
   requiredArgType(args[0], baseSchema.QName);
   qname := args[0] as TXQValueQName;
   arity := args[1].toInt64;
-  temp := TXQTermDefineFunction.createReference(TXQTermNamedFunction.create(qname.url, {qname.prefix, todo}qname.local, arity), arity);
+  namedf := TXQTermNamedFunction.create(qname.url, {qname.prefix, todo}qname.local, arity);
+  if context.staticContext.strictTypeChecking and (namedf.func <> nil) and (namedf.kind <> xqfkTypeConstructor) then namedf.version := namedf.func.getVersion(arity);
+  temp := TXQTermDefineFunction.createReference(namedf, arity);
   temp.name := TXQEQNameWithPrefix.create;
   temp.name.namespaceURL := qname.url;
   temp.name.namespacePrefix := qname.prefix;
@@ -5336,7 +5339,7 @@ begin
   pxpold.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
   pxpold.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
   pxpold.registerFunction('join',1,2,@xqFunctionJoin,[]);
-  pxpold.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary) as xs:string', '($data as xs:base64Binary) as xs:string','($data as xs:hexBinary, $encoding as xs:string) as xs:string', '($data as xs:base64Binary, $encoding as xs:string) as xs:string']);
+  pxpold.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary|xs:base64Binary) as xs:string', '($data as xs:hexBinary|xs:base64Binary, $encoding as xs:string) as xs:string']);
   pxpold.registerFunction('string-to-hexBinary',1,2,@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
   pxpold.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
 

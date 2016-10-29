@@ -2421,7 +2421,6 @@ var
   t: TXSType;
   argcount, i, stacksize: Integer;
   stack: TXQEvaluationStack;
-  {$ifdef checkreturntypes}version: Integer;{$endif}
 begin
   //evaluateChildren(context, evilkids);
   stack := context.temporaryVariables;
@@ -2436,31 +2435,14 @@ begin
 
 
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, argcount, evilkids);
-  if context.staticContext.strictTypeChecking and (kind in [xqfkBasic, xqfkComplex,xqfkNativeInterpreted]) and (argcount > 0) then
-    {$ifdef checkreturntypes}version := {$endif}func.checkOrConvertTypes(@evilkids[0], argcount, context, self)
-   {$ifdef checkreturntypes}
-   else
-    version := -1{$endif};
-
-
+  if version <> nil then
+    version^.checkOrConvertTypes(@evilkids[0], argcount, context, self);
 
   case kind of
     xqfkBasic:
       result := TXQBasicFunctionInfo(func).func(argcount, evilkids);
     xqfkComplex:
       result := TXQComplexFunctionInfo(func).func(context, argcount, evilkids);
-    xqfkTypeConstructor: begin
-      if argcount <> 1 then raiseEvaluationError('XPST0017', 'Invalid argument count for constructor function');
-      case evilkids[0].getSequenceCount of
-        0: result := xqvalue();
-        1: begin
-          t := TXSType(TObject(func));
-          if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(evilkids[0])
-          else result := (t as TXSQNameType).cast(evilkids[0], context);
-        end
-        else raiseEvaluationError('XPTY0004', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
-      end;
-    end;
     xqfkNativeInterpreted: begin
       init(context.staticContext);
       interpretedFunction.contextOverrideParameterNames(context, argcount);
@@ -2474,10 +2456,9 @@ begin
   end;
 
   {$ifdef checkreturntypes}
-  if version <> -1 then begin
-    if not func.versions[version].returnType.instanceOf(result, context) then
+  if version <> nil then
+    if not version.returnType.instanceOf(result, context) then
       raiseEvaluationError('XPTY0004', 'Invalid return value, '+result.toXQuery()+' does not have type '+func.versions[version].returnType.serialize);
-  end;
   {$endif}
   if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, -1, nil);
   stack.popTo(stacksize);
@@ -2508,7 +2489,6 @@ begin
     xqfkBasic:             result := getChildrenContextDependencies + []; //all basic functions are pure
     xqfkComplex:           result := getChildrenContextDependencies + TXQComplexFunctionInfo(func).contextDependencies;
     xqfkNativeInterpreted: result := getChildrenContextDependencies + TXQInterpretedFunctionInfo(func).contextDependencies;
-    xqfkTypeConstructor:   result := getChildrenContextDependencies;
     else                   Result := ALL_CONTEXT_DEPENDENCIES;
   end;
 end;
@@ -2519,6 +2499,7 @@ begin
   if name <> nil then name := name.clone;
   kind:=source.kind;
   func:=source.func;
+  version := source.version;
   //todo: also clone interpretedFunction?
 end;
 
@@ -2533,7 +2514,9 @@ var
   i: Integer;
 begin
   result := '';
-  result += name.ToString + '(';
+  if name <> nil then
+    result += name.ToString;
+  result += '(';
   for i := 0 to high(children) do begin
     if i <> 0 then result += ', ';
     result += children[i].ToString;
@@ -2599,6 +2582,18 @@ begin
   exit(false);
 end;
 
+function TXQTermNamedFunction.convertToTypeConstructor: TXQTermNamedFunction;
+begin
+  result := TXQTermNamedFunctionTypeConstructor.Create;
+  result.kind := xqfkTypeConstructor;
+  result.func := func;
+  result.children := children;
+  result.name := name;
+  children := nil;
+  name := nil;
+  free;
+end;
+
 procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
 var
   i: Integer;
@@ -2637,6 +2632,30 @@ begin
     end;
   end;
 end;
+
+
+function TXQTermNamedFunctionTypeConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  t: TXSType;
+begin
+  result := children[0].evaluate(context);
+  case result.getSequenceCount of
+    0: ;
+    1: begin
+      t := TXSType(TObject(func));
+      if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(result)
+      else result := (t as TXSQNameType).cast(result, context);
+    end
+    else raiseEvaluationError('XPTY0004', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
+  end;
+end;
+
+function TXQTermNamedFunctionTypeConstructor.getContextDependencies: TXQContextDependencies;
+begin
+  result := getChildrenContextDependencies;
+end;
+
+
 
 { TXQDynamicFunctionCall }
 
@@ -4371,6 +4390,7 @@ begin
       for i := 0 to parameterCount - 1 do
         (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
       resulttype := functionReferenceGetResultType(f);
+      children[high(children)] := f.convertToTypeConstructor;
     end;
 
     if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
@@ -4400,7 +4420,8 @@ begin
   result := TXQValueFunction.create();
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
     copyAnnotations(result.annotations, f.interpretedFunction.annotations);
-  result.body := TXQTermNamedFunction.create();
+  if f.kind = xqfkTypeConstructor then result.body := TXQTermNamedFunctionTypeConstructor.create()
+  else result.body := TXQTermNamedFunction.create();
   TXQTermNamedFunction(result.body).assignWithoutChildren(f);
 
   setlength(result.parameters, parameterCount);
