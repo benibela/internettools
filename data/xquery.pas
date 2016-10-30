@@ -3497,7 +3497,7 @@ begin
      if definition <> nil then exit;
      if length(CurrentInitializations) > 0 then begin
        for i := 0 to high(CurrentInitializations) do
-         if CurrentInitializations[i].versions[0].name = self.versions[0].name then exit;
+         if CurrentInitializations[i] = self then exit;
        if length(CurrentInitializations) > 100 then raise EXQEvaluationException.create('PXP', 'Internal recursion 1601161646');
      end;
      setlength(CurrentInitializations, length(CurrentInitializations) + 1);

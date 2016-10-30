@@ -4137,8 +4137,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           f.kind:=xqfkNativeInterpreted;
           if TXQInterpretedFunctionInfo(f.func).func = nil then
               TXQInterpretedFunctionInfo(f.func).initialize();
-          f.interpretedFunction :=  TXQInterpretedFunctionInfo(f.func).func;
-          f.functionStaticContext := staticContext;  //todo??
+          f.init(staticContext);
           exit(true);
         end;
 

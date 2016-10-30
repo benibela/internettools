@@ -2466,9 +2466,9 @@ begin
     xqfkComplex:
       result := TXQComplexFunctionInfo(func).func(context, argcount, evilkids);
     xqfkNativeInterpreted: begin
-      init(context.staticContext);
-      interpretedFunction.contextOverrideParameterNames(context, argcount);
-      result := interpretedFunction.evaluateInContext(context, self);
+      assert(TXQInterpretedFunctionInfo(func).func <> nil);
+      TXQInterpretedFunctionInfo(func).func.contextOverrideParameterNames(context, argcount);
+      result := TXQInterpretedFunctionInfo(func).func.evaluateInContext(context, self);
     end;
     xqfkUnknown: begin
       init(context.staticContext);
@@ -2505,7 +2505,9 @@ begin
   kind:=source.kind;
   func:=source.func;
   version := source.version;
-  //todo: also clone interpretedFunction?
+
+  interpretedFunction := source.interpretedFunction;
+  functionStaticContext := source.functionStaticContext;
 end;
 
 function TXQTermNamedFunction.clone: TXQTerm;
