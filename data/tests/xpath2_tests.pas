@@ -2203,6 +2203,8 @@ begin
   t('serialize-json($x)', '{"b": {"c": {"y": 123}}}');
 
 
+
+
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")).a return $i, "|")', 'x', '');
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return $i.a, "|")', 'x', '');
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return ($i.b,$i.c), "|")', 'Y|Z', '');
@@ -2512,6 +2514,7 @@ begin
   t('$a // b', '17');
   t('[$a] / b', '17');
   t('[$a] // b', '17');
+  t('join(({}/(a:=123),":", $a))', '123 : 123');
   t('($seq := ({"a": 1, "b": 2, "c": 3}, {"b": 4, "c": 5, "d": 6, "e": [{"a": 10, "b": 11}], "f": {"a": 20, "b": 21}}))[2]', '');
   t('join($seq / a)', '1');
   t('join($seq / b)', '2 4');
