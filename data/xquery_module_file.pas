@@ -441,10 +441,10 @@ var
 begin
   ignore(context);
   fn := normalizePath(args[0]);
-  if FindFirst(fn, faAnyFile, search) <> 0 then
+  if sysutils.FindFirst(fn, faAnyFile, search) <> 0 then
     raiseFileError(ifthen(FileExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
   dateTime := FileDateToDateTime(search.Time);
-  FindClose(search);
+  sysutils.FindClose(search);
   dt := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
   dt.value.timezone:=GetLocalTimeOffset;;
   result := dt;
