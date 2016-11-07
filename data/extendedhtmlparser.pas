@@ -1105,9 +1105,9 @@ begin
     if (not parentIsModule and not (parent is TXQTermDefineFunction))
        or (parentIsModule and (t^ = TXQTermModule(parent).children[high(TXQTermModule(parent).children)])) then begin
       hasVars := true;
-      if listVars and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t).variable))) then begin
+      if listVars and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t^).getVariable))) then begin
         SetLength(vars, length(vars) + 1);
-        vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t).variable);
+        vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t^).getVariable);
       end;
     end;
   end;
@@ -1139,18 +1139,6 @@ begin
 end;
 
 procedure THtmlTemplateParser.GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray; out hasDefaultVariable: Boolean);
-
-  function stest(const t: TXQTerm): boolean;
-  var
-    i: Integer;
-  begin
-    if not assigned(t) then exit(false);
-    result := (t is TXQTermDefineVariable) and (TXQTermDefineVariable(t).variable is TXQTermVariable);
-
-    if t is TXQTermWithChildren then
-      for i := 0 to high(TXQTermWithChildren(t).children) do
-        result := result or stest(TXQTermWithChildren(t).children[i]);
-  end;
 var
   cur: TTemplateElement;
   visitor: TXQTerm_VisitorFindWeirdGlobalVariableDeclarations;
