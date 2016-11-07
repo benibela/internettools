@@ -287,7 +287,12 @@ begin
       nextToken;
     end;
 
-    if containerCount > 0 then raiseError('unclosed');
+    if containerCount > 0 then begin
+      for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
+        if containerStack[i].ClassType = TXQValueJSONArray then TXQValueJSONArray(containerStack[i]).seq.clear
+        else TXQValueObject(containerStack[i]).values.clear;
+      raiseError('unclosed');
+    end;
 
     if result = nil then result := xqvalue;
   finally
