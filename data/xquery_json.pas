@@ -216,7 +216,8 @@ var containerStack: array of TXQValue;
     parsingPhase := jppObjectExpectValue;
   end;
 
-var scannerOptions: TJSONOptions;
+
+var scannerOptions:  {$if FPC_FULLVERSION > 30000}TJSONOptions{$else}boolean{$endif};
   i: Integer;
 begin
   result := nil;
@@ -225,9 +226,13 @@ begin
   containerCount := 0;
   parsingPhase := jppRoot;
   tempSeq := nil;
+  {$if FPC_FULLVERSION > 30000}
   scannerOptions := [joUTF8];
   if not (pjoLiberal in options) then include(scannerOptions, joStrict);
   if pjoAllowTrailingComma in options then include(scannerOptions, joIgnoreTrailingComma);
+  {$else}
+  scannerOptions := true;
+  {$endif}
   scanner := TJSONScanner.Create(data, scannerOptions);
   try
 
@@ -260,10 +265,9 @@ begin
             end;
           end;
         end;
-        tkCurlyBraceClose: case parsingPhase of
-          jppObjectExpectComma: popContainer;
+        tkCurlyBraceClose:
+          if (parsingPhase = jppObjectExpectComma) or ((parsingPhase = jppObjectExpectKey) and (pjoAllowTrailingComma in options)) then popContainer
           else raiseError();
-        end;
         tkSquaredBraceOpen: begin
           pushValue(pushContainer(TXQValueJSONArray.create()));
           setCurrentContainer;
@@ -275,11 +279,12 @@ begin
             end;
           end;
         end;
-        tkSquaredBraceClose: case parsingPhase of
-          jppArrayExpectComma: popContainer;
+        tkSquaredBraceClose:
+          if (parsingPhase = jppArrayExpectComma) or ((parsingPhase = jppArrayExpectValue) and (pjoAllowTrailingComma in options)) then popContainer
           else raiseError();
-        end;
-        tkIdentifier: if parsingPhase = jppObjectExpectKey then readObjectKey;
+        tkIdentifier:
+          if (parsingPhase = jppObjectExpectKey) and (pjoLiberal in options) then readObjectKey
+          else raiseError();
         //tkComment:
         //tkUnknown
         else raiseError();
