@@ -2578,10 +2578,11 @@ begin
     t('json(''[{"hallo": "world"}, {hallo: 1000}]'')(2).hallo', '1000');
     t('json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
     t('json(''{"hallo": "world"} {hallo: 1000}'')[2].hallo', '1000');
-    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'world');
-    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {})[1].hallo', 'world');
-    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
-    f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"jsoniq-multiple-top-level-items": false()})[1].hallo', 'jerr:JNDY0021');
+    f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'')[1].hallo', 'jerr:JNDY0021');
+    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"liberal": true()})[1].hallo', 'world');
+    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"liberal": true(), "jsoniq-multiple-top-level-items": ()})[1].hallo', 'world');
+    t('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"liberal": true(), "jsoniq-multiple-top-level-items": true()})[1].hallo', 'world');
+    f('jn:parse-json(''{"hallo": "world"} {hallo: 1000}'', {"liberal": true(), "jsoniq-multiple-top-level-items": false()})[1].hallo', 'jerr:JNDY0021');
     t('jn:parse-json(())', '');
 
     t('[4,5,6](0)', '');
