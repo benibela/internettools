@@ -154,6 +154,7 @@ TAssertionAssert = class(TAssertion)
   constructor create(akind: TAssertionAssertKind; avalue: string);
   function check(errorCode: string): TTestCaseResult; override;
   function expectError: boolean; override;
+  function regexFlags: TWrappedRegExprFlags;
 end;
 
 
@@ -882,13 +883,18 @@ begin
     aakXml: result := OK[xmlEqual(res, value, ignorePrefixes)];
     //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
-    aakSerializationMatches: begin//raise exception.Create('assert serialization-matches not supported ');
+    aakSerializationMatches: begin
       result := tcrFail;
       node := res.toNode;
-      if node = nil then exit();
-      regex := wregexprParse(value,[]);
+      if node <> nil then str := node.outerXML()
+      else begin
+        node := TTreeNode.create(tetText, res.toString);
+        str := node.outerXML();
+        node.free;
+      end;
+      regex := wregexprParse(value, regexflags);
       try
-        result := OK[wregexprMatches(regex, node.outerXML())]
+        result := OK[wregexprMatches(regex, str)]
       finally
         wregexprFree(regex);
       end;
@@ -921,6 +927,23 @@ end;
 function TAssertionAssert.expectError: boolean;
 begin
   result := kind in [aakError, aakSerializationError];
+end;
+
+function TAssertionAssert.regexFlags: TWrappedRegExprFlags;
+var
+  i: Integer;
+begin
+  result := [];
+  for i := 1 to length(flags) do
+    case flags[i] of
+    's': Include(result, wrfSingleLine);
+    'm': Include(result, wrfMultiLine);
+    'i': Include(result, wrfIgnoreCase);
+    'x': Include(result, wrfStripWhitespace);
+    'q': Include(result, wrfQuote);
+    '!': include(result, wrfSkipSyntaxNormalization);
+    else raise Exception.Create('Invalid flag');
+    end;
 end;
 
 constructor TResult.create(e: TTreeNode);
@@ -1182,6 +1205,7 @@ begin
   put('feature', 'fn-transform-XSLT', false);
   put('feature', 'fn-transform-XSLT30', false);
   put('feature', 'simple-uca-fallback', false);
+  put('feature', 'advanced-uca-fallback', false);
   put('feature', 'olson-timezone', false);
   put('feature', 'arbitraryPrecisionDecimal', true);
 
