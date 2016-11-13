@@ -2782,39 +2782,36 @@ end;
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
 var
-  i, p: Integer;
-  procedure push(const t:string); inline;
-  begin
-    if p + length(t) > length(result) + 1 then setlength(result, length(result) + 64);
-    move(t[1], result[p], length(t));
-    p+=length(t);
-  end;
+  i: Integer;
+  builder: TStrBuilder;
 
 begin
-  setlength(result, length(s));
-  p:=1;
+  builder.init(@result, length(s));
   i := 1;
   while i <= length(s) do begin
     case s[i] of
-      '<': push('&lt;');
-      '>': push('&gt;');
-      '&': push('&amp;');
-      '''': push('&apos;');
-      '"': push('&quot;');
-      #13: push('&#xD;');
-      #10: if attrib then push('&#xA;') else push(#10);
-      #9: if attrib then push('&#x9;') else push(#9);
-      #$C2: if (i <> length(s)) and (s[i+1] <> #$85) then push(#$C2) else begin push('&#x85;'); i+=1; end;
-      #$E2: if (i + 2 <= length(s)) and ((s[i+1] <> #$80) or (s[i+2] <> #$A8)) then push(#$E2) else begin push('&#x2028;'); i+=2; end;
-      else begin
-        if p > length(result) then setlength(result, length(result) + 64);
-        result[p] := s[i];
-        p+=1;
+      '<': builder.add('&lt;');
+      '>': builder.add('&gt;');
+      '&': builder.add('&amp;');
+      '''': builder.add('&apos;');
+      '"': builder.add('&quot;');
+      #13: builder.add('&#xD;');
+      #10: if attrib then builder.add('&#xA;') else builder.add(#10);
+      #9: if attrib then builder.add('&#x9;') else builder.add(#9);
+      #0..#8,#11,#12,#14..#$1F,#$7F: builder.addhexentity(ord(s[i]));
+      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then builder.add(#$C2) else begin
+        i+=1;
+        builder.addhexentity(ord(s[i]));
       end;
+      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then builder.add(#$E2) else begin
+        builder.add('&#x2028;');
+        i+=2;
+      end;
+      else builder.add(s[i]);
     end;
     i+=1;
   end;
-  setlength(result, p - 1);
+  builder.final;
 end;
 
 function xmlStrWhitespaceCollapse(const s: string): string;
@@ -2824,48 +2821,39 @@ end;
 
 function htmlStrEscape(s: string; attrib: boolean; encoding: TSystemCodePage): string;
 var
-  i, p: Integer;
-  procedure push(const t:string); inline;
-  begin
-    if p + length(t) > length(result) + 1 then setlength(result, length(result) + 64);
-    move(t[1], result[p], length(t));
-    p+=length(t);
-  end;
-  procedure normal; inline;
-  begin
-    if p > length(result) then setlength(result, length(result) + 64);
-    result[p] := s[i];
-    p+=1;
-  end;
+  i: Integer;
+  builder: TStrBuilder;
+
 begin
-  setlength(result, length(s));
-  p:=1;
+  builder.init(@result, length(s));
   i := 1;
   if attrib then begin
     while i <= length(s) do begin
       case s[i] of
-        '&': push('&amp;');
-        '"': push('&quot;');
-        #$A0: if encoding = CP_WINDOWS1252 then push('&nbsp;') else normal;
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end else normal;
-        else normal;
+        '&': builder.add('&amp;');
+        '"': builder.add('&quot;');
+        #$A0: if encoding = CP_WINDOWS1252 then builder.add('&nbsp;') else builder.add(s[i]);
+        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.add('&nbsp;'); i+=1; end else builder.add(s[i]);
+        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.addhexentity(ord(s[i])); not needed?
+        else builder.add(s[i]);
       end;
       i+=1;
     end
   end else begin
     while i <= length(s) do begin
       case s[i] of
-        '&': push('&amp;');
-        '<': push('&lt;');
-        '>': push('&gt;');
-        #$A0: if encoding = CP_WINDOWS1252 then push('&nbsp;') else normal;
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin push('&nbsp;'); i+=1; end  else normal;
-        else normal;
+        '&': builder.add('&amp;');
+        '<': builder.add('&lt;');
+        '>': builder.add('&gt;');
+        #$A0: if encoding = CP_WINDOWS1252 then builder.add('&nbsp;') else builder.add(s[i]);
+        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.add('&nbsp;'); i+=1; end  else builder.add(s[i]);
+        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.addhexentity(ord(s[i]));
+        else builder.add(s[i]);
       end;
       i+=1;
     end;
   end;
-  setlength(result, p - 1);
+  builder.final;
 end;
 
 function equalNamespaces(const ans, bns: INamespace): boolean;

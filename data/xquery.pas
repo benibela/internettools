@@ -2935,11 +2935,16 @@ function strIterator(const s: RawByteString): TStrIterator;
 
 type TStrBuilder = record
   buffer: pstring;
-  len: sizeint;
-  procedure init(abuffer:pstring);
+  next, bufferend: pchar; //next empty pchar and first pos after the string
+  procedure init(abuffer:pstring; basecapacity: integer = 64);
   procedure final;
-  procedure add(const s: string);
-  procedure add(const codepoint: integer);
+  function count: integer; inline;
+  procedure reserveadd(delta: integer);
+  procedure add(c: char); inline;
+  procedure add(const s: string); inline;
+  procedure add(const codepoint: integer); inline;
+  procedure addhexentity(codepoint: integer);
+  procedure addhexnumber(codepoint: integer);
 end;
 
 //**Escapes for an URL (internally used)
@@ -3165,42 +3170,101 @@ begin
 end;
 
 
-procedure TStrBuilder.init(abuffer:pstring);
-var temp: string;
+procedure TStrBuilder.init(abuffer:pstring; basecapacity: integer);
 begin
-  len := 0;
   buffer := abuffer;
-  if buffer^ = '' then SetLength(buffer^, 100);
+  SetLength(buffer^, basecapacity); //need to create a new string to prevent aliasing
+  //if length(buffer^) < basecapacity then
+  //else UniqueString(buffer^);    //or could uniquestring be enough?
+
+  next := pchar(buffer^);
+  bufferend := next + length(buffer^);
 end;
 
 procedure TStrBuilder.final;
 begin
-  if len <> Length(buffer^) then
-    setlength(buffer^, len);
+  if next <> bufferend then begin
+    setlength(buffer^, count);
+    next := pchar(buffer^) + length(buffer^);
+    bufferend := next;
+  end;
+end;
+
+function TStrBuilder.count: integer;
+begin
+  result := next - pointer(buffer^);
+end;
+
+procedure TStrBuilder.reserveadd(delta: integer);
+var
+  oldlen: Integer;
+begin
+  if next + delta > bufferend then begin
+    oldlen := count;
+    SetLength(buffer^, max(2*length(buffer^), oldlen + delta));
+    next := pchar(buffer^) + oldlen;
+    bufferend := pchar(buffer^) + length(buffer^);
+  end;
+end;
+
+procedure TStrBuilder.add(c: char);
+begin
+  if next >= bufferend then reserveadd(1);
+  next^ := c;
+  inc(next);
 end;
 
 procedure TStrBuilder.add(const s: string);
 var
-  newlen: sizeint;
+  l: sizeint;
 begin
-  newlen := len + length(s);
-  if newlen > length(buffer^) then
-    SetLength(buffer^, max(2*length(buffer^), newlen));
-  move(pchar(s)^, (pointer(buffer^) + len)^, length(s));
-  len := newlen;
+  l := length(s);
+  if l = 0 then exit;
+  if next + l > bufferend then reserveadd(l);
+  move(pchar(pointer(s))^, next^, l);
+  inc(next, l);
 end;
 
 procedure TStrBuilder.add(const codepoint: integer);
 var
-  toadd, newlen: sizeint;
+  l: sizeint;
 begin
-  toadd := strGetUnicodeCharacterUTFLength(codepoint);
-  newlen := len + toadd;
-  if newlen > length(buffer^) then
-    SetLength(buffer^, max(2*length(buffer^), newlen));
-  strGetUnicodeCharacterUTF(codepoint, pchar(pointer(buffer)^) + len);
-  len := newlen;
+  l := strGetUnicodeCharacterUTFLength(codepoint);
+  if next + l > bufferend then reserveadd(l);
+  strGetUnicodeCharacterUTF(codepoint, next);
+  inc(next, l);
 end;
+
+function charEncodeHexDigitUp(digit: integer): char;
+begin
+  case digit of
+    0..9: result := chr(ord('0') + digit);
+    $A..$F: result := chr(ord('A') - $A + digit);
+    else assert(false);
+  end;
+end;
+
+procedure TStrBuilder.addhexentity(codepoint: integer);
+var
+  i: Integer;
+begin
+  add('&#x');
+  if codepoint <= $FF then begin
+    if codepoint > $F then add(charEncodeHexDigitUp( codepoint shr 4 ));
+    add(charEncodeHexDigitUp(  codepoint and $F ))
+  end else addhexnumber(codepoint);
+  add(';');
+end;
+
+procedure TStrBuilder.addhexnumber(codepoint: integer);
+var
+  digits: Integer;
+begin
+  digits := 1;
+  while codepoint shr (4 * digits) > 0 do inc(digits);
+  add(IntToHex(codepoint, digits));
+end;
+
 
 function TXQTermContextItem.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin

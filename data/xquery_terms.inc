@@ -2440,7 +2440,6 @@ function TXQTermNamedFunction.evaluate(var context: TXQEvaluationContext): IXQVa
 //{$define checkreturntypes}  there is no point in testing the return type for native functions. but it might spot internal inconsistencies
 var
   evilkids: PIXQValue;
-  t: TXSType;
   argcount, i, stacksize: Integer;
   stack: TXQEvaluationStack;
 begin

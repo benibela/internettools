@@ -1569,7 +1569,7 @@ begin
   t('outer-xml(<a x="&#x9;"/>)', '<a x="&#x9;"/>');
   t('outer-xml(<a x="&#xA;"/>)', '<a x="&#xA;"/>');
   t('outer-xml(<a x="&#xD;"/>)', '<a x="&#xD;"/>');
-  t('outer-xml(<a x="&#xE;"/>)', '<a x="'#$E'"/>');
+  t('outer-xml(<a x="&#xE;"/>)', '<a x="&#xE;"/>');
   t('outer-xml(<a>&#x9;</a>)', '<a>'#9'</a>');
   t('outer-xml(<a>&#xA;</a>)', '<a>'#10'</a>');
   t('outer-xml(<a>&#xD;</a>)', '<a>&#xD;</a>');
