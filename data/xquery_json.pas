@@ -109,7 +109,7 @@ var
   var token: string;
   begin
     Str(scanner.CurToken, token);
-    raise EXQEvaluationException.create('jerr:JNDY0021', message+' at ' + token +' '+ scanner.CurTokenString + ' in '+scanner.CurLine);
+    raise EXQEvaluationException.create('jerr:JNDY0021', message+' at ' + scanner.CurTokenString +' (' + token +') in '+scanner.CurLine);
   end;
 
   function nextToken: TJSONToken;
@@ -129,6 +129,7 @@ var
     temp64: Int64;
     tempFloat: Extended;
     tempd: BigDecimal;
+    tempchar: Char;
   begin
     if TryStrToInt64(scanner.CurTokenString, temp64) then exit(xqvalue(temp64));
     if TryStrToBigDecimal(scanner.CurTokenString, @tempd) then
@@ -138,6 +139,17 @@ var
     if TryStrToFloat(scanner.CurTokenString, tempFloat) then
       if striContains(scanner.CurTokenString, 'E') then exit(baseSchema.double.createValue(tempFloat))
       else exit(TXQValueDecimal.create(tempFloat));
+    if (pjoLiberal in options) and ((scanner.CurTokenString = '+') or (scanner.CurTokenString = '-')) then begin
+      tempchar := scanner.CurTokenString[1];
+      if scanner.FetchToken = tkIdentifier then
+        case scanner.CurTokenString of
+          'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity':
+            case tempchar of
+              '+': exit(xqvalue(getPosInf)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
+              '-': exit(xqvalue(getNegInf));
+            end;
+        end;
+    end;
     raiseError('Invalid number');
   end;
 
@@ -283,8 +295,14 @@ begin
           if (parsingPhase = jppArrayExpectComma) or ((parsingPhase = jppArrayExpectValue) and (pjoAllowTrailingComma in options)) then popContainer
           else raiseError();
         tkIdentifier:
-          if (parsingPhase = jppObjectExpectKey) and (pjoLiberal in options) then readObjectKey
-          else raiseError();
+          if pjoLiberal in options then begin
+            if parsingPhase = jppObjectExpectKey then readObjectKey
+            else case scanner.CurTokenString of
+              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(getPosInf));
+              'NAN', 'NaN', 'nan': pushValue(xqvalue(getNaN));
+              else raiseError();
+            end;
+          end else raiseError();
         //tkComment:
         //tkUnknown
         else raiseError();
