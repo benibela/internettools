@@ -1647,7 +1647,7 @@ var
 begin
   if seq.Count = 0 then exit('[]');
   if seq.Count = 1 then exit(seq[0].jsonSerialize(nodeFormat));
-  if insertWhitespace then begin
+  if insertWhitespace and (seq.Count <= 8) then begin
     insertWhitespace := false;
     for i := 0 to seq.Count - 1 do
       if seq[i].kind in [pvkObject,pvkArray] then begin insertWhitespace := true; break; end;
@@ -2179,7 +2179,7 @@ var
   newindent: String;
 begin
   if seq.Count = 0 then exit('[]');
-  if insertWhitespace then begin
+  if insertWhitespace and (seq.Count <= 8)then begin
     insertWhitespace := false;
     for i := 0 to seq.Count - 1 do
       if seq[i].kind in [pvkObject,pvkArray] then begin insertWhitespace := true; break; end;
