@@ -721,7 +721,8 @@ THtmlTemplateParser=class
 
   TXQTerm_VisitorFindWeirdGlobalVariableDeclarations = class(TXQTerm_Visitor)
     vars: TXQTermVariableArray;
-    listVars: boolean;
+    listVars, findNestedVariables: boolean;
+
     hasVars: boolean;
     function visit(t: PXQTerm): TXQTerm_VisitAction; override;
   end;
@@ -1102,7 +1103,7 @@ var
 begin
   if (t^ is TXQTermDefineVariable) then begin
     parentIsModule := parent is TXQTermModule;
-    if (not parentIsModule and not (parent is TXQTermDefineFunction))
+    if (not parentIsModule and (not (parent is TXQTermDefineFunction) or  (t^ = TXQTermDefineFunction(parent).children[high(TXQTermDefineFunction(parent).children)]) ))
        or (parentIsModule and (t^ = TXQTermModule(parent).children[high(TXQTermModule(parent).children)])) then begin
       hasVars := true;
       if listVars and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t^).getVariable))) then begin
@@ -1110,7 +1111,7 @@ begin
         vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t^).getVariable);
       end;
     end;
-  end;
+  end else if (t^ is TXQTermPatternMatcher) and not findNestedVariables then exit(xqtvaNoRecursion);
   Result:=xqtvaContinue;
 end;
 
