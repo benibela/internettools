@@ -47,6 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {$H+}
 {$DEFINE ALLOW_EXTERNAL_DOC_DOWNLOAD}
 
+
+//{$define dumpFunctions}
 interface
 
 
@@ -1258,6 +1260,7 @@ type
   private
     typeList, hiddenTypeList: TXQMapStringObject;
     procedure cacheDescendants;
+    {$ifdef dumpFunctions}procedure logConstructorFunctions;{$endif}
   end;
 
   { TJSSchema }
@@ -2270,6 +2273,8 @@ type
       @item(@code(function ($a, $b) { $a + $b }) @br This returns an anonymous function which adds two numbers. )
     )
 
+    A complete list of support functions is given at http://www.benibela.de/documentation/internettools/xpath-functions.html
+
     Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
 
     Extended syntax:@br
@@ -2321,116 +2326,6 @@ type
     )    )
     @item( Most of them can be disabled with 'declare option pxp:respective-option "off"' (that there are syntax modifying options is another extension) )
     )
-
-    New functions:@br
-
-    @unorderedList(
-
-      @item(@code(deep-text()) @br This is the concatenated plain text of the every tag inside the current text.
-                                      You can also pass a separator like deep-text(' ') to separate text of different nodes.)
-      @item(@code(extract($string as xs:string, $regex as xs:string [, $match as xs:integer *,[$flags as xs:string]])) @br
-            This applies the regex $regex to $string and returns only the matching part.
-            @br If the $match argument is provided, only the $match-th submatch will be returned. This can be a sequence of several integers.
-            @br If flags contains *, all occurrences are returned
-            @br (This functions used to be called filter, but was renamed to due to XQuery 3))
-      @item(@code(eval($query as xs:string)) @br This evaluates $query as a XQuery-expression. )
-      @item(@code(css($css as xs:string)) @br This evaluates the $css string as a css selector. )
-      @item(@code(parse-date($input as xs:string, $format as xs:string))
-                  @br Reads a date/time from string with the given format. $format is a standard Pascal format, using ymdhnsz (e.g. "yyyy-mm-dd"), not a XQuery 3.0 picture string. )
-      @item(@code(parse-time(input as xs:string, $format as xs:string))
-                  @br Reads a date/time from string with the given format. $format is a standard Pascal format (see above) )
-      @item(@code(parse-dateTime($input as xs:string, $format as xs:string))
-                  @br Reads a date/time from string with the given format. $format is a standard Pascal format (see above) )
-      @item(@code(inner-xml($node as node()))
-                  @br Returns the inner xml of a node as string (like innerHTML in javascript) )
-      @item(@code(outer-xml($node as node()))
-                  @br Returns the outer xml of a node as string (= inner-xml plus the opening/closing tag of the node itself) )
-      @item(@code(inner-html($node as node()))
-                  @br Returns the inner html of a node as string (like inner-xml, but valid html) )
-      @item(@code(outer-html($node as node()))
-                  @br Returns the outer html of a node as string (like outer-xml, but valid html) )
-      @item(@code(form($form as node()*[, $override as item()*]))
-                  @br This creates the request corresponding to a html form. The request includes the value of all input/select/textarea descendants of the $form parameter.
-                  @br You can use the $override parameter to give a sequence of values replacing the default values of the form elements.
-                  @br A value is either a string, e.g. @code("name=value&name2=...") which has to be url encoded and is splitted at the &-separators to override each parameter separately. (so the order of the name=value pairs is changed to the order of the input elements in the form)
-                  @br Or a JSON-like object @code({"name": "value", ...}), in which the properties must not be url encodeded (i.e. the form method url encodes each property) and in which each property overrides the corresponding parameter.
-                  @br
-                  @br It returns a JSON object with these properties:
-                  @br url: The url the form should be send to (includes the encoded data for a GET request)
-                  @br method: POST or GET
-                  @br post: Encoded post data
-                  @br headers: Sequence of additional headers
-                  @br
-                  @br Depending on the enctype attribute of the form, it will either return url encoded or multipart encoded post data. For latter, also a Content-Type header with the specific boundary is added.
-                  @br For multipart encoded data, the value parameters do not have to be strings, but can be JSON-objects. They can have these properties: "file": to upload a file. "value": for a string value. "filename": to set the filename field of the Content-Disposition header. "type": Becomes a Content-Type header. "headers": An arbitrary sequence of headers )
-      @item(@code(resolve-html($relative as item()*, [$base as item()]))
-                  @br Resolves every value in the $relative sequence to an HTTP request with an absolute URL/URI, using $base as reference base URI.
-                  @br Atomic values (e.g. strings) are resolved as simple URIs similar to resolve-uri.
-                  @br For HTML elements that refer to other resources (e.g. <a href=...> or <img src=...>) it returns the absolute URI of that resource.
-                      For <form> elements it returns the same object as the @code(form) function. For all other HTML elements it interprets the text content as relative string URI.
-                  @br If $base is not a node it treated as simple absolute URI. If $base is a node, the function uses the base URI of the document that contains the node.)
-      @item(@code(uri-encode($uri-part as xs:string?))
-                  @br Encodes a string for a URI. Exactly the same as @code(fn:encode-for-uri) but with a simpler name.)
-      @item(@code(uri-decode($uri-part as xs:string?))
-                  @br Decodes an URI string. The reverse of @code(uri-encode) (but no roundtrip guarantee) )
-      @item(@code(is-nth($i as xs:integer, $a as xs:integer, $b as xs:integer))
-                  @br Returns true iff the equation @code( i = a * n + b ) can be solved by an non-negative integer @code(n).
-                  (This is used to implement the css functions like nth-child ) )
-      @item(@code(var := object())
-                  @br This creates an object with name @code($var). Default values can be passed as sequence of name/value pairs.
-                  @br A alternative syntax is @code( {} )
-                  )
-      @item(@code(get-property($obj as object(), $name as xs:string))
-                  @br Returns the property with the given name of an object. Since this is just a normal function, it can also be used, if the object.property syntax has been disabled
-                  @br Deprecated, now the JSONiq syntax @code($obj($name)) should be used. This function will be removed in later versions.
-                  )
-      @item(@code(join($sequence as xs:item()*[, $seperator as xs:string]))
-                  @br This is the same as string-join, but without type checking. If seperator is omitted it becomes " ".
-                  )
-      @item(@code(transform([$root as item()*,] $f as function(), [$options as object()]]) as item()* )
-                  @br Transform calls $f for every descendant and attribute node of $root and replaces each node with the return value of $f.
-                  @br If $root is omitted, the context item . is used.
-                  @br If $options("always-recurse") is true, all values returned by $f are also transformed with further calls of $f.
-                  @br Preliminary, behaviour might change in future versions. E.g. it might be renamed to map-nodes
-                  )
-      @item(@code(match($template as item(), $node as node()+))
-                  @br Performs pattern matching between the template and the nodes, and returns a list or an object of matched values.@br
-                  @br E.g. @code(match(<a>{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code(<a>FOO</a>), and
-                           @code(match(<a>*{{.}}</a>, <x><a>FOO</a><a>BAR</a></x>)) returns @code((<a>FOO</a>, <a>BAR</a>))
-                  @br It is also possible to use named variables in the template, in which case an object is returned, e.g:
-                           @code(match(<x><a>{{first:=.}}</a><a>{{second:=.}}</a></x>, <x><a>FOO</a><a>BAR</a></x>)) returns an object with two properties @code(first) and @code(bar), containing @code(<a>FOO</a>) and @code(<a>BAR</a>) respectively.
-                      These properties can be accessed like @code(match(<x><a>{{first:=.}}</a><a>{{second:=.}}</a></x>, <x><a>FOO</a><a>BAR</a></x>).first)
-                  @br Multiple values assigned to the same variable are merged into a single sequence, e.g. @code(match(<x><a>{{res:=.}}</a><a>{{res:=.}}</a></x>, <x><a>FOO</a><a>BAR</a></x>)) returns an object with a single property @code(res) with value @code((<a>FOO</a>, <a>BAR</a>))
-                  @br If unnamed and named variables are mixed, the unnamed variables are treated like variables with the name @code(_result).
-                  @br The template can be a node or a string. Written as string the example above would be @code(match("<a>{.}</a>", <x><a>FOO</a><a>BAR</a></x>)).
-                  @br You can pass multiple templates and nodes, in which case each template is applied to each node, and the result of all matching calls is returned in a single sequence.
-                  @br If the template cannot be matched, an error is raised.
-                  @br see THtmlTemplateParser for the full template reference.
-                  (This function is not actually declared in xquery.pas, but in extendedhtmlparser.pas, so it is only available if latter unit is included in any uses clause. )
-                  )
-      @item(@code(json($source as xs:string))
-                  @br Reads a json object/value from a string and converts it to an object/value (see object extension above).
-                  @br If the string is an url the json is loaded from there (i.e. be aware of possible security issues when using it. jn:parse-json from xquery_json / JSONiq will only parse it)
-                  @br Only available if the xquery_json unit is included in an uses clause.
-                  )
-      @item(@code(serialize-json($object as item()* ))
-                  @br Serializes an xq value as JSON string.
-                  @br Only available if the xquery_json unit is included in an uses clause.)
-      @item(@code(binary-to-string($data as xs:base64Binary|xs:hexBinary[, $encoding as xs:string]) as xs:string)
-                  @br Converts $data to a string using the given $encoding)
-      @item(@code(string-to-hexBinary($data as xs:string[, $encoding as xs:string]) as xs:hexBinary)
-                  @br Returns a hex binary representation of $data with the given $encoding)
-      @item(@code(string-to-base64Binary($data as xs:string[, $encoding as xs:string]) as xs:base64Binary)
-                  @br Returns a base64 binary representation of $data with the given $encoding)
-      @item(@code(random([$max]))
-                  @br Returns a random number)
-      @item(@code(random-seed([$seed]))
-                  @br Initializes the random number generator)
-      @item(All above functions belong to the namespace "http://www.benibela.de/2012/pxp/extensions",
-            which is at default bound to the prefixes "pxp" and "". This namespace also contains a copy of all standard XPath function)
-
-    )
-
 
     You can look at the unit tests in the tests directory to see many (> 5000) examples.
 
@@ -2915,6 +2810,9 @@ protected
   binaryOpFunctions: TXQMapStringObject;
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
+  {$ifdef dumpFunctions}
+  procedure logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+  {$endif}
 end;
 
 //**Returns a "..." string for use in json (internally used)
@@ -8276,6 +8174,8 @@ begin
   inherited Destroy;
 end;
 
+
+
 procedure TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string);
 var
   temp: TXQBasicFunctionInfo;
@@ -8290,7 +8190,12 @@ begin
      if maxArgCount <> - 1 then temp.maxArgCount := maxArgCount
      else temp.maxArgCount:=high(temp.maxArgCount);
   end else temp.guessArgCount;
+
+  {$ifdef dumpFunctions}
+  logFunctionCreation(name, temp, typeChecking);
+  {$endif}
 end;
+
 
 procedure TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string);
 begin
@@ -8312,6 +8217,9 @@ begin
      if maxArgCount <> - 1 then temp.maxArgCount := maxArgCount
      else temp.maxArgCount:=high(temp.maxArgCount);
   end else temp.guessArgCount;
+  {$ifdef dumpFunctions}
+  logFunctionCreation(name, temp, typeChecking);
+  {$endif}
 end;
 
 procedure TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
@@ -8331,6 +8239,9 @@ begin
   parseTypeChecking(temp, [typeDeclaration], false);
   temp.versions[0].name:=name; //just for error printing
   temp.guessArgCount;
+  {$ifdef dumpFunctions}
+  logFunctionCreation(name, temp, [typeDeclaration]);
+  {$endif}
 end;
 
 function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;
@@ -8433,6 +8344,50 @@ procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo;
 begin
   globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking, op);
 end;
+
+{$ifdef dumpFunctions}
+procedure TXQNativeModule.logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+var
+  i: Integer;
+  version: String;
+begin
+  if xqpmXQuery1 in acceptedModels then version := '1.0'
+  else version := '3.0';
+  i := 0;
+  repeat
+    write('<f m="', xmlStrEscape(trim(namespace.getURL),true), '" version="'+version+'" name="', xmlStrEscape(name,true), '" args="');
+    if i < length(typeChecking) then write(xmlStrEscape(typeChecking[i], true))
+    else if info.minArgCount = info.maxArgCount then write(info.minArgCount, ' argument', IfThen(info.minArgCount = 1, '', 's'))
+    else write(info.minArgCount, ' to ',info.maxArgCount, ' arguments');
+    writeln('"/>');
+    inc(i);
+  until i >= length(typeChecking);
+end;
+{$endif}
+
+{$ifdef dumpFunctions}
+procedure TXSSchema.logConstructorFunctions;
+var
+  i, j: Integer;
+  t: TXSType;
+  sversion: string;
+  ok: Boolean;
+begin
+  for i := 0 to typeList.Count - 1 do begin
+    t := TXSType( typeList.Objects[i] );
+    if isAbstractType(t) or baseSchema.isValidationOnlyType(t) then continue;
+    sversion := '1.0';
+    case t.name of
+      'dateTimeStamp', 'error': sversion := '3.0';
+      'null': continue;
+    end;
+    ok := true;
+    for j := 1 to length(t.name) do if not (t.name[j] in ['a'..'z','A'..'Z','-','0'..'9']) then begin ok := false; break; end;
+    if not ok then continue;
+    writeln('<f m="' , XMLNamespaceURL_XMLSchema, '" version="'+sversion+'" name="', xmlStrEscape(t.name,true), '" args="($arg as xs:anyAtomicType?) as xs:' ,xmlStrEscape(t.name,true), '?"/>');
+  end;
+end;
+{$endif}
 
 class function TXQNativeModule.findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
 var
@@ -8591,7 +8546,6 @@ end;
 
 
 var xs: TXQNativeModule;
-
 initialization
 assert(SizeOf(IXQValue) = sizeof(pointer));
 collations:=TStringList.Create;
@@ -8657,8 +8611,7 @@ baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');
 baseSchema.hide('numeric');
 
-
-
+{$ifdef dumpFunctions}baseSchema.logConstructorFunctions;{$endif}
 
 InitCriticalSection(interpretedFunctionSynchronization);
 finalization

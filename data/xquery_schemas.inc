@@ -1066,6 +1066,7 @@ begin
     TXSType(typeList.Objects[i]).id := i;
 end;
 
+
 function TXSSchema.isAbstractType(t: TXSType): boolean;
 begin
   result := (t = anySimpleType) or (t = NOTATION) or (t = anyAtomicType);
