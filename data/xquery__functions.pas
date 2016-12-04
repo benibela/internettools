@@ -1952,6 +1952,7 @@ function xqFunctionGarbage_Collect(const context: TXQEvaluationContext; {%H-}arg
 begin
   TXQueryEngineBreaker.freeCommonCaches;
   TNamespace.freeCache;
+  result := xqvalue;
 end;
 
 function xqFunctionEval(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
