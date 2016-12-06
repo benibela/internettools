@@ -177,19 +177,6 @@ begin
   result := commonDecimalType(at, bt, baseSchema.Double);
 end;
 
-class function TXSType.commonNumericType(a, b: TXSType): TXSNumericType;
-begin
-  if a.derivedFrom(baseSchema.integer) and b.derivedFrom(baseSchema.integer) then exit(commonIntegerType(a,b))
-  else exit(commonDecimalType(a,b,baseSchema.double) as TXSNumericType);
-end;
-
-class function TXSType.commonNumericType(const a, b: IXQValue): TXSNumericType;
-begin
-  result := commonNumericType(a.typeAnnotation, b.typeAnnotation)
-end;
-
-
-
 
 
 

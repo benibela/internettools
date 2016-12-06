@@ -422,7 +422,7 @@ begin
     exit;
   end;
 
-  t := TXSType.commonNumericType(a, b);
+  t := TXSType.commonDecimalType(a, b) as TXSNumericType;
   if t.derivedFrom(baseSchema.decimal) then begin
     bd := b.toDecimal;
     if isZero(bd) then raiseDivisionBy0NotAllowed;

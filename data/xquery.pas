@@ -1069,9 +1069,6 @@ type
     class function commonDecimalType(a,b: TXSType; const failureType: TXSType): TXSType; //static;
     class function commonDecimalType(const a,b: IXQValue): TXSType; static;
 
-    class function commonNumericType(a, b: TXSType): TXSNumericType;
-    class function commonNumericType(const a, b: IXQValue): TXSNumericType;
-
     //** Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
     function createValue(const v: IXQValue): IXQValue; inline;
     function createValue(const v: Int64): IXQValue; inline;
