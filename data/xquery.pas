@@ -2270,7 +2270,7 @@ type
       @item(@code(function ($a, $b) { $a + $b }) @br This returns an anonymous function which adds two numbers. )
     )
 
-    A complete list of support functions is given at http://www.benibela.de/documentation/internettools/xpath-functions.html
+    A complete list of supported functions is given at http://www.benibela.de/documentation/internettools/xpath-functions.html
 
     Differences between this implementation and standard XPath/XQuery (most differences can be turned off with the respective option or the field in the default StaticContext):
 
