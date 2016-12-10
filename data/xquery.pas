@@ -2466,7 +2466,7 @@ public
 
   private
     FLastQuery: IXQuery;
-    FCreationThread: SizeInt;
+    FCreationThread: TThreadID;
   protected
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
