@@ -154,17 +154,17 @@ begin
    b := failureType;
 
  if becomesType(baseSchema.Double) then
-   exit; //all values can be converted to double, but double can not be converted to anything
+   exit(baseSchema.double); //all values can be converted to double, but double can not be converted to anything
 
  //(decimal, float, integer) bases remaining
 
  if becomesType(baseSchema.Float) then
-   exit(); //all of them can be converted to float
+   exit(baseSchema.float); //all of them can be converted to float
 
  //(decimal, integer) remaining
 
  result := failureType;
- becomesType(baseSchema.Decimal)
+ if becomesType(baseSchema.Decimal) then result := baseSchema.decimal;
 end;
 
 class function TXSType.commonDecimalType(const a, b: IXQValue): TXSType;
@@ -244,13 +244,13 @@ var
   temp: String;
 begin
   case err of
-    xsceNoError: temp := '??';
     xsceFORG0001: temp := 'FORG0001';
     xsceXPTY0004: temp := 'XPTY0004';
     xsceFOCA0002: temp := 'FOCA0002';
     xsceFODT0001: temp := 'FODT0001';
     xsceFODT0002: temp := 'FODT0002';
     xsceFOAR0002: temp := 'FOAR0002';
+    else {xsceNoError: }temp := '??';
   end;
   raise EXQEvaluationException.create('err:'+temp, 'Cannot cast '+from+' to '+to_);
 end;

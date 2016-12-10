@@ -756,13 +756,14 @@ begin
           else if COMMAND_CLOSED[t] = 0 then exit(tetIgnore)
           else if COMMAND_CLOSED[t] = 2 then exit(t);
         end;
-      raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s)
+      raise ETemplateParseException.Create('Unbekannter Templatebefehl: '+s);
     end;
   end;
   case treeTyp of
     tetOpen, tetDocument: exit(tetHTMLOpen);
     tetClose: exit(tetHTMLClose);
     tetText: exit(tetHTMLText);
+    else result := tetIgnore; //should not happen
   end;
 end;
 
@@ -775,7 +776,7 @@ begin
   end;
 end;
 
-procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
+procedure ignore(const {%H-}intentionallyUnusedParameter: TObject); inline; begin end;
 
 
 { EHTMLParseMatchingException }
@@ -794,12 +795,12 @@ end;
 
 function TTemplateElement.templateReverse: TTemplateElement;
 begin
- exit(TTemplateElement(reverse));
+ result := TTemplateElement(reverse);
 end;
 
 function TTemplateElement.templateNext: TTemplateElement;
 begin
-  exit(TTemplateElement(next));
+  result := TTemplateElement(next);
 end;
 
 procedure TTemplateElement.setTemplateAttribute(name, avalue: string);
@@ -981,7 +982,6 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     textRegexs[high(textRegexs)] := wregexprParse(r, flags);
   end;
 var
-  term: TXQTerm;
   temp: String;
 begin
   contentRepetitions := 0;
@@ -994,7 +994,6 @@ begin
     temp := deepNodeText();
     if isVariableName(temp) then temp += ' := .'; //replace $xx with $xx := .
     source := parser.parseQuery(temp); //todo: encoding?
-    term := source.Term;
   end else
     source := cachePXP('source');
 
@@ -1833,7 +1832,7 @@ begin
   FHTML := TTreeParser.Create;
   FHTML.parsingModel:=pmHTML;
   FHTML.readComments:=true;
-  outputEncoding:=eUTF8;
+  outputEncoding:=CP_UTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
   FRepetitionRegEx:=wregexprParse('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *', [wrfSingleLine]);
@@ -2068,7 +2067,7 @@ begin
   NOLINK := '       ';
   EMPTY := strDup(' ', width) + NOLINK;
 
-  tempTemplateIndent:='';templateIndent:=0; htmlIndent:=0;
+  tempTemplateIndent:='';tempHTMLIndent:='';templateIndent:=0; htmlIndent:=0;
 
   setlength(res, 0);
   template := TTemplateElement(FTemplate.getLastTree.next);

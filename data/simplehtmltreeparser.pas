@@ -1242,7 +1242,7 @@ end;
 
 function TTreeNode.getPrevious: TTreeNode;
 begin
-  if self = nil then exit;
+  if self = nil then exit(nil);
   result := previous
 end;
 
@@ -1657,6 +1657,7 @@ var known: TNamespaceList;
           known.Delete(known.count-1);
       end;
       tetDocument: if html then result := innerHTML(insertLineBreaks) else result := innerXML(insertLineBreaks);
+      else result := ''; //should not happen
     end;
   end;
 
@@ -1942,6 +1943,7 @@ var content: string;
 
 
 begin
+  result := prContinue;
   ws := -1;
   for i := 0 to textLen - 1do
     if (text + i)^ in WHITE_SPACE then begin
@@ -1981,7 +1983,6 @@ begin
   if content <> '' then new.addAttribute('', strNormalizeLineEndings(content));
   new.hash := nodeNameHashCheckASCII(new.value);
   new.initialized;
-  result := prContinue;
 end;
 
 function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: longint): TTreeNode;
@@ -2043,7 +2044,8 @@ var
   closeFrom: Integer;
 begin
   result := nil;
- for i := FElementStack.Count-1 downto 0 do begin
+  closeFrom := FElementStack.Count;
+  for i := FElementStack.Count-1 downto 0 do begin
     temp :=TTreeNode(FElementStack[i]);
     if (temp.typ = tetOpen) and striEqual(temp.value, ctag) then begin
       closeFrom:=i;

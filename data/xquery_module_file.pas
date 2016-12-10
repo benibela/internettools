@@ -414,25 +414,25 @@ begin
   result := FileExists(Filename) and not DirectoryExists(Filename); //does this work?
 end;
 
-function exists(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function exists(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := xqvalue(FileExists(normalizePath(args[0])));
 end;
 
-function is_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function is_dir(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := xqvalue(DirectoryExists(normalizePath(args[0])));
 end;
 
-function is_file(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function is_file(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := xqvalue(FileExistsAsTrueFile(args[0].toString));
 end;
 
-function last_modified(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function last_modified(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dateTime: TDateTime;
   fn: String;
@@ -450,7 +450,7 @@ begin
   result := dt;
 end;
 
-function size(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function size(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   code: String;
   path: String;
@@ -514,7 +514,7 @@ begin
   result := xqvalue();
 end;
 
-function writeOrAppendSerialized(argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
+function writeOrAppendSerialized({%H-}argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
 var
   temp: TXQueryEngine;
   data: IXQValue;
@@ -528,7 +528,7 @@ begin
   result := writeOrAppendSomething(args[0], append, data.toString);
 end;
 
-function writeOrAppendText(argc: SizeInt; args: PIXQValue; append: boolean; text: string): IXQValue;
+function writeOrAppendText({%H-}argc: SizeInt; args: PIXQValue; append: boolean; text: string): IXQValue;
 var
   data: String;
   enc: TSystemCodePage;
@@ -542,33 +542,33 @@ begin
   result := writeOrAppendSomething(args[0], append, data);
 end;
 
-function append(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function append(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendSerialized(argc, args, true);
 end;
-function append_Binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function append_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
 end;
-function append_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function append_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendText(argc, args, true, args[1].toString);
 end;
-function append_Text_Lines(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function append_Text_Lines(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendText(argc, args, true, args[1].toJoinedString(LineEnding) + LineEnding);
 end;
 
-function write(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function write(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendSerialized(argc, args, false);
 end;
-function write_Binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function write_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   offset: int64;
 begin
@@ -577,12 +577,12 @@ begin
   if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
   result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueString).toRawBinary, offset);
 end;
-function write_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function write_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendText(argc, args, false, args[1].toString);
 end;
-function write_Text_Lines(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function write_Text_Lines(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := writeOrAppendText(argc, args, false, args[1].toJoinedString(LineEnding) + LineEnding);
@@ -610,7 +610,7 @@ end;
 
 
 
-function copy(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function copy(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   source, dest: String;
   copier: TDirCopier;
@@ -642,7 +642,7 @@ begin
   result := xqvalue();
 end;
 
-function create_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function create_dir(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir, code: String;
 begin
@@ -659,7 +659,7 @@ begin
   result := xqvalue();
 end;
 
-function create_temp_dir(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function create_temp_dir(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
@@ -674,7 +674,7 @@ begin
   result := xqvalue(dir);
 end;
 
-function create_temp_file(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function create_temp_file(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
@@ -720,7 +720,7 @@ begin
     TDirDeleter.checkResult(SysUtils.DeleteFile(current), current);
 end;
 
-function delete(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function delete(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
   recursive: Boolean;
@@ -809,7 +809,7 @@ begin
   end;
 end;
 
-function list(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function list(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   mask: String;
 begin
@@ -819,7 +819,7 @@ begin
   result := myList(args[0], true, (argc >= 2) and args[1].toBoolean, mask)
 end;
 
-function move(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function move(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   source: String;
   dest: String;
@@ -874,7 +874,7 @@ end;
 
 
 
-function read_binary(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function read_binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   from: int64;
   len: int64;
@@ -890,7 +890,7 @@ begin
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
 end;
 
-function read_text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function read_text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   data: rawbytestring;
   enc: TSystemCodePage;
@@ -919,13 +919,13 @@ begin
   result := path;
 end;
 
-function name(argc: SizeInt; args: PIXQValue): IXQValue;
+function name({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(strFileName(normalizePath(args[0])));
 end;
 
 
-function resolve_path(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function resolve_path(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
 begin
@@ -934,7 +934,7 @@ begin
   result := xqvalue(suffixDirectoy(path));
 end;
 
-function parent(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function parent(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   path: String;
 begin
@@ -944,13 +944,13 @@ begin
   result := xqvalue(suffixDirectoy(path));
 end;
 
-function children(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function children(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   Result := myList(args[0], false, false);
 end;
 
-function path_to_native(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function path_to_native(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   dir: String;
 begin
@@ -960,28 +960,28 @@ begin
   result := xqvalue(dir);
 end;
 
-function path_to_uri(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function path_to_uri(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
   result := xqvalue(urlHexEncode(fileNameExpandToURI(normalizePath(args[0])), URIForbiddenChars) );
 end;
 
-function dir_separator(argc: SizeInt; args: PIXQValue): IXQValue;
+function dir_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(DirectorySeparator);
 end;
 
-function line_separator(argc: SizeInt; args: PIXQValue): IXQValue;
+function line_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(LineEnding);
 end;
 
-function path_separator(argc: SizeInt; args: PIXQValue): IXQValue;
+function path_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(PathSeparator);
 end;
 
-function temp_dir(argc: SizeInt; args: PIXQValue): IXQValue;
+function temp_dir({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(GetTempDir());
 end;

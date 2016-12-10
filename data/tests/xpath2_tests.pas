@@ -569,8 +569,11 @@ begin
     t('0.00<true()', 'true');
     t('0.00<false()', 'false');
   end;
+  t('10000000000000000000000000000000000000 < xs:untypedAtomic("9999999999999999999999")', 'false');
+  t('xs:untypedAtomic("9999999999999999999999") < 10000000000000000000000000000000000000', 'true');
 
-                //Generic comparisons
+
+  //Generic comparisons
   t('(1, 2) = (2, 3)', 'true', '');
   t('(1, 2) != (2, 3)', 'true', '');
   t('(2, 3) = (3, 4)', 'true', '');

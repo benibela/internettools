@@ -80,7 +80,7 @@ begin
 end;
 
 
-function mathPi(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathPi({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqv(pi);
 end;
@@ -135,7 +135,7 @@ begin
     end;
 end;
 
-function mathExp(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathExp({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -143,7 +143,7 @@ begin
     result := xqv(exp(f));
 end;
 
-function mathExp10(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathExp10({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -151,7 +151,7 @@ begin
     result := xqv(power(10, f));
 end;
 
-function mathLog(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathLog({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -161,7 +161,7 @@ begin
     else result := xqv(NaN);
 end;
 
-function mathLog10(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathLog10({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -171,7 +171,7 @@ begin
     else result := xqv(NaN);
 end;
 
-function mathSqrt(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathSqrt({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -181,28 +181,28 @@ begin
 end;
 
 
-function mathSin(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathSin({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
   if singleArgMathNNN(args, f, result) then
     result := xqv(sin(f));
 end;
-function mathCos(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathCos({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
   if singleArgMathNNN(args, f, result) then
     result := xqv(cos(f));
 end;
-function mathTan(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathTan({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
   if singleArgMathNNN(args, f, result) then
     result := xqv(tan(f));
 end;
-function mathASin(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathASin({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -210,7 +210,7 @@ begin
     result := xqv(arcsin(f));
   except on e: EMathError do result := xqv(NaN); end;
 end;
-function mathAcos(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathAcos({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -218,7 +218,7 @@ begin
     result := xqv(arccos(f));
   except on e: EMathError do result := xqv(NaN); end;
 end;
-function mathAtan(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathAtan({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: xqfloat;
 begin
@@ -239,9 +239,8 @@ begin
     else exit(xqv(Infinity));
 end;
 
-function mathPow(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathPow({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  f: xqfloat;
   bd: BigDecimal;
   a: xqfloat;
   b: xqfloat;
@@ -286,7 +285,7 @@ begin
   end;
 end;
 
-function mathAtan2(argc: SizeInt; args: PIXQValue): IXQValue;
+function mathAtan2({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   a: xqfloat;
   b: xqfloat;

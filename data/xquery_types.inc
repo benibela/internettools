@@ -964,7 +964,7 @@ begin
   else if instanceOf(baseSchema.base64Binary) then begin
     if str = '' then exit('');
     result := base64.DecodeStringBase64(str)
-  end else assert(false);
+  end else begin assert(false); result := ''; end;
 end;
 
 function TXQValueString.clone: IXQValue;
@@ -1218,10 +1218,12 @@ const componentMax: array[1..6] of integer = (high(integer), 13, 32, 25, 60, 60)
 const componentFiller: array[1..6] of integer = (1972, 12, 31, 0, 0, 0);
 const componentChars: string = 'ymdhns';
 begin
+  result := dtprFailure;
   if data = nil then data := @tempData;
   duration := strBeginsWith(format, '[-]P');
-  if duration and ((length(s) <= 2) or strEndsWith(s, 'T')) then exit(dtprFailure);
+  if duration and ((length(s) <= 2) or strEndsWith(s, 'T')) then exit;
   formats := strSplit(format, '|');
+  if length(formats) = 0 then exit;
   for i:=0 to high(formats) do begin
     usedFormat:=formats[i];
     result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone, [dtpfStrict]);

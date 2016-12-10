@@ -157,7 +157,7 @@ function TXQTermWithChildren.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Vi
 var
   i: Integer;
 begin
-  if length(children) = 0 then exit(xqtvaContinue);
+  result := xqtvaContinue;
   for i := 0 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
     case result of xqtvaAbort: exit; end;
@@ -487,7 +487,7 @@ begin
     amArrayOverride, amArrayInsert: begin
       if not context.hasGlobalVariable(varname, value, varnamespace) then value := xqvalue;
       applyProperties;
-      if (arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
+      if ({%H-}arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
       else if arrayIndex > value.getSequenceCount then begin
         seq := TXQValueSequence.create(value);
         seq.add(result);
@@ -521,7 +521,7 @@ begin
   end;
 
   if length(properties) = 0 then //test is unnessesary, as it should work with only the last branch. But being explicit looks better
-    context.staticContext.sender.VariableChangelog.add(varname, value, varnamespace)
+    context.staticContext.sender.VariableChangelog.add(varname, value{%H-}, varnamespace)
    else
     context.staticContext.sender.VariableChangelog.addObjectModification(varname, value, varnamespace, properties)
 
@@ -565,11 +565,11 @@ begin
       context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, nsu, name, result);
     end;
   end;
-  if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + name+ ' given.');
+  if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + getVariable.ToString+ ' given.');
 
   if hasTypeDeclaration then
     if not sequenceType.instanceOf(result, context) then
-      raiseEvaluationError('XPTY0004', 'Variable '+name + ' with value ' +result.toXQuery() + ' has not the correct type '+TXQTermSequenceType(children[0]).serialize);
+      raiseEvaluationError('XPTY0004', 'Variable '+getVariable.ToString + ' with value ' +result.toXQuery() + ' has not the correct type '+TXQTermSequenceType(children[0]).serialize);
 end;
 
 function TXQTermDefineVariable.getContextDependencies: TXQContextDependencies;
@@ -770,7 +770,7 @@ begin
       if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
       else result := (atomicTypeInfo as TXSQNameType).cast(v, context);
     end;
-    else raiseXPTY0004TypeError(v, debugTermToString);
+    else begin raiseXPTY0004TypeError(v, debugTermToString); result := nil; end;
   end;
 end;
 
@@ -806,6 +806,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
         if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
         else result := arguments[high(arguments)].isItemStar();
       end;
+      else result := false; //hide warning
     end;
   end;
 
@@ -1032,11 +1033,14 @@ begin
   evilkids := stack.topptr(ccount - 1);
   case targetLength of
     0: result := xqvalue;
-    1: for i := 0 to ccount - 1 do
-      if not evilkids[i].isUndefined then begin
-        result := evilkids[i];
-        break;
-      end;
+    1: begin
+      result := evilkids[0];
+      for i := 1 to ccount - 1 do
+        if not evilkids[i].isUndefined then begin
+          result := evilkids[i];
+          break;
+        end;
+    end
     else begin
       tempSeq := TXQValueSequence.create(targetLength);
       result := tempSeq;
@@ -1284,7 +1288,7 @@ begin
     if Assigned(previousItem) then visitor.declare(@previousItem);
     if Assigned(nextItem) then visitor.declare(@nextItem);
     result := visitor.simpleTermVisit(@when, parent);
-  end;
+  end else result := xqtvaContinue;
 end;
 
 procedure TXQTermFlowerWindowVarsAndCondition.visitchildrenToUndeclare(visitor: TXQTerm_Visitor; parent: txqterm);
@@ -2144,7 +2148,7 @@ var
       while i < oldSortingCache.Count do begin
         if data.compareTuples(lastTuple, TOrderedTuple(oldSortingCache[i])) = 0 then begin
           for k in nonGroupingVars do
-            tempLists[k].add(TOrderedTuple(oldSortingCache[i]).vars[k]);
+            {%H-}tempLists[k].add(TOrderedTuple(oldSortingCache[i]).vars[k]);
           tobject(oldSortingCache[i]).free;
         end else newGroupedTuple;
         inc(i);
@@ -2474,6 +2478,7 @@ begin
       interpretedFunction.contextOverrideParameterNames(context, argcount);
       result := interpretedFunction.evaluate(context, self);
     end;
+    else begin assert(false); result := nil; end;
   end;
 
   {$ifdef checkreturntypes}
@@ -2930,11 +2935,14 @@ function TXQTermPath.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitActio
 var
   i, j: Integer;
 begin
+  result := xqtvaContinue;
   for i := 0 to high(path) do begin
     if path[i].typ = qcFunctionSpecialCase then visitor.simpleTermVisit(@path[i].specialCase, self);
     if path[i].requiredType <> nil then visitor.simpleTermVisit(@path[i].requiredType, self);
-    for j := 0 to high(path[i].filters) do
-      visitor.simpleTermVisit(@path[i].filters[j], self);
+    for j := 0 to high(path[i].filters) do begin
+      result := visitor.simpleTermVisit(@path[i].filters[j], self);
+      case result of xqtvaAbort: exit; end;
+    end;
   end;
 end;
 
@@ -3061,8 +3069,11 @@ begin
     namespaceURLOrPrefix:=strSplitGet(':',queryCommand.value);
     if namespaceURLOrPrefix = '*' then namespaceCheck := xqnmNone
     else namespaceCheck := xqnmPrefix;
-  end else if queryCommand.value <> '*' then namespaceCheck := xqnmPrefix
-  else namespaceCheck := xqnmNone;
+  end else begin
+    namespaceURLOrPrefix := '';
+    if queryCommand.value <> '*' then namespaceCheck := xqnmPrefix
+    else namespaceCheck := xqnmNone;
+  end;
   if namespaceCheck <> xqnmNone then setNamespace(namespaceCheck, namespaceURLOrPrefix);
 
   //result.requiredType := nil;
@@ -3258,7 +3269,10 @@ begin
     result := context.temporaryVariables.top(self, index)
   else if index = -2 then
     result := context.getGlobalVariable(value, namespace)
-  else fail;
+  else begin
+    fail;
+    result := nil;
+  end;
 end;
 
 function TXQTermVariable.getContextDependencies: TXQContextDependencies;
@@ -3486,6 +3500,7 @@ begin
     if TXQTermTypeSwitchClause(children[i]).matched(context, v, result) then
       exit;
   raiseInternalError(164301750);
+  result := nil;
 end;
 
 function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
@@ -4012,7 +4027,7 @@ begin
     result := visitor.simpleTermVisit(@nameValue, self);
     case result of xqtvaAbort: exit; end;
   end;
-  inherited visitchildren(visitor);
+  result := inherited visitchildren(visitor);
 end;
 
 { TXQTermJSONObjectConstructor }
@@ -4289,6 +4304,7 @@ var
   varDef: TXQTermDefineVariable;
 begin
   visitor.parent := self;
+  result := xqtvaContinue;
   case kind of
     xqtdfUserDefined, xqtdfNamedReference: begin
       for i := 0 to parameterCount - 1 do begin
@@ -4300,8 +4316,10 @@ begin
           visitor.parent := self;
         end;
       end;
-      for i := parameterCount to high(children) do
+      for i := parameterCount to high(children) do begin
         result := visitor.simpleTermVisit(@children[i], self);
+        case result of xqtvaAbort: exit; end;
+      end;
       visitor.parent := self;
       for i := parameterCount - 1 downto 0 do
         visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));

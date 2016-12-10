@@ -72,7 +72,7 @@ begin
   if args[0].isUndefined then exit(xqvalue);
   v := castSomethingToDatetime(args[0]);
   if v.getInternalDateTimeData^.timezone = high(Integer) then exit(xqvalue);
-  fillchar(tempCorrectlyInitialized, sizeof(tempCorrectlyInitialized), 0);
+  fillchar(tempCorrectlyInitialized{%H-}, sizeof(tempCorrectlyInitialized), 0);
   tempCorrectlyInitialized.min:=v.getInternalDateTimeData^.timezone;
   tempCorrectlyInitialized.hour:=tempCorrectlyInitialized.min div 60; tempCorrectlyInitialized.min:=tempCorrectlyInitialized.min mod 60;
   tempCorrectlyInitialized.timezone:=high(Integer);

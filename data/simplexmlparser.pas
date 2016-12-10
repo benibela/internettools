@@ -79,7 +79,9 @@ end;
 function THTMLEventHandler.convToStr(p: pchar; l: longint; flags: TTextFlags = []): string;
 begin
   if not (tfCDATA in flags) then
-    result:=strDecodeHTMLEntities(p,l,fileEncoding);
+    result:=strDecodeHTMLEntities(p,l,fileEncoding)
+   else
+    result:=strFromPchar(p,l);
   result:=strChangeEncoding(result,fileEncoding,outputEncoding);
 end;
 

@@ -482,7 +482,7 @@ begin
       if not (ak in [pvkInt64, pvkBigDecimal]) then begin
         af := a.toFloat;;
         if IsNan(af) or IsInfinite(af) then
-          raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.debugAsStringWithTypeAnnotation()+' for integer division');
+          raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.toXQuery()+' for integer division');
       end;
       exit(baseSchema.integer.createValue(0))
     end;
@@ -642,6 +642,7 @@ begin
   if (k = pvkSequence) and (v.getSequenceCount=1) then
     exit(recurse); //split so we do not get an temporary ixqvalue in the main function
   raiseXQEvaluationError('XPTY0020', 'Expected node', v);
+  result := nil;
 end;
 
 function xqvalueSameNode(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -835,8 +836,8 @@ begin
   if argc = 0 then begin
     if context.SeqValue <> nil then result := numberize(context.SeqValue)
     else if context.ParentElement <> nil then result := numberize(xqvalue(context.ParentElement))
-    else context.raiseXPDY0002ContextItemAbsent;
-    exit;
+    else begin context.raiseXPDY0002ContextItemAbsent; result := nil; end;
+    exit();
   end;
   result := numberize(args[0]);
 end;
@@ -977,7 +978,7 @@ begin
   case args[0].getSequenceCount of
     0: exit(xqvalue);
     1: ;
-    else raiseXPTY0004TypeError(args[0], 'numeric?');
+    else begin raiseXPTY0004TypeError(args[0], 'numeric?'); result := nil; end;
   end;
   baseType := getBaseType(args[0]);
   if argc = 1 then prec := 0
@@ -994,6 +995,7 @@ begin
       else if prec > 4933 then result := baseType.createValue(0)
       else result := baseType.createValue(xqfloatRounded(f, prec));
     end;
+    else begin raiseXPTY0004TypeError(args[0], 'numeric?'); result := nil; end;
   end;
 end;
 
@@ -1079,22 +1081,23 @@ end;
 //String functions
 function xqFunctionString(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  if argc = 0 then begin
-    result := xqvalue(context.SeqValueAsString);
-  end else if argc = 1 then
-    if args[0].kind = pvkFunction then raise EXQEvaluationException.create('FOTY0014', 'Cannot pass function item to fn:string')
+  if argc <> 1 then result := xqvalue(context.SeqValueAsString)
+  else begin
+    if args[0].kind = pvkFunction then begin raiseXQEvaluationError('FOTY0014', 'Cannot pass function item to fn:string', args[0]); result := nil; end
     else result := xqvalue(args[0].toString);
+  end;
 end;
 
 function xqFunctionDeep_Node_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var sep: string;
 begin
-  if argc = 1 then sep := args[0].toString;
+  if argc = 1 then sep := args[0].toString else sep := '';
   if (context.SeqValue <> nil) and (context.SeqValue.kind = pvkNode) then begin
 //    raise EXQEvaluationException.Create('deep-text() needs a node, but context item is atomic value');
     result := xqvalue(treeElementAsString(context.SeqValue.toNode,sep));
   end else if context.ParentElement <> nil then //TODO: why doesn't it read textelement?
     result := xqvalue(treeElementAsString(context.ParentElement,sep))
+  else result := xqvalue('');
 end;
 
 function xqFunctionOuter_XML(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -1336,6 +1339,8 @@ var replaceNames, replaceValues: TStringArray;
       if form = nil then exit(xqvalue());
       method := UpperCase(form.getAttribute('method', 'GET', cmp));
       post := striEqual(method, 'POST');
+      request := '';
+      mime.data := nil;
       multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
 
       used := TStringList.Create;
@@ -1486,7 +1491,7 @@ var temp: TXQVArray;
 
 begin
   requiredArgCount(argc, 2);
-  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].debugAsStringWithTypeAnnotation());
+  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].toXQuery());
 
   multipart := '';
   headers := args[0].getProperty('headers');
@@ -1684,7 +1689,7 @@ begin
   for v in args[0].GetEnumeratorPtrUnsafe do begin
     ok := tryValueToInteger(v^, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
-    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.debugAsStringWithTypeAnnotation());
+    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.toXQuery());
     temp.add(codepoint);
   end;
   temp.final;
@@ -1720,7 +1725,7 @@ begin
   else raise EXQEvaluationException.create('pxp:binary', 'Unknown binary type: '+args[0].typeAnnotation.name);
 
   if argc > 1 then
-    exit(xqvalue(strChangeEncoding(raw, strEncodingFromName(args[1].toString), eUTF8)));
+    exit(xqvalue(strChangeEncoding(raw, strEncodingFromName(args[1].toString), CP_UTF8)));
 
   result := xqvalue(raw);
 end;
@@ -1730,7 +1735,7 @@ var
 begin
   //(string, encoding?) => binary
   data := args[0].toString;
-  if argc > 1 then data := strChangeEncoding(data, eUTF8, strEncodingFromName(args[1].toString));
+  if argc > 1 then data := strChangeEncoding(data, CP_UTF8, strEncodingFromName(args[1].toString));
   result := TXQValueString.create(baseSchema.hexBinary, strEncodeHex(data));
 end;
 function xqFunctionString_To_base64Binary(argc: SizeInt; args: PIXQValue): IXQValue;
@@ -1739,7 +1744,7 @@ var
 begin
   //(string, encoding?) => binary
   data := args[0].toString;
-  if argc > 1 then data := strChangeEncoding(data, eUTF8, strEncodingFromName(args[1].toString));
+  if argc > 1 then data := strChangeEncoding(data, CP_UTF8, strEncodingFromName(args[1].toString));
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
 end;
 
@@ -1950,6 +1955,7 @@ end;
 
 function xqFunctionGarbage_Collect(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  ignore(context); ignore(args);
   TXQueryEngineBreaker.freeCommonCaches;
   TNamespace.freeCache;
   result := xqvalue;
@@ -2199,7 +2205,7 @@ begin
       else stamp := baseSchema.duration.createValue(args[1]).getInternalDateTimeData^.toDayTime();
       if (stamp mod SCALE <> 0)
          or (stamp < -14*60*SCALE) or (stamp > 14*60*SCALE)
-         then raise EXQEvaluationException.create('FODT0003', 'Invalid timezone: ' + args[1].debugAsStringWithTypeAnnotation());
+         then raise EXQEvaluationException.create('FODT0003', 'Invalid timezone: ' + args[1].toXQuery());
       tz := stamp div SCALE;
     end;
   end else tz := context.staticContext.ImplicitTimezoneInMinutes;
@@ -3203,7 +3209,7 @@ begin
             exit;
           end;
     end;
-    else raiseError;
+    else begin raiseError; result := nil; end;
   end;
 end;
 
@@ -3308,7 +3314,7 @@ function xqFunctionPosition(const context: TXQEvaluationContext; {%H-}argc: Size
 begin
   if context.SeqValue <> nil then result := xqvalue(context.SeqIndex)
   else if context.ParentElement <> nil then result := xqvalue(1)
-  else context.raiseXPDY0002ContextItemAbsent;
+  else begin context.raiseXPDY0002ContextItemAbsent; result := nil; end;
 
 end;
 
@@ -3316,7 +3322,7 @@ function xqFunctionLast(const context: TXQEvaluationContext; {%H-}argc: SizeInt;
 begin
   if context.SeqValue <> nil then result := xqvalue(context.SeqLength)
   else if context.ParentElement <> nil then result := xqvalue(1)
-  else context.raiseXPDY0002ContextItemAbsent;
+  else begin context.raiseXPDY0002ContextItemAbsent; result := nil; end;
 end;
 
 function xqFunctionId_Common(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; parentElement: boolean): IXQValue;
@@ -3611,7 +3617,7 @@ function xqFunctionFunction_name({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   f: TXQValueFunction;
 begin
-  if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].debugAsStringWithTypeAnnotation());
+  if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].toXQuery());
   f := args[0] as TXQValueFunction;
   if f.name = '' then exit(xqvalue);
   result := TXQValueQName.create(f.namespaceURL, f.namespacePrefix, f.name);
@@ -3621,7 +3627,7 @@ function xqFunctionFunction_arity({%H-}argc: SizeInt; args: PIXQValue): IXQValue
 var
   f: TXQValueFunction;
 begin
-  if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].debugAsStringWithTypeAnnotation());
+  if not (args[0] is TXQValueFunction) then raise EXQEvaluationException.create('XPTY0004', 'Expected function, got: '+args[0].toXQuery());
   f := args[0] as TXQValueFunction;
   result := xqvalue(length(f.parameters));
 end;
@@ -5088,6 +5094,12 @@ begin
 
   //analyze picture
   picture := args[1].toString;
+  for i := 0 to 1 do begin
+    pictureParser[i].integerGroups := nil;
+    pictureParser[i].fractionGroups := nil;
+    pictureParser[i].prefix := '';
+    pictureParser[i].suffix := '';
+  end;
   FillChar(pictureParser, sizeof(pictureParser), 0);
   currentPictureParser := 0;
   pictureParser[0].subPosition := spInPrefix;
@@ -5251,7 +5263,7 @@ begin
       if groupPos >= 0 then begin
         if (dot - i >= integerGroups[groupPos]) and (i <> j) then begin
           resstr := strGetUnicodeCharacter(data^.chars[xqdfpGroupingSeparator]) + resstr;
-          if integerGroupDelta < 0 then dec(groupPos)
+          if {%H-}integerGroupDelta < 0 then dec(groupPos)
           else integerGroups[groupPos] += integerGroupDelta;
         end;
       end;

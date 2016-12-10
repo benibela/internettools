@@ -2959,8 +2959,8 @@ end;
 
 function strslice(const  first, last: pansichar): RawByteString;
 begin
-  if first>last then exit;
   result := '';
+  if first>last then exit;
   SetLength(result,last-first+1);
   move(first^,result[1],length(result));
 end;
@@ -4533,7 +4533,8 @@ function strEscape(s: RawByteString; const toEscape: TCharSet; escapeChar: ansic
 var
  i: Integer;
 begin
-  if length(s) = 0 then begin result := ''; exit; end;
+  result := '';
+  if length(s) = 0 then exit;
   for i:=1 to length(s) do begin
     if s[i] in toEscape then result := result +  escapeChar;
     result := result +  s[i];
@@ -5084,7 +5085,7 @@ begin
     begin result := base+rel; exit; end;
   end;
   p := pos('#', rel);
-  if p > 0 then begin relparams:=strCopyFrom(rel, p); delete(rel, p, length(rel) - p + 1);end;
+  if p > 0 then begin relparams:=strCopyFrom(rel, p); delete(rel, p, length(rel) - p + 1);end else relparams := '';
   p := pos('?', rel);
   if p > 0 then begin relparams:=strCopyFrom(rel, p) + relparams; delete(rel, p, length(rel) - p + 1);end;
   if rel = '' then begin result := base + relparams; exit; end;
@@ -5754,8 +5755,6 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
   (n:'m'#$C3#$A4'rz';v:3));
 
 function readNumber(const s:RawByteString; var ip: integer; const count: integer): integer;
-var
-  temp: String;
 begin
   if (dtpfStrict in options) and ((ip > length(s)) or not (s[ip] in ['0'..'9'])) then begin
     result := -1;
@@ -5769,7 +5768,7 @@ var
   i: Integer;
 
   prefix, mid, suffix: RawByteString;
-  p, formatChars: Integer;
+  p: Integer;
 
   count: integer;
   base: ansichar;
@@ -5783,6 +5782,7 @@ var
 
 
 begin
+  truecount := 0; //hide warning
   p := pos('[', mask);
   if p > 0 then begin
     suffix := mask;
@@ -6623,7 +6623,7 @@ begin
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
 
-function compareString(c:TObject; a, b:pointer):longint;
+function compareString({%H-}c:TObject; a, b:pointer):longint;
 begin
   result := striCompareClever(PString(a)^, PString(b)^);
 end;

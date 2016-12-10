@@ -56,7 +56,7 @@ begin
 end;
 
 
-function xqFunctionString_length(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionString_length(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: String;
 begin
@@ -69,7 +69,7 @@ begin
 end;
 
 
-function xqFunctionSubstring(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSubstring({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var s:string;
     from, len: integer;
 begin
@@ -79,9 +79,9 @@ begin
 end;
 
 
-function xqFunctionTranslate(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTranslate({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- i,pos, cp: Integer;
+ i,cp: Integer;
  resstr: String;
  mapIterator, transIterator: TStrIterator;
  found: Boolean;
@@ -111,7 +111,7 @@ end;
 
 
 
-function xqFunctionNormalizeUnicode(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   method: String;
   p: pchar;
@@ -135,9 +135,9 @@ begin
   Freemem(p);
 end;
 
-function xqFunctionString_to_codepoints(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionString_to_codepoints({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: string;
- i, cp: Integer;
+ cp: Integer;
  resseq: TXQValueSequence;
 begin
   temp := args[0].toString;
@@ -212,12 +212,12 @@ begin
   end;
 end;
 
-function xqFunctionUpper_Case(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionUpper_Case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(strUpperUtf8(args[0].toString));
 end;
 
-function xqFunctionLower_case(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionLower_case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqvalue(strLowerUtf8(args[0].toString));
 end;

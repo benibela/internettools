@@ -126,6 +126,7 @@ begin
   pos:=@html[1];
   htmlEnd:=@html[length(html)];
   marker:=pos;
+  cdataTagStartMarker := nil; //hide warning
   while (pos<=htmlEnd) do begin
     case pos^ of
       '<': begin //Start or end of a tag
@@ -295,7 +296,7 @@ type TTempSearchClassText=class
   lastLink: boolean;
   searchedText:string;
   function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
-  function readText(text: pchar; textLen: longint; tf: TTextFlags):TParsingResult;
+  function readText(text: pchar; textLen: longint; {%H-}tf: TTextFlags):TParsingResult;
 end;
 
 

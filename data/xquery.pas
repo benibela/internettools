@@ -3135,13 +3135,11 @@ begin
   case digit of
     0..9: result := chr(ord('0') + digit);
     $A..$F: result := chr(ord('A') - $A + digit);
-    else assert(false);
+    else begin assert(false); result := #0; end;
   end;
 end;
 
 procedure TStrBuilder.addhexentity(codepoint: integer);
-var
-  i: Integer;
 begin
   add('&#x');
   if codepoint <= $FF then begin
@@ -3166,7 +3164,7 @@ begin
   if context.SeqValue <> nil then result := context.SeqValue
   else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
   else if context.RootElement <> nil then result := xqvalue(context.RootElement)
-  else context.raiseXPDY0002ContextItemAbsent();
+  else begin context.raiseXPDY0002ContextItemAbsent(); result := nil; end
 end;
 
 function TXQTermContextItem.debugTermToString: string;
@@ -3203,6 +3201,7 @@ function TXQPathMatchingStep.serialize: string;
 var
   i: Integer;
 begin
+  result := '';
   if typ <> qcFunctionSpecialCase then begin
    if not (qmAttribute in matching) then
      case typ of
@@ -3508,7 +3507,7 @@ begin
   inherited create(aerrcode, amessage, anamespace);
   value := avalue;
   if value <> nil then
-    message := message + ':'+LineEnding+value.debugAsStringWithTypeAnnotation();
+    message := message + ':'+LineEnding+value.toXQuery();
   term := aterm;
   if term <> nil then
     message := message + ' in '+LineEnding+term.ToString;
@@ -4381,7 +4380,8 @@ var ak, bk: TXQValueKind;
       result := compareValue(double(ad), double(bd));
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
       result := compareValue(Single(ad), Single(bd));
-    end;
+    end else
+      result := -2; //should not happen, but hides warning
   end;
 
   function compareCommonAsStrings(): integer;
@@ -4419,7 +4419,10 @@ var ak, bk: TXQValueKind;
   begin
     case k of
       pvkInt64, pvkBigDecimal, //this case is handled in vtod
-      pvkFloat: raisePXPInternalError(); //float trigger floating point conversion
+      pvkFloat: begin
+        raisePXPInternalError(); //float trigger floating point conversion
+        result := ''; //hide warning
+      end;
       pvkString, pvkNode: begin
         if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
         result := trim(v.toString);
@@ -4427,7 +4430,7 @@ var ak, bk: TXQValueKind;
       else begin
         if strictTypeChecking then raiseXPTY0004TypeError(v, 'decimal');
         result := trim(v.toString);
-      end;
+      end
     end;
   end;
   function compareAsBigDecimals: integer;
@@ -4438,7 +4441,7 @@ var ak, bk: TXQValueKind;
       pvkInt64, pvkBigDecimal: bda := a.toDecimal; //always ok
       else begin
         temps := vtodecimalstr(ak, a);
-        if not tryStrToBigDecimal(temps, @result) then
+        if not tryStrToBigDecimal(temps, @bda) then
           if strContains(temps, 'N') then exit(compareCommonFloat())
           else raiseFORG0001InvalidConversion(a, 'decimal');
       end;
@@ -4447,7 +4450,7 @@ var ak, bk: TXQValueKind;
       pvkInt64, pvkBigDecimal: bdb := b.toDecimal; //always ok
       else begin
         temps := vtodecimalstr(bk, b);
-        if not tryStrToBigDecimal(temps, @result) then
+        if not tryStrToBigDecimal(temps, @bdb) then
           if strContains(temps, 'N') then exit(compareCommonFloat())
           else raiseFORG0001InvalidConversion(b, 'decimal');
       end;
@@ -4481,7 +4484,7 @@ var ak, bk: TXQValueKind;
           if strContains(s, 'N') then exit(compareCommonFloat())
           else exit(-compareAsBigDecimals(b, s));
       temp := temp - TXQValueInt64(b).value;
-    end else raisePXPInternalError;
+    end else begin raisePXPInternalError; temp := 0; end;
     result := compareInts(temp);
   end;
 
@@ -4514,12 +4517,13 @@ var ak, bk: TXQValueKind;
         end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
           result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),ImplicitTimezoneInMinutes);
       end;
-      pvkQName:
+      pvkQName: begin
+        result := -2;
         if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
            or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
           if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
             result := 0
-          else result := -2;
+      end;
       pvkNull: result := 0;
       pvkUndefined: result := -2;
       pvkNode, pvkString: result := compareCommonAsStrings;
@@ -4529,7 +4533,7 @@ var ak, bk: TXQValueKind;
         result := compareCommon(getFirst(a), getFirst(b), overrideCollation, castUnknownToString);
       end;
       pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
-      else raisePXPInternalError;
+      else begin result := -2; raisePXPInternalError; end;
     end;
   end;
 
@@ -4687,11 +4691,12 @@ begin
         if (compres = accept1) or (compres=accept2) then exit(true);
       end;
   end else begin
-    if ak = pvkSequence then seq := a
-    else plain := a;
-    if bk = pvkSequence then seq := b
-    else plain := b;
-    if plain = a then begin
+    if ak = pvkSequence then begin
+     seq := a;
+     plain := b;
+    end else begin
+      seq := b;
+      plain := a;
       accept1:=-accept1;
       accept2:=-accept2;
     end;
@@ -4959,6 +4964,7 @@ begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp = nil then begin
     if nsprefix <> '' then raise EXQEvaluationException.Create('XPST0008', 'Unknown namespace prefix: '+nsprefix);
+    result := '';
     exit;
   end;
   result := temp.getURL;
@@ -5067,7 +5073,7 @@ function TXQEvaluationContext.SeqValueAsString: string;
 begin
   if SeqValue <> nil then result := SeqValue.toString
   else if ParentElement <> nil then result := treeElementAsString(ParentElement)
-  else raiseXPDY0002ContextItemAbsent;
+  else begin raiseXPDY0002ContextItemAbsent; result := ''; end;
 end;
 
 
@@ -5657,6 +5663,7 @@ begin
   end;
 
   makeErrorMessage;
+  result := -1;
 end;
 
 destructor TXQAbstractFunctionInfo.Destroy;
@@ -5740,6 +5747,7 @@ begin
     inc(a);
     inc(b);
   end;
+  result := 0;
 end;
 
 function TXQCollation.doCompare(const a, b: string): integer;
@@ -6726,6 +6734,7 @@ end;
 
 function TXQueryEngine.getEvaluationContext(staticContextOverride: TXQStaticContext): TXQEvaluationContext;
 begin
+  result.SeqValue := nil;
   FillChar(result, sizeof(result), 0);
   if staticContextOverride = nil then result.staticContext:=StaticContext
   else result.staticContext := staticContextOverride;
@@ -7220,7 +7229,7 @@ var pos: pchar;
       '~': result := newFunction('split-equal', [newReadAttrib(attribName), newString(attribValue), newString(' ')]); //includes
       '|': result := newFunction('split-equal', [newReadAttrib(attribName), newString(attribValue), newString('-')]); //dashmatch;
       '=': result := newBinOp(newReadAttrib(attribName), '=', newString(attribValue)); //equal;
-      else raiseParsingError('Unknown operator: '+op+' before ' +attribValue);
+      else begin raiseParsingError('Unknown operator: '+op+' before ' +attribValue); result := nil; end;
     end;
 
     skipSpace;
@@ -7270,7 +7279,7 @@ var pos: pchar;
     tn: String;
   begin
     expect(':');
-    if pos^ = ':' then raiseParsingError(':: pseudo elements are not supported');
+    if pos^ = ':' then begin raiseParsingError(':: pseudo elements are not supported'); exit(nil); end;
     t := nextToken;
     if pos^ = '(' then begin
       expect('(');
@@ -7291,7 +7300,7 @@ var pos: pchar;
       end
       else if striequal(t, 'not') then begin
         case pos^ of
-          #0: raiseParsingError('Unclosed not');
+          #0: begin raiseParsingError('Unclosed not'); exit(nil); end;
           '#': result := hash;
           '.': result := classs;
           '[': result := attrib;
@@ -7341,7 +7350,7 @@ var pos: pchar;
             skipSpace;
             if b <> 0 then b := b * StrToInt(nextToken);
           end
-          else raiseParsingError('Expected nth');
+          else begin raiseParsingError('Expected nth'); exit(nil); end;
         end;
 
 
@@ -7354,8 +7363,8 @@ var pos: pchar;
           result := isNth(newFunction('count', allOfSameType('preceding-sibling')), a,b-1)
         else if striequal(t, 'nth-last-of-type') then
           result := isNth(newFunction('count', allOfSameType('following-sibling')), a,b-1)
-        else raiseParsingError('impossible');
-      end else raiseParsingError('Unknown function: '+t);
+        else begin raiseParsingError('impossible'); result := nil; end;
+      end else begin raiseParsingError('Unknown function: '+t); result := nil; end;
       skipSpace;
       expect(')')
     end else begin
@@ -7373,8 +7382,8 @@ var pos: pchar;
         result := newFunction('not', [result]);
       end else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self', 'a'), newFunction('exists', newReadAttrib('href')))
       else if striEqual(t, 'checked') then       result := newFunction('exists', [newReadAttrib('checked')])
-      else if striEqual(t, 'enabled') or striEqual(t, 'disabled') or striEqual(t, 'visited') or striEqual(t, 'active') or striEqual(t, 'hover') or striEqual(t, 'focus') or striEqual(t, 'target')  then raiseParsingError('Unsupported pseudo class: '+t)
-      else raiseParsingError('Unknown pseudo class: '+t);
+      else if striEqual(t, 'enabled') or striEqual(t, 'disabled') or striEqual(t, 'visited') or striEqual(t, 'active') or striEqual(t, 'hover') or striEqual(t, 'focus') or striEqual(t, 'target')  then begin raiseParsingError('Unsupported pseudo class: '+t); exit(nil); end
+      else begin raiseParsingError('Unknown pseudo class: '+t); exit(nil); end;
     end;
   end;
 
@@ -7412,7 +7421,7 @@ var pos: pchar;
           '.': filter := classs();
           '[': filter := attrib();
           ':': filter := pseudoOrNegation(elementName);
-          else raiseParsingError('impossible')
+          else begin raiseParsingError('impossible'); filter := nil; end;
         end;
         if not (result is TXQTermFilterSequence) or (filter is TXQTermConstant) or
            (TXQTermFilterSequence(result).children[1] is TXQTermConstant) then
@@ -7530,8 +7539,8 @@ begin
 
   filterSequence(result, list1, filter[0], context);
   for i:=1 to high(filter) do begin
-    xqswap(seq1, seq2);
-    temp := list1; list1 := list2; list2 := temp;
+    xqswap(seq1, seq2{%H-}); //hide unitialized warning, since this only happens if length(filter) > 1
+    temp := list1; list1 := {%H-}list2; list2 := temp;
     filterSequence(seq2, list1, filter[i], context);
   end;
   result := seq1;

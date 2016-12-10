@@ -892,7 +892,6 @@ end;
 
 procedure TTemplateActionPage.perform(reader: TMultipageTemplateReader);
 var
-  cachedCondition: IXQuery;
   cururl: String;
   post: String;
   page: String;
@@ -1236,7 +1235,7 @@ begin
   tree := TTreeParser.Create;
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
-  tree.TargetEncoding:=eUTF8;
+  tree.TargetEncoding:=CP_UTF8;
   readTree(tree.parseTree(template));
   loadPatterns(baseActions, @strLoadFromFileUTF8);
   setPatternNames(baseActions);
@@ -1256,7 +1255,7 @@ begin
   try
     tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
     tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
-    tree.TargetEncoding:=eUTF8;
+    tree.TargetEncoding:=CP_UTF8;
     readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
     loadPatterns(baseActions,loadSomething,path);
     setPatternNames(baseActions);

@@ -151,6 +151,7 @@ var
         end;
     end;
     raiseError('Invalid number');
+    result := nil; //hide warning
   end;
 
 

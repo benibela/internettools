@@ -258,7 +258,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         replacement := TXQTermVariableGlobalImported.Create;
         TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
       end;
-    end else if staticContext.isLibraryModule then raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString)
+    end else if staticContext.isLibraryModule then begin raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString); exit; end
     else begin
       declaration := staticContext.findVariableDeclaration(v);
       if declaration <> nil then
@@ -422,10 +422,11 @@ begin
     if q <> nil then begin
       modu := TXQueryBreaker(q).getTerm as TXQTermModule;
       goToNewContext(TXQueryBreaker(q).staticContext);
-    end else if curcontext = outcontext then begin
+    end else begin
       modu := mainmodule;
       oldLastVarIndex := lastVariableIndex;
-    end else raise EXQParsingException.create('pxp:INTERNAL', '1650100');
+      if curcontext <> outcontext then raise EXQParsingException.create('pxp:INTERNAL', '1650100');
+    end;
 
 
     for i := 0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
@@ -531,7 +532,7 @@ begin
     xqptElement: begin
       result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkElementType), namespaceprefix, localpart);
     end;
-    xqptUnknown: raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238');
+    xqptUnknown: begin raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238'); result := nil; end;
   end;
   free;
 end;
@@ -843,6 +844,7 @@ begin
       result := xqnmNone;
   end else begin
     url := '';
+    prefix := '';
     if allowWildcards and (localpart = '*') then result := xqnmNone;
   end;
   if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
@@ -963,7 +965,7 @@ procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQP
     'namespace-node': result := [qmAttribute];
     'schema-attribute': result := [qmAttribute,qmSchemaFail];
     'schema-element': result := [qmElement,qmSchemaFail];
-    else raiseParsingError('XPST0003', 'Unknown element test: '+select);
+    else begin raiseParsingError('XPST0003', 'Unknown element test: '+select); result := []; end;
     end;
   end;
 
@@ -1246,8 +1248,9 @@ var token: String;
       window: TXQTermFlowerWindow;
     begin
       token := nextToken();
+      flags := [];
       case token of
-        'tumbling': flags := [];
+        'tumbling': ; //flags := [];
         'sliding': flags := [xqtfwSliding];
         else raiseSyntaxError('Expected variable, sliding/tumbling window or pattern in flowr expression, but got: '+token);
       end;
@@ -1286,7 +1289,7 @@ var token: String;
          if (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
       end;
       'for': isfor:=true;
-      else raiseParsingError('XPST0003', 'Invalid flower: '+token);
+      else begin raiseParsingError('XPST0003', 'Invalid flower: '+token); isfor := false; end;
     end;
     skipWhitespaceAndComment();
     if pos^ in ['s', 't'] then begin
@@ -1946,7 +1949,7 @@ var
 begin
   if t is TXQTermVariable then pname := @TXQTermVariable(t).value
   else if t is TXQTermPendingEQNameToken then pname := @TXQTermPendingEQNameToken(t).localpart
-  else raiseSyntaxError('Internal error 201601102252');
+  else begin raiseSyntaxError('Internal error 201601102252'); exit(nil); end;
   if not strContains(pname^, '.') then exit(t);
   name := pname^;
   pname^ := strSplitGet('.', name);
@@ -2135,7 +2138,7 @@ begin
             base := 10;
             code := charDecodeDigit(temp[2]);
           end
-          else raiseSyntaxError('Invalid entity');
+          else begin raiseSyntaxError('Invalid entity'); base := 0; code := 0;end;
         end;
         for i := 3 to length(temp) do begin
           if (temp[i] in ['0'..'9'])
