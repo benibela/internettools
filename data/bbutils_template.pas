@@ -4251,11 +4251,13 @@ begin
       'z': begin
         if (mask[mp-1] = '+') and (length(part) < 6) then len := 6
         else len := length(part);
-        if len > 9 then len := 9 //do not have those digits
-        else if len < 9 then begin
+        if len < 9 then begin
           scale := powersOf10[9 - len];
           temp := nanoseconds div scale;
           if nanoseconds mod scale >= scale div 2 then inc(temp); //round
+        end else begin
+          temp := nanoseconds;
+          if len > 9 then len := 9 //we do not have those digits
         end;
         if temp >= powersOf10[len] then begin result := TryAgainWithRoundedSeconds; exit; end; //rounding overflowed
         toadd := strTrimRight(strFromInt(temp, len), ['0']);
@@ -4291,7 +4293,7 @@ var y,m,d: integer;
     nanoseconds: integer;
     timeZone: integer;
 begin
-  dateTimeParsePartsNew(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, outtimezone);
+  dateTimeParsePartsNew(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, @timeZone);
 
   if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
   if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');

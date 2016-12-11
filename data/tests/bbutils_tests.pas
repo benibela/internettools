@@ -705,6 +705,19 @@ begin
   test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.000009), '12.000009');
   test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.0000009), '12.000001');
   test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.00000009), '12.0'); //TODO: fix this case (? print either 12.000000 or 12)
+  test(dateTimeFormatNEW('s.z', 0,0,0,0,0, 45, 123456789), '45.1');
+  test(dateTimeFormatNEW('s.zz', 0,0,0,0,0, 45, 123456789), '45.12');
+  test(dateTimeFormatNEW('s.zzz', 0,0,0,0,0, 45, 123456789), '45.123');
+  test(dateTimeFormatNEW('s.zzzz', 0,0,0,0,0, 45, 123456789), '45.1235');
+  test(dateTimeFormatNEW('s.zzzzz', 0,0,0,0,0, 45, 123456789), '45.12346');
+  test(dateTimeFormatNEW('s.zzzzzz', 0,0,0,0,0, 45, 123456789), '45.123457');
+  test(dateTimeFormatNEW('s.zzzzzzz', 0,0,0,0,0, 45, 123456789), '45.1234568');
+  test(dateTimeFormatNEW('s.zzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.12345679');
+  test(dateTimeFormatNEW('s.zzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.123456789');
+  test(dateTimeFormatNEW('s.zzzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.1234567890'); //digits >= 10 are are always 0
+  test(dateTimeFormatNEW('s.zzzzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.12345678900');
+  test(dateTimeParseNew('2000-01-02 12:23:45+03', 'yyyy-mm-dd hh:nn:ssZ') , dateTimeParseNew('2000-01-02 9:23:45', 'yyyy-mm-dd h:nn:ss'));
+
   test(datetimeFormatOld('yyyy-mm-dd hh:nn:ss.zz', -1, 12, 31, 23, 59, 59, 0.999), '0001-01-01 00:00:00.00');
   test(dateFormat('yyyymmdd', 2012, 12, 21), '20121221');
   test(datetimeFormatOld('yyyymmddhhnnss', 2012, 12, 21, 17,00,00), '20121221170000');
