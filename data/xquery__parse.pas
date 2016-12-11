@@ -532,7 +532,7 @@ begin
     xqptElement: begin
       result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkElementType), namespaceprefix, localpart);
     end;
-    xqptUnknown: begin raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238'); result := nil; end;
+    else{xqptUnknown: }begin raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238'); result := nil; end;
   end;
   free;
 end;
