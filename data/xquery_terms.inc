@@ -956,7 +956,7 @@ begin
       break;
     end;
   if not needCoercion then
-    if (not arguments[high(arguments)].isItemStar) and (((fun.resulttype = nil) or not fun.resulttype.subtypeOf(arguments[i])))
+    if (not arguments[high(arguments)].isItemStar) and (((fun.resulttype = nil) or not fun.resulttype.subtypeOf(arguments[high(arguments)])))
         then
           needCoercion := true;
   if not needCoercion then exit(v);
