@@ -618,7 +618,7 @@ end;
 
 function TDecodedUrl.resolved(rel: string): TDecodedUrl;
 begin
-  if (pos('://',rel) > 0) then result := decodeURL(rel)
+  if strIsAbsoluteURI(rel) then result := decodeURL(rel)
   else result := decodeURL(strResolveURI(rel, combined));
 end;
 
