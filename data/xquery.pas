@@ -6778,6 +6778,11 @@ begin
   FCreationThread := GetThreadID;
 end;
 
+procedure threadSafetyViolated;
+begin
+  raise EXQException.create('pxp:INTERNAL', 'A TXQueryEngine must be destroyed in the thread that created it');
+end;
+
 destructor TXQueryEngine.Destroy;
 var
   i: Integer;
@@ -6809,7 +6814,7 @@ begin
    TNamespace.freeCache;
   end;
   if FCreationThread <> GetThreadID then //otherwise the runningEngines counter above would fail
-    raise EXQException.create('pxp:INTERNAL', 'A TXQueryEngine must be destroyed in the thread that created it');
+    threadSafetyViolated; //if this wass inlined, the function crashes even if not executed, see #fpc31135
   inherited Destroy;
 end;
 
