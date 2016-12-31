@@ -94,12 +94,16 @@ How to use it:
     ...
     <fix level="minor">minor fix</fix>
     <fix level="major">major fix</fix>
-    <fix level="critical">critical fix</fix>
+    <fix level="critical" xml:lang="...only in one language.."">critical fix</fix>
     ..
     <add level="minor">minor fix</add>
     ..
     <change level="minor">minor fix</change>
     ..
+
+    <trans xml:lang="..">
+      ... <add/fix/change/.../>
+    </trans>
   </build>
    ...
   </changelog>
@@ -140,6 +144,7 @@ private
 
 
   fnewversion:TVersionNumber;
+  function matchingLanguage(const properties: TProperties): boolean;
   function getInstallerCommand: string;
   function GetInstallerDownloadedFileName: string;
   function loadNewVersionEnterTag(tagName: string; properties: TProperties):TParsingResult;
@@ -153,7 +158,9 @@ private
   fbuildinfolastbuild: longint;
   fbuildinfolasttag:string;
   fupdatebuildversion:longint;
+  finmismatchedtranslationblock: boolean;
   function needBuildInfoEnterTag(tagName: string; properties: TProperties):TParsingResult;
+  function needBuildInfoLeaveTag(tagName: string): TParsingResult;
   function needBuildInfoTextRead(text: string):TParsingResult;
   procedure needBuildInfo();//newversion,build
 
@@ -165,6 +172,8 @@ private
   }
   function _needRestart:boolean;
 public
+  language: string; //language to filter changelog(e.g. 'en') or empty to accept all
+
   constructor create(currentVersion:TVersionNumber;installDir,versionsURL,changelogURL: string);
   {** check if the user can write in the application directory and is therefore able to install the update. }
   function hasDirectoryWriteAccess:boolean;
@@ -307,6 +316,17 @@ begin
   result:=ftempDir+finstallerBaseName;
 end;
 
+function TAutoUpdater.matchingLanguage(const properties: TProperties): boolean;
+var
+  xmllang: String;
+begin
+  if language = '' then exit(true);
+  xmllang := getProperty('xml:lang', properties);
+  if (xmllang = '') or (xmllang = language) then exit(true);
+  if (length(xmllang) > length(language)) and strBeginsWith(xmllang, language) and (xmllang[length(language)+1] = '-') then exit(true);
+  exit(false);
+end;
+
 function TAutoUpdater.getInstallerCommand: string;
 begin
   Result:=finstallerParameters;
@@ -331,18 +351,28 @@ end;
 function TAutoUpdater.needBuildInfoEnterTag(tagName: string;
   properties: TProperties): TParsingResult;
 begin
-  if striequal(tagname,'build') then begin
-    fbuildinfolastbuild:=StrToIntDef(getProperty('version',properties),0);
-    if (fbuildinfolastbuild<=fnewversion) and (fbuildinfolastbuild>fupdatebuildversion) then
-        fupdatebuildversion:=fbuildinfolastbuild;
-  end else if striequal(tagname,'download') then
-    if (fbuildinfolastbuild=fnewversion) and (isOurPlatform(getProperty('platform',properties))) then begin
-      finstallerurl:=getProperty('url',properties);
-      finstallerBaseName:=copy(finstallerurl,strrpos('/',finstallerurl)+1,length(finstallerurl));
-      finstallerParameters:=getProperty('execute',properties);
-      finstallerNeedRestart:=StrToBoolDef(getProperty('restart',properties),false);
+  if matchingLanguage(properties) then begin
+    if striequal(tagname,'build') then begin
+      fbuildinfolastbuild:=StrToIntDef(getProperty('version',properties),0);
+      if (fbuildinfolastbuild<=fnewversion) and (fbuildinfolastbuild>fupdatebuildversion) then
+          fupdatebuildversion:=fbuildinfolastbuild;
+    end else if striequal(tagname,'download') then begin
+      if (fbuildinfolastbuild=fnewversion) and (isOurPlatform(getProperty('platform',properties))) then begin
+        finstallerurl:=getProperty('url',properties);
+        finstallerBaseName:=copy(finstallerurl,strrpos('/',finstallerurl)+1,length(finstallerurl));
+        finstallerParameters:=getProperty('execute',properties);
+        finstallerNeedRestart:=StrToBoolDef(getProperty('restart',properties),false);
+      end;
     end;
-  fbuildinfolasttag:=tagName;
+    if not finmismatchedtranslationblock then
+      fbuildinfolasttag:=tagName;
+  end else if striEndsWith(tagName, 'trans') then finmismatchedtranslationblock := true;
+  result:=prContinue;
+end;
+
+function TAutoUpdater.needBuildInfoLeaveTag(tagName: string): TParsingResult;
+begin
+  if striEqual(tagName, 'trans') then finmismatchedtranslationblock:=false;
   result:=prContinue;
 end;
 
@@ -372,7 +402,8 @@ begin
   finstallerNeedRestart:=true;
 
   fupdatebuildversion:=0;
-  parseXML(changelogXML,@needBuildInfoEnterTag,nil,@needBuildInfoTextRead,eUTF8);
+  finmismatchedtranslationblock := false;
+  parseXML(changelogXML,@needBuildInfoEnterTag,@needBuildInfoLeaveTag,@needBuildInfoTextRead,eUTF8);
   if fupdatebuildversion<>fnewversion then
     raise Exception.Create(Format(rsChangelogFail, [fnewversionstr, IntToStr(fupdatebuildversion)]));
 end;

@@ -1,16 +1,29 @@
-  <?xml version="1.0" encoding="UTF-8"?>
-  <?xml-stylesheet type="text/xsl" href="../changelog.xsl"?>
-  <changelog program="auto update example*">
-  <build version="1000" date="2009-12-30">
-    <download url="http://benibela.de/updates/autoupdateexample/linux.sh" platform="LINUX" execute="sh &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
-    <download url="http://benibela.de/updates/autoupdateexample/windows.vbs" platform="WINDOWS" execute="cscript &quote;$DOWNLOAD&quote; &quote;--installpath=$INSTALLPATH&quote; &quote;--oldpath=$OLDPATH&quote; &quote;--oldversion=$OLDVERSION&quote; &quote;--oldfile=$OLDFILE&quote;" restart="false"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../changelog.xsl"?>
+<changelog program="auto update example*">
+<build version="1000" date="2009-12-30">
+  <download url="http://benibela.de/updates/autoupdateexample/linux.sh" platform="LINUX" execute="sh &quot;$DOWNLOAD&quot; &quot;--installpath=$INSTALLPATH&quot; &quot;--oldpath=$OLDPATH&quot; &quot;--oldversion=$OLDVERSION&quot; &quot;--oldfile=$OLDFILE&quot;" restart="false"/>
+  <download url="http://benibela.de/updates/autoupdateexample/windows.vbs" platform="WINDOWS" execute="cscript &quot;$DOWNLOAD&quot; &quot;--installpath=$INSTALLPATH&quot; &quot;--oldpath=$OLDPATH&quot; &quot;--oldversion=$OLDVERSION&quot; &quot;--oldfile=$OLDFILE&quot;" restart="false"/>
 
-    <fix level="minor">example of an minor fix</fix>
-    <fix level="major">eoa major fix</fix>
-    <fix level="critical">eoa critical fix</fix>
-    
-    <add level="minor">example of a minor add</add>
-    
-    <change level="major">example of a major change</change>    
-  </build>
-  </changelog>
+  <fix level="minor">example of an minor fix</fix>
+  <fix level="major">eoa major fix</fix>
+  <fix level="critical">eoa critical fix</fix>
+  <fix xml:lang="de">deutscher Fix (German, language test)</fix>
+  <fix xml:lang="en">English fix (language test)</fix>
+
+  <add level="minor">example of a minor add</add>
+
+  <change level="major">example of a major change</change>
+
+  <trans xml:lang="de">
+    <add>add: de</add>
+    <change>deutsche Änderung</change>
+  </trans>
+  <trans xml:lang="en">
+    <add>add: en</add>
+    <change>English change</change>
+  </trans>
+
+  <fix>a final fix</fix>
+</build>
+</changelog>

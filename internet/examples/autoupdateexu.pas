@@ -19,6 +19,7 @@ type
     Button5: TButton;
     Button6: TButton;
     Button7: TButton;
+    ComboBox1: TComboBox;
     Edit1: TEdit;
     Edit2: TEdit;
     Edit3: TEdit;
@@ -27,6 +28,7 @@ type
     Label2: TLabel;
     Label3: TLabel;
     Label4: TLabel;
+    Label5: TLabel;
     Memo1: TMemo;
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
@@ -35,6 +37,7 @@ type
     procedure Button5Click(Sender: TObject);
     procedure Button6Click(Sender: TObject);
     procedure Button7Click(Sender: TObject);
+    procedure ComboBox1Change(Sender: TObject);
     procedure Edit4Change(Sender: TObject);
     procedure FormCreate(Sender: TObject);
   private
@@ -59,6 +62,7 @@ procedure TForm1.Button4Click(Sender: TObject);
 begin
   defaultInternetConfiguration.userAgent := edit4.Text;
   au:=TAutoUpdater.create(StrToInt(Edit1.Text),'',Edit2.Text,Edit3.Text);
+  au.language := ComboBox1.Text;
   updateEnabledButtons();
 end;
 
@@ -84,7 +88,7 @@ end;
 procedure TForm1.Button5Click(Sender: TObject);
 begin
   FreeAndNil(au);
-    updateEnabledButtons();
+  updateEnabledButtons();
 end;
 
 procedure TForm1.Button6Click(Sender: TObject);
@@ -96,6 +100,11 @@ end;
 procedure TForm1.Button7Click(Sender: TObject);
 begin
   au.openFileBrowser;
+end;
+
+procedure TForm1.ComboBox1Change(Sender: TObject);
+begin
+  if au <> nil then au.language := ComboBox1.Text;
 end;
 
 procedure TForm1.Edit4Change(Sender: TObject);

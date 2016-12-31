@@ -10,9 +10,6 @@
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
     </General>
-    <VersionInfo>
-      <StringTable ProductVersion=""/>
-    </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="default" Default="True"/>
       <Item2 Name="win32">
