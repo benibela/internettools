@@ -11,6 +11,72 @@ procedure unitTests();
 
 implementation
 
+procedure testcookies;
+var cm: TCookieManager;
+  sl: THTTPHeaderList;
+  example, examplesub1, examplesub2, other: TDecodedUrl;
+
+  procedure parseheaders(const url: TDecodedUrl; const t: string);
+  begin
+    sl.text := t; cm.parseHeadersForCookies(url, sl);
+  end;
+  procedure testcookies(const url: TDecodedUrl; const c: string);
+  begin
+    test(cm.makeCookieHeader(url), 'Cookie: ' + c);
+  end;
+
+begin
+  example := decodeURL('http://example.org/abvc');
+  examplesub1 := decodeURL('http://sub1.example.org/def');
+  examplesub2 := decodeURL('http://sub2.example.org/ghi');
+  other := decodeURL('http://other.com');
+  sl := THTTPHeaderList.Create;
+
+  parseheaders(example, 'Set-Cookie: foo=bar');
+  testcookies(example, 'foo=bar');
+  testcookies(examplesub1, 'foo=bar');
+  testcookies(examplesub2, 'foo=bar');
+  testcookies(other, '');
+
+  parseheaders(example ,'Set-Cookie: FOO=Xyz; '+LineEnding+'Set-Cookie: whitespace="a b%c";');
+  testcookies(example, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub1, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub2, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(other, '');
+
+  parseheaders(other,
+    'Set-Cookie: colon1=;;' + LineEnding+
+    'Set-Cookie: colon2=";";' + LineEnding+
+    'Set-Cookie: colon3="\;";' + LineEnding
+  );
+  testcookies(example, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub1, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub2, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(other, 'colon1=; colon2="; colon3="\');
+
+  cm.clear;
+  parseheaders(example ,'Set-Cookie: ws1=a b c%d;');
+  parseheaders(example ,'Set-Cookie: ws2="a b c%d"');
+  parseheaders(other,'Set-Cookie: fo'#9'o'#9'=bar; xyz; asas=x<yasd; as');
+  testcookies(example, 'ws1=a b c%d; ws2="a b c%d"');
+  testcookies(other, 'fo'#9'o=bar');
+  parseheaders(example ,'Set-Cookie:     w   s 3  =  "a b c%d"   ');
+  testcookies(example, 'ws1=a b c%d; ws2="a b c%d"; w   s 3="a b c%d"');
+  testcookies(other, 'fo'#9'o=bar');
+
+  cm.clear;
+  parseheaders(example ,'Set-Cookie: empty=');
+  parseheaders(example ,'Set-Cookie: ignoreeasdasdfas');
+  parseheaders(example ,'Set-Cookie: empty2=;');
+  parseheaders(example ,'Set-Cookie: empty3="";');
+  testcookies(example, 'empty=; empty2=; empty3=""');
+
+
+
+  sl.free;
+  writeln('ok');
+  halt;
+end;
 
 procedure testurl(fullUrl: string; protocol, username, password, host, port, path, params, linktarget: string; combined: string = '');
 var
@@ -1072,6 +1138,13 @@ begin
   testurl('https://ssl.muenchen.de/aDISWeb/app?service=direct/0/Home/$DirectLink&sp=SOPAC', 'https', '', '', 'ssl.muenchen.de', '', '/aDISWeb/app', '?service=direct/0/Home/$DirectLink&sp=SOPAC', '');
   testurl('https://ssl.muenchen.de//////aDISWeb///////app?service=direct//0///Home////$DirectLink&sp=SOPAC', 'https', '', '', 'ssl.muenchen.de', '', '/aDISWeb/app', '?service=direct//0///Home////$DirectLink&sp=SOPAC', '', 'https://ssl.muenchen.de/aDISWeb/app?service=direct//0///Home////$DirectLink&sp=SOPAC');
 
+
+  test(decodeURL('http://example.org').resolved('http://foo.bar').combined(), 'http://foo.bar');
+  test(decodeURL('http://example.org').resolved('https://foo.bar/xyz').combined(), 'https://foo.bar/xyz');
+  test(decodeURL('http://example.org').resolved('redirect.php?target=http://whatwg.com/abc').combined(), 'http://example.org/redirect.php?target=http://whatwg.com/abc');
+  test(decodeURL('http://example.org').resolved('/redirect.php?target=http://whatwg.com/abc').combined(), 'http://example.org/redirect.php?target=http://whatwg.com/abc');
+
+  testcookies;
 end;
 
 end.
