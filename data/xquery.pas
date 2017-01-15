@@ -2815,32 +2815,6 @@ end;
 //**Returns a "..." string for use in json (internally used)
 function jsonStrEscape(s: string):string;
 
-//** Str iterator for internal use. It will be moved to bbutils, once the interface has been decided upon
-type TStrIterator = record
-  FCurrent: integer;
-
-  s: RawByteString;
-  pos: integer;
-  property Current: integer read FCurrent;
-  function MoveNext: Boolean;
-  function GetEnumerator: TStrIterator;
-end;
- //** Str iterator for internal use. It will be moved to bbutils, once the interface has been decided upon
-function strIterator(const s: RawByteString): TStrIterator;
-
-type TStrBuilder = record
-  buffer: pstring;
-  next, bufferend: pchar; //next empty pchar and first pos after the string
-  procedure init(abuffer:pstring; basecapacity: integer = 64);
-  procedure final;
-  function count: integer; inline;
-  procedure reserveadd(delta: integer);
-  procedure add(c: char); inline;
-  procedure add(const s: string); inline;
-  procedure add(const codepoint: integer); inline;
-  procedure addhexentity(codepoint: integer);
-  procedure addhexnumber(codepoint: integer);
-end;
 
 //**Escapes for an URL (internally used)
 function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
@@ -3065,98 +3039,6 @@ begin
 end;
 
 
-procedure TStrBuilder.init(abuffer:pstring; basecapacity: integer);
-begin
-  buffer := abuffer;
-  SetLength(buffer^, basecapacity); //need to create a new string to prevent aliasing
-  //if length(buffer^) < basecapacity then
-  //else UniqueString(buffer^);    //or could uniquestring be enough?
-
-  next := pchar(buffer^);
-  bufferend := next + length(buffer^);
-end;
-
-procedure TStrBuilder.final;
-begin
-  if next <> bufferend then begin
-    setlength(buffer^, count);
-    next := pchar(buffer^) + length(buffer^);
-    bufferend := next;
-  end;
-end;
-
-function TStrBuilder.count: integer;
-begin
-  result := next - pointer(buffer^);
-end;
-
-procedure TStrBuilder.reserveadd(delta: integer);
-var
-  oldlen: Integer;
-begin
-  if next + delta > bufferend then begin
-    oldlen := count;
-    SetLength(buffer^, max(2*length(buffer^), oldlen + delta));
-    next := pchar(buffer^) + oldlen;
-    bufferend := pchar(buffer^) + length(buffer^);
-  end;
-end;
-
-procedure TStrBuilder.add(c: char);
-begin
-  if next >= bufferend then reserveadd(1);
-  next^ := c;
-  inc(next);
-end;
-
-procedure TStrBuilder.add(const s: string);
-var
-  l: sizeint;
-begin
-  l := length(s);
-  if l = 0 then exit;
-  if next + l > bufferend then reserveadd(l);
-  move(pchar(pointer(s))^, next^, l);
-  inc(next, l);
-end;
-
-procedure TStrBuilder.add(const codepoint: integer);
-var
-  l: sizeint;
-begin
-  l := strGetUnicodeCharacterUTFLength(codepoint);
-  if next + l > bufferend then reserveadd(l);
-  strGetUnicodeCharacterUTF(codepoint, next);
-  inc(next, l);
-end;
-
-function charEncodeHexDigitUp(digit: integer): char;
-begin
-  case digit of
-    0..9: result := chr(ord('0') + digit);
-    $A..$F: result := chr(ord('A') - $A + digit);
-    else begin assert(false); result := #0; end;
-  end;
-end;
-
-procedure TStrBuilder.addhexentity(codepoint: integer);
-begin
-  add('&#x');
-  if codepoint <= $FF then begin
-    if codepoint > $F then add(charEncodeHexDigitUp( codepoint shr 4 ));
-    add(charEncodeHexDigitUp(  codepoint and $F ))
-  end else addhexnumber(codepoint);
-  add(';');
-end;
-
-procedure TStrBuilder.addhexnumber(codepoint: integer);
-var
-  digits: Integer;
-begin
-  digits := 1;
-  while codepoint shr (4 * digits) > 0 do inc(digits);
-  add(IntToHex(codepoint, digits));
-end;
 
 
 function TXQTermContextItem.evaluate(var context: TXQEvaluationContext): IXQValue;
@@ -3730,22 +3612,6 @@ begin
   result += '"';
 end;
 
-function TStrIterator.MoveNext: Boolean;
-begin
-  result := pos <= length(s);
-  fcurrent := strDecodeUTF8Character(s, pos);
-end;
-
-function TStrIterator.GetEnumerator: TStrIterator;
-begin
-  result := self;
-end;
-
-function strIterator(const s: RawByteString): TStrIterator;
-begin
-  result.s := s;
-  result.pos := 1;
-end;
 
 
 function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
