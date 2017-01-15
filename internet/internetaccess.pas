@@ -92,6 +92,19 @@ type
     class function randomLetter: Char; static;
   end;
 
+  THTTPHeaderList = TStringList;
+
+  TCookieManager = record
+    cookies: array of record
+      domain, name, value: string;
+    end;
+    procedure clear;
+    procedure setCookie(domain: string; const name,value:string);
+    procedure parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList);
+    function makeCookieHeader(const target: TDecodedUrl):string;
+    function makeCookieHeaderValueOnly(const target: TDecodedUrl):string;
+  end;
+
   TInternetAccess = class;
 
   TInternetAccessReaction = (iarAccept, iarFollowRedirectGET, iarFollowRedirectKeepMethod, iarRetry, iarReject);
@@ -128,13 +141,7 @@ type
     function getLastErrorDetails(): string; virtual;
   protected
     //** Cookies receive from/to-send the server
-    cookies: array of record
-      name, value:string;
-    end;
-    procedure setCookie(name,value:string);
-    procedure parseHeadersForCookies();
-    function makeCookieHeader:string;
-    function makeCookieHeaderValueOnly:string;
+    cookies: TCookieManager;
     //utility functions to minimize platform dependent code
   public
     type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie);
@@ -147,7 +154,7 @@ type
     class function makeHeaderLine(const name, value: string): string; static;
     class function makeHeaderLine(const kind: THeaderKind; const value: string): string; static;
     class function makeHeaderName(const kind: THeaderKind): string; static;
-    procedure enumerateAdditionalHeaders(callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
+    procedure enumerateAdditionalHeaders(const target: TDecodedUrl; callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
     function getLastHTTPHeaderValue(kind: THeaderKind): string;
     function getLastHTTPHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
     //constructor, since .create is "abstract" and can not be called
@@ -735,8 +742,10 @@ begin
           method := 'GET';
           data := '';
         end;
+        cookies.parseHeadersForCookies(url, lastHTTPHeaders); //parse for old url
         url := url.resolved(getLastHTTPHeaderValue(iahLocation));
         dec(remainingRedirects);
+        continue;
       end;
       iarRetry: ; //do nothing
       else begin
@@ -747,7 +756,7 @@ begin
       end;
     end;
 
-    parseHeadersForCookies();
+    cookies.parseHeadersForCookies(url, lastHTTPHeaders);
   end;
 
   lastURLDecoded := url;
@@ -760,69 +769,106 @@ begin
   result := lastErrorDetails;
 end;
 
-procedure TInternetAccess.setCookie(name, value: string);
+procedure TCookieManager.clear;
+begin
+  SetLength(cookies, 0);
+end;
+
+procedure TCookieManager.setCookie(domain: string; const name, value: string);
 var i:longint;
 begin
-  for i:=0 to high(cookies) do
-    if SameText(cookies[i].name,name) then begin
+  domain := lowercase(domain);
+  for i:=0 to high(cookies) do //todo: use a map
+    if strEqual(cookies[i].name, name) //case-sensitive according to RFC6265 (likely insensitive in RFC 2109, but that is obsolete)
+       and strEqual(cookies[i].domain, domain) //case-insensitive, but domain is assumed to be normalized as it is not send to the server
+       then begin
       cookies[i].value:=value;
       exit;
     end;
   setlength(cookies,length(cookies)+1);
+  cookies[high(cookies)].domain:=domain;
   cookies[high(cookies)].name:=name;
   cookies[high(cookies)].value:=value;
 end;
 
-procedure TInternetAccess.parseHeadersForCookies();
-var i,mark:longint;
+//Returns the highest private domain (e.g. www.example.com -> example.com )
+//todo: do not count points, but use a list of tlds (so it will works with co.uk)
+function getTLD(const domain: string): string;
+var
+  dots, i: Integer;
+begin
+  dots := 0;
+  for i := length(domain) downto 1 do
+    if domain[i] = '.' then begin
+      inc(dots);
+      if dots >= 2 then exit(strCopyFrom(domain, i + 1));
+    end;
+  if dots = 1 then exit(domain);
+  result := '';
+end;
+
+procedure TCookieManager.parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList);
+const WSP = [' ',#9];
+var i,mark, markEndBeforeTrim:longint;
     header, name, value:string;
     ci, headerlen: Integer;
 begin
-  for ci := 0 to lastHTTPHeaders.Count - 1 do
-    case parseHeaderLineKind(lastHTTPHeaders[ci]) of
+  for ci := 0 to headers.Count - 1 do
+    case TInternetAccess.parseHeaderLineKind(headers[ci]) of
       iahSetCookie: begin
-        header := parseHeaderLineValue(lastHTTPHeaders[ci]);
+        header := TInternetAccess.parseHeaderLineValue(headers[ci]);
         headerlen := length(header);
         //Name getrimmt finden
         i := 1;
-        while (i <= headerlen) and (header[i] = ' ') do i+=1;
+        while (i <= headerlen) and (header[i] in WSP) do i+=1;
         mark:=i;
-        while (i <= headerlen) and not (header[i] in ['=',' ']) do i+=1;
+        while (i <= headerlen) and (header[i] <> '=') do i+=1;
+        if (i > headerlen) then continue; //no =
+        markEndBeforeTrim := i;
+        while (i > 1) and (header[i-1] in WSP) do dec(i);
         name:=copy(header,mark,i-mark);
 
+
         //Wert finden
-        while (i <= headerlen) and not (header[i] = '=') do i+=1;
-        i+=1;
+        i := markEndBeforeTrim  +1;
+        while (i <= headerlen) and (header[i] in WSP) do i+=1;
         mark:=i;
-        if (i <= headerlen) and (header[i]='"') then begin//quoted-str allowed??
-          i+=1;
-          while (i <= headerlen) and not (header[i] = '"') do i+=1;
-          i+=1;
-        end else
-          while (i <= headerlen) and not (header[i] in [';', #13, #10]) do i+=1;
+        while (i <= headerlen) and (header[i] <> ';') do i+=1;
+        markEndBeforeTrim := i;
+        while (i > 1) and (header[i-1] in WSP) do dec(i);
         value:=copy(header,mark,i-mark);
 
-        setCookie(name,value);
+        setCookie(getTLD(source.host), name,value);
       end;
     end;
 end;
 
-function TInternetAccess.makeCookieHeader: string;
+function TCookieManager.makeCookieHeader(const target: TDecodedUrl): string;
 begin
   result:='';
   if length(cookies)=0 then exit;
-  result := makeHeaderLine(iahCookie, makeCookieHeaderValueOnly);
+  result := TInternetAccess.makeHeaderLine(iahCookie, makeCookieHeaderValueOnly(target));
 end;
 
-function TInternetAccess.makeCookieHeaderValueOnly: string;
+function TCookieManager.makeCookieHeaderValueOnly(const target: TDecodedUrl): string;
 var
   i: Integer;
+  domain: String;
+  builder: TStrBuilder;
 begin
   result:='';
   if length(cookies)=0 then exit;
-  result:=cookies[0].name+'='+cookies[0].value;
-  for i:=1 to high(cookies) do
-    result+='; '+cookies[i].name+'='+cookies[i].value;
+  domain := LowerCase(getTLD(target.host));
+  builder.init(@result);
+
+  for i := 0 to high(cookies) do
+    if strEqual(cookies[i].domain, domain) then begin
+      if builder.count <> 0 then builder.add('; ');
+      builder.add(cookies[i].name);
+      builder.add('=');
+      builder.add(cookies[i].value);
+    end;
+  builder.final;
 end;
 
 class function TInternetAccess.parseHeaderLineKind(const line: string): THeaderKind;
@@ -887,7 +933,7 @@ begin
   end;
 end;
 
-procedure TInternetAccess.enumerateAdditionalHeaders(callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
+procedure TInternetAccess.enumerateAdditionalHeaders(const target: TDecodedUrl;  callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
   procedure callKnownKind(kind: THeaderKind; value: string);
   begin
     callback(data, kind, makeHeaderName(kind), value);
@@ -897,8 +943,9 @@ var
   hadHeader: array[THeaderKind] of Boolean;
   i: Integer;
   kind: THeaderKind;
+  temp: String;
 begin
-  FillChar(hadHeader, sizeof(hadHeader), 0);
+  FillChar(hadHeader{%H-}, sizeof(hadHeader), 0);
 
   for i := 0 to additionalHeaders.Count - 1 do begin
      kind := parseHeaderLineKind(additionalHeaders[i]);
@@ -908,7 +955,10 @@ begin
 
    if (not hadHeader[iahReferer]) and (lastUrl <> '') then callKnownKind( iahReferer, lastUrl );
    if (not hadHeader[iahAccept]) then callKnownKind( iahAccept, 'text/html,application/xhtml+xml,application/xml,text/*,*/*' );
-   if (not hadHeader[iahCookie]) and (length(cookies) > 0) then callKnownKind( iahCookie, makeCookieHeaderValueOnly());
+   if (not hadHeader[iahCookie]) and (length(cookies.cookies) > 0) then begin
+     temp := cookies.makeCookieHeaderValueOnly(target);
+     if temp <> '' then callKnownKind( iahCookie, temp);
+   end;
    if (not hadHeader[iahContentType]) and hasPostData then callKnownKind(iahContentType, ContentTypeForData);
 end;
 

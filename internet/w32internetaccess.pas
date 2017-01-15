@@ -204,7 +204,7 @@ begin
   end;
 
   headerAdd.hfile := hfile;
-  enumerateAdditionalHeaders(@addHeader, data <> '', @headerAdd);
+  enumerateAdditionalHeaders(decoded, @addHeader, data <> '', @headerAdd);
 
   for i := 1 to 2 do begin //repeat if ssl certificate is wrong
     if data='' then

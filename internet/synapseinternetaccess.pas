@@ -162,7 +162,7 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
      if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
      else connection.Sock.SSL.SSLType := LT_all;
 
-   enumerateAdditionalHeaders(@addHeader, data <> '', connection);
+   enumerateAdditionalHeaders(url, @addHeader, data <> '', connection);
   end;
 
 var ok: Boolean;

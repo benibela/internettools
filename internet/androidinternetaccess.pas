@@ -338,7 +338,7 @@ begin
         if ExceptionCheckAndClear then exit;
         j.DeleteLocalRef(jUrl);
 
-        enumerateAdditionalHeaders(@addHeader, data <> '', @stack);
+        enumerateAdditionalHeaders(url, @addHeader, data <> '', @stack);
         if (data <> '') and (m in [hmPut, hmPost]) then
           if not setRequestData() then begin
             lastErrorDetails:= 'Failed to set request data';
