@@ -910,6 +910,15 @@ begin
   t('parse-date("2010-10-08", "yyyy-mm-d")', '2010-10-08', '');
   t('parse-date("1899-Dec-31", "yyyy-mmm-d")', '1899-12-31', '');
   t('parse-date("1899-Dec-29", "yyyy-mmm-d")', '1899-12-29', '');
+  t('parse-date("1234/08/06")', '1234-08-06');
+  t('parse-date("10.03.1900")', '1900-03-10');
+  t('parse-date("1/2/2000")', '2000-02-01');
+  t('parse-date("1234-8-6")', '1234-08-06');
+  t('parse-date("2123 Feb 17")', '2123-02-17');
+  t('parse-date("10 Mär 1989")', '1989-03-10');
+  t('parse-date("30 März 1989")', '1989-03-30');
+  t('parse-date("/2345/Mär/19/")', '2345-03-19');
+  t('parse-date("/2345:::May--19:")', '2345-05-19');
   if strictTypeChecking then func := 'year-from-date'
   else func := 'year-from-dateTime';
   t(func+'(parse-date("1800-09-07", "yyyy-mm-dd"))', '1800', '');

@@ -2098,9 +2098,50 @@ function xqFunctionParse_datetime({%H-}argc: SizeInt; args: PIXQValue): IXQValue
 begin
   result := TXQValueDateTime.create(baseSchema.dateTime, args[0].toString, args[1].toString);
 end;
-function xqFunctionParse_date({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function guessDateFormat(const d: string): string;
+var state: (gdfsFirstDigits, gdfsFirstSeparator, gdfsMiddleDigits, gdfsMiddleLetters, gdfsSecondSeparator);
+  i, start: Integer;
+  builder: TStrBuilder;
+  direction: (gdfsYMD, gdfsDMY);
 begin
-  result := TXQValueDateTime.create(baseSchema.date, args[0].toString, args[1].toString);
+  state := gdfsFirstDigits;
+  builder.init(@result, 10);
+  i := 1;
+  while (i <= length(d)) and (d[i] <= ' ') do inc(i);
+  start := i;
+  with builder do
+    for i := i to length(d) do
+      case state of
+        gdfsFirstDigits: if not (d[i] in ['0'..'9']) then begin
+          if i = start then begin inc(start); add('"'); add(d[i]); add('"'); continue; end;
+          if i - start > 3 then begin direction := gdfsYMD; add('yyyy'); end
+          else begin direction := gdfsDMY; add('d'); end;
+          state := gdfsFirstSeparator;
+          add(d[i]);
+        end;
+        gdfsFirstSeparator: case d[i] of
+          '0'..'9': begin add('m'); state := gdfsMiddleDigits; end;
+          'A'..'Z','a'..'z': begin add('mmm+'); state := gdfsMiddleLetters; end;
+          else add(d[i]);
+        end;
+        gdfsMiddleDigits: if not (d[i] in ['0'..'9']) then begin state := gdfsSecondSeparator; add(d[i]); end;
+        gdfsMiddleLetters: if d[i] in [#0..'@','['..'`', '{'..'~'] then begin state := gdfsSecondSeparator; add(d[i]); end;
+        gdfsSecondSeparator: if d[i] in ['0'..'9'] then begin
+          if direction = gdfsYMD then add('d')
+          else add('y+');
+          break;
+        end else add(d[i]);
+      end;
+  builder.final;
+end;
+
+function xqFunctionParse_date({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var d, fmt: string;
+begin
+  d := args[0].toString;
+  if argc = 2 then fmt := args[1].toString
+  else fmt := guessDateFormat(d);
+  result := TXQValueDateTime.create(baseSchema.date, d, fmt);
 end;
 function xqFunctionParse_time({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -5329,7 +5370,7 @@ begin
   //my functions
   pxpold.registerFunction('extract',2,4,@xqFunctionExtract, []);
   pxpold.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
-  pxpold.registerFunction('parse-date',2,2,@xqFunctionParse_Date, []);
+  pxpold.registerFunction('parse-date',1,2,@xqFunctionParse_Date, []);
   pxpold.registerFunction('parse-dateTime',2,2,@xqFunctionParse_Datetime, []);
   pxpold.registerFunction('parse-time',2,2,@xqFunctionParse_Time, []);
   pxpold.registerFunction('deep-text',0,1,@xqFunctionDeep_Node_Text, []);

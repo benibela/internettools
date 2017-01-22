@@ -74,8 +74,6 @@ begin
 
 
   sl.free;
-  writeln('ok');
-  halt;
 end;
 
 procedure testurl(fullUrl: string; protocol, username, password, host, port, path, params, linktarget: string; combined: string = '');
