@@ -6916,7 +6916,7 @@ begin
   cxt.options :=ParsingOptions;
   cxt.options.AllowExtendedStrings:=true;
   cxt.staticContext := context;
-  cxt.parsingModel:=xqpmXPath2;
+  cxt.parsingModel:=xqpmXPath3;
   cxt.engine := self;
   try
     cxt.str := str;
