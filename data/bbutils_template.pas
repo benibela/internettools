@@ -678,7 +678,7 @@ type TDateTimeParsingFlag = (dtpfStrict);
 //**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
 //**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
-//**x+ will match any additional amount of x. (e.g. yy -> 2 digit year, yy+ -> at least 2 digit year, yyyy -> 4 digit year, [yy]yy -> 2 or 4 digit year)
+//**x+ will match any additional amount of x. (e.g. yy -> 2 digit year, yy+ -> at least 2 digit year, yyyy -> 4 digit year, [yy]yy -> 2 or 4 digit year) (mmm+ for short or long dates)@br
 //**"something" can be used to match the input verbatim@br
 //**whitespace is matched against whitespace (i.e. [ #9#10#13]+ matches [ #9#10#13]+)
 //**The function works if the string is latin-1 or utf-8, and it also supports German month names@br
@@ -4104,14 +4104,16 @@ begin
           while (mp <= length(mask)) and (mask[mp] = base) do begin inc(mp); inc(count); end;
           truecount:=count;
           if (mp <= length(mask)) and (mask[mp] = '+') then begin
-            while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do inc(count);
-            inc(mp);
-            if count > 9 then begin
-              result := dtprFailureValueTooHigh; //input is invalid, but continue parsing, so we do not report value-too-high on input with completely invalid format, just because there is a large number at the beginning
-              inc(ip, count-4); //jump ahead, so there are no problems with invalid integers
-              count := 4;
-            end else if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
-
+            if (base = 'm') and (truecount >= 3) then begin inc(count); inc(mp); end
+            else begin
+              while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do inc(count);
+              inc(mp);
+              if count > 9 then begin
+                result := dtprFailureValueTooHigh; //input is invalid, but continue parsing, so we do not report value-too-high on input with completely invalid format, just because there is a large number at the beginning
+                inc(ip, count-4); //jump ahead, so there are no problems with invalid integers
+                count := 4;
+              end else if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
+            end;
           end;
         end else begin //am/pm special case
           if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
@@ -4140,50 +4142,51 @@ begin
             continue;
           end;
           'm': case truecount of
-            3: begin //special case verbose month names
-              //special month name handling
-              mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
+            3, 4: begin //special case verbose month names
               parts[2] := high(parts[2]);
-              for i:=low(DefaultShortMonths) to high(DefaultShortMonths) do
-                if ((length(DefaultShortMonths[i].n) = 3) and (mid = DefaultShortMonths[i].n)) or
-                   ((length(DefaultShortMonths[i].n) <> 3) and strliequal(@input[ip], DefaultShortMonths[i].n, length(DefaultShortMonths[i].n))) then begin
-                     inc(ip,  length(DefaultShortMonths[i].n));
-                     parts[2] := DefaultShortMonths[i].v;
-                     break;
-                   end;
-              {$IFDEF HASDefaultFormatSettings}
-              if parts[2] <> high(parts[2]) then continue;
-              for i:=1 to 12 do
-                if ((length(DefaultFormatSettings.ShortMonthNames[i]) = 3) and (DefaultFormatSettings.ShortMonthNames[i] = mid)) or
-                   (strliequal(@input[ip], DefaultFormatSettings.ShortMonthNames[i], length(DefaultFormatSettings.ShortMonthNames[i]))) then begin
-                     inc(ip,  length(DefaultFormatSettings.ShortMonthNames[i]));
-                     parts[2] := i;
-                     break;
-                   end;
-              {$ENDIF}
-              if parts[2] <> high(parts[2]) then continue;
-              begin result := dtprFailure; exit; end
-            end;
-            4: begin
-              //special month name handling
-              parts[2] := high(parts[2]);
-              for i:=low(DefaultLongMonths) to high(DefaultLongMonths) do
-                if strliequal(@input[ip], DefaultLongMonths[i].n, length(DefaultLongMonths[i].n)) then begin
+              if count >= 4 then begin
+                //special month name handling
+                for i:=low(DefaultLongMonths) to high(DefaultLongMonths) do
+                  if strliequal(@input[ip], DefaultLongMonths[i].n, length(DefaultLongMonths[i].n)) then begin
                      inc(ip,  length(DefaultLongMonths[i].n));
                      parts[2] := DefaultLongMonths[i].v;
                      break;
                    end;
-              {$IFDEF HASDefaultFormatSettings}
-              if parts[2] <> high(parts[2]) then continue;
-              for i:=1 to 12 do
-                if strliequal(@input[ip], DefaultFormatSettings.LongMonthNames[i], length(DefaultFormatSettings.LongMonthNames[i])) then begin
-                  inc(ip,  length(DefaultFormatSettings.LongMonthNames[i]));
-                  parts[2] := i;
-                  break;
-                end;
-              {$ENDIF}
-              if parts[2] <> high(parts[2]) then continue;
-              begin result := dtprFailure; exit; end
+                if parts[2] <> high(parts[2]) then continue;
+                {$IFDEF HASDefaultFormatSettings}
+                for i:=1 to 12 do
+                  if strliequal(@input[ip], DefaultFormatSettings.LongMonthNames[i], length(DefaultFormatSettings.LongMonthNames[i])) then begin
+                    inc(ip,  length(DefaultFormatSettings.LongMonthNames[i]));
+                    parts[2] := i;
+                    break;
+                  end;
+                if parts[2] <> high(parts[2]) then continue;
+                {$ENDIF}
+              end;
+              if truecount = 3 then begin
+                //special month name handling
+                mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
+                for i:=low(DefaultShortMonths) to high(DefaultShortMonths) do
+                  if ((length(DefaultShortMonths[i].n) = 3) and (mid = DefaultShortMonths[i].n)) or
+                     ((length(DefaultShortMonths[i].n) <> 3) and strliequal(@input[ip], DefaultShortMonths[i].n, length(DefaultShortMonths[i].n))) then begin
+                       inc(ip,  length(DefaultShortMonths[i].n));
+                       parts[2] := DefaultShortMonths[i].v;
+                       break;
+                     end;
+                if parts[2] <> high(parts[2]) then continue;
+                {$IFDEF HASDefaultFormatSettings}
+                for i:=1 to 12 do
+                  if ((length(DefaultFormatSettings.ShortMonthNames[i]) = 3) and (DefaultFormatSettings.ShortMonthNames[i] = mid)) or
+                     (strliequal(@input[ip], DefaultFormatSettings.ShortMonthNames[i], length(DefaultFormatSettings.ShortMonthNames[i]))) then begin
+                       inc(ip,  length(DefaultFormatSettings.ShortMonthNames[i]));
+                       parts[2] := i;
+                       break;
+                     end;
+                if parts[2] <> high(parts[2]) then continue;
+                {$ENDIF}
+              end;
+              result := dtprFailure;
+              exit;
             end;
           end;
           'Z': begin //timezone
