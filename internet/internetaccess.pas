@@ -94,12 +94,14 @@ type
 
   THTTPHeaderList = TStringList;
 
+  TCookieFlags = set of (cfHostOnly{, cfSecure, cfHttpOnly});
   TCookieManager = record
     cookies: array of record
       domain, name, value: string;
+      flags: TCookieFlags;
     end;
     procedure clear;
-    procedure setCookie(domain: string; const name,value:string);
+    procedure setCookie(domain: string; const name,value:string; flags: TCookieFlags);
     procedure parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList);
     function makeCookieHeader(const target: TDecodedUrl):string;
     function makeCookieHeaderValueOnly(const target: TDecodedUrl):string;
@@ -774,7 +776,7 @@ begin
   SetLength(cookies, 0);
 end;
 
-procedure TCookieManager.setCookie(domain: string; const name, value: string);
+procedure TCookieManager.setCookie(domain: string; const name, value: string; flags: TCookieFlags);
 var i:longint;
 begin
   domain := lowercase(domain);
@@ -783,12 +785,14 @@ begin
        and strEqual(cookies[i].domain, domain) //case-insensitive, but domain is assumed to be normalized as it is not send to the server
        then begin
       cookies[i].value:=value;
+      cookies[i].flags:=flags;
       exit;
     end;
   setlength(cookies,length(cookies)+1);
   cookies[high(cookies)].domain:=domain;
   cookies[high(cookies)].name:=name;
   cookies[high(cookies)].value:=value;
+  cookies[high(cookies)].flags:=flags;
 end;
 
 //Returns the highest private domain (e.g. www.example.com -> example.com )
@@ -807,38 +811,89 @@ begin
   result := '';
 end;
 
+function normalizeDomain(const s: string): string;
+begin
+  result := lowercase(s); //should this do xn-- punycoding?
+end;
+
+function domainMatches(const str, domain: string): boolean;
+//RFC 6265: A string domain-matches a given domain string if at ...
+begin
+  if strEqual(str, domain) then exit(true);
+  result := strEndsWith(str, domain) and (length(str) > length(domain)) and (str[length(str) - length(domain)] = '.') {and str is not an ip};
+end;
+
 procedure TCookieManager.parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList);
 const WSP = [' ',#9];
-var i,mark, markEndBeforeTrim:longint;
-    header, name, value:string;
+var i:longint;
+    header:string;
     ci, headerlen: Integer;
+
+  function parseNameValuePair(var name, value: string; needEqualSign: boolean): boolean;
+  var mark, markEndBeforeTrim: integer;
+      nameStart, nameEnd: integer;
+      valueStart, valueEnd: integer;
+  begin
+    while (i <= headerlen) and (header[i] in WSP) do i+=1;
+    nameStart := i;
+    while (i <= headerlen) and not (header[i] in ['=', ';']) do i+=1;
+    if (i > headerlen) then exit(false); //no =     foo; =
+    nameEnd := i - 1;
+    while (nameEnd > nameStart) and (header[nameEnd] in WSP) do dec(nameEnd);
+    name:=copy(header,nameStart,nameEnd -  nameStart + 1);
+
+    if header[i] <> '=' then begin
+      value := '';
+      exit(not needEqualSign);
+    end;
+
+    inc(i);
+    while (i <= headerlen) and (header[i] in WSP) do i+=1;
+    valueStart := i;
+    while (i <= headerlen) and (header[i] <> ';') do i+=1;
+    valueEnd := i - 1;
+    while (valueEnd > valueStart) and (header[valueEnd] in WSP) do dec(valueEnd);
+    value:=copy(header,valueStart,valueEnd - valueStart + 1 );
+
+    result := true;
+  end;
+
+var name, value, domain, tName, tValue: string;
+    flags: TCookieFlags;
 begin
   for ci := 0 to headers.Count - 1 do
     case TInternetAccess.parseHeaderLineKind(headers[ci]) of
       iahSetCookie: begin
         header := TInternetAccess.parseHeaderLineValue(headers[ci]);
         headerlen := length(header);
-        //Name getrimmt finden
         i := 1;
-        while (i <= headerlen) and (header[i] in WSP) do i+=1;
-        mark:=i;
-        while (i <= headerlen) and (header[i] <> '=') do i+=1;
-        if (i > headerlen) then continue; //no =
-        markEndBeforeTrim := i;
-        while (i > 1) and (header[i-1] in WSP) do dec(i);
-        name:=copy(header,mark,i-mark);
+        if not parseNameValuePair(name, value, true) then continue;
 
-
-        //Wert finden
-        i := markEndBeforeTrim  +1;
-        while (i <= headerlen) and (header[i] in WSP) do i+=1;
-        mark:=i;
-        while (i <= headerlen) and (header[i] <> ';') do i+=1;
-        markEndBeforeTrim := i;
-        while (i > 1) and (header[i-1] in WSP) do dec(i);
-        value:=copy(header,mark,i-mark);
-
-        setCookie(getTLD(source.host), name,value);
+        domain := '';
+        flags := [];
+        while i < headerlen do begin
+          inc(i);
+          if not parseNameValuePair(tname, tvalue, false) then break;
+          case lowercase(tname) of
+            //'expires': ;
+            //'max-age': ;
+            'domain': begin
+              if strBeginsWith(tvalue, '.') then delete(tvalue, 1, 1);
+              domain := normalizeDomain(tvalue);
+            end;
+            //'path':;
+            //'secure': Include(flags, cfSecure);
+            //'httponly': Include(flags, cfHttpOnly);
+          end;
+        end;
+        if domain <> '' then begin
+          //exclude(flags, cfHostOnly);
+          if not domainMatches(normalizeDomain(source.host), domain) then continue;
+        end else begin;
+          include(flags, cfHostOnly);
+          domain := normalizeDomain(source.host);
+        end;
+        setCookie(domain, name, value, flags);
       end;
     end;
 end;
@@ -858,11 +913,13 @@ var
 begin
   result:='';
   if length(cookies)=0 then exit;
-  domain := LowerCase(getTLD(target.host));
+  domain := normalizeDomain(target.host);
   builder.init(@result);
 
   for i := 0 to high(cookies) do
-    if strEqual(cookies[i].domain, domain) then begin
+    if strEqual(cookies[i].domain, domain)
+       or (not (cfHostOnly in cookies[i].flags) and domainMatches(domain, cookies[i].domain))
+       then begin
       if builder.count <> 0 then builder.add('; ');
       builder.add(cookies[i].name);
       builder.add('=');

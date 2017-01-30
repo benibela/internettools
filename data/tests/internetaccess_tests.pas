@@ -33,15 +33,23 @@ begin
   sl := THTTPHeaderList.Create;
 
   parseheaders(example, 'Set-Cookie: foo=bar');
+  parseheaders(examplesub1, 'Set-Cookie: foo=t1');
+  parseheaders(examplesub2, 'Set-Cookie: foo=t2');
   testcookies(example, 'foo=bar');
-  testcookies(examplesub1, 'foo=bar');
-  testcookies(examplesub2, 'foo=bar');
+  testcookies(examplesub1, 'foo=t1');
+  testcookies(examplesub2, 'foo=t2');
   testcookies(other, '');
 
   parseheaders(example ,'Set-Cookie: FOO=Xyz; '+LineEnding+'Set-Cookie: whitespace="a b%c";');
+  parseheaders(examplesub1 ,'Set-Cookie: FOO===;;;');
   testcookies(example, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
-  testcookies(examplesub1, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
-  testcookies(examplesub2, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub1, 'foo=t1; FOO===');
+  testcookies(examplesub2, 'foo=t2');
+  testcookies(other, '');
+
+  testcookies(example, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub1, 'foo=t1; FOO===');
+  testcookies(examplesub2, 'foo=t2');
   testcookies(other, '');
 
   parseheaders(other,
@@ -50,8 +58,8 @@ begin
     'Set-Cookie: colon3="\;";' + LineEnding
   );
   testcookies(example, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
-  testcookies(examplesub1, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
-  testcookies(examplesub2, 'foo=bar; FOO=Xyz; whitespace="a b%c"');
+  testcookies(examplesub1, 'foo=t1; FOO===');
+  testcookies(examplesub2, 'foo=t2');
   testcookies(other, 'colon1=; colon2="; colon3="\');
 
   cm.clear;
@@ -71,7 +79,13 @@ begin
   parseheaders(example ,'Set-Cookie: empty3="";');
   testcookies(example, 'empty=; empty2=; empty3=""');
 
-
+  cm.clear;
+  parseheaders(example ,'Set-Cookie: a=1; Domain=example.org');
+  parseheaders(example,'Set-Cookie: b=2; Domain=sub1.example.org');
+  parseheaders(examplesub1,'Set-Cookie: c=3; Domain=example.org');
+  parseheaders(examplesub1 ,'Set-Cookie: d=4; Domain=sub1.example.org');
+  testcookies(example, 'a=1; c=3');
+  testcookies(examplesub1, 'a=1; c=3; d=4');
 
   sl.free;
 end;
