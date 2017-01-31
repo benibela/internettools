@@ -280,7 +280,12 @@ defaultInternetAccessClass := TSynapseInternetAccess;
 
 {$if not (defined(WINDOWS) or defined(android))}
 InitCriticalSection(resolvConfCS);
+{$endif}
 finalization
+
+freeThreadVars; //otherwise ssl_openssl_lib.finalization calls SSLCS.Free; causing the TSynapseInternetAccess.free to crash, if another unit calls freeThreadVars later;
+
+{$if not (defined(WINDOWS) or defined(android))}
 DoneCriticalsection(resolvConfCS);
 {$endif}
 
