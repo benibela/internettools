@@ -102,9 +102,12 @@ type
     end;
     procedure clear;
     procedure setCookie(domain: string; const name,value:string; flags: TCookieFlags);
-    procedure parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList);
+    procedure parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList; allowUnsecureXidelExtensions: boolean = false);
     function makeCookieHeader(const target: TDecodedUrl):string;
     function makeCookieHeaderValueOnly(const target: TDecodedUrl):string;
+    function serializeCookies: string;
+    procedure loadFromFile(const fn: string);
+    procedure saveToFile(const fn: string);
   end;
 
   TInternetAccess = class;
@@ -136,14 +139,11 @@ type
     FOnProgress:TProgressEvent;
     lastErrorDetails: string;
     lastURLDecoded: TDecodedUrl;
-    FLastHTTPHeaders: TStringList;
+    FLastHTTPHeaders: THTTPHeaderList;
     //**Override this if you want to sub class it
     function doTransferUnchecked(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
     function doTransferChecked(method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer):string;
     function getLastErrorDetails(): string; virtual;
-  protected
-    //** Cookies receive from/to-send the server
-    cookies: TCookieManager;
     //utility functions to minimize platform dependent code
   public
     type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie);
@@ -176,6 +176,9 @@ type
     property lastHTTPHeaders: TStringList read FLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
     function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string
   public
+    //** Cookies receive from/to-send the server
+    cookies: TCookieManager;
+
     constructor create();virtual;
     destructor Destroy; override;
     //**post the (raw) data to the given url and returns the resulting document
@@ -797,18 +800,9 @@ end;
 
 //Returns the highest private domain (e.g. www.example.com -> example.com )
 //todo: do not count points, but use a list of tlds (so it will works with co.uk)
-function getTLD(const domain: string): string;
-var
-  dots, i: Integer;
+function isPublicDomain(const domain: string): boolean;
 begin
-  dots := 0;
-  for i := length(domain) downto 1 do
-    if domain[i] = '.' then begin
-      inc(dots);
-      if dots >= 2 then exit(strCopyFrom(domain, i + 1));
-    end;
-  if dots = 1 then exit(domain);
-  result := '';
+  result := not strContains(domain, '.');
 end;
 
 function normalizeDomain(const s: string): string;
@@ -816,6 +810,7 @@ begin
   result := lowercase(s); //should this do xn-- punycoding?
 end;
 
+//str is a sub domain of domain
 function domainMatches(const str, domain: string): boolean;
 //RFC 6265: A string domain-matches a given domain string if at ...
 begin
@@ -823,28 +818,27 @@ begin
   result := strEndsWith(str, domain) and (length(str) > length(domain)) and (str[length(str) - length(domain)] = '.') {and str is not an ip};
 end;
 
-procedure TCookieManager.parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList);
+procedure TCookieManager.parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList; allowUnsecureXidelExtensions: boolean);
 const WSP = [' ',#9];
 var i:longint;
     header:string;
     ci, headerlen: Integer;
 
-  function parseNameValuePair(var name, value: string; needEqualSign: boolean): boolean;
-  var mark, markEndBeforeTrim: integer;
+  function parseNameValuePair(out name, value: string; needEqualSign: boolean): boolean;
+  var
       nameStart, nameEnd: integer;
       valueStart, valueEnd: integer;
   begin
     while (i <= headerlen) and (header[i] in WSP) do i+=1;
     nameStart := i;
     while (i <= headerlen) and not (header[i] in ['=', ';']) do i+=1;
-    if (i > headerlen) then exit(false); //no =     foo; =
     nameEnd := i - 1;
     while (nameEnd > nameStart) and (header[nameEnd] in WSP) do dec(nameEnd);
     name:=copy(header,nameStart,nameEnd -  nameStart + 1);
 
-    if header[i] <> '=' then begin
+    if (i > headerlen) or (header[i] <> '=') then begin
       value := '';
-      exit(not needEqualSign);
+      exit(not needEqualSign and (length(name) > 0 ));
     end;
 
     inc(i);
@@ -884,11 +878,13 @@ begin
             //'path':;
             //'secure': Include(flags, cfSecure);
             //'httponly': Include(flags, cfHttpOnly);
+            'hostonly': if allowUnsecureXidelExtensions then include(flags, cfHostOnly);
           end;
         end;
         if domain <> '' then begin
           //exclude(flags, cfHostOnly);
-          if not domainMatches(normalizeDomain(source.host), domain) then continue;
+          if not allowUnsecureXidelExtensions then
+            if not domainMatches(normalizeDomain(source.host), domain) or isPublicDomain(domain) then continue; //only allow for super domains and private ones
         end else begin;
           include(flags, cfHostOnly);
           domain := normalizeDomain(source.host);
@@ -918,7 +914,7 @@ begin
 
   for i := 0 to high(cookies) do
     if strEqual(cookies[i].domain, domain)
-       or (not (cfHostOnly in cookies[i].flags) and domainMatches(domain, cookies[i].domain))
+       or (not (cfHostOnly in cookies[i].flags) and domainMatches(domain, cookies[i].domain)) //also send of super domain
        then begin
       if builder.count <> 0 then builder.add('; ');
       builder.add(cookies[i].name);
@@ -926,6 +922,46 @@ begin
       builder.add(cookies[i].value);
     end;
   builder.final;
+end;
+
+function TCookieManager.serializeCookies: string;
+var builder: TStrBuilder;
+  i: Integer;
+begin
+  result:='';
+  with builder do begin
+    init(@result);
+    for i := 0 to high(cookies) do with cookies[i] do begin
+      add('Set-Cookie: ');
+      add(name);
+      add('=');
+      add(value);
+      add('; Domain=');
+      add(domain);
+      if cfHostOnly in flags then add('; HostOnly');;
+      add(#13#10);
+    end;
+    final;
+  end;
+end;
+
+procedure TCookieManager.loadFromFile(const fn: string);
+var temp: THTTPHeaderList;
+    tempurl: TDecodedUrl;
+begin
+  temp := THTTPHeaderList.Create;
+  try
+    temp.NameValueSeparator := ':';
+    temp.LoadFromFile(fn);
+    parseHeadersForCookies(tempurl{%H-}, temp, true);
+  finally
+    temp.free;
+  end;
+end;
+
+procedure TCookieManager.saveToFile(const fn: string);
+begin
+  strSaveToFileUTF8(fn, serializeCookies);
 end;
 
 class function TInternetAccess.parseHeaderLineKind(const line: string): THeaderKind;

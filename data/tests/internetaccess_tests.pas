@@ -24,6 +24,10 @@ var cm: TCookieManager;
   begin
     test(cm.makeCookieHeader(url), 'Cookie: ' + c);
   end;
+  procedure testcookiedump(const c: string);
+  begin
+    test(cm.serializeCookies, c);
+  end;
 
 begin
   example := decodeURL('http://example.org/abvc');
@@ -62,6 +66,18 @@ begin
   testcookies(examplesub2, 'foo=t2');
   testcookies(other, 'colon1=; colon2="; colon3="\');
 
+  testcookiedump(
+   'Set-Cookie: foo=bar; Domain=example.org; HostOnly'#13#10+
+   'Set-Cookie: foo=t1; Domain=sub1.example.org; HostOnly'#13#10+
+   'Set-Cookie: foo=t2; Domain=sub2.example.org; HostOnly'#13#10+
+   'Set-Cookie: FOO=Xyz; Domain=example.org; HostOnly'#13#10+
+   'Set-Cookie: whitespace="a b%c"; Domain=example.org; HostOnly'#13#10+
+   'Set-Cookie: FOO===; Domain=sub1.example.org; HostOnly'#13#10+
+   'Set-Cookie: colon1=; Domain=other.com; HostOnly'#13#10+
+   'Set-Cookie: colon2="; Domain=other.com; HostOnly'#13#10+
+   'Set-Cookie: colon3="\; Domain=other.com; HostOnly'#13#10
+  );
+
   cm.clear;
   parseheaders(example ,'Set-Cookie: ws1=a b c%d;');
   parseheaders(example ,'Set-Cookie: ws2="a b c%d"');
@@ -71,6 +87,11 @@ begin
   parseheaders(example ,'Set-Cookie:     w   s 3  =  "a b c%d"   ');
   testcookies(example, 'ws1=a b c%d; ws2="a b c%d"; w   s 3="a b c%d"');
   testcookies(other, 'fo'#9'o=bar');
+
+  testcookiedump('Set-Cookie: ws1=a b c%d; Domain=example.org; HostOnly'#13#10+
+                 'Set-Cookie: ws2="a b c%d"; Domain=example.org; HostOnly'#13#10+
+                 'Set-Cookie: fo'#9'o=bar; Domain=other.com; HostOnly'#13#10+
+                 'Set-Cookie: w   s 3="a b c%d"; Domain=example.org; HostOnly'#13#10);
 
   cm.clear;
   parseheaders(example ,'Set-Cookie: empty=');
@@ -82,10 +103,27 @@ begin
   cm.clear;
   parseheaders(example ,'Set-Cookie: a=1; Domain=example.org');
   parseheaders(example,'Set-Cookie: b=2; Domain=sub1.example.org');
-  parseheaders(examplesub1,'Set-Cookie: c=3; Domain=example.org');
+  parseheaders(examplesub1,'Set-Cookie: c=3; Domain=example.org; HttpOnly');
   parseheaders(examplesub1 ,'Set-Cookie: d=4; Domain=sub1.example.org');
+  parseheaders(examplesub2 ,'Set-Cookie: hey=hu; Domain=sub1.example.org');
   testcookies(example, 'a=1; c=3');
   testcookies(examplesub1, 'a=1; c=3; d=4');
+  testcookies(examplesub2, 'a=1; c=3');
+
+  parseheaders(examplesub2,'Set-Cookie: c=3a; Domain=example.org;;;;;;');
+  parseheaders(examplesub2,'Set-Cookie: c=3b; Path=/; HttpOnly;;; Domain   =   sub2.example.org;');
+  parseheaders(examplesub2,'Set-Cookie: x=y; Domain=org');
+  parseheaders(examplesub2,'Set-Cookie: x=y; Domain=.org');
+  testcookies(example, 'a=1; c=3a');
+  testcookies(examplesub1, 'a=1; c=3a; d=4');
+  testcookies(examplesub2, 'a=1; c=3a; c=3b');
+
+  testcookiedump(
+    'Set-Cookie: a=1; Domain=example.org'#13#10+
+    'Set-Cookie: c=3a; Domain=example.org'#13#10+
+    'Set-Cookie: d=4; Domain=sub1.example.org'#13#10+
+    'Set-Cookie: c=3b; Domain=sub2.example.org; HostOnly'#13#10
+  );
 
   sl.free;
 end;
