@@ -8,6 +8,9 @@ uses
   {$IFDEF UNIX}{$IFDEF UseCThreads}
   cthreads,
   {$ENDIF}{$ENDIF}
+  {$ifdef windows}
+  windows,
+  {$endif}
   Classes, sysutils, strutils, xquery, xquery_utf8, xquery_module_math,
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
   bbutils, math, rcmdline, internetaccess, mockinternetaccess;

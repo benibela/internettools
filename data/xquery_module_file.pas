@@ -395,8 +395,11 @@ var
   i: Integer;
 begin
   result := path.toString;
-  if strBeginsWith(result, 'file:///') then begin
-    delete(result, 1, {$ifdef windows}8{$else}7{$endif});
+  if strBeginsWith(result, 'file://') then begin
+    delete(result, 1, 7);
+    {$ifdef windows}
+    if strBeginsWith(result, '/') then delete(result, 1, 1);
+    {$endif};
     result := urlHexDecode(result)
   end;
   for i := 1 to length(result) do
@@ -410,14 +413,32 @@ begin
 end;
 
 function FileExistsAsTrueFile(const Filename: string): boolean;
+{$ifdef windows}
+var
+  temp: DWORD;
+{$endif}
 begin
-  result := FileExists(Filename) and not DirectoryExists(Filename); //does this work?
+  {$ifdef windows}
+  temp := FileGetAttr(Filename);
+  result := (temp <> $ffffffff) and ((temp and FILE_ATTRIBUTE_DIRECTORY) = 0);
+  {$else}
+  result := FileExists(Filename) and not DirectoryExists(Filename);
+  {$endif}
+end;
+
+function FileOrDirectoryExists(const Filename: string): boolean;
+begin
+  {$ifdef windows}
+  result := DWORD(FileGetAttr(Filename)) <> $ffffffff;
+  {$else}
+  result := FileExists(Filename);
+  {$endif}
 end;
 
 function exists(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
-  result := xqvalue(FileExists(normalizePath(args[0])));
+  result := xqvalue(FileOrDirectoryExists(normalizePath(args[0])));
 end;
 
 function is_dir(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -442,7 +463,7 @@ begin
   ignore(context);
   fn := normalizePath(args[0]);
   if sysutils.FindFirst(fn, faAnyFile, search) <> 0 then
-    raiseFileError(ifthen(FileExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
+    raiseFileError(ifthen(FileOrDirectoryExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
   dateTime := FileDateToDateTime(search.Time);
   sysutils.FindClose(search);
   dt := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
@@ -467,7 +488,7 @@ begin
     result := xqvalue(system.FileSize(f));
     CloseFile(f);
   except
-    if FileExists(path) then code := Error_Io_Error
+    if FileOrDirectoryExists(path) then code := Error_Io_Error
     else code := Error_Not_Found;
     raiseFileError(code, 'Failed to get size', args[0]);
   end;
@@ -622,7 +643,7 @@ begin
   try
     if DirectoryExists(dest) then dest := strAddPathSeparator(dest) + strFileName(source);
     if DirectoryExists(source) then begin
-      if FileExists(dest) and not DirectoryExists(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
+      if FileExistsAsTrueFile(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
       ForceDirectories(dest);
       copier := TDirCopier.Create;
       try
@@ -633,7 +654,7 @@ begin
         copier.free;
       end;
     end else begin
-      if not FileExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
+      if not FileOrDirectoryExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
       TDirCopier.checkResult(CopyFile(source, dest), dest);
     end;
   except
@@ -730,7 +751,7 @@ begin
   ignore(context);
   path := normalizePath(args[0]);
   recursive := (argc = 2) and args[1].toBoolean;
-  if not FileExists(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
+  if not FileOrDirectoryExists(path) then raiseFileError(Error_Not_Found, 'Cannot delete something not existing', args[0]);
   if not DirectoryExists(path) then begin
     TDirDeleter.checkResult(SysUtils.DeleteFile(path), path)
   end else if recursive then begin
@@ -830,8 +851,13 @@ begin
 
   if DirectoryExists(dest) then dest := strAddPathSeparator(dest) + strFileName(source);
   if DirectoryExists(source) then begin
-    if FileExists(dest) and not DirectoryExists(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
-  end else if not FileExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
+    if FileExistsAsTrueFile(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
+  end else begin
+    if not FileOrDirectoryExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
+    {$ifdef windows}if FileExistsAsTrueFile(dest) then if not sysutils.DeleteFile(dest) then
+      raiseFileError(Error_Io_Error, 'Destination exists', args[1]);
+    {$endif}
+  end;
 
   if not RenameFile(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
   result := xqvalue();
@@ -860,13 +886,13 @@ begin
     on e: EStreamError do begin
       errcode := Error_Io_Error;
       if DirectoryExists(fn) then errcode := Error_IsDir
-      else if not FileExists(fn) then errcode := Error_Not_Found;
+      else if not FileOrDirectoryExists(fn) then errcode := Error_Not_Found;
       raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
     end;
     on e: EOutOfMemory do begin //raised for a directory,wtf??
       errcode := Error_Io_Error;
       if DirectoryExists(fn) then errcode := Error_IsDir
-      else if not FileExists(fn) then errcode := Error_Not_Found;
+      else if not FileOrDirectoryExists(fn) then errcode := Error_Not_Found;
       raiseFileError(errcode, 'Failed to open file for reading', xqvalue(fn));
     end;
   end;
@@ -956,14 +982,18 @@ var
 begin
   ignore(context);
   dir := suffixDirectoy(ResolveDots(fileNameExpand(normalizePath(args[0]))));
-  if not FileExists(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
+  if not FileOrDirectoryExists(dir) then raiseFileError(Error_Not_Found, 'Path does not exists: ', args[0]);
   result := xqvalue(dir);
 end;
 
 function path_to_uri(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  path: String;
 begin
   ignore(context);
-  result := xqvalue(urlHexEncode(fileNameExpandToURI(normalizePath(args[0])), URIForbiddenChars) );
+  path := fileNameExpandToURI(normalizePath(args[0]));
+  {$ifdef windows}path := StringReplace(path, '\', '/', [rfReplaceAll]);{$endif}
+  result := xqvalue(urlHexEncode(path, URIForbiddenChars) );
 end;
 
 function dir_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
