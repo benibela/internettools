@@ -833,6 +833,7 @@ type TStrBuilder = record
   procedure add(c: char); inline;
   procedure add(const s: string); inline;
   procedure add(const codepoint: integer); inline;
+  procedure add(const p: pchar; const l: integer); inline;
   procedure addhexentity(codepoint: integer);
   procedure addhexnumber(codepoint: integer);
 end;
@@ -5392,6 +5393,14 @@ begin
   l := strGetUnicodeCharacterUTFLength(codepoint);
   if next + l > bufferend then reserveadd(l);
   strGetUnicodeCharacterUTF(codepoint, next);
+  inc(next, l);
+end;
+
+procedure TStrBuilder.add(const p: pchar; const l: integer); inline;
+begin
+  if l <= 0 then exit;
+  if next + l > bufferend then reserveadd(l);
+  move(p^, next^, l);
   inc(next, l);
 end;
 
