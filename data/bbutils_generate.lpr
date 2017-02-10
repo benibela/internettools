@@ -17,8 +17,8 @@ uses
   {Attention: Bootstraping! This program generates bbutils, but need bbutils to be compiled.
                             If you don't have bbutils, you can use bbutils_template instead
   }
-//  ,  bbutils
-  , bbutils_template
+  ,  bbutils
+//  , bbutils_template
   { you can add units after this };
 
 {$R *.res}
@@ -2380,7 +2380,8 @@ begin
     if length(entities[i].s) < 3 then raise Exception.Create('too short: '+entities[i].s);
   end;
 
-  WriteLn(convertTemplate(strLoadFromFile('bbutils_template.pas'), @special));
+  strSaveToFile('bbutils.inc', convertTemplate(strLoadFromFile('bbutils_template.inc'), @special));
+  strSaveToFile('bbutilsh.inc', convertTemplate(strLoadFromFile('bbutils_templateh.inc'), @special));
 
 
  { try
