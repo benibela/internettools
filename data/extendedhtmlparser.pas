@@ -821,6 +821,7 @@ begin
   if COMMAND_CLOSED[attyp] = 2 then typ := tetClose
   else typ := tetOpen;
   value := COMMAND_STR[attyp];
+  hash := nodeNameHash(value);
 end;
 
 function isVariableName(s: string): boolean;
@@ -1254,8 +1255,10 @@ var
   end;
 
 begin
-  if (html.typ <> tetOpen) or (template.templateType <> tetHTMLOpen) or
-     not striequal(html.value, template.value) then
+  if (html.typ <> tetOpen)
+     or (template.templateType <> tetHTMLOpen)
+     or (html.hash <> template.hash)
+     or not striequal(html.value, template.value) then
        exit(false);
   if (template.attributes = nil) and (template.templateAttributes = nil) then
     exit(true);
