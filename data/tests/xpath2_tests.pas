@@ -3263,7 +3263,7 @@ begin
   t('form(//form[1], "foo=override&Y=override2&Z=override3&Z=override4").post', 'foo=override&Y=override2&Z=override3&Z=override4', '');
   t('form(//form[1], {"foo": "override", "Y": "override2", "Z": "override3", "Z": "override4"}).post', 'foo=override&Y=override2&Z=override3&Z=override4', '');
   t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&Y=override2&ride=&Z=override3&Z=override4', '');
-  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": "override3", "Z": "override4"}).post', 'foo=over%25%26ride&Y=override%202&Z=override3&Z=override4', '');
+  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": "override3", "Z": "override4"}).post', 'foo=over%25%26ride&Y=override+2&Z=override3&Z=override4', '');
 
   t('form(//form[2]).url', 'pseudo://test/abc22?foo2=bar2&Y=456', '');
   t('form(//form[2]).method', 'GET', '');

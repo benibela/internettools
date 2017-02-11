@@ -24,6 +24,14 @@ var cm: TCookieManager;
   begin
     test(cm.makeCookieHeader(url), 'Cookie: ' + c);
   end;
+  procedure parseheaders(const url: string; const t: string);
+  begin
+    sl.text := t; cm.parseHeadersForCookies(decodeURL(url,false), sl);
+  end;
+  procedure testcookies(const url: string; const c: string);
+  begin
+    test(cm.makeCookieHeader(decodeURL(url,false)), 'Cookie: ' + c);
+  end;
   procedure testcookiedump(const c: string);
   begin
     test(cm.serializeCookies, c);
@@ -36,6 +44,8 @@ begin
   other := decodeURL('http://other.com');
   sl := THTTPHeaderList.Create;
 
+
+  //---basic cookies---
   parseheaders(example, 'Set-Cookie: foo=bar');
   parseheaders(examplesub1, 'Set-Cookie: foo=t1');
   parseheaders(examplesub2, 'Set-Cookie: foo=t2');
@@ -67,15 +77,15 @@ begin
   testcookies(other, 'colon1=; colon2="; colon3="\');
 
   testcookiedump(
-   'Set-Cookie: foo=bar; Domain=example.org; HostOnly'#13#10+
-   'Set-Cookie: foo=t1; Domain=sub1.example.org; HostOnly'#13#10+
-   'Set-Cookie: foo=t2; Domain=sub2.example.org; HostOnly'#13#10+
-   'Set-Cookie: FOO=Xyz; Domain=example.org; HostOnly'#13#10+
-   'Set-Cookie: whitespace="a b%c"; Domain=example.org; HostOnly'#13#10+
-   'Set-Cookie: FOO===; Domain=sub1.example.org; HostOnly'#13#10+
-   'Set-Cookie: colon1=; Domain=other.com; HostOnly'#13#10+
-   'Set-Cookie: colon2="; Domain=other.com; HostOnly'#13#10+
-   'Set-Cookie: colon3="\; Domain=other.com; HostOnly'#13#10
+   'Set-Cookie: foo=bar; Domain=example.org; Path=/; HostOnly'#13#10+
+   'Set-Cookie: foo=t1; Domain=sub1.example.org; Path=/; HostOnly'#13#10+
+   'Set-Cookie: foo=t2; Domain=sub2.example.org; Path=/; HostOnly'#13#10+
+   'Set-Cookie: FOO=Xyz; Domain=example.org; Path=/; HostOnly'#13#10+
+   'Set-Cookie: whitespace="a b%c"; Domain=example.org; Path=/; HostOnly'#13#10+
+   'Set-Cookie: FOO===; Domain=sub1.example.org; Path=/; HostOnly'#13#10+
+   'Set-Cookie: colon1=; Domain=other.com; Path=/; HostOnly'#13#10+
+   'Set-Cookie: colon2="; Domain=other.com; Path=/; HostOnly'#13#10+
+   'Set-Cookie: colon3="\; Domain=other.com; Path=/; HostOnly'#13#10
   );
 
   cm.clear;
@@ -88,10 +98,11 @@ begin
   testcookies(example, 'ws1=a b c%d; ws2="a b c%d"; w   s 3="a b c%d"');
   testcookies(other, 'fo'#9'o=bar');
 
-  testcookiedump('Set-Cookie: ws1=a b c%d; Domain=example.org; HostOnly'#13#10+
-                 'Set-Cookie: ws2="a b c%d"; Domain=example.org; HostOnly'#13#10+
-                 'Set-Cookie: fo'#9'o=bar; Domain=other.com; HostOnly'#13#10+
-                 'Set-Cookie: w   s 3="a b c%d"; Domain=example.org; HostOnly'#13#10);
+  //---domains---
+  testcookiedump('Set-Cookie: ws1=a b c%d; Domain=example.org; Path=/; HostOnly'#13#10+
+                 'Set-Cookie: ws2="a b c%d"; Domain=example.org; Path=/; HostOnly'#13#10+
+                 'Set-Cookie: fo'#9'o=bar; Domain=other.com; Path=/; HostOnly'#13#10+
+                 'Set-Cookie: w   s 3="a b c%d"; Domain=example.org; Path=/; HostOnly'#13#10);
 
   cm.clear;
   parseheaders(example ,'Set-Cookie: empty=');
@@ -119,11 +130,68 @@ begin
   testcookies(examplesub2, 'a=1; c=3a; c=3b');
 
   testcookiedump(
-    'Set-Cookie: a=1; Domain=example.org'#13#10+
-    'Set-Cookie: c=3a; Domain=example.org'#13#10+
-    'Set-Cookie: d=4; Domain=sub1.example.org'#13#10+
-    'Set-Cookie: c=3b; Domain=sub2.example.org; HostOnly'#13#10
+    'Set-Cookie: a=1; Domain=example.org; Path=/'#13#10+
+    'Set-Cookie: c=3a; Domain=example.org; Path=/'#13#10+
+    'Set-Cookie: d=4; Domain=sub1.example.org; Path=/'#13#10+
+    'Set-Cookie: c=3b; Domain=sub2.example.org; Path=/'#13#10
   );
+
+  //---paths---
+  cm.clear;
+  //see http://softwareengineering.stackexchange.com/questions/193429/is-path-in-set-cookie-url-encoded
+  parseheaders(example,'Set-Cookie: k=v; path=/'#13#10+
+   'Set-Cookie: f%2520o=ba%2520r; ;;;path=/qa%20x;'#13#10+
+   'Set-Cookie: f%2520o=second; ; ;;; path=/qb%25x;'#13#10+
+   'Set-Cookie: Z%2520Z=Z%2520Z; ;path=/;'
+  );
+  testcookies(example, 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org', 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/', 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org///////////', 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org%2F', '');
+  testcookies('http://example.org/////qa%20x', 'k=v; Z%2520Z=Z%2520Z'); //firefox does that, too, but i do not like it
+  testcookies('http://example.org/qa%20x', 'k=v; f%2520o=ba%2520r; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qa x', 'k=v; f%2520o=ba%2520r; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qa%20x/', 'k=v; f%2520o=ba%2520r; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qa x/', 'k=v; f%2520o=ba%2520r; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qa%20x/foo', 'k=v; f%2520o=ba%2520r; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qa x/bar', 'k=v; f%2520o=ba%2520r; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qa+x', 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qb%25x', 'k=v; f%2520o=second; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/qb%x', 'k=v; f%2520o=second; Z%2520Z=Z%2520Z'); //not what firefox does
+
+  testcookiedump('Set-Cookie: k=v; Domain=example.org; Path=/; HostOnly'#13#10+
+  'Set-Cookie: f%2520o=ba%2520r; Domain=example.org; Path=/qa%20x; HostOnly'#13#10+
+  'Set-Cookie: f%2520o=second; Domain=example.org; Path=/qb%x; HostOnly'#13#10+
+  'Set-Cookie: Z%2520Z=Z%2520Z; Domain=example.org; Path=/; HostOnly'#13#10);
+
+  parseheaders('http://example.org/haus/maus?xyxas/(assdashttp://asas','Set-Cookie: new=123; path=/abc/def/ghi'#13#10'Set-Cookie: new2=456; path=abc/def/ghi');
+  testcookiedump('Set-Cookie: k=v; Domain=example.org; Path=/; HostOnly'#13#10+
+  'Set-Cookie: f%2520o=ba%2520r; Domain=example.org; Path=/qa%20x; HostOnly'#13#10+
+  'Set-Cookie: f%2520o=second; Domain=example.org; Path=/qb%x; HostOnly'#13#10+
+  'Set-Cookie: Z%2520Z=Z%2520Z; Domain=example.org; Path=/; HostOnly'#13#10+
+  'Set-Cookie: new=123; Domain=example.org; Path=/abc/def/ghi; HostOnly'#13#10+
+  'Set-Cookie: new2=456; Domain=example.org; Path=/haus; HostOnly'#13#10
+  );
+  testcookies('http://example.org/abc/def/', 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/abc/def/ghi', 'k=v; Z%2520Z=Z%2520Z; new=123');
+  testcookies('http://example.org/abc/def/ghi/', 'k=v; Z%2520Z=Z%2520Z; new=123');
+  testcookies('http://example.org/abc/def/ghi/jkl', 'k=v; Z%2520Z=Z%2520Z; new=123');
+  testcookies('http://example.org/abc/defx', 'k=v; Z%2520Z=Z%2520Z');
+  testcookies('http://example.org/haus', 'k=v; Z%2520Z=Z%2520Z; new2=456');
+  testcookies('http://example.org:80/haus/maus', 'k=v; Z%2520Z=Z%2520Z; new2=456');
+  testcookies('https://example.org/haus?foobar', 'k=v; Z%2520Z=Z%2520Z; new2=456');
+  testcookies('https://example.org/h%61us', 'k=v; Z%2520Z=Z%2520Z; new2=456');
+  testcookies('https://example.org/h%61us%2Ffoobar', 'k=v; Z%2520Z=Z%2520Z; new2=456'); //not what firefox does, but it seems to be an user input safeguard rather than a cookie issue
+
+
+  cm.clear;
+  parseheaders(example, 'Set-Cookie: a=123;Secure;;');
+  testcookies(example, '');
+  testcookies('https://example.org', 'a=123');
+  testcookies('https://example.org/xyz', 'a=123');
+  testcookiedump('Set-Cookie: a=123; Domain=example.org; Path=/; HostOnly; Secure'#13#10);
+
 
   sl.free;
 end;
