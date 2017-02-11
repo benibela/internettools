@@ -1191,6 +1191,12 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   t('<r><t:meta-attribute name="x" case-sensitive="true" matching="list-contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="x y">2</a><a x="X Y">3</a></r>', '_result=3');
   t('<r><t:meta-attribute name="x" case-sensitive="false" matching="list-contains"/><a x="X">{.}</a></r>','<r><a x="xay">1</a><a x="x y">2</a><a x="X Y">3</a></r>', '_result=2');
 
+  t('<t:element>{.}</t:element>', '<a>foobar</a>', '_result=foobar');
+  t('<b><t:element x="y">{.}</t:element></b>', '<b><a>foo</a><a x="z">2</a><a x="y">bar</a></b>', '_result=bar');
+  t('<b><t:element t:condition="@x=''z''">{.}</t:element></b>', '<b><a>foo</a><a x="z">2</a><a x="y">bar</a></b>', '_result=2');
+  t('<t:element><b>{.}</b>{name()}</t:element>', '<x><a>foo</a><c><b>bar</b></c></x>', '_result=bar'#10'_result=x');
+  t('<x><t:element><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><c><b>bar</b></c></x>', '_result=bar'#10'_result=c');
+  t('<x><t:element t:ignore-self-test="name = ''c''"><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><b>bar</b></x>', '_result=bar'#10'_result=x');
 
   q('let <r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '2');
   q('let <r><t:meta-attribute name="x" case-sensitive="false"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '1');

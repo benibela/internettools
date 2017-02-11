@@ -52,6 +52,7 @@ type
 TTemplateElementType=(tetIgnore,
                       tetHTMLOpen, tetHTMLClose,
                       tetHTMLText,
+                      tetMatchElementOpen, tetMatchElementClose,
                       tetMatchText,
                       tetCommandMeta, tetCommandMetaAttribute, tetCommandRead, tetCommandShortRead,
                       tetCommandLoopOpen,tetCommandLoopClose,
@@ -553,6 +554,10 @@ TXQTermVariableArray = array of TXQTermVariable;
         case-sensitive enables case-sensitive comparisons.@br
         (older versions used regex/is instead matches/eq, which is now deprecated and will be removed in future versions)
       )
+      @item(@code(<template:element> .. </template:element>)@br
+        Matches any element. @br
+        It is handled like an element without t: prefix, but skips the name test. E.g. if either @code(<a>) or @code(<b>) should be allowed, you can use @code(<t:element t:condition="name() = ('a', 'b')">) rather than listing both.
+      )
       @item(@code(<template:meta [text-matching="??"] [case-sensitive="??"] [attribute-text-matching="??"] [attribute-case-sensitive="??"]/>) @br
         Specifies meta information to change the template semantic:@br
         @code(text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
@@ -738,18 +743,18 @@ implementation
 uses math,strutils;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
-      firstRealTemplateType = tetMatchText;
-      COMMAND_CLOSED:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of longint=(0,0,0,0,0,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
-      COMMAND_STR:array[firstRealTemplateType..tetCommandSwitchPrioritizedClose] of string=('match-text','meta','meta-attribute','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized');
+      firstRealTemplateType = tetMatchElementOpen;
+      COMMAND_CLOSED:array[firstRealTemplateType..high(TTemplateElementType)] of longint=(1, 2, 0,0,0,0,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
+      COMMAND_STR:array[firstRealTemplateType..high(TTemplateElementType)] of string=('element', 'element', 'match-text','meta','meta-attribute','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized','siblings','siblings', 'siblings-header','siblings-header');
 
 
 { TTemplateElement }
 
-function strToCommand(ns, s:string; treeTyp: TTreeNodeType): TTemplateElementType;
+function strToCommand(const ns, s:string; treeTyp: TTreeNodeType): TTemplateElementType;
 var  t: TTemplateElementType;
 begin
   if ((treeTyp = tetOpen) or (treeTyp = tetClose)) then begin
-    if ns = HTMLPARSER_NAMESPACE_URL then begin
+    if strEqual(ns, HTMLPARSER_NAMESPACE_URL) then begin
       for t:=low(COMMAND_STR) to high(COMMAND_STR) do
         if striequal(s,COMMAND_STR[t]) then begin
           if treeTyp = tetOpen then exit(t)
@@ -857,7 +862,8 @@ begin
   if attributes <> nil then
     for i := attributes.Count - 1 downto 0 do begin
       rv := attributes.Items[i].realvalue;
-      if (templateType >= firstRealTemplateType) or (attributes.Items[i].getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin
+      if (templateType in [firstRealTemplateType..high(TTemplateElementType)] - [tetMatchElementOpen])
+         or (attributes.Items[i].getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin
         if templateAttributes = nil then templateAttributes := tStringAttributeList.Create;
         templateAttributes.Add(attributes.Items[i].value+'='+attributes.Items[i].realvalue);
         attributes.Delete(i);
@@ -1255,11 +1261,13 @@ var
   end;
 
 begin
-  if (html.typ <> tetOpen)
-     or (template.templateType <> tetHTMLOpen)
-     or (html.hash <> template.hash)
-     or not striequal(html.value, template.value) then
-       exit(false);
+  if html.typ <> tetOpen then exit(false);
+  case template.templateType of
+    tetHTMLOpen: if (html.hash <> template.hash) or not striequal(html.value, template.value) then
+      exit(false);
+    tetMatchElementOpen: ;
+    else exit(false);
+  end;
   if (template.attributes = nil) and (template.templateAttributes = nil) then
     exit(true);
   for attrib in template.attributes do begin
@@ -1409,7 +1417,7 @@ var xpathText: TTreeNode;
     else templateStart := templateStart.templateReverse.templateNext;
   end;
 
-  procedure HandleMatchOpen;
+  function HandleMatchOpen: boolean;
   begin
     //To check if a node matches a template node we have to check all children, if they don't match
     //we have to test it with another node
@@ -1678,8 +1686,8 @@ begin
             case templateStart.templateType of
               tetMatchText: HandleMatchText;
               tetHTMLText: raise ETemplateParseException.Create('Assertion fail: Template text has been converted to text-match');
-              tetHTMLOpen: HandleMatchOpen;
-              tetHTMLClose:
+              tetHTMLOpen, tetMatchElementOpen: HandleMatchOpen;
+              tetHTMLClose, tetMatchElementClose:
                 if templateStart.templateReverse.ignoreSelfTest <> nil then templateStart := templateStart.templateNext //there is no way to get the value of the query now, is there?
                 else raise ETemplateParseException.Create('Assertion fail: Closing template tag </'+templateStart.value+'> not matched');
 
@@ -1799,8 +1807,8 @@ begin
     last := nil;
     while cur <> nil do begin
       case cur.templateType of
-        tetHTMLOpen, tetHTMLText: begin
-          if (cur.match = nil) and (cur.templateType<>tetIgnore) then begin
+        tetHTMLOpen, tetHTMLText, tetMatchElementOpen: begin
+          if (cur.match = nil) then begin
             err := 'Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10+
                    'Couldn''t find a match for: '+cur.toString+#13#10;
             if realLast <> nil then err += 'Previous element is:'+reallast.toString+#13#10;
