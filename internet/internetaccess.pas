@@ -94,14 +94,14 @@ type
 
   THTTPHeaderList = TStringList;
 
-  TCookieFlags = set of (cfHostOnly{, cfSecure, cfHttpOnly});
+  TCookieFlags = set of (cfHostOnly, cfSecure {, cfHttpOnly});
   TCookieManager = record
     cookies: array of record
-      domain, name, value: string;
+      domain, path, name, value: string;
       flags: TCookieFlags;
     end;
     procedure clear;
-    procedure setCookie(domain: string; const name,value:string; flags: TCookieFlags);
+    procedure setCookie(domain, path: string; const name,value:string; flags: TCookieFlags);
     procedure parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList; allowUnsecureXidelExtensions: boolean = false);
     function makeCookieHeader(const target: TDecodedUrl):string;
     function makeCookieHeaderValueOnly(const target: TDecodedUrl):string;
@@ -120,6 +120,15 @@ type
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
   TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data:string; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
+
+  //**URL Encoding encodes every special character @code(#$AB) by @code(%AB). This model describes which characters are special:
+  TUrlEncodingModel = (
+    ueHTMLForm,     //**< Encode for application/x-www-form-urlencoded as defined in HTML 5 standard
+    ueURLPath,      //**< Encode for the path part of an URL
+    ueURLQuery,     //**< Encode for the query part of an URL
+    ueXPathURI,     //**< Encode for the XPath/XQuery function fn:encode-for-uri as defined in the XPath standard
+    ueXPathHTML4,   //**< Encode for the XPath/XQuery function fn:encode-for-uri as defined in the XPath standard (they quote the the HTML4 standard)
+    ueXPathFromIRI);//**< Encode for the XPath/XQuery function fn:iri-to-uri as defined in the XPath standard
 
   //**@abstract(Abstract base class for connections)
   //**This class defines the interface methods for http requests, like get, post or request.@br
@@ -212,9 +221,9 @@ type
     procedure closeOpenedConnections();virtual;abstract;
 
     //**Encodes the passed string in the url encoded format
-    class function urlEncodeData(data: string): string;
+    class function urlEncodeData(const data: string; encodingModel: TUrlEncodingModel = ueHTMLForm): string; static;
     //**Encodes all var=... pairs of data in the url encoded format
-    class function urlEncodeData(data: TStringList): string;
+    class function urlEncodeData(data: TStringList; encodingModel: TUrlEncodingModel = ueHTMLForm): string; static;
 
     //**parses a string like 200=accept,400=abort,300=redirect
     class function reactFromCodeString(const codes: string; actualCode: integer; var reaction: TInternetAccessReaction): string; static;
@@ -707,12 +716,9 @@ begin
     FOnTransferEnd(self, method, url, data, Result);
 end;
 
+
 function TInternetAccess.doTransferChecked(method: string; url: TDecodedUrl; data: string; remainingRedirects: integer): string;
 
-  const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!', '~', '*', '''', '(', ')', '%'];
-        allowedPath = allowedUnreserved  + [':','@','&','=','+','$',',', ';','/'];
-        allowedURI = allowedUnreserved + [';','/','?',':','@','&','=','+','$',',','[',']','"'];
-        low = [#0..#128];
 var
   reaction: TInternetAccessReaction;
   message: String;
@@ -721,8 +727,8 @@ begin
 
   reaction := iarReject;
   while reaction <> iarAccept do begin
-    url.path := strEscapeToHex(url.path, low - allowedPath, '%'); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
-    url.params := strEscapeToHex(url.params, low - allowedURI, '%');
+    url.path := urlEncodeData(url.path, ueURLPath); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
+    url.params := urlEncodeData(url.params, ueURLQuery);
 
     result := doTransferUnchecked(method, url, data);
 
@@ -779,13 +785,14 @@ begin
   SetLength(cookies, 0);
 end;
 
-procedure TCookieManager.setCookie(domain: string; const name, value: string; flags: TCookieFlags);
+procedure TCookieManager.setCookie(domain, path: string; const name, value: string; flags: TCookieFlags);
 var i:longint;
 begin
   domain := lowercase(domain);
   for i:=0 to high(cookies) do //todo: use a map
     if strEqual(cookies[i].name, name) //case-sensitive according to RFC6265 (likely insensitive in RFC 2109, but that is obsolete)
        and strEqual(cookies[i].domain, domain) //case-insensitive, but domain is assumed to be normalized as it is not send to the server
+       and strEqual(cookies[i].path, path) //case-sensitive
        then begin
       cookies[i].value:=value;
       cookies[i].flags:=flags;
@@ -793,6 +800,7 @@ begin
     end;
   setlength(cookies,length(cookies)+1);
   cookies[high(cookies)].domain:=domain;
+  cookies[high(cookies)].path:=path;
   cookies[high(cookies)].name:=name;
   cookies[high(cookies)].value:=value;
   cookies[high(cookies)].flags:=flags;
@@ -818,6 +826,22 @@ begin
   result := strEndsWith(str, domain) and (length(str) > length(domain)) and (str[length(str) - length(domain)] = '.') {and str is not an ip};
 end;
 
+
+//str is a subdirectory of path
+function pathMatches(str: string; const path: string): boolean;
+begin
+  if strEqual(str, path) then exit(true);
+  if not strBeginsWith(str, '/') then str := '/' + str;
+  str := strUnescapeHex(str, '%');
+  if strBeginsWith(str, path) then begin
+    if strEndsWith(path, '/')
+       or (length(str) = length(path))
+       or ((length(str) > length(path)) and (str[length(path)+1] = '/' ) ) then
+      exit(true);
+  end;
+  result := false;
+end;
+
 procedure TCookieManager.parseHeadersForCookies(const source: TDecodedUrl; headers: THTTPHeaderList; allowUnsecureXidelExtensions: boolean);
 const WSP = [' ',#9];
 var i:longint;
@@ -838,7 +862,7 @@ var i:longint;
 
     if (i > headerlen) or (header[i] <> '=') then begin
       value := '';
-      exit(not needEqualSign and (length(name) > 0 ));
+      exit(not needEqualSign);
     end;
 
     inc(i);
@@ -852,8 +876,9 @@ var i:longint;
     result := true;
   end;
 
-var name, value, domain, tName, tValue: string;
+var name, value, domain, path, tName, tValue: string;
     flags: TCookieFlags;
+    lastSlash: LongInt;
 begin
   for ci := 0 to headers.Count - 1 do
     case TInternetAccess.parseHeaderLineKind(headers[ci]) of
@@ -864,6 +889,7 @@ begin
         if not parseNameValuePair(name, value, true) then continue;
 
         domain := '';
+        path := '';
         flags := [];
         while i < headerlen do begin
           inc(i);
@@ -875,8 +901,8 @@ begin
               if strBeginsWith(tvalue, '.') then delete(tvalue, 1, 1);
               domain := normalizeDomain(tvalue);
             end;
-            //'path':;
-            //'secure': Include(flags, cfSecure);
+            'path': if strBeginsWith(tvalue, '/') then path := tvalue;
+            'secure': Include(flags, cfSecure);
             //'httponly': Include(flags, cfHttpOnly);
             'hostonly': if allowUnsecureXidelExtensions then include(flags, cfHostOnly);
           end;
@@ -889,7 +915,16 @@ begin
           include(flags, cfHostOnly);
           domain := normalizeDomain(source.host);
         end;
-        setCookie(domain, name, value, flags);
+        if path = '' then begin
+          path := source.path;
+          if not strBeginsWith(path, '/') then path := '/'
+          else begin
+            lastSlash := strLastIndexOf(path, '/');
+            if lastSlash = 1 then path := '/'
+            else path := copy(path, 1, lastSlash - 1);
+          end;
+        end;
+        setCookie(domain, strUnescapeHex(path, '%'), name, value, flags);
       end;
     end;
 end;
@@ -913,8 +948,10 @@ begin
   builder.init(@result);
 
   for i := 0 to high(cookies) do
-    if strEqual(cookies[i].domain, domain)
-       or (not (cfHostOnly in cookies[i].flags) and domainMatches(domain, cookies[i].domain)) //also send of super domain
+    if (strEqual(cookies[i].domain, domain)
+       or (not (cfHostOnly in cookies[i].flags) and domainMatches(domain, cookies[i].domain))) //also send of super domain
+       and (pathMatches(target.path, cookies[i].path))
+       and (not (cfSecure in cookies[i].flags) or ( striEqual(target.protocol, 'https') ) )
        then begin
       if builder.count <> 0 then builder.add('; ');
       builder.add(cookies[i].name);
@@ -938,7 +975,10 @@ begin
       add(value);
       add('; Domain=');
       add(domain);
-      if cfHostOnly in flags then add('; HostOnly');;
+      add('; Path=');
+      add( TInternetAccess.urlEncodeData(path, ueURLPath));
+      if cfHostOnly in flags then add('; HostOnly');
+      if cfSecure in flags then add('; Secure');
       add(#13#10);
     end;
     final;
@@ -1172,49 +1212,38 @@ begin
   end;
 end;
 
-class function TInternetAccess.urlEncodeData(data: string): string;
-const ENCODE_TABLE:array[1..19,0..1] of string=(('%','%25'),
-                                               (#9,'%09'), //tab
-                                               (#10,'%0A'),//new line and carriage return (13,10)
-                                               (#13,'%0D'),
-                                               ('"','%22'),
-                                               ('<','%3C'),
-                                               ('>','%3E'),
-                                               ('#','%23'),
-                                               ('$','%24'),
-                                               ('&','%26'),
-                                               ('+','%2B'),
-//                                               (' ','%20'),
-                                               (' ','+'),
-                                               (',','%2C'),
-                                               ('/','%2F'),
-                                               (':','%3A'),
-                                               (';','%3B'),
-                                               ('=','%3D'),
-                                               ('?','%3F'),
-                                               ('@','%40')
-(*                                               ('ü', '%FC'),
-                                               ('ö', '%F6'),
-                                               ('ä', '%E4'),
-                                               ('Ü', '%DC'),
-                                               ('Ö', '%D6'),
-                                               ('Ä', '%C4')*)
-                                               );
-var i:integer;
+class function TInternetAccess.urlEncodeData(const data: string; encodingModel: TUrlEncodingModel): string;
+const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!', '~', '*', '''', '(', ')', '%'];
+      allowedPath = allowedUnreserved  + [':','@','&','=','+','$',',', ';','/'];
+      allowedURI = allowedUnreserved + [';','/','?',':','@','&','=','+','$',',','[',']'];
+      allChars = [#0..#255];
+const ENCODE_TABLE: array[TUrlEncodingModel] of TCharSet = (
+  allChars - [#$20, #$2A, #$2D, #$2E, #$30..#$39, #$41..#$5A, #$5F, #$61..#$7A],
+  allChars - allowedPath,
+  allChars - allowedURI,
+  allChars - ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~'],
+  allChars - [#32..#126],
+  allChars - ([#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`'])
+);
+var
+  i: Integer;
+
 begin
-  result:=data;
-  for i:=low(ENCODE_TABLE) to high(ENCODE_TABLE) do
-    result:=StringReplace(result,ENCODE_TABLE[i,0],ENCODE_TABLE[i,1],[rfReplaceAll]);
+  result:=strEscapeToHex(data, ENCODE_TABLE[encodingModel], '%');
+  if encodingModel = ueHTMLForm then begin
+    for i := 1 to length(result) do
+      if result[i] = ' ' then result[i] := '+';
+  end;
 end;
 
-class function TInternetAccess.urlEncodeData(data: TStringList): string;
+class function TInternetAccess.urlEncodeData(data: TStringList; encodingModel: TUrlEncodingModel): string;
 var
  i: Integer;
 begin
   Result:='';
   for i:=0 to data.Count-1 do begin
     if result <> '' then result+='&';
-    result+=urlEncodeData(data.Names[i])+'='+urlEncodeData(data.ValueFromIndex[i]);
+    result+=urlEncodeData(data.Names[i], encodingModel)+'='+urlEncodeData(data.ValueFromIndex[i], encodingModel);
   end;
 end;
 
@@ -1268,7 +1297,7 @@ end;
 
 function httpRequest(url: string; postdata: TStringList): string;
 begin
-  result := httpRequest(url, TInternetAccess.urlEncodeData(postdata));
+  result := httpRequest(url, TInternetAccess.urlEncodeData(postdata, ueHTMLForm));
 end;
 
 function httpRequest(const method, url, rawdata: string): string;

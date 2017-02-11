@@ -2817,8 +2817,7 @@ function jsonStrEscape(s: string):string;
 
 
 //**Escapes for an URL (internally used)
-function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
-const URIForbiddenChars = [#$20..#$7E] - ['<','>','"',' ','{','}','|','\','^','`'];
+//function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
 //**Checks the length of the args array (internally used)
 procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint = -2);
 procedure requiredArgType(const v: IXQValue; typ: TXSType);
@@ -3612,29 +3611,6 @@ begin
   result += '"';
 end;
 
-
-
-function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
-var
-  p: Integer;
-  i: Integer;
-  temp: String;
-begin
-  SetLength(result, 3*length(s));
-  p := 1;
-  for i := 1 to length(s) do
-    if s[i] in safe then begin
-      result[p] := s[i];
-      p+=1;
-    end else begin
-      result[p] := '%';
-      temp := IntToHex(ord(s[i]), 2);
-      result[p+1] := temp[1];
-      result[p+2] := temp[2];
-      p+=3;
-    end;
-  setlength(result, p-1);
-end;
 
 function urlHexDecode(s: string): string;
 var

@@ -1211,11 +1211,16 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
     for i:=0 to high(split) do addSingleValue(split[i]);
   end;
 
+  function encode(const s: string): string; inline;
+  begin
+    result := TInternetAccess.urlEncodeData(s, ueHTMLForm);
+  end;
+
   procedure addPair(const n, v: string);
   begin
     if urlEncoded then begin
-      arrayAdd(names, urlHexEncode(n));
-      arrayAdd(values, urlHexEncode(v));
+      arrayAdd(names, encode(n));
+      arrayAdd(values, encode(v));
     end else begin
       arrayAdd(names, n);
       arrayAdd(values, v);
@@ -1304,11 +1309,16 @@ var replaceNames, replaceValues: TStringArray;
       header: string;
       post: Boolean;
 
+      function encode(const s: string): string; inline;
+      begin
+        result := TInternetAccess.urlEncodeData(s, ueHTMLForm);
+      end;
+
       procedure addPair(n: string; v: string);
       begin
         if not multipart then begin
           if request <> '' then request += '&';
-          request += urlHexEncode(n) + '=' + urlHexEncode(v);
+          request += encode(n) + '=' + encode(v);
         end else begin
           mime.addFormData(n, v);
         end;
@@ -2554,16 +2564,16 @@ end;
 
 function xqFunctionEncode_For_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := xqvalue(urlHexEncode(args[0].toString));
+  result := xqvalue(TInternetAccess.urlEncodeData(args[0].toString, ueXPathURI));
 end;
 
 function xqFunctionIri_To_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := xqvalue(urlHexEncode(args[0].toString, URIForbiddenChars));
+  result := xqvalue(TInternetAccess.urlEncodeData(args[0].toString, ueXPathFromIRI));
 end;
 function xqFunctionEscape_Html_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  result := xqvalue(urlHexEncode(args[0].toString, [#32..#126]));
+  result := xqvalue(TInternetAccess.urlEncodeData(args[0].toString, ueXPathHTML4));
 end;
 
 function xqFunctionDecode_Uri({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
