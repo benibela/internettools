@@ -2374,6 +2374,15 @@ begin
   end;
 end;
 
+function charEncodeHexDigitUp(digit: integer): char;
+begin
+  case digit of
+    0..9: result := chr(ord('0') + digit);
+    $A..$F: result := chr(ord('A') - $A + digit);
+    else begin assert(false); result := #0; end;
+  end;
+end;
+
 function strEscapeToHex(s:RawByteString; const toEscape: TCharSet; escape: RawByteString): RawByteString;
 var
   p: Integer;
@@ -2399,8 +2408,8 @@ begin
     end else begin
       move(escapeP^, result[p], length(escape));
       inc(p, length(escape));
-      temp := IntToHex(ord(s[i]), 2);
-      move(temp[1], result[p], 2);
+      result[p] := charEncodeHexDigitUp(ord(s[i]) shr 4);
+      result[p+1] := charEncodeHexDigitUp(ord(s[i]) and $F);
       inc(p, 2);
     end;
   //setlength(result, p-1);
@@ -3086,14 +3095,6 @@ begin
   inc(next, l);
 end;
 
-function charEncodeHexDigitUp(digit: integer): char;
-begin
-  case digit of
-    0..9: result := chr(ord('0') + digit);
-    $A..$F: result := chr(ord('A') - $A + digit);
-    else begin assert(false); result := #0; end;
-  end;
-end;
 
 procedure TStrBuilder.addhexentity(codepoint: integer);
 begin
