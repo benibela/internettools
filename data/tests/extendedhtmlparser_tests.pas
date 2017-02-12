@@ -1196,7 +1196,44 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   t('<b><t:element t:condition="@x=''z''">{.}</t:element></b>', '<b><a>foo</a><a x="z">2</a><a x="y">bar</a></b>', '_result=2');
   t('<t:element><b>{.}</b>{name()}</t:element>', '<x><a>foo</a><c><b>bar</b></c></x>', '_result=bar'#10'_result=x');
   t('<x><t:element><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><c><b>bar</b></c></x>', '_result=bar'#10'_result=c');
-  t('<x><t:element t:ignore-self-test="name = ''c''"><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><b>bar</b></x>', '_result=bar'#10'_result=x');
+//  t('<x><t:element t:ignore-self-test="name = ''c''"><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><b>bar</b></x>', '_result=bar'#10'_result=x');
+
+  //Sibling tests
+  t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>',
+    '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>',
+    '<x><b>1B</b><a>2A</a><d>3D</d><c>4C</c>    <b>f1B</b><a>f2A</a><d>f3D</d><c>f4C</c> </x>',
+    'b=1B'#10'a=2A'#10'd=3D'#10'c=4C');
+  t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>',
+    '<x><a>1A</a><k>mu</k>xyxyas<b>2B</b>fsdfds<c>3C</c>awawa<t/><d>4D</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+
+  f('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>',
+    '<x><b>1B</b><a>2A</a><c>3C</c><d>4D</d></x>');
+  t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>',
+    '<x><b>1B</b><a>2A</a><c>3C</c><d>4D</d><c>final</c></x>',
+    'b=1B'#10'a=2A'#10'd=4D'#10'c=final');
+  t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings>+</x>',
+    '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d> <c>3bC</c><d>4bD</d> <c>3cC</c><d>4cD</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D'#10'c=3bC'#10'd=4bD'#10'c=3cC'#10'd=4cD');
+
+
+  t('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
+    '<x><y><a>1A</a><b>2B</b></y><z><c>3C</c><d>4D</d></z></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  t('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
+    '<x><y><b>1B</b><a>2A</a><d>3D</d><c>4C</c></y>    <z><a>f2A</a><b>f1B</b><d>c3D</d><c>c4C</c></z> </x>',
+    'b=1B'#10'a=2A'#10'd=c3D'#10'c=c4C');
+  t('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
+    '<x><y><b>1B</b><a>2A</a></y>    <z><d>3D</d><c>4C</c><y><b>f1B</b><a>f2A</a></y><d>f3D</d><c>f4C</c></z> </x>',
+    'b=1B'#10'a=2A'#10'd=3D'#10'c=4C');
+  t('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
+    '<x><y><a>1A</a><k>mu</k>xyxyas<b>2B</b>f</y>sdf<z>ds<c>3C</c>awawa<t/><d>4D</d></z></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  f('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
+    '<x><y><b>1B</b><a>2A</a></y><z><c>3C</c><d>4D</d></z></x>');
+
 
   q('let <r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '2');
   q('let <r><t:meta-attribute name="x" case-sensitive="false"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '1');

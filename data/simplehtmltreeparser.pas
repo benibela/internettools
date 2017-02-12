@@ -239,6 +239,7 @@ TTreeNode = class
   function getRootElement(): TTreeNode;    //**< Returns the highest element node ancestor
   function getDocument(): TTreeDocument; //**< Returns the document node containing this node. Raises an exception if there is no associated document
   function hasDocument(): boolean; //**< Returns if this node is contained in a document
+  function getChildrenCount(types: TTreeNodeTypes): integer;
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
   function getNamespacePrefix(): string; //**< Returns the namespace prefix. (i.e. 'a' for 'a:b', '' for 'b')
@@ -1267,6 +1268,20 @@ end;
 function TTreeNode.hasDocument: boolean;
 begin
   result := document is TTreeDocument;
+end;
+
+function TTreeNode.getChildrenCount(types: TTreeNodeTypes): integer;
+var
+  child: TTreeNode;
+begin
+  result := 0;
+  child := getFirstChild();
+  if child = nil then exit();
+  repeat
+    if child.typ in types then
+      inc(result);
+    child := child.getNextSibling();
+  until child = nil;
 end;
 
 {$ImplicitExceptions off}

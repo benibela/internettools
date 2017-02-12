@@ -59,7 +59,9 @@ TTemplateElementType=(tetIgnore,
                       tetCommandIfOpen, tetCommandIfClose,
                       tetCommandElseOpen, tetCommandElseClose,
                       tetCommandSwitchOpen, tetCommandSwitchClose,
-                      tetCommandSwitchPrioritizedOpen, tetCommandSwitchPrioritizedClose
+                      tetCommandSwitchPrioritizedOpen, tetCommandSwitchPrioritizedClose,
+                      tetCommandSiblingsOpen, tetCommandSiblingsClose,
+                      tetCommandSiblingsHeaderOpen, tetCommandSiblingsHeaderClose
                       );
 TTemplateElementFlag = (tefOptional, tefSwitchChild);
 TTemplateElementFlags = set of TTemplateElementFlag;
@@ -101,6 +103,7 @@ TTemplateElement=class(TTreeNode)
   //"caches"
   test, condition, valuepxp, source, min, max, varname, ignoreSelfTest: IXQuery; //when adding, remember to update all the references
   textRegexs: array of TWrappedRegExpr;
+  data: tobject;
 
   function templateReverse: TTemplateElement; inline;
   function templateNext: TTemplateElement; inline;
@@ -651,6 +654,12 @@ THtmlTemplateParser=class
     FAttributeDefaultMatching: string;
     FAttributeMatching: TStringList;
 
+    FSiblingMatching: array of record
+      id: string;
+      childrenCount: integer; //for pattern debugging
+      order: array of integer;
+    end;
+
     function GetVariableLogCondensed: TXQVariableChangeLog;
     function GetVariables: TXQVariableChangeLog;
     function getHTMLTree: TTreeNode;
@@ -784,7 +793,15 @@ end;
 procedure ignore(const {%H-}intentionallyUnusedParameter: TObject); inline; begin end;
 
 
-{ EHTMLParseMatchingException }
+type
+  TCommandSiblingData = class
+      id: integer;
+      children: array of TTemplateElement;
+  end;
+  TCommandSiblingHeaderData = class(TCommandSiblingData)
+    countChildren: array of TTemplateElement;
+  end;
+
 
 constructor EHTMLParseMatchingException.create(const mes: string; const asender: TObject);
 begin
@@ -924,6 +941,19 @@ begin
       templateAttributes.Assign(s.templateAttributes);
     end;
 
+    if s.data <> nil then begin
+      if s.data is TCommandSiblingData then begin
+        data := s.data.newinstance;
+        TCommandSiblingData(data).id := TCommandSiblingData(s.data).id;
+        TCommandSiblingData(data).children := TCommandSiblingData(s.data).children;
+        SetLength(TCommandSiblingData(data).children, length(TCommandSiblingData(data).children));
+      end;
+      if s.data is TCommandSiblingHeaderData then begin
+        TCommandSiblingHeaderData(data).countChildren := TCommandSiblingHeaderData(s.data).countChildren;
+        SetLength(TCommandSiblingHeaderData(data).countChildren, length(TCommandSiblingHeaderData(data).countChildren));
+      end;
+    end;
+
     contentRepetitions:=s.contentRepetitions;
     match:=s.match;
 
@@ -988,12 +1018,68 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     end;
     textRegexs[high(textRegexs)] := wregexprParse(r, flags);
   end;
+
+  procedure cacheSibling(header: boolean);
+  var data: TCommandSiblingData;
+    child: TTreeNode;
+    count, i: Integer;
+    id: String;
+  begin
+    count := getChildrenCount([tetOpen]);
+    if count = 0 then raise ETemplateParseException.Create('Siblings need a child.');
+    if header then begin
+      data := TCommandSiblingHeaderData.Create;
+      SetLength(TCommandSiblingHeaderData(data).countChildren, count);
+    end else data := TCommandSiblingData.Create;
+    SetLength(data.children, count);
+
+    id := getAttribute('id');
+    data.id := -1;
+    for i := 0 to high(parser.FSiblingMatching) do
+      if parser.FSiblingMatching[i].id = id then begin
+        data.id := i;
+        if parser.FSiblingMatching[i].childrenCount <> count then raise ETemplateParseException.Create('t:siblings children count mismatch.');
+        break;
+      end;
+    if data.id = -1 then begin
+      SetLength(parser.FSiblingMatching, length(parser.FSiblingMatching) + 1 );
+      data.id := high(parser.FSiblingMatching);
+      parser.FSiblingMatching[data.id].id := id;
+      parser.FSiblingMatching[data.id].childrenCount := count;
+    end;
+
+    child := getFirstChild();
+    if child = nil then exit();
+    count := 0;
+    repeat
+      if child.typ = tetOpen then begin
+        data.children[count]:= child as TTemplateElement;
+        if TTemplateElement(child).templateType = tetCommandLoopOpen then begin
+          if not header then raise ETemplateParseException.Create('Loop not allowed in siblings');
+          TCommandSiblingHeaderData(data).countChildren[count] := TTemplateElement(child);
+          data.children[count]:= child.getFirstChild()  as TTemplateElement;
+        end;
+        inc(count);
+      end;
+      child := child.getNextSibling();
+    until child = nil;
+
+
+    if Self.data = nil then self.data := data //make it thread-safe?, but this is not thread-safe. should it be thread-safe?
+    else data.free;
+  end;
+
 var
   temp: String;
 begin
   contentRepetitions := 0;
 
   if recreate then freeCaches;
+
+  case templateType of
+    tetCommandSiblingsHeaderOpen: cacheSibling(true);
+    tetCommandSiblingsOpen: cacheSibling(false);
+  end;
 
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
 
@@ -1042,6 +1128,7 @@ begin
   for i:=0 to high(textRegexs) do
     wregexprFree(textRegexs[i]);
   setlength(textRegexs, 0);
+  FreeAndNil(data);
   {FreeAndNil(test);
   FreeAndNil(condition);
   FreeAndNil(source);
@@ -1423,6 +1510,7 @@ var xpathText: TTreeNode;
     //we have to test it with another node
     //But once a element E match we can assume that there is no better match on the same level (e.g. a
     //match F with E.parent = F.parent), because this is simple list matching
+    result := false;
     if (not templateElementFitHTMLOpen(htmlStart, templateStart)) then htmlStart:=htmlStart.next
     else begin
       templateStart.match := htmlStart;
@@ -1430,6 +1518,7 @@ var xpathText: TTreeNode;
       else begin
         htmlStart := htmlStart.reverse.next;
         templateStart := templateStart.templateReverse.templateNext;
+        result := true;
       end;
     end;
   end;
@@ -1569,7 +1658,7 @@ var xpathText: TTreeNode;
       else value := xqvalue();
 
       while curChild <> nil do begin //enumerate all child tags
-        if curChild.templateType in [tetHTMLOpen,tetHTMLClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if curChild.templateType in [tetHTMLOpen,tetHTMLClose,tetMatchElementOpen,tetMatchElementClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
         if curChild.templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
         if elementFit(curChild) then begin
           templateStart := curChild;
@@ -1649,6 +1738,118 @@ var xpathText: TTreeNode;
     else switchHTML;
   end;
 
+  procedure HandleCommandSiblingsHeader;
+  var outSiblingIndices: array of integer;
+    childrenStart, lastHTMLStartMatch: TTreeNode;
+    header, curChild: TTemplateElement;
+    counts: array of integer;
+    minCounts, maxCounts, usedCounts: pinteger;
+    count: Integer;
+    remainingMinCount, firstActiveChild, i: integer;
+    data: TCommandSiblingHeaderData;
+    found: Boolean;
+  begin
+    //all element children of t:siblings-header are numbered 0..k and the children of t:siblings are numbered the same.
+    //HandleCommandSiblingsHeader records the id-numbers of the children in the order they occur in the HTML.
+    //HandleCommandSiblings then matches the children of t:siblings in that order.
+
+    //As all matching it allows additional nodes between the matched siblings, but unlike the rest it only checks for siblings,
+    //i.e. children of htmlStart and not for descendants;
+
+    header := templateStart;
+    data := TCommandSiblingHeaderData(header.data);
+    childrenStart := header.getFirstChild();
+    if childrenStart = nil then raise ETemplateParseException.Create('<t:siblings> without children');
+
+    count := length(data.children);
+    SetLength(counts, 3 * count);
+    minCounts := @counts[0];
+    maxCounts := @counts[count];
+    usedCounts := @counts[2*count];
+
+    remainingMinCount := 0;
+
+    for i := 0 to count - 1 do begin
+      if data.countChildren[i] = nil then begin
+        if tefOptional in data.children[i].flags then minCounts[i] := 0
+        else minCounts[i] := 1;
+        maxCounts[i] := 1;
+      end else begin
+        if data.countChildren[i].min = nil then minCounts[i] := 0
+        else minCounts[i] := performPXPEvaluation(data.countChildren[i].min).toInt64;
+        if data.countChildren[i].max = nil then maxCounts[i] := 0
+        else maxCounts[i] := performPXPEvaluation(data.countChildren[i].max).toInt64;
+      end;
+      remainingMinCount += minCounts[i];
+    end;
+
+    outSiblingIndices := nil;
+
+    firstActiveChild := 0;
+
+    lastHTMLStartMatch := htmlStart;
+
+    while (htmlStart <> htmlEnd.next) and (htmlStart <> nil) do begin
+      found := false;
+      for i := firstActiveChild to count - 1 do begin
+        if usedCounts[i] = maxCounts[i] then continue;
+        curChild := data.children[i];;
+        if templateElementFitHTMLOpen(htmlStart, curChild) then begin
+          curChild.match := htmlStart;
+          if  matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
+            lastHTMLStartMatch := htmlStart.getNextSibling();
+            SetLength(outSiblingIndices, length(outSiblingIndices) + 1);
+            outSiblingIndices[high(outSiblingIndices)] := i;
+            if usedCounts[i] < minCounts[i] then dec(remainingMinCount);
+            inc(usedCounts[i]);
+            if (i = firstActiveChild) and (usedCounts[i] = maxCounts[i]) then inc(firstActiveChild);
+            found := true;
+            break;
+          end;
+        end;
+      end;
+      //uncommented to not allow nodes between the matched siblings
+      //if not found then break;
+      htmlStart := htmlStart.getNextSibling();
+    end;
+
+    if remainingMinCount <= 0 then begin
+      templateStart := templateStart.templateReverse.templateNext; //accept
+      FSiblingMatching[data.id].order := outSiblingIndices;
+      htmlStart := lastHTMLStartMatch;
+    end else htmlStart := htmlEnd.next; //reject
+  end;
+
+  procedure HandleCommandSiblings;
+  var
+    i: integer;
+    data: TCommandSiblingData;
+    found: Boolean;
+    siblings: TTemplateElement;
+    tempHTMLStart: TTreeNode;
+  begin
+    siblings := templateStart;
+    data := TCommandSiblingData(siblings.data);
+
+    with FSiblingMatching[data.id] do begin
+      for i := 0 to high(order) do begin
+        templateStart := data.children[order[i]];
+        found := false;
+        while (htmlStart <> nil) and
+              ((htmlStart <> htmlEnd.next)) do begin
+          tempHTMLStart := htmlStart;
+          if HandleMatchOpen then begin //this moves to the next descendant, but we want the next sibling
+            found := true;
+            break;
+          end;
+          htmlStart := tempHtmlStart.getNextSibling();
+        end;
+      end;
+      if not found then begin htmlStart := htmlEnd.next; templateStart := siblings;  exit; end;
+    end;
+
+    templateStart := siblings.templateReverse.templateNext; //accept
+  end;
 
 var level: integer;
 begin
@@ -1700,7 +1901,10 @@ begin
               tetCommandSwitchOpen: HandleCommandSwitch(false);
               tetCommandSwitchPrioritizedOpen: HandleCommandSwitch(true);
 
-              tetIgnore, tetCommandMeta, tetCommandMetaAttribute, tetCommandIfOpen, tetCommandSwitchClose: templateStart := templateStart.templateNext;
+              tetCommandSiblingsOpen: HandleCommandSiblings;
+              tetCommandSiblingsHeaderOpen: HandleCommandSiblingsHeader;
+
+              tetIgnore, tetCommandMeta, tetCommandMetaAttribute, tetCommandIfOpen, tetCommandSwitchClose, tetCommandSiblingsHeaderClose, tetCommandSiblingsClose : templateStart := templateStart.templateNext;
 
               tetCommandIfClose, tetCommandElseClose: SkipFollowingElses;
 
@@ -1734,20 +1938,21 @@ procedure THtmlTemplateParser.initializeCaches;
 var
   cur: TTemplateElement;
 begin
+  FSiblingMatching := nil;
   if FTemplate.getLastTree <> nil then begin
     if (FTemplate.getLastTree.getEncoding <> OutputEncoding) then begin
       cur := TTemplateElement(FTemplate.getLastTree.next);
       while cur <> nil do begin
         if (cur.templateAttributes<>nil) then
           cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
-        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+        if (cur.templateAttributes<>nil) or (cur.templateType in [tetCommandShortRead, tetCommandSiblingsHeaderOpen, tetCommandSiblingsOpen]) then
           cur.initializeCaches(self,true);
         cur := cur.templateNext;
       end;
     end else begin
       cur := TTemplateElement(FTemplate.getLastTree.next);
       while cur <> nil do begin
-        if (cur.templateAttributes<>nil) or (cur.templateType = tetCommandShortRead) then
+        if (cur.templateAttributes<>nil) or (cur.templateType in [tetCommandShortRead, tetCommandSiblingsHeaderOpen, tetCommandSiblingsOpen]) then
           cur.initializeCaches(self,lastTrimTextNodes <> FTrimTextNodes);
         cur := cur.templateNext;
       end;
