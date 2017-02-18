@@ -15,7 +15,7 @@ uses
 type
 TXQHashKeyString = {$ifdef USE_FLRE}TFLRERawByteString{$else}RawByteString{$endif};
 {$ifndef USE_FLRE}TXQHash = record
-  function hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
+  class function hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt; static;
 end;{$endif}
 generic TXQHashmapStr<TValue> = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, TValue, TXQHash>{$endif})
 protected
@@ -515,7 +515,7 @@ begin
 end;
 
 {$ifndef USE_FLRE}
-function TXQHash.hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
+class function TXQHash.hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
 begin
   result := nodeNameHash(a) and (n-1);
 end;
