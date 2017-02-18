@@ -31,6 +31,7 @@ var XMLNamespace_Expath_File: INamespace;
 implementation
 
 uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
+  , internetaccess //it does not need internet access itself, just the URI encoding function there
   {$ifdef unix},BaseUnix{$endif}
   {$ifdef windows},windows{$endif}
     ;
@@ -993,7 +994,7 @@ begin
   ignore(context);
   path := fileNameExpandToURI(normalizePath(args[0]));
   {$ifdef windows}path := StringReplace(path, '\', '/', [rfReplaceAll]);{$endif}
-  result := xqvalue(urlHexEncode(path, URIForbiddenChars) );
+  result := xqvalue(TInternetAccess.urlEncodeData(path, ueXPathFromIRI) );
 end;
 
 function dir_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
