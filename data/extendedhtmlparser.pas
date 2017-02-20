@@ -561,6 +561,14 @@ TXQTermVariableArray = array of TXQTermVariable;
         Matches any element. @br
         It is handled like an element without t: prefix, but skips the name test. E.g. if either @code(<a>) or @code(<b>) should be allowed, you can use @code(<t:element t:condition="name() = ('a', 'b')">) rather than listing both.
       )
+      @item(@code(<template:siblings-header [id=".."]> .. </template:siblings-header> <template:siblings [id=".."]>..<template:siblings>)@br
+        These two commands connect elements in different parts of the matched document, and reorder the elements in the siblings command to the same order matched by the header command. The children of these two commands are associated by their order, i.e. the first child of the header command is associated with the first child of the sibling (replay) command.
+        For example, the columns of a table can be associated with the columns in the table header, such the pattern can match any order of those columns. @code(<table><thead><t:siblings-header><th>myheader1</th><th>myheader2</th>..</t:siblings-header></thead> <tr><t:siblings><td>..</td><td>..</td></t:siblings></tr></table> ). Here you can swap the two columns in the document without affecting the matching (except for the order of the output variables). @br
+        The command allows loop counters and optional elements in the header. If an header element can match multiple headers in the document the corresponding element in the replay command is duplicated accordingly. @br
+        Sibling elements in the header that cannot be matched by the pattern are ignored. Similarly additional elements are ignored during the replay, but the elements of the document ignored are not necessarily in the same order in both cases, since the sibling command only reorders its children. E.g. if you use the above example to match table columns and apply it to a document with an additional column between the two headers, the sibling command will still match the first two columns of the table (unless the second @code(<td>) cannot match the new column, but in this case you might want to use t:switch ).
+        You can put an additional @code( <th/>* ) and @code( <td/> ) at the end of the header/replay command to prevent this. The th will match any unexpected column and the td will skip it during replay. @br
+        It is currently not backtracked and the header command will swallow all the siblings it can. If it has swallowed too many, the matching will fail, even if it could have succeeded, if the header had skipped some optional elements.
+      )
       @item(@code(<template:meta [text-matching="??"] [case-sensitive="??"] [attribute-text-matching="??"] [attribute-case-sensitive="??"]/>) @br
         Specifies meta information to change the template semantic:@br
         @code(text-matching): specifies how text node in the template are matched against html text nodes. You can set it to the allowed attributes of match-text. (default is "starts-with") @br
@@ -1777,7 +1785,7 @@ var xpathText: TTreeNode;
       end else begin
         if data.countChildren[i].min = nil then minCounts[i] := 0
         else minCounts[i] := performPXPEvaluation(data.countChildren[i].min).toInt64;
-        if data.countChildren[i].max = nil then maxCounts[i] := 0
+        if data.countChildren[i].max = nil then maxCounts[i] := -1
         else maxCounts[i] := performPXPEvaluation(data.countChildren[i].max).toInt64;
       end;
       remainingMinCount += minCounts[i];

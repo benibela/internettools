@@ -86,7 +86,7 @@ var i:longint;
              raise ETemplateParseException.Create(errormsg);
            end;
   end;
-var previoushtml: string;
+var previoushtml, temp: string;
   tempobj: TXQValueObject;
     procedure t(const template, html, expected: string);
     begin
@@ -1217,6 +1217,9 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings>+</x>',
     '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d> <c>3bC</c><d>4bD</d> <c>3cC</c><d>4cD</d></x>',
     'a=1A'#10'b=2B'#10'c=3C'#10'd=4D'#10'c=3bC'#10'd=4bD'#10'c=3cC'#10'd=4cD');
+  t('<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings>+</x>',
+    '<x><a>1A</a><a>1bA</a><b>2B</b><c>3C</c><d>4D</d> <c>3bC</c><d>4bD</d> <c>3cC</c><d>4cD</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D'#10'c=3bC'#10'd=4bD'#10'c=3cC'#10'd=4cD');
 
 
   t('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
@@ -1233,6 +1236,132 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
     'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
   f('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
     '<x><y><b>1B</b><a>2A</a></y><z><c>3C</c><d>4D</d></z></x>');
+
+  //optional
+  temp := '<x><t:siblings-header><a>{$a}</a>?<b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><b>2B</b><c>3C</c><d>4D</d></x>',
+    'b=2B'#10'd=4D');
+  temp := '<x><t:siblings-header><a>{$a}</a><b t:optional="true">{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><a>1A</a><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'c=3C');
+
+  //loops
+  temp := '<x><t:siblings-header><a>{$a}</a>*<b>{$b}</b>+</t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><b>1B</b><a>2A</a><d>3D</d><c>4C</c></x>',
+    'b=1B'#10'a=2A'#10'd=3D'#10'c=4C');
+  t(temp,
+    '<x><b>2B</b><c>3C</c><d>4D</d></x>',
+    'b=2B'#10'd=4D');
+  t(temp,
+    '<x><b>1B</b><d>3D</d><c>4C</c></x>',
+    'b=1B'#10'd=3D');
+  f(temp,
+    '<x><a>1A</a><c>3C</c><d>4D</d></x>');
+  f(temp, //no backtrack
+    '<x><b>1B</b><d>3D</d><c>4C</c><a>/</x>');
+  t(temp,
+    '<x><b>1B</b><b>2B</b><b>3B</b><c>3C</c><d>4D</d><y/><d>5D</d><d>6D</d><x/></x>',
+    'b=1B'#10'b=2B'#10'b=3B'#10'd=4D'#10'd=5D'#10'd=6D');
+  t(temp,
+    '<x><b>1B</b><a>A</a><b>2B</b><b>3B</b><c>3C</c><d>4D</d><c>AC</c><y/><d>5D</d><d>6D</d><x/></x>',
+    'b=1B'#10'a=A'#10'b=2B'#10'b=3B'#10'd=4D'#10'c=AC'#10'd=5D'#10'd=6D');
+  temp := '<x><t:siblings-header><a>{$a}</a>+<b>{$b}</b>*</t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><b>1B</b><a>2A</a><d>3D</d><c>4C</c></x>',
+    'b=1B'#10'a=2A'#10'd=3D'#10'c=4C');
+  f(temp,
+    '<x><b>2B</b><c>3C</c><d>4D</d></x>');
+  t(temp,
+    '<x><a>1A</a><c>3C</c><d>4D</d></x>',
+    'a=1A'#10'c=3C');
+  t(temp,
+    '<x><a>2A</a><d>3D</d><c>4C</c></x>',
+    'a=2A'#10'c=4C');
+  f(temp,
+    '<x><b>1B</b><b>2B</b><b>3B</b><c>3C</c><d>4D</d><y/><d>5D</d><d>6D</d><x/></x>');
+  t(temp,
+    '<x><a>1A</a><a>2A</a><a>3A</a><d>3D</d><c>4C</c><y/><c>5C</c><c>6C</c><x/></x>',
+    'a=1A'#10'a=2A'#10'a=3A'#10'c=4C'#10'c=5C'#10'c=6C');
+  t(temp,
+    '<x><b>1B</b><a>A</a><b>2B</b><b>3B</b><c>3C</c><d>4D</d><c>AC</c><y/><d>5D</d><d>6D</d><x/></x>',
+    'b=1B'#10'a=A'#10'b=2B'#10'b=3B'#10'd=4D'#10'c=AC'#10'd=5D'#10'd=6D');
+
+  temp := '<x><t:siblings-header><t:loop min="2" max="2+1"><a>{$a}</a></t:loop><b>{$b}</b>{1,4}</t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a> <b>b1</b><b>b2</b><b>b3</b><b>b4</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'a=a3'#10'b=b1'#10'b=b2'#10'b=b3'#10'b=b4'#10'c=c1'#10'c=c2'#10'c=c3'#10'd=d1'#10'd=d2'#10'd=d3'#10'd=d4'
+    );
+  t(temp,
+    '<x><a>a1</a><a>a2</a> <b>b1</b><b>b2</b><b>b3</b><b>b4</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'b=b1'#10'b=b2'#10'b=b3'#10'b=b4'#10'c=c1'#10'c=c2'#10'd=d1'#10'd=d2'#10'd=d3'#10'd=d4'
+    );
+  f(temp,
+    '<x><a>a1</a> <b>b1</b><b>b2</b><b>b3</b><b>b4</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>'
+    );
+  f(temp,
+    '<x><b>b1</b><b>b2</b><b>b3</b><b>b4</b><a>a1</a> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>'
+    );
+  f(temp,
+    '<x><b>b1</b><b>b2</b><a>a1</a><b>b3</b><b>b4</b><a>a1</a> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>'
+    );
+  f(temp,
+    '<x><b>b1</b><b>b2</b><b>b3</b><b>b4</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>'
+    );
+  t(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a><a>a4</a> <b>b1</b><b>b2</b><b>b3</b><b>b4</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'a=a3'#10'b=b1'#10'b=b2'#10'b=b3'#10'b=b4'#10'c=c1'#10'c=c2'#10'c=c3'#10'd=d1'#10'd=d2'#10'd=d3'#10'd=d4'
+    );
+
+  t(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a> <b>b1</b><b>b2</b><b>b3</b><b>b4</b><b>b5</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'a=a3'#10'b=b1'#10'b=b2'#10'b=b3'#10'b=b4'#10'c=c1'#10'c=c2'#10'c=c3'#10'd=d1'#10'd=d2'#10'd=d3'#10'd=d4'
+    );
+  t(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a> <b>b1</b><b>b2</b><b>b3</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'a=a3'#10'b=b1'#10'b=b2'#10'b=b3'#10'c=c1'#10'c=c2'#10'c=c3'#10'd=d1'#10'd=d2'#10'd=d3'
+    );
+  t(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a> <b>b1</b><b>b2</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'a=a3'#10'b=b1'#10'b=b2'#10'c=c1'#10'c=c2'#10'c=c3'#10'd=d1'#10'd=d2'
+    );
+  t(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a> <b>b1</b> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'a=a2'#10'a=a3'#10'b=b1'#10'c=c1'#10'c=c2'#10'c=c3'#10'd=d1'
+    );
+  f(temp,
+    '<x><a>a1</a><a>a2</a><a>a3</a> <c>c1</c><c>c2</c><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>'
+    );
+  t(temp,
+    '<x><a>a1</a><b>b1</b><a>a2</a><a>a3</a> <c>c1</c><c>c2</c><d>dx</d><d>dy</d><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'b=b1'#10'a=a2'#10'a=a3'#10'c=c1'#10'd=dx'#10'c=c3'#10'c=c4'
+    );
+  t(temp,
+    '<x><a>a1</a><b>b1</b><b>b2</b><a>a2</a><a>a3</a> <c>c1</c><c>c2</c><d>dx</d><d>dy</d><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>',
+    'a=a1'#10'b=b1'#10'b=b2'#10'a=a2'#10'a=a3'#10'c=c1'#10'd=dx'#10'd=dy'#10'c=c3'#10'c=c4'
+    );
+  f(temp, //no matching c
+    '<x><a>a1</a><b>b1</b><a>a2</a><b>b2</b><a>a3</a> <c>c1</c><c>c2</c><d>dx</d><d>dy</d><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d> </x>'
+    );
+  t(temp,
+    '<x><a>a1</a><b>b1</b><a>a2</a><b>b2</b><a>a3</a> <c>c1</c><c>c2</c><d>dx</d><d>dy</d><c>c3</c><c>c4</c><c>c5</c> <d>d1</d><d>d2</d><d>d3</d><d>d4</d><d>d5</d><c>cx</c> </x>',
+    'a=a1'#10'b=b1'#10'a=a2'#10'b=b2'#10'a=a3'#10'c=c1'#10'd=dx'#10'c=c3'#10'd=d1'#10'c=cx'
+    );
+
 
 
   q('let <r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '2');
