@@ -1041,7 +1041,8 @@ procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreat
     end else data := TCommandSiblingData.Create;
     SetLength(data.children, count);
 
-    id := getAttribute('id');
+    if templateAttributes = nil then id := ''
+    else id := templateAttributes.Values['id'];
     data.id := -1;
     for i := 0 to high(parser.FSiblingMatching) do
       if parser.FSiblingMatching[i].id = id then begin

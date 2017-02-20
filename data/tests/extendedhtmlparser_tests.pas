@@ -1237,6 +1237,23 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   f('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
     '<x><y><b>1B</b><a>2A</a></y><z><c>3C</c><d>4D</d></z></x>');
 
+
+  temp := '<x><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header> <s2><t:siblings-header id="other"><a>{$a}</a><b>{$b}</b></t:siblings-header></s2> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings>  <t:siblings id="other"><c>{$c}</c><d>{$d}</d></t:siblings> </x>';
+  t(temp,
+    '<x><a>1A</a><b>2B</b>  <s2> <a>x1A</a><b>x2B</b> </s2>  <c>3C</c><d>4D</d> <c>x3C</c><d>x4D</d>        </x>',
+    'a=1A'#10'b=2B'#10'a=x1A'#10'b=x2B'#10'c=3C'#10'd=4D'#10'c=x3C'#10'd=x4D');
+  f(temp,
+    '<x><a>1A</a><b>2B</b>  <s2> <b>x2B</b> <a>x1A</a> </s2>  <c>3C</c><d>4D</d> <c>x3C</c><d>x4D</d>        </x>');
+  t(temp,
+    '<x><a>1A</a><b>2B</b>  <s2> <b>x2B</b> <a>x1A</a> </s2>  <c>3C</c><d>4D</d> <d>x4D</d><c>x3C</c>        </x>',
+    'a=1A'#10'b=2B'#10'b=x2B'#10'a=x1A'#10'c=3C'#10'd=4D'#10'd=x4D'#10'c=x3C');
+  t(temp,
+    '<x><b>2B</b><a>1A</a>  <s2> <b>x2B</b> <a>x1A</a> </s2>  <d>4D</d><c>3C</c> <d>x4D</d><c>x3C</c>        </x>',
+    'b=2B'#10'a=1A'#10'b=x2B'#10'a=x1A'#10'd=4D'#10'c=3C'#10'd=x4D'#10'c=x3C');
+  t(temp,
+    '<x><b>2B</b><a>1A</a>  <s2>  <a>x1A</a> <b>x2B</b> </s2> <d>4D</d><c>3C</c> <c>x3C</c>  <d>x4D</d>       </x>',
+    'b=2B'#10'a=1A'#10'a=x1A'#10'b=x2B'#10'd=4D'#10'c=3C'#10'c=x3C'#10'd=x4D');
+
   //siblings t:condition
   temp := '<x><t:siblings-header><t:element t:condition="name()=(''u'',''v'')">{$uv}</t:element><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
   t(temp,
