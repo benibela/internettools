@@ -1237,7 +1237,50 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   f('<x><y><t:siblings-header><a>{$a}</a><b>{$b}</b></t:siblings-header></y> <z><t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></z></x>',
     '<x><y><b>1B</b><a>2A</a></y><z><c>3C</c><d>4D</d></z></x>');
 
-  //optional
+  //siblings t:condition
+  temp := '<x><t:siblings-header><t:element t:condition="name()=(''u'',''v'')">{$uv}</t:element><b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x><u>start</u><b>2B</b><c>3C</c><d>4D</d></x>',
+    'uv=start'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><v>start</v><b>2B</b><c>3C</c><d>4D</d></x>',
+    'uv=start'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><b>2B</b><v>start</v><d>4D</d><c>3C</c></x>',
+    'b=2B'#10'uv=start'#10'd=4D'#10'c=3C');
+  f(temp,
+    '<x><b>2B</b><v>start</v><c>3C</c><d>4D</d></x>');
+
+  //siblings t:test
+  temp := '<x><t:siblings-header><a t:test="exists(@a)">{$a}</a><b t:test="exists(@b)">{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x a="on" b="on"><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    '');
+  t(temp,
+    '<x a="on"><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1'#10'c=3C');
+  t(temp,
+    '<x b="on"><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'b=2B'#10'd=4D');
+
+  temp := '<x><t:siblings-header><t:loop test="exists(@a)"><a>{$a}</a></t:loop><t:loop test="exists(@b)"><b>{$b}</b></t:loop></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
+  t(temp,
+    '<x a="on" b="on"><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1'#10'b=2B'#10'c=3C'#10'd=4D');
+  t(temp,
+    '<x><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    '');
+  t(temp,
+    '<x a="on"><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'a=1'#10'c=3C');
+  t(temp,
+    '<x b="on"><a>1</a><b>2B</b><c>3C</c><d>4D</d></x>',
+    'b=2B'#10'd=4D');
+
+  //siblings optional
   temp := '<x><t:siblings-header><a>{$a}</a>?<b>{$b}</b></t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
   t(temp,
     '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',
@@ -1253,7 +1296,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
     '<x><a>1A</a><c>3C</c><d>4D</d></x>',
     'a=1A'#10'c=3C');
 
-  //loops
+  //siblings loops
   temp := '<x><t:siblings-header><a>{$a}</a>*<b>{$b}</b>+</t:siblings-header> <t:siblings><c>{$c}</c><d>{$d}</d></t:siblings></x>';
   t(temp,
     '<x><a>1A</a><b>2B</b><c>3C</c><d>4D</d></x>',

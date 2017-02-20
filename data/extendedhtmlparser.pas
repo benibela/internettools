@@ -1778,7 +1778,11 @@ var xpathText: TTreeNode;
     remainingMinCount := 0;
 
     for i := 0 to count - 1 do begin
-      if data.countChildren[i] = nil then begin
+      if ((data.children[i].test <> nil) and not performPXPEvaluation(data.children[i].test).toBoolean)
+        or ((data.countChildren[i] <> nil) and (data.countChildren[i].test <> nil) and not performPXPEvaluation(data.countChildren[i].test).toBoolean)  then begin
+        minCounts[i] := 0;
+        maxCounts[i] := 0;
+      end else if data.countChildren[i] = nil then begin
         if tefOptional in data.children[i].flags then minCounts[i] := 0
         else minCounts[i] := 1;
         maxCounts[i] := 1;
