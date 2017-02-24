@@ -127,7 +127,7 @@ type
     ueURLPath,      //**< Encode for the path part of an URL
     ueURLQuery,     //**< Encode for the query part of an URL
     ueXPathURI,     //**< Encode for the XPath/XQuery function fn:encode-for-uri as defined in the XPath standard
-    ueXPathHTML4,   //**< Encode for the XPath/XQuery function fn:encode-for-uri as defined in the XPath standard (they quote the the HTML4 standard)
+    ueXPathHTML4,   //**< Encode for the XPath/XQuery function fn:escape-html-uri as defined in the XPath standard (they quote the the HTML4 standard)
     ueXPathFromIRI);//**< Encode for the XPath/XQuery function fn:iri-to-uri as defined in the XPath standard
 
   //**@abstract(Abstract base class for connections)
