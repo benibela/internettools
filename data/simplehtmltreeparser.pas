@@ -311,7 +311,7 @@ end;
 
 TTreeDocument = class(TTreeNode)
 protected
-  FEncoding: TSystemCodePage;
+  FEncoding, FBaseEncoding: TSystemCodePage;
   FBaseURI, FDocumentURI: string;
   FCreator: TTreeParser;
 
@@ -319,6 +319,7 @@ public
   constructor create(creator: TTreeParser);
   property baseURI: string read FBaseURI write FBaseURI;
   property documentURI: string read FDocumentURI write FDocumentURI;
+  property baseEncoding: TSystemCodePage read FBaseEncoding;
 
   function getCreator: TTreeParser;
 
@@ -2747,6 +2748,7 @@ begin
 
   FTrees.Add(FCurrentTree);
   result := FCurrentTree;
+  FCurrentTree.FBaseEncoding := FCurrentTree.FEncoding;
   if FTargetEncoding <> CP_NONE then begin
     FCurrentTree.setEncoding(FTargetEncoding, true, true);
   end else begin

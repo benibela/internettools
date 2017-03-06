@@ -1186,10 +1186,30 @@ begin
 end;
 
 
+function getFormEncoding(n: TTreeNode): TSystemCodePage;
+begin
+  n := n.getRootHighest();
+  if n is TTreeDocument then
+    result := TTreeDocument(n).baseEncoding
+  else
+    result := CP_UTF8;
+  case result of
+    CP_ACP, CP_OEMCP, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII, CP_NONE:
+      result := CP_UTF8;
+  end;
+end;
 
-procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlEncoded: boolean;
+function formEncode(s: string; encoding: TSystemCodePage): string;
+begin
+  if (encoding <> CP_UTF8) and (encoding <> CP_NONE) and (encoding <> StringCodePage(s)) {todo: does that make sense?} then
+    s := strConvertFromUtf8(s, encoding);
+  result := TInternetAccess.urlEncodeData(s, ueHTMLForm);
+end;
+
+
+procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlEncoded: boolean; charset: TSystemCodePage;
                                out names, values: TStringArray;
-                               out specialNames: TStringArray; out specialValues: TXQVArray);
+                               out specialNames: TStringArray; out specialValues: TXQVArray); //-> special objects
   procedure addSingleValue(temp: string);
   begin
     if urlEncoded then begin
@@ -1211,16 +1231,11 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
     for i:=0 to high(split) do addSingleValue(split[i]);
   end;
 
-  function encode(const s: string): string; inline;
-  begin
-    result := TInternetAccess.urlEncodeData(s, ueHTMLForm);
-  end;
-
   procedure addPair(const n, v: string);
   begin
     if urlEncoded then begin
-      arrayAdd(names, encode(n));
-      arrayAdd(values, encode(v));
+      arrayAdd(names, formEncode(n, charset));
+      arrayAdd(values, formEncode(v, charset));
     end else begin
       arrayAdd(names, n);
       arrayAdd(values, v);
@@ -1290,6 +1305,7 @@ begin
 
 end;
 
+
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var replaceNames, replaceValues: TStringArray;
     specialReplaceValues: TXQVArray;
@@ -1308,17 +1324,14 @@ var replaceNames, replaceValues: TStringArray;
       multipart: boolean;
       header: string;
       post: Boolean;
-
-      function encode(const s: string): string; inline;
-      begin
-        result := TInternetAccess.urlEncodeData(s, ueHTMLForm);
-      end;
+      encoding: TSystemCodePage;
+      resultobj: TXQValueObject;
 
       procedure addPair(n: string; v: string);
       begin
         if not multipart then begin
           if request <> '' then request += '&';
-          request += encode(n) + '=' + encode(v);
+          request += formEncode(n,encoding) + '=' + formEncode(v, encoding);
         end else begin
           mime.addFormData(n, v);
         end;
@@ -1352,6 +1365,7 @@ var replaceNames, replaceValues: TStringArray;
       request := '';
       mime.data := nil;
       multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
+      encoding := getFormEncoding(form);
 
       used := TStringList.Create;
       used.CaseSensitive:=false;
@@ -1381,15 +1395,17 @@ var replaceNames, replaceValues: TStringArray;
 
       value := form.getAttribute('action', cmp);
 
-      result := TXQValueObject.create();
-      (result as TXQValueObject).setMutable('method', method);
+      resultobj := TXQValueObject.create();
+      result := resultobj;
+
+      resultobj.setMutable('method', method);
 
       if post then begin
         if multipart then begin
           request := mime.compose(header);
-          (result as TXQValueObject).setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
+          resultobj.setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
         end;
-        (result as TXQValueObject).setMutable('post', request)
+        resultobj.setMutable('post', request)
       end else if request <> '' then
         if strContains(value, '?') then value += '&' + request
         else value += '?' + request;
@@ -1399,7 +1415,8 @@ var replaceNames, replaceValues: TStringArray;
       if form.hasDocument() and (form.getDocument() <> nil) then value := strResolveURI(value, form.getDocument().baseURI);
       value := strResolveURI(value, context.staticContext.baseURI);
       {$ENDIF}
-      (result as TXQValueObject).setMutable('url', value);
+      resultobj.setMutable('url', value);
+      if encoding <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(encoding));
     end;
 
 var v: PIXQValue;
@@ -1413,7 +1430,7 @@ begin
   cmp := @context.staticContext.nodeCollation.equal;
 
   if argc = 2 then
-    urlEncodingFromValue(args[1], cmp, false, replaceNames, replaceValues, specialReplaceNames, specialReplaceValues);
+    urlEncodingFromValue(args[1], cmp, false,{<-false=>no encoding} CP_NONE, replaceNames, replaceValues, specialReplaceNames, specialReplaceValues);
 
 
   resseq := TXQValueSequence.create();
@@ -1432,11 +1449,17 @@ var names, values: array of TStringArray;
     i: Integer;
     specialNames: TStringArray;
     specialValues: TXQVArray;
+    encoding: TSystemCodePage;
 begin
   setlength(names, 2); setlength(values, 2);
   cmp := @context.staticContext.nodeCollation.equal; ignore(context);
-  urlEncodingFromValue(args[0], cmp, true, names[0], values[0], specialNames, specialValues); //todo: handle specials
-  urlEncodingFromValue(args[1], cmp, true, names[1], values[1], specialNames, specialValues);
+  encoding := CP_UTF8;
+  if argc = 3 then begin
+    encoding := strEncodingFromName(args[2].toString);
+    if encoding = CP_NONE then encoding := CP_UTF8;
+  end;
+  urlEncodingFromValue(args[0], cmp, true, encoding, names[0], values[0], specialNames, specialValues); //todo: handle specials
+  urlEncodingFromValue(args[1], cmp, true, encoding, names[1], values[1], specialNames, specialValues);
   setlength(used, 2);
 
   setlength(used[1], length(values[1]));
@@ -1481,7 +1504,7 @@ var temp: TXQVArray;
     temps: String;
   begin
     cmp := @context.staticContext.nodeCollation.equal;
-    urlEncodingFromValue(args[1], cmp, false, names, values, specialNames, specialValues);
+    urlEncodingFromValue(args[1], cmp, false, CP_NONE, names, values, specialNames, specialValues);
     for i := 0 to high(names) do begin
       j := mime.getFormDataIndex(names[i]);
       if j < 0 then mime.addFormData(names[i], values[i])
@@ -1517,12 +1540,13 @@ begin
     if args[0].getProperty('method').toString = 'POST' then propName := 'post'
     else propName := 'url';
 
-    SetLength(temp, 2);
+    SetLength(temp, 3);
     temp[0] := args[0].getProperty(propName);
     temp[1] := args[1];
+    temp[2] := args[0].getProperty('charset');
 
 
-    result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, 2, @temp[0]));
+    result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, 3, @temp[0]));
   end else begin
     obj := args[0] as TXQValueObject;
     multipart := trim(strCopyFrom(multipart, pos('=', multipart) + 1));

@@ -3293,6 +3293,12 @@ begin
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');
 
+  t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%C3%A4=%C3%BC", "charset": "utf-8"}');
+  t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "latin1"}');
+  t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "cp1252"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "cp1252"}');
+  t('serialize-json(form-combine({"url": "http://foo/?x=y", "method": "POST", "post": "a=b", "charset": "utf-8"}, {"ä": "ü"}))', '{"post": "a=b&%C3%A4=%C3%BC", "url": "http://foo/?x=y", "method": "POST", "charset": "utf-8"}');
+  t('serialize-json(form-combine({"url": "http://foo/?x=y", "method": "POST", "post": "a=b", "charset": "latin1"}, {"ä": "ü"}))', '{"post": "a=b&%E4=%FC", "url": "http://foo/?x=y", "method": "POST", "charset": "latin1"}');
+
   t('join(for $r in (random(), random(), random()) return if ($r >= 0 and $r < 1) then "O" else "F")', 'O O O');
   t('join(for $r in (random(10), random(10), random(10.5)) return if ($r >= 0 and $r < 10) then "O" else "F")', 'O O O');
   t('(random(), random-seed(123), random())[last()]  = (random-seed(123), random())[last()]', 'true');
