@@ -1164,6 +1164,12 @@ begin
     exit(true);
   end;
 
+  if includeAllInputs and cmp(temp.value, 'button') and (temp['name'] <> '') then begin
+    name := temp.getAttribute('name', cmp);
+    value := temp.getAttribute('value', cmp);
+    exit(true);
+  end;
+
   if cmp(temp.value, 'select') then begin
     name := temp.getAttribute('name', cmp);
     tempend := temp.reverse;
