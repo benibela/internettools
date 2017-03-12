@@ -685,14 +685,18 @@ type TBinarySearchAcceptedConditions = set of TBinarySearchAcceptedCondition;
 //**             +1 if the searched element is larger than a.
 //**(that is the opposite of what you might expect, but it is logical: the data parameter has to come first to match a method signature. The data parameter is compared to a parameter (to match a standalone comparison function signature))
 type TBinarySearchFunction = function (data: TObject; a: pointer): longint;
-//** General binary search function
-//** @br @code(a) is the first element in the (ascending, sorted) array, @code(b) the last, @code(size) the size of each element
+//** General binary search function. It can find an element or a lower/upper bound.
+//** @br @code(a) points to the first element in the (ascending, sorted) array, @code(b) to the last, @code(size) the size of each element
 //** @br @code(compareFunction) is a TBinarySearchFunction comparing the searched element to another element
 //** @br @code(compareFunctionData) is the data passed to the comparison function as first argument (you can think of it as searched element)
 //** @br @code(choosen) is the element that should be returned, if there are multiple matches (bsFirst, bsLast  or bsAny) .
 //** @br @code(condition) the comparison relation between the returned and searched element (E.g. for [bsGreater, bsEqual] the returned element satisfies @code(compareFunction(reference, returned) <= 0).)
 //** @br returns a pointer to the found match or nil if there is none.
 //** @br (note that you can combine, e.g. bsGreater and bsLast, which will always return the last element, unless all are lower)
+//** @br
+//** @br Beware of the pointers. You need to be very carefully. @code(a) and @code(b) point to the first and last elements. They are not the element, they are pointers to the location of the element in the array. If a = b, the array has one element. You need to pass a < b for empty arrays.
+//** @br The first parameter of @code(compareFunction) is user defined data, so it can be anything. The second parameter is a pointer to the location of an array element. It is not the array element itself, not even on a list of pointers.
+//** @br The same holds for the pointer returned by the function, i.e. it is like that second parameter.
 function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
 
 function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} inline; {$ENDIF} {$ifdef HASDeprecated}deprecated;{$endif}
