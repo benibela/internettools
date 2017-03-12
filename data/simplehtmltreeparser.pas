@@ -348,7 +348,7 @@ TParsingModel = (pmStrict, pmHTML, pmUnstrictXML);
 //**If TargetEncoding is not CP_NONE, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
 //**You can change the class used for the elements in the tree with the field treeNodeClass.
 TTreeParser = class
-  function processingInstruction(text: pchar; textLen: longint; unusedParameter: TTextFlags): TParsingResult;
+  function processingInstruction(text: pchar; textLen: longint; {%H-}unusedParameter: TTextFlags): TParsingResult;
 protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;

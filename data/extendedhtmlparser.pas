@@ -1756,7 +1756,7 @@ var xpathText: TTreeNode;
     count: Integer;
     remainingMinCount, firstActiveChild, i: integer;
     data: TCommandSiblingHeaderData;
-    found: Boolean;
+    //found: Boolean;
   begin
     //all element children of t:siblings-header are numbered 0..k and the children of t:siblings are numbered the same.
     //HandleCommandSiblingsHeader records the id-numbers of the children in the order they occur in the HTML.
@@ -1803,7 +1803,7 @@ var xpathText: TTreeNode;
     lastHTMLStartMatch := htmlStart;
 
     while (htmlStart <> htmlEnd.next) and (htmlStart <> nil) do begin
-      found := false;
+      //found := false;
       for i := firstActiveChild to count - 1 do begin
         if usedCounts[i] = maxCounts[i] then continue;
         curChild := data.children[i];;
@@ -1816,7 +1816,7 @@ var xpathText: TTreeNode;
             if usedCounts[i] < minCounts[i] then dec(remainingMinCount);
             inc(usedCounts[i]);
             if (i = firstActiveChild) and (usedCounts[i] = maxCounts[i]) then inc(firstActiveChild);
-            found := true;
+            //found := true;
             break;
           end;
         end;

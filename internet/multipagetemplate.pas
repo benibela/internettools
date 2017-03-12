@@ -506,7 +506,7 @@ begin
     SetLength(errCodes, length(errors));
     for i := 0 to high(errors) do begin
       if strBeginsWith(errors[i], 'Q{') then begin
-        errNamespaces[i] := strDecodeHTMLEntities(strBetween(errors[i], 'Q{','}'),eUTF8);
+        errNamespaces[i] := strDecodeHTMLEntities(strBetween(errors[i], 'Q{','}'),CP_UTF8);
         errCodes[i] := strAfter(errors[i], '{');
       end else if strContains(errors[i], ':') then begin
         temp := strSplit(errors[i], ':');

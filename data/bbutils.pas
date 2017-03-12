@@ -2387,7 +2387,6 @@ function strEscapeToHex(s:RawByteString; const toEscape: TCharSet; escape: RawBy
 var
   p: Integer;
   i: Integer;
-  temp: String;
   escapeCount: integer;
   escapeP: pansichar;
 begin
