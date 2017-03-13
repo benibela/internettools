@@ -40,6 +40,15 @@ uses
 
 type
 
+TSynapseSplitStream = class(TMemoryStream)
+  onWrite: TTransferBlockWriteEvent;
+  function Write(const Buffer; Count: LongInt): LongInt; override;
+end;
+
+THTTPSendWithFakeStream = class(THTTPSend)
+  constructor Create;
+end;
+
 { TSynapseInternetAccess }
 //**@abstract(Internet access class using the Synapse library)
 //**Set defaultInternetAccessClass to TSynapseInternetAccess to use it.@br
@@ -50,13 +59,13 @@ TSynapseInternetAccess=class(TInternetAccess)
     const Value: String);
 protected
   //synapse will automatically handle keep alive
-  connection: THTTPSend;
+  connection: THTTPSendWithFakeStream;
   lastProgressLength,contentLength:longint;
   forwardProgressEvent: TProgressEvent;
   lastHTTPSFallbackHost: string;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  function doTransferUnchecked(method:string; const url: TDecodedUrl; data: string): string; override;
+  procedure doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl;  data:string);override;
 public
   constructor create();override;
   destructor destroy;override;
@@ -109,7 +118,20 @@ begin
     end;
   end;
 end;
+
 {$endif}
+
+function TSynapseSplitStream.Write(const Buffer; Count: LongInt): LongInt;
+begin
+  onWrite(buffer, count);
+end;
+
+constructor THTTPSendWithFakeStream.Create;
+begin
+  inherited Create;
+  FDocument.Free;
+  FDocument := TSynapseSplitStream.Create;
+end;
 
 procedure TSynapseInternetAccess.connectionStatus(Sender: TObject;
   Reason: THookSocketReason; const Value: String);
@@ -142,7 +164,7 @@ begin
   end;
 end;
 
-function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TDecodedUrl; data: string): string;
+procedure TSynapseInternetAccess.doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl; data: string);
   procedure initConnection;
   begin
    connection.Clear;
@@ -167,10 +189,10 @@ function TSynapseInternetAccess.doTransferUnchecked(method:string; const url: TD
 
 var ok: Boolean;
 begin
-  result:='';
   contentLength:=-1;
   lastProgressLength:=-1;
   lastHTTPResultCode := -1;
+  (connection.Document as TSynapseSplitStream).onWrite := onBlockWrite;
 
   if striequal(url.protocol, 'https') then
     if (not IsSSLloaded) then begin//check if ssl is actually loaded
@@ -204,7 +226,6 @@ begin
   end;
 
   if ok then begin
-    result:=ReadStrFromStream(connection.Document, connection.Document.Size);
     LastHTTPHeaders.assign(connection.Headers);
     lastHTTPResultCode := connection.ResultCode;
   end else begin
@@ -224,7 +245,7 @@ var
 begin
   init;
 
-  connection:=THTTPSend.Create;
+  connection:=THTTPSendWithFakeStream.Create;
   connection.Sock.OnStatus:=@connectionStatus;
  // connection.Sock.SSL.SSLType:=LT_SSLv3;
 

@@ -46,7 +46,7 @@ There are three ways to use it:
 *)
 TMockInternetAccess = class(TInternetAccess)
   constructor create; override;
-  function doTransferUnChecked(method: string; const url: TDecodedUrl; data: string): string; override;
+  procedure doTransferUnChecked(onReceivedBlock: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl; data: string); override;
 
   destructor Destroy; override;
 public
@@ -65,11 +65,13 @@ begin
   init
 end;
 
-function TMockInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
+procedure TMockInternetAccess.doTransferUnChecked(onReceivedBlock: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl; data: string);
+var result: string;
 begin
   if SimulatedServerPath = '' then result := DefaultMockPage
   else result := strLoadFromFile(SimulatedServerPath + url.path + url.params);
   if Assigned(OnTransfer) then OnTransfer(method, url, data, result);
+  if result <> '' then onReceivedBlock(pointer(result)^, length(result));
 end;
 
 destructor TMockInternetAccess.Destroy;

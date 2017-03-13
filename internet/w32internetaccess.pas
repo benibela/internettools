@@ -50,7 +50,7 @@ type
     hSession,hLastConnection: hInternet;
     newConnectionOpened:boolean;
     lastServer: TDecodedUrl;
-    function doTransferUnchecked(method:string; const decoded: TDecodedUrl; data: string): string; override;
+    procedure doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method:string; const decoded: TDecodedUrl; data: string); override;
     function getLastErrorDetails: string; override;
   public
     constructor create();override;
@@ -146,7 +146,8 @@ begin
 end;
 
 
-function TW32InternetAccess.doTransferUnchecked(method:string; const decoded: TDecodedUrl; data:string): string;
+procedure TW32InternetAccess.doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method: string; const decoded: TDecodedUrl;
+  data: string);
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', ''); //just as default. it will be overriden
 var
   databuffer : array[0..4095] of char;
@@ -156,13 +157,13 @@ var
   dwcode : array[1..20] of char;
   res    : pchar;
   callResult: boolean;
-  i: Integer;
+  i, totalRead: Integer;
   headerOut: string;
   headerAdd: TAddHeaderData;
 begin
   lastHTTPResultCode := -1;
   lastErrorDetails := '';
-  result := '';
+  dwContentLength := 0;
   if not assigned(hSession) Then exit;
 
   if (lastServer.Protocol<>decoded.protocol) or (lastServer.Host<>decoded.host) or (lastServer.Port <> decoded.port)
@@ -255,16 +256,17 @@ begin
       OnProgress(self,0,dwContentLength);
     end;
     dwRead:=0;
+    totalRead := 0;
     SetLastError(0);
     while true do begin
       if InternetReadfile(hfile,@databuffer,sizeof(databuffer)-1,@DwRead) then begin
         if dwRead = 0 then
           break; //this is end-of-file condition according to MSDN (InternetReadFile must return true)
-        temp:=length(result);
-        setLength(result,temp+dwRead);
-        move(dataBuffer[0],result[temp+1],dwRead);
-        if assigned(OnProgress) then
-          OnProgress(self,length(result),dwContentLength);
+        onBlockWrite(databuffer[0], dwRead);
+        if assigned(OnProgress) then begin
+          inc(totalRead, dwRead);
+          OnProgress(self,totalRead,dwContentLength);
+        end;
       end else if InternetQueryDataAvailable(hfile, @dwRead, 0, 0) then begin
         if dwRead = 0 then //the above condition never occurs (at least on WINE). So explicitly check for more data. (this is supposed to prevent problems with chunked transfers)
           break;

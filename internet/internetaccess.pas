@@ -118,8 +118,11 @@ type
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
+  TTransferClearEvent = procedure() of object;
+  TTransferBlockWriteEvent = procedure(const Buffer; Count: Longint) of object;
   TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data:string; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
+
 
   //**URL Encoding encodes every special character @code(#$AB) by @code(%AB). This model describes which characters are special:
   TUrlEncodingModel = (
@@ -150,8 +153,8 @@ type
     lastURLDecoded: TDecodedUrl;
     FLastHTTPHeaders: THTTPHeaderList;
     //**Override this if you want to sub class it
-    function doTransferUnchecked(method: string; const url: TDecodedUrl;  data:string):string;virtual;abstract;
-    function doTransferChecked(method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer):string;
+    procedure doTransferUnchecked(onReceivedBlock: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl;  data:string);virtual;abstract;
+    procedure doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer);
     function getLastErrorDetails(): string; virtual;
     //utility functions to minimize platform dependent code
   public
@@ -702,13 +705,22 @@ begin
   result := request(method, decodeURL(fullUrl), data);
 end;
 
+function makeMethod(code, data: pointer): TMethod; inline;
+begin
+  result.Code:=code;
+  result.Data:=data;
+end;
+
 function TInternetAccess.request(method: string; url: TDecodedUrl; data: string): string;
+var builder: TStrBuilder;
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
   if assigned(FOnTransferStart) then
     FOnTransferStart(self, method, url, data);
 
-  result:=doTransferChecked(method,url,data,10);
+  builder.init(@result);
+  doTransferChecked(TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.addbuffer, @builder)), method,url,data,10);
+  builder.final;
 
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, url.combined+'<-DATA:'+data,result);
@@ -717,7 +729,8 @@ begin
 end;
 
 
-function TInternetAccess.doTransferChecked(method: string; url: TDecodedUrl; data: string; remainingRedirects: integer): string;
+procedure TInternetAccess.doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string;
+  url: TDecodedUrl; data: string; remainingRedirects: integer);
 
 var
   reaction: TInternetAccessReaction;
@@ -730,9 +743,8 @@ begin
     url.path := urlEncodeData(url.path, ueURLPath); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
     url.params := urlEncodeData(url.params, ueURLQuery);
 
-    result := doTransferUnchecked(method, url, data);
-
-
+    onClear();
+    doTransferUnchecked(onReceivedBlock, method, url, data);
 
     reaction := iarReject;
     case lastHTTPResultCode of
