@@ -39,9 +39,9 @@ uses
   ;
 
 type
-
+TSynapseInternetAccess=class;
 TSynapseSplitStream = class(TMemoryStream)
-  onWrite: TTransferBlockWriteEvent;
+  internetAccess: TSynapseInternetAccess;
   function Write(const Buffer; Count: LongInt): LongInt; override;
 end;
 
@@ -55,17 +55,15 @@ end;
 //**You also have to install the Synapse package.@br
 //**In contrast to native Synapse this will automatically load openssl, if it is called on HTTPS URLs.
 TSynapseInternetAccess=class(TInternetAccess)
-  procedure connectionStatus(Sender: TObject; Reason: THookSocketReason;
-    const Value: String);
 protected
   //synapse will automatically handle keep alive
   connection: THTTPSendWithFakeStream;
-  lastProgressLength,contentLength:longint;
-  forwardProgressEvent: TProgressEvent;
   lastHTTPSFallbackHost: string;
+  headersSet: boolean;
+  procedure checkHeaders;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  procedure doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl;  data:string);override;
+  procedure doTransferUnchecked(method: string; const url: TDecodedUrl; const data:TInternetAccessDataBlock);override;
 public
   constructor create();override;
   destructor destroy;override;
@@ -123,7 +121,9 @@ end;
 
 function TSynapseSplitStream.Write(const Buffer; Count: LongInt): LongInt;
 begin
-  onWrite(buffer, count);
+  internetAccess.checkHeaders;
+  internetAccess.writeBlock(buffer, count);
+  result := count;
 end;
 
 constructor THTTPSendWithFakeStream.Create;
@@ -131,26 +131,6 @@ begin
   inherited Create;
   FDocument.Free;
   FDocument := TSynapseSplitStream.Create;
-end;
-
-procedure TSynapseInternetAccess.connectionStatus(Sender: TObject;
-  Reason: THookSocketReason; const Value: String);
-var
-  i: Integer;
-begin
-  if (FOnProgress=nil) or (connection=nil) then exit;
-  if contentLength=-1 then begin
-    for i:=0 to connection.Headers.Count-1 do
-      if pos('content-length',lowercase(connection.Headers[i]))>0 then begin
-        contentLength:=StrToIntDef(copy(connection.Headers[i],pos(':',connection.Headers[i])+1,length(connection.Headers[i])),-1);
-        exit;
-      end;
-    if contentLength=-1 then exit;
-    lastProgressLength:=0;
-  end;
-  if (Reason <> HR_ReadCount) or (value = '') then exit;
-  lastProgressLength:=lastProgressLength + StrToIntDef(value, 0);
-  FOnProgress(self, lastProgressLength, contentLength);
 end;
 
 procedure addHeader(data: pointer; headerKind: TSynapseInternetAccess.THeaderKind; const name, header: string);
@@ -164,7 +144,15 @@ begin
   end;
 end;
 
-procedure TSynapseInternetAccess.doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl; data: string);
+procedure TSynapseInternetAccess.checkHeaders;
+begin
+  if headersSet then exit;
+  LastHTTPHeaders.assign(connection.Headers);
+  lastHTTPResultCode := connection.ResultCode;
+  headersSet := true;
+end;
+
+procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
   procedure initConnection;
   begin
    connection.Clear;
@@ -174,9 +162,9 @@ procedure TSynapseInternetAccess.doTransferUnchecked(onBlockWrite: TTransferBloc
                                     and ( (striEqual(url.protocol, 'http') and (url.port <> '80'))
                                           or (striEqual(url.protocol, 'https') and (url.port <> '443'))
                                          );
-   if data <> '' then begin
-     connection.Document.Size := length(data);
-     move(data[1], connection.Document.Memory^, length(data));
+   if data.count > 0 then begin
+     connection.Document.Size := data.count;
+     move(data.data^, connection.Document.Memory^, data.count);
      connection.MimeType := ContentTypeForData; //this pointless as addHeader overrides it. But it does not hurt either
    end;
    connection.Protocol:='1.1';
@@ -185,16 +173,12 @@ procedure TSynapseInternetAccess.doTransferUnchecked(onBlockWrite: TTransferBloc
      if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
      else connection.Sock.SSL.SSLType := LT_all;
 
-   enumerateAdditionalHeaders(url, @addHeader, data <> '', connection);
+   enumerateAdditionalHeaders(url, @addHeader, data.count > 0, connection);
+   headersSet := false;
   end;
 
 var ok: Boolean;
 begin
-  contentLength:=-1;
-  lastProgressLength:=-1;
-  lastHTTPResultCode := -1;
-  (connection.Document as TSynapseSplitStream).onWrite := onBlockWrite;
-
   if striequal(url.protocol, 'https') then
     if (not IsSSLloaded) then begin//check if ssl is actually loaded
       lastHTTPResultCode := -2;
@@ -227,17 +211,10 @@ begin
   end;
 
   if ok then begin
-    LastHTTPHeaders.assign(connection.Headers);
-    lastHTTPResultCode := connection.ResultCode;
+    checkHeaders;
   end else begin
     lastHTTPResultCode := -4;
-    exit;
   end;
-
-
-  if (FOnProgress<>nil) and (lastProgressLength<connection.DownloadSize) then
-    if contentLength=-1 then FOnProgress(self,connection.DownloadSize,connection.DownloadSize)
-    else FOnProgress(self,connection.DownloadSize,contentLength);
 end;
 
 constructor TSynapseInternetAccess.create();
@@ -247,8 +224,7 @@ begin
   init;
 
   connection:=THTTPSendWithFakeStream.Create;
-  connection.Sock.OnStatus:=@connectionStatus;
- // connection.Sock.SSL.SSLType:=LT_SSLv3;
+  (connection.Document as TSynapseSplitStream).internetAccess := self;
 
   connection.UserAgent:=defaultInternetConfiguration.userAgent;
   if defaultInternetConfiguration.useProxy then begin

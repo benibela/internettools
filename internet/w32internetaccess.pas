@@ -50,7 +50,7 @@ type
     hSession,hLastConnection: hInternet;
     newConnectionOpened:boolean;
     lastServer: TDecodedUrl;
-    procedure doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method:string; const decoded: TDecodedUrl; data: string); override;
+    procedure doTransferUnchecked(method:string; const decoded: TDecodedUrl; const data: TInternetAccessDataBlock); override;
     function getLastErrorDetails: string; override;
   public
     constructor create();override;
@@ -146,35 +146,31 @@ begin
 end;
 
 
-procedure TW32InternetAccess.doTransferUnchecked(onBlockWrite: TTransferBlockWriteEvent; method: string; const decoded: TDecodedUrl;
-  data: string);
+procedure TW32InternetAccess.doTransferUnchecked(method: string; const decoded: TDecodedUrl; const data: TInternetAccessDataBlock);
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', ''); //just as default. it will be overriden
 var
   databuffer : array[0..4095] of char;
   hfile: hInternet;
-  dwindex,dwcodelen,dwRead,dwNumber,temp,dwContentLength: cardinal;
+  dwindex,dwcodelen,dwRead,dwNumber,temp: cardinal;
   tempPort: integer;
   dwcode : array[1..20] of char;
   res    : pchar;
   callResult: boolean;
-  i, totalRead: Integer;
+  i: Integer;
   headerOut: string;
   headerAdd: TAddHeaderData;
 begin
-  lastHTTPResultCode := -1;
-  lastErrorDetails := '';
-  dwContentLength := 0;
   if not assigned(hSession) Then exit;
 
   if (lastServer.Protocol<>decoded.protocol) or (lastServer.Host<>decoded.host) or (lastServer.Port <> decoded.port)
      or (lastServer.username <> decoded.username) or (lastServer.password <> decoded.password) then begin
     if hLastConnection<>nil then
       InternetCloseHandle(hLastConnection);
-    if striequal(decoded.protocol, 'http') then begin
-      tempPort:=80;
-      temp:=INTERNET_SERVICE_HTTP;
-    end else if striequal(decoded.protocol, 'https') then begin
+    if striequal(decoded.protocol, 'https') then begin
       tempPort:=443;
+      temp:=INTERNET_SERVICE_HTTP;
+    end else {if striequal(decoded.protocol, 'http') then} begin //if there is no else branch fpc gives pointless warnings
+      tempPort:=80;
       temp:=INTERNET_SERVICE_HTTP;
     end;
     if decoded.port <> '' then
@@ -205,13 +201,13 @@ begin
   end;
 
   headerAdd.hfile := hfile;
-  enumerateAdditionalHeaders(decoded, @addHeader, data <> '', @headerAdd);
+  enumerateAdditionalHeaders(decoded, @addHeader, data.count > 0, @headerAdd);
 
   for i := 1 to 2 do begin //repeat if ssl certificate is wrong
-    if data='' then
+    if data.count = 0 then
       callResult:= httpSendRequestA(hfile, nil,0,nil,0)
      else
-      callResult:= httpSendRequestA(hfile, pchar(headerAdd.overridenPostHeader), Length(headerAdd.overridenPostHeader), @data[1], Length(data));
+      callResult:= httpSendRequestA(hfile, pchar(headerAdd.overridenPostHeader), Length(headerAdd.overridenPostHeader), data.data, data.count);
 
     if callResult then break;
 
@@ -219,8 +215,8 @@ begin
       //as suggested by http://msdn.microsoft.com/en-us/subscriptions/aa917690.aspx
       temp := getLastError;
       if (temp = ERROR_INTERNET_INVALID_CA) or (temp = ERROR_INTERNET_SEC_CERT_REV_FAILED) or (temp = ERROR_INTERNET_SEC_CERT_NO_REV) then begin
-        dwContentLength := sizeof(dwNumber);
-        InternetQueryOptionA(hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, @dwContentLength);
+        temp := sizeof(dwNumber);
+        InternetQueryOptionA(hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, @temp);
         dwNumber := dwNumber or SECURITY_FLAG_IGNORE_UNKNOWN_CA or SECURITY_FLAG_IGNORE_REVOCATION;
         InternetSetOptionA(hfile, INTERNET_OPTION_SECURITY_FLAGS, @dwNumber, sizeof (dwNumber) );
         continue;
@@ -248,25 +244,13 @@ begin
     end;
 
   if method <> 'HEAD' then begin
-    if assigned(OnProgress) then begin
-      dwCodeLen := 15;
-      HttpQueryInfoA(hfile, HTTP_QUERY_CONTENT_LENGTH, @dwcode, @dwcodelen, @dwIndex);
-      res := pchar(@dwcode);
-      dwContentLength:=StrToIntDef(res,1*1024*1024);
-      OnProgress(self,0,dwContentLength);
-    end;
     dwRead:=0;
-    totalRead := 0;
     SetLastError(0);
     while true do begin
       if InternetReadfile(hfile,@databuffer,sizeof(databuffer)-1,@DwRead) then begin
         if dwRead = 0 then
           break; //this is end-of-file condition according to MSDN (InternetReadFile must return true)
-        onBlockWrite(databuffer[0], dwRead);
-        if assigned(OnProgress) then begin
-          inc(totalRead, dwRead);
-          OnProgress(self,totalRead,dwContentLength);
-        end;
+        writeBlock(databuffer[0], dwRead);
       end else if InternetQueryDataAvailable(hfile, @dwRead, 0, 0) then begin
         if dwRead = 0 then //the above condition never occurs (at least on WINE). So explicitly check for more data. (this is supposed to prevent problems with chunked transfers)
           break;

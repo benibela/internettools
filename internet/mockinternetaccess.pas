@@ -30,7 +30,7 @@ uses
 
 
 
-type TMockTransfer = procedure (const method: string; const url: TDecodedUrl; const postdata: string; var outdata: string) of object;
+type TMockTransfer = procedure (const method: string; const url: TDecodedUrl; const postdata: TInternetAccessDataBlock; var outdata: string) of object;
 { TInternetAccessNonSense }
 
 { TMockInternetAccess }
@@ -46,7 +46,7 @@ There are three ways to use it:
 *)
 TMockInternetAccess = class(TInternetAccess)
   constructor create; override;
-  procedure doTransferUnChecked(onReceivedBlock: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl; data: string); override;
+  procedure doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock); override;
 
   destructor Destroy; override;
 public
@@ -65,13 +65,13 @@ begin
   init
 end;
 
-procedure TMockInternetAccess.doTransferUnChecked(onReceivedBlock: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl; data: string);
+procedure TMockInternetAccess.doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
 var result: string;
 begin
   if SimulatedServerPath = '' then result := DefaultMockPage
   else result := strLoadFromFile(SimulatedServerPath + url.path + url.params);
   if Assigned(OnTransfer) then OnTransfer(method, url, data, result);
-  if result <> '' then onReceivedBlock(pointer(result)^, length(result));
+  if result <> '' then writeBlock(pointer(result)^, length(result));
 end;
 
 destructor TMockInternetAccess.Destroy;

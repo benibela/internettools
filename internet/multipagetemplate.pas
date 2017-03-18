@@ -340,7 +340,7 @@ type
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   private
-    procedure onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: string; var reaction: TInternetAccessReaction);
+    procedure onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction);
   end;
 
   { TTemplateActionLoadPage }
@@ -885,7 +885,7 @@ begin
   end;
 end;
 
-procedure TTemplateActionPage.onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: string; var reaction: TInternetAccessReaction);
+procedure TTemplateActionPage.onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction);
 begin
   TInternetAccess.reactFromCodeString(errorHandling, sender.lastHTTPResultCode, reaction);
 end;

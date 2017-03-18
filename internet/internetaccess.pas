@@ -68,7 +68,11 @@ type
     procedure prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
   end;
 
-  { TMIMEMultipartData }
+  TInternetAccessDataBlock = record
+    data: pointer;
+    count: SizeInt;
+    class function create(const s: string): TInternetAccessDataBlock; static;
+  end;
 
   TMIMEMultipartSubData = record
     data: string;
@@ -120,7 +124,7 @@ type
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
   TTransferClearEvent = procedure() of object;
   TTransferBlockWriteEvent = procedure(const Buffer; Count: Longint) of object;
-  TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data:string; var reaction: TInternetAccessReaction) of object;
+  TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
 
 
@@ -147,14 +151,21 @@ type
     FOnTransferEnd: TTransferEndEvent;
     FOnTransferReact: TTransferReactEvent;
     FOnTransferStart: TTransferStartEvent;
-  protected
     FOnProgress:TProgressEvent;
+    //active transfer
+    FOnWriteBlock: TTransferBlockWriteEvent;
+    FTransferCurrentSize, FTransferContentLength: integer; //only used for progress event
+    procedure beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent);
+    procedure endTransfer;
+  protected
+    procedure writeBlock(const Buffer; Count: Longint);
+  protected
     lastErrorDetails: string;
     lastURLDecoded: TDecodedUrl;
     FLastHTTPHeaders: THTTPHeaderList;
     //**Override this if you want to sub class it
-    procedure doTransferUnchecked(onReceivedBlock: TTransferBlockWriteEvent; method: string; const url: TDecodedUrl;  data:string);virtual;abstract;
-    procedure doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string; url: TDecodedUrl;  data:string; remainingRedirects: integer);
+    procedure doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);virtual;abstract;
+    procedure doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string; url: TDecodedUrl;  data: TInternetAccessDataBlock; remainingRedirects: integer);
     function getLastErrorDetails(): string; virtual;
     //utility functions to minimize platform dependent code
   public
@@ -448,6 +459,13 @@ begin
   end;
 end;
 
+class function TInternetAccessDataBlock.create(const s: string): TInternetAccessDataBlock;
+begin
+  result.count := length(s);
+  if result.count = 0 then result.data := nil
+  else result.data := pointer(s);
+end;
+
 { TMIMEMultipartData }
 
 procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: string);
@@ -719,7 +737,7 @@ begin
     FOnTransferStart(self, method, url, data);
 
   builder.init(@result);
-  doTransferChecked(TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.addbuffer, @builder)), method,url,data,10);
+  doTransferChecked(TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.addbuffer, @builder)), method,url,TInternetAccessDataBlock.create(data),10);
   builder.final;
 
   if internetConfig^.logToPath<>'' then
@@ -728,9 +746,38 @@ begin
     FOnTransferEnd(self, method, url, data, Result);
 end;
 
+procedure TInternetAccess.beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent);
+begin
+  onClear();
+  FOnWriteBlock := onReceivedBlock;
+  FTransferCurrentSize := 0;
+  FTransferContentLength := -1;
+  lastHTTPResultCode := -1;
+  lastErrorDetails := '';
+  //do not call OnTransferStart, since that event is triggered once for each request, while this function is called for the each request and again for each redirection;
+end;
+
+procedure TInternetAccess.endTransfer;
+begin
+  if Assigned(FOnProgress) then begin
+    if (FTransferCurrentSize < FTransferContentLength) then FOnProgress(self, FTransferContentLength, FTransferContentLength)
+    else if FTransferContentLength = -1 then FOnProgress(self, 0, 0);
+  end;
+end;
+
+procedure TInternetAccess.writeBlock(const Buffer; Count: Longint);
+begin
+  FOnWriteBlock(buffer, count);
+  if Assigned(FOnProgress) then begin
+    if FTransferContentLength < 0 then
+      FTransferContentLength := StrToIntDef(getLastHTTPHeaderValue('content-length') , -1);
+    FTransferCurrentSize := FTransferCurrentSize + Count;
+    FOnProgress(self, FTransferCurrentSize, FTransferContentLength);
+  end;
+end;
 
 procedure TInternetAccess.doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string;
-  url: TDecodedUrl; data: string; remainingRedirects: integer);
+  url: TDecodedUrl; data: TInternetAccessDataBlock; remainingRedirects: integer);
 
 var
   reaction: TInternetAccessReaction;
@@ -743,8 +790,9 @@ begin
     url.path := urlEncodeData(url.path, ueURLPath); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
     url.params := urlEncodeData(url.params, ueURLQuery);
 
-    onClear();
-    doTransferUnchecked(onReceivedBlock, method, url, data);
+    beginTransfer(onClear, onReceivedBlock);
+    doTransferUnchecked(method, url, data);
+    endTransfer;
 
     reaction := iarReject;
     case lastHTTPResultCode of
@@ -763,7 +811,7 @@ begin
       iarFollowRedirectGET, iarFollowRedirectKeepMethod: begin
         if reaction = iarFollowRedirectGET then begin
           method := 'GET';
-          data := '';
+          data := TInternetAccessDataBlock.create('');
         end;
         cookies.parseHeadersForCookies(url, lastHTTPHeaders); //parse for old url
         url := url.resolved(getLastHTTPHeaderValue(iahLocation));
