@@ -49,7 +49,7 @@ type
 TAndroidInternetAccess=class(TInternetAccess)
 protected
   jhttpclient: jobject;
-  function doTransferUnchecked(method:string; const url: TDecodedUrl; data:string): string;override;
+  procedure doTransferUnchecked(method:string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);override;
   function ExceptionCheckAndClear: boolean;
 public
   constructor create;override;
@@ -278,7 +278,7 @@ begin
     end;
 end;
 
-function TAndroidInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; data: string): string;
+procedure TAndroidInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
 var stack: TLocalStackRecord;
 
 
@@ -289,13 +289,13 @@ var stack: TLocalStackRecord;
   begin
     with stack do
       with classInfos do begin
-        if data = '' then exit;
-        wrappedData := j.env^^.NewByteArray(j.env, length(data));
+        if data.isEmpty then exit;
+        wrappedData := j.env^^.NewByteArray(j.env, data.count);
         if wrappedData = nil then begin
           lastErrorDetails := 'Failed to allocate JNI array';
           exit(false);
         end;
-        j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, length(data), @data[1]); //todo: faster way than copying?
+        j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, data.count, data.data); //todo: is there a faster way than copying?
 
         //entity = new ByteArrayEntity(data)
         jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
@@ -314,13 +314,10 @@ var stack: TLocalStackRecord;
   end;
 
 var
-  i: Integer;
-
   m: THttpMethod;
   jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext: jobject;
   args: array[0..1] of jvalue;
 begin
-  result:='';
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
     ExceptionCheckAndClear
@@ -338,8 +335,8 @@ begin
         if ExceptionCheckAndClear then exit;
         j.DeleteLocalRef(jUrl);
 
-        enumerateAdditionalHeaders(url, @addHeader, data <> '', @stack);
-        if (data <> '') and (m in [hmPut, hmPost]) then
+        enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, @stack);
+        if (not data.isEmpty) and (m in [hmPut, hmPost]) then
           if not setRequestData() then begin
             lastErrorDetails:= 'Failed to set request data';
             exit;
@@ -374,8 +371,6 @@ begin
           j.DeleteLocalRef(jStatusLine);
 
           try
-            result := j.inputStreamToStringAndDelete(j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent));
-
             lastHTTPHeaders.Clear;
             jHeaderIterator := j.callObjectMethodChecked(jResponse,  jmHttpMessageHeaderIterator);
             while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
@@ -385,6 +380,8 @@ begin
               j.DeleteLocalRef(jHeader);
             end;
             j.DeleteLocalRef(jHeaderIterator);
+
+            j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @writeBlock);
           finally
             j.DeleteLocalRef(jResult);
           end;

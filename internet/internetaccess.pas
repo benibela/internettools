@@ -72,6 +72,7 @@ type
     data: pointer;
     count: SizeInt;
     class function create(const s: string): TInternetAccessDataBlock; static;
+    function isEmpty: boolean; inline;
   end;
 
   TMIMEMultipartSubData = record
@@ -123,7 +124,7 @@ type
   //**Event to intercept transfers end/start
   TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
   TTransferClearEvent = procedure() of object;
-  TTransferBlockWriteEvent = procedure(const Buffer; Count: Longint) of object;
+  TTransferBlockWriteEvent = TStreamLikeWrite;
   TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
 
@@ -466,6 +467,11 @@ begin
   else result.data := pointer(s);
 end;
 
+function TInternetAccessDataBlock.isEmpty: boolean;
+begin
+  result := count = 0;
+end;
+
 { TMIMEMultipartData }
 
 procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: string);
@@ -723,11 +729,6 @@ begin
   result := request(method, decodeURL(fullUrl), data);
 end;
 
-function makeMethod(code, data: pointer): TMethod; inline;
-begin
-  result.Code:=code;
-  result.Data:=data;
-end;
 
 function TInternetAccess.request(method: string; url: TDecodedUrl; data: string): string;
 var builder: TStrBuilder;
