@@ -160,7 +160,7 @@ begin
   trimmed:=TrimLeft(data);
   lastRetrievedType:=guessType(data);
   case lastRetrievedType of
-    rtEmpty:;
+    rtEmpty: exit('');
     rtRemoteURL: exit(internetaccess.httpRequest(trimmed));
     rtFile: exit(strLoadFromFileUTF8(trimmed));
     else exit(data);
