@@ -138,7 +138,10 @@ type
 
 //-----------------------Flow/Thread control functions------------------------
 type TProcedureOfObject=procedure () of object;
+     TStreamLikeWrite = procedure(const Buffer; Count: Longint) of object;
 function procedureToMethod(proc: TProcedure): TMethod;
+function makeMethod(code, data: pointer): TMethod; {$IFDEF HASINLINE} inline; {$ENDIF}
+
 //**Calls proc in an new thread
 procedure threadedCall(proc: TProcedureOfObject; isfinished: TNotifyEvent); overload;
 //**Calls proc in an new thread
@@ -464,6 +467,7 @@ type TStrBuilder = record
   buffer: pstring;
   next, bufferend: pchar; //next empty pchar and first pos after the string
   procedure init(abuffer:pstring; basecapacity: integer = 64);
+  procedure clear;
   procedure final;
   function count: integer; inline;
   procedure reserveadd(delta: integer);
@@ -471,6 +475,7 @@ type TStrBuilder = record
   procedure add(const s: string); inline;
   procedure add(const codepoint: integer); inline;
   procedure add(const p: pchar; const l: integer); inline;
+  procedure addbuffer(const block; l: integer); inline;
   procedure addhexentity(codepoint: integer);
   procedure addhexnumber(codepoint: integer);
 end;
@@ -773,6 +778,12 @@ begin
   move(proc, result.code, sizeof(proc));
   //result.code:=proc;
   result.Data:=nil;
+end;
+
+function makeMethod(code, data: pointer): TMethod;
+begin
+  result.Code:=code;
+  result.Data:=data;
 end;
 
 procedure threadedCallBase(proc: TProcedureOfObject; isfinished: TNotifyEvent);
@@ -3036,6 +3047,11 @@ begin
   bufferend := next + length(buffer^);
 end;
 
+procedure TStrBuilder.clear;
+begin
+  next := Pointer(buffer^);
+end;
+
 procedure TStrBuilder.final;
 begin
   if next <> bufferend then begin
@@ -3095,6 +3111,14 @@ begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);
   move(p^, next^, l);
+  inc(next, l);
+end;
+
+procedure TStrBuilder.addbuffer(const block; l: integer);
+begin
+  if l <= 0 then exit;
+  if next + l > bufferend then reserveadd(l);
+  move(block, next^, l);
   inc(next, l);
 end;
 
