@@ -6,7 +6,7 @@ unit bbjniutils;
 interface
 
 uses
-  Classes, SysUtils, jni;
+  Classes, SysUtils, jni, bbutils;
 
 type EAndroidInterfaceException = class(Exception);
 
@@ -97,7 +97,9 @@ type
   procedure ThrowNew(c: pchar; error: string);
 
   function inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead, jmInputStreamClose: jmethodID): string;
-  function inputStreamToStringAndDelete(stream: jobject): string; //same as in androidinternetaccess
+  function inputStreamToStringAndDelete(stream: jobject): string;
+  procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite; jmInputStreamRead, jmInputStreamClose: jmethodID);
+  procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite);
 
   function getMapProperty(map: jobject; value: jobject): jobject;
 
@@ -140,7 +142,7 @@ function repairModifiedUTF8(const s: string): string; //valid utf is converted, 
 
 implementation
 
-uses bbutils, math {$IFDEF CD_Android}, customdrawnint{$endif};
+uses math {$IFDEF CD_Android}, customdrawnint{$endif};
 
 function needJ: TJavaEnv;
 var attachArgs: JavaVMAttachArgs;
@@ -730,7 +732,6 @@ end;
 function TJavaEnv.ExceptionDescribeAndClear: string;
 var je: jthrowable;
     temp: jobject;
-    message: String;
 begin
   je := env^^.ExceptionOccurred(env);
   if je = nil then exit('');
@@ -760,21 +761,42 @@ end;
 
 
 function TJavaEnv.inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead, jmInputStreamClose: jmethodID): string;
+var builder: TStrBuilder;
+begin
+  builder.init(@result);
+  inputStreamReadAllAndDelete(stream, TStreamLikeWrite(makeMethod(@builder.addbuffer, @builder)), jmInputStreamRead, jmInputStreamClose);
+  builder.final;
+end;
+
+function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
+var
+  streamClass: jclass;
+begin
+  streamClass := commonClasses_InputStream;
+  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B(streamClass), commonMethods_InputStream_Close(streamClass));
+  deleteLocalRef(streamClass);
+end;
+
+procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite; jmInputStreamRead,
+  jmInputStreamClose: jmethodID);
+const BUFFERLEN = 8192;
 var wrappedBuffer: jvalue;
-    len: integer;
-    oldlen: Integer;
+    temp: JBoolean;
+    len: jint;
+    buffer: pointer;
 begin
   if stream = nil then raise EAndroidInterfaceException.create('No stream');
+  temp := 0;
 
-  result := '';
-  wrappedBuffer.l := env^^.NewByteArray(env, 16384);
+  wrappedBuffer.l := env^^.NewByteArray(env, BUFFERLEN);
   len := env^^.CallIntMethodA(env, stream,  jmInputStreamRead, @wrappedBuffer);;
   RethrowJavaExceptionIfThereIsOne;
   while len >= 0 do begin
     if len > 0 then begin
-      oldlen := length(result);
-      setlength(result, oldlen + len);
-      env^^.GetByteArrayRegion(env, wrappedBuffer.l, 0, len, @result[oldlen+1]); //todo: faster way than copying?
+      buffer := env^^.GetPrimitiveArrayCritical(env, wrappedBuffer.l, temp);
+      if buffer <> nil then
+        readCallback(buffer^, len);
+      env^^.ReleasePrimitiveArrayCritical(env, wrappedBuffer.l, buffer, JNI_ABORT);
     end;
     len := callIntMethodChecked(stream,  jmInputStreamRead, @wrappedBuffer);;
   end;
@@ -784,12 +806,12 @@ begin
   DeleteLocalRef(stream);
 end;
 
-function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
+procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite);
 var
   streamClass: jclass;
 begin
   streamClass := commonClasses_InputStream;
-  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B(streamClass), commonMethods_InputStream_Close(streamClass));
+  inputStreamReadAllAndDelete(stream, readCallback, commonMethods_InputStream_Read_B(streamClass), commonMethods_InputStream_Close(streamClass));
   deleteLocalRef(streamClass);
 end;
 
