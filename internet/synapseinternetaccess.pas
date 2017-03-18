@@ -175,7 +175,8 @@ procedure TSynapseInternetAccess.doTransferUnchecked(onBlockWrite: TTransferBloc
                                           or (striEqual(url.protocol, 'https') and (url.port <> '443'))
                                          );
    if data <> '' then begin
-     WriteStrToStream(connection.Document, data);
+     connection.Document.Size := length(data);
+     move(data[1], connection.Document.Memory^, length(data));
      connection.MimeType := ContentTypeForData; //this pointless as addHeader overrides it. But it does not hurt either
    end;
    connection.Protocol:='1.1';
