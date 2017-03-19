@@ -348,6 +348,11 @@ var url: String;
 begin
   result.protocol:='http';
   result.port:='';
+  result.username:=''; //if these values are not initialized here, they might get a random value
+  result.password:='';
+  result.path:='';
+  result.params:='';
+  result.linktarget:='';
 
   url:=totalURL;
   if pos('://', url) > 0 then
