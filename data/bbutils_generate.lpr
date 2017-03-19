@@ -2252,7 +2252,7 @@ begin
 end;
 
 const SDHE_Start: string =
-'var code,j,resLen:integer;'+LineEnding+
+'var j,resLen:integer;'+LineEnding+
 '    lastChar: pchar;'+LineEnding+
 '    entity,entityStart, entityEnd, entityMid, entityBase: longint;'+LineEnding+
 '    ok: boolean;'+LineEnding+
