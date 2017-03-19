@@ -2983,5 +2983,6 @@ finalization
   XMLNamespace_XMLNS := nil;
   omittedEndTags.free;
   omittedStartTags.free;
+  TNamespace.freeCache;
 end.
 
