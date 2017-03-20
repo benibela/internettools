@@ -16,7 +16,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
 {** @abstract(You can use this unit to configure and create internet connections.)
 
-    Currently it only supports http/s connections, but this might change in future (e.g. to also support ftp)}
+    Currently it only supports HTTP/S connections, but this might change in future (e.g. to also support ftp)}
 unit internetaccess;
 
 {$mode objfpc}{$H+}
@@ -37,13 +37,13 @@ type
     userAgent: string; //**< the user agent used when connecting
     tryDefaultConfig: boolean; //**< should the system default configuration be used (not always supported, currently it only works with wininet)
     useProxy: Boolean; //**< should a proxy be used
-    proxyHTTPName, proxyHTTPPort: string; //**< proxy used for http
-    proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for https (not always supported, currently only with wininet)
+    proxyHTTPName, proxyHTTPPort: string; //**< proxy used for HTTP
+    proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for HTTPS (not always supported, currently only with wininet)
     proxySOCKSName, proxySOCKSPort: string; //**< socks proxy
 
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
-    checkSSLCertificates: boolean; //**< If ssl certificates should be checked in https connections (currently only for w32internetaccess)
+    checkSSLCertificates: boolean; //**< If ssl certificates should be checked in HTTPS connections (currently only for w32internetaccess)
 
     logToPath: string;
 
@@ -139,7 +139,7 @@ type
     ueXPathFromIRI);//**< Encode for the XPath/XQuery function fn:iri-to-uri as defined in the XPath standard
 
   //**@abstract(Abstract base class for connections)
-  //**This class defines the interface methods for http requests, like get, post or request.@br
+  //**This class defines the interface methods for HTTP requests, like get, post or request.@br
   //**If a method fails, it will raise a EInternetException@br@br
   //**Since this is an abstract class, you cannot use it directly, but need to use one of the implementing child classes
   //**TW32InternetAccess, TSynapseInternetAccess, TAndroidInternetAccess or TMockInternetAccess. @br
@@ -207,24 +207,28 @@ type
     destructor Destroy; override;
     //**post the (raw) data to the given url and returns the resulting document
     //**as string
-    function post(totalUrl: string; data:string):string;
+    function post(const totalUrl, data:string):string;
     //**post the (raw) data to the url given as three parts and returns the page as string
-    function post(protocol,host,url: string; data:string):string;
+    function post(const protocol,host,url: string; data:string):string;
     //**get the url as stream
-    procedure get(totalUrl: string; stream:TStream);
+    procedure get(const totalUrl: string; stream:TStream);
     //**get the url as string
-    function get(totalUrl: string):string;
+    function get(const totalUrl: string):string;
     //**get the url as stream
-    procedure get(protocol,host,url: string; stream:TStream);
+    procedure get(const protocol,host,url: string; stream:TStream);
     //**get the url as string
-    function get(protocol,host,url: string):string;
+    function get(const protocol,host,url: string):string;
 
-    //**performs a http @noAutoLink(request)
-    function request(method, fullUrl, data:string):string;
-    //**performs a http @noAutoLink(request)
+    //**performs a HTTP @noAutoLink(request)
+    function request(const method, fullUrl, data:string):string;
+    //**performs a HTTP @noAutoLink(request)
     function request(method, protocol,host,url, data:string):string;
-    //**performs a http @noAutoLink(request)
+    //**performs a HTTP @noAutoLink(request)
     function request(method: string; url: TDecodedUrl; data:string):string;
+    //**performs a HTTP @noAutoLink(request)
+    procedure request(const method: string; const url: TDecodedUrl; const uploadData:string; outStream: TStream);
+    //**performs a HTTP @noAutoLink(request)
+    procedure request(const method: string; const url: TDecodedUrl; const uploadData: TInternetAccessDataBlock; const onClear: TTransferClearEvent; const onReceivedBlock: TTransferBlockWriteEvent);
 
 
 
@@ -267,6 +271,7 @@ type
 //** Splits a url into parts
 //** @param(normalize performs some normalizations (e.g. foo//bar -> foo/bar))
 function decodeURL(const totalURL: string; normalize: boolean = true): TDecodedUrl;
+function decodeURL(const protocol, host, url: string; normalize: boolean = true): TDecodedUrl;
 
 type TRetrieveType = (rtEmpty, rtRemoteURL, rtFile, rtXML, rtJSON);
 
@@ -286,13 +291,13 @@ const ContentTypeUrlEncoded: string = 'application/x-www-form-urlencoded';
 const ContentTypeMultipart: string = 'multipart/form-data'; //; boundary=
 
 
-//**Make a http GET request to a certain url.
+//**Make a HTTP GET request to a certain url.
 function httpRequest(url: string): string; overload;
-//**Make a http POST request to a certain url, sending the data in rawpostdata unmodified to the server.
+//**Make a HTTP POST request to a certain url, sending the data in rawpostdata unmodified to the server.
 function httpRequest(url: string; rawpostdata: string): string; overload;
-//**Make a http POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it.
+//**Make a HTTP POST request to a certain url, sending the data in postdata to the server, after url encoding all name=value pairs of it.
 function httpRequest(url: string; postdata: TStringList): string; overload;
-//**Make a http request to a certain url, sending the data in rawdata unmodified to the server.
+//**Make a HTTP request to a certain url, sending the data in rawdata unmodified to the server.
 function httpRequest(const method, url, rawdata: string): string; overload;
 
 
@@ -413,6 +418,15 @@ begin
       if (result.path[p] = '/') and (result.path[p-1] = '/') then delete(result.path, p, 1)
       else p += 1;
   end;
+end;
+
+function decodeURL(const protocol, host, url: string; normalize: boolean): TDecodedUrl;
+var
+  temp: String;
+begin
+  temp := '';
+  if not strBeginsWith(url, '/') then temp := '/';
+  result := decodeURL(protocol + '://' + host + temp + url, normalize);
 end;
 
 function guessType(const data: string): TRetrieveType;
@@ -723,13 +737,12 @@ end;
 
 
 
-function TInternetAccess.request(method, protocol, host, url, data: string):string;
+function TInternetAccess.request(method, protocol, host, url, data: string): string;
 begin
-  if not strBeginsWith(url, '/') then url := '/' + url;
-  result := request(method, protocol+'://'+host+url,data);
+  result := request(method, decodeURL(protocol, host, url), data);
 end;
 
-function TInternetAccess.request(method, fullUrl, data: string): string;
+function TInternetAccess.request(const method, fullUrl, data: string): string;
 begin
   result := request(method, decodeURL(fullUrl), data);
 end;
@@ -743,13 +756,31 @@ begin
     FOnTransferStart(self, method, url, data);
 
   builder.init(@result);
-  doTransferChecked(TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.addbuffer, @builder)), method,url,TInternetAccessDataBlock.create(data),10);
+  request(method, url, TInternetAccessDataBlock.create(data), TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.addbuffer, @builder)));
   builder.final;
 
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, url.combined+'<-DATA:'+data,result);
   if assigned(FOnTransferEnd) then
     FOnTransferEnd(self, method, url, data, Result);
+end;
+
+procedure clearStream(self: TStream);
+begin
+  self.Position := 0;
+  self.Size := 0;
+end;
+
+procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: string; outStream: TStream);
+begin
+  request(method, url, TInternetAccessDataBlock.create(uploadData), TTransferClearEvent(makeMethod(@clearStream, outStream)), @outStream.WriteBuffer);
+end;
+
+procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: TInternetAccessDataBlock;
+  const onClear: TTransferClearEvent; const onReceivedBlock: TTransferBlockWriteEvent);
+begin
+  //todo: this does not call ontransferstart/end
+  doTransferChecked(onClear, onReceivedBlock, method, url, uploadData, 10);
 end;
 
 procedure TInternetAccess.beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent);
@@ -1227,39 +1258,32 @@ begin
   inherited Destroy;
 end;
 
-function TInternetAccess.post(totalUrl: string;data:string):string;
+function TInternetAccess.post(const totalUrl, data: string): string;
 begin
   result := request('POST', totalUrl, data);
 end;
 
-function TInternetAccess.post(protocol, host, url: string; data: string
-  ): string;
+function TInternetAccess.post(const protocol, host, url: string; data: string): string;
 begin
   result:=request('POST',protocol,host,url,data);
 end;
 
-procedure TInternetAccess.get(totalUrl: string; stream: TStream);
-var buffer:string;
+procedure TInternetAccess.get(const totalUrl: string; stream: TStream);
 begin
-  assert(stream<>nil);
-  buffer:=get(totalUrl);
-  stream.WriteBuffer(buffer[1],sizeof(buffer[1])*length(buffer));
+  request('GET', decodeURL(totalUrl), '', stream);
 end;
 
-function TInternetAccess.get(totalUrl: string):string;
+function TInternetAccess.get(const totalUrl: string): string;
 begin
   result:=request('GET', totalUrl, '');
 end;
 
-procedure TInternetAccess.get(protocol, host, url: string; stream: TStream);
-var buffer:string;
+procedure TInternetAccess.get(const protocol, host, url: string; stream: TStream);
 begin
-  assert(stream<>nil);
-  buffer:=get(protocol,host,url);
-  stream.WriteBuffer(buffer[1],sizeof(buffer[1])*length(buffer));
+  request('GET', decodeURL(protocol, host, url), '', stream);
 end;
 
-function TInternetAccess.get(protocol, host, url: string): string;
+function TInternetAccess.get(const protocol, host, url: string): string;
 begin
   result:=request('GET', protocol, host, url, '');
 end;
