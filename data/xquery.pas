@@ -5056,21 +5056,26 @@ end;
 
 
 var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
-threadvar commonValues: array[TXQValueKind] of TXQValue;
+threadvar threadLocalCache: record
+   runningEngines: integer;
+   commonValues: array[TXQValueKind] of TXQValue;
+end;
 
 class procedure TXQueryEngine.freeCommonCaches;
 var k: TXQValueKind;
   v, w: TXQValue;
 begin
-  for k := low(commonValues) to high(commonValues) do begin
-    v := commonValues[k];
-    while v <> nil do begin
-      w := v.ffreelist;
-      Freemem(pointer(v));
-      v := w;
+  with threadLocalCache do begin
+    for k := low(commonValues) to high(commonValues) do begin
+      v := commonValues[k];
+      while v <> nil do begin
+        w := v.ffreelist;
+        Freemem(pointer(v));
+        v := w;
+      end;
     end;
+    FillChar(commonValues, sizeof(commonValues), 0);
   end;
-  FillChar(commonValues, sizeof(commonValues), 0);
 end;
 
 function xqvalue: IXQValue;
@@ -6585,7 +6590,6 @@ begin
   result.globallyDeclaredVariables := FDefaultVariableHeap;
 end;
 
-threadvar runningEngines: integer;
 
 constructor TXQueryEngine.create;
 begin
@@ -6616,7 +6620,7 @@ begin
   FDefaultVariableHeap := TXQVariableChangeLog.create();
   FModules := TInterfaceList.Create;
   FPendingModules := TInterfaceList.Create;
-  inc(runningEngines);
+  inc(threadLocalCache.runningEngines);
   FCreationThread := GetThreadID;
 end;
 
@@ -6650,10 +6654,12 @@ begin
   StaticContext.Free;
   //We need to call freeCommonCaches on every thread.
   //We cannot know when the thread ends, so we do it with the last engine on the thread
-  dec(runningEngines);
-  if runningEngines = 0 then begin
-   freeCommonCaches;
-   TNamespace.freeCache;
+  with threadLocalCache do begin
+    dec(runningEngines);
+    if runningEngines = 0 then begin
+     freeCommonCaches;
+     TNamespace.freeCache;
+    end;
   end;
   if FCreationThread <> GetThreadID then //otherwise the runningEngines counter above would fail
     threadSafetyViolated; //if this wass inlined, the function crashes even if not executed, see #fpc31135

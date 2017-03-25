@@ -161,18 +161,20 @@ var k: TXQValueKind;
   hackMethod: TMethod;
 begin
   k := classKind;
-  if commonValues[k] <> nil then begin
-    result := commonValues[k];
-    commonValues[k] := txqvalue(result).ffreelist;
-    //A normal object needs to be cleaned up and initialized. We do the clean up in the destructor and can skip it here
-    //hackMethod := tmethod(@CleanupInstance);
-    //hackMethod.Data := result;
-    //TProcedureOfObject(hackMethod)();
-    //InitInstance(result);
-  end else begin
-    hackMethod.Data := self;
-    hackMethod.Code := @TObject.newinstance;
-    result := TNewinstanceFunc(hackMethod)();
+  with threadLocalCache do begin
+    if commonValues[k] <> nil then begin
+      result := commonValues[k];
+      commonValues[k] := txqvalue(result).ffreelist;
+      //A normal object needs to be cleaned up and initialized. We do the clean up in the destructor and can skip it here
+      //hackMethod := tmethod(@CleanupInstance);
+      //hackMethod.Data := result;
+      //TProcedureOfObject(hackMethod)();
+      //InitInstance(result);
+    end else begin
+      hackMethod.Data := self;
+      hackMethod.Code := @TObject.newinstance;
+      result := TNewinstanceFunc(hackMethod)();
+    end;
   end;
 end;
 
@@ -187,8 +189,12 @@ var
   k: TXQValueKind;
 begin
   k := classKind;
-  ffreelist := commonValues[k];
-  commonValues[k] := self;
+  with threadLocalCache do begin
+    if runningEngines > 0 then begin
+      ffreelist := commonValues[k];
+      commonValues[k] := self;
+    end else Freemem(pointer(self));
+  end;
 end;
 
 function TXQValue.kind: TXQValueKind;
