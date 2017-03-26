@@ -371,6 +371,7 @@ type
     procedure initFromTree(t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
+    destructor Destroy; override;
   end;
 
   { TTemplateActionChoose }
@@ -652,6 +653,12 @@ begin
   TTemplateActionIf(result).test := test;
   if &else <> nil then TTemplateActionIf(result).&else := &else.clone;
 
+end;
+
+destructor TTemplateActionIf.Destroy;
+begin
+  &else.free;
+  inherited Destroy;
 end;
 
 { TTemplateActionMeta }
@@ -1011,7 +1018,7 @@ begin
   SetLength(TTemplateActionPage(result).postparams, length(postparams));
   TTemplateActionPage(result).condition:=condition;
   TTemplateActionPage(result).method:=method;
-  result := cloneChildren(result);
+  result := result;
 end;
 
 { TTemplateActionVariable }
