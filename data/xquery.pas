@@ -8305,6 +8305,7 @@ procedure freeThreadVars;
 begin
   internetaccess.freeThreadVars;
   FreeAndNil(theDefaultQueryEngine);
+  TNamespace.freeCache; //if no query engine existed in this thread, this needs to be freed explicitely
 end;
 
 
