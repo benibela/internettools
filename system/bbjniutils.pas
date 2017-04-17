@@ -72,6 +72,7 @@ type
   function getObjectArrayElement(a: jobject; index: integer): jobject; inline;
   procedure setStringArrayElement(a: jobject; index: integer; v: string); inline;
   function getStringArrayElement(a: jobject; index: integer): string; inline;
+  function getIntArray(a: jobject): TLongintArray; inline;
   function getArrayLength(a: jobject): jint; inline;
 
   function newObject(c: jclass; m: jmethodID): jobject;
@@ -434,6 +435,13 @@ end;
 function TJavaEnv.getStringArrayElement(a: jobject; index: integer): string;
 begin
   result := jStringToStringAndDelete(getObjectArrayElement(a, index));
+end;
+
+function TJavaEnv.getIntArray(a: jobject): TLongintArray;
+begin
+  SetLength(result, getArrayLength(a));
+  if length(result) = 0 then exit;
+  env^^.GetIntArrayRegion(env, a, 0, length(result), @result[0]);;
 end;
 
 function TJavaEnv.getArrayLength(a: jobject): jint;
