@@ -7,7 +7,7 @@ object Form1: TForm1
   Caption = 'Form1'
   ClientHeight = 651
   ClientWidth = 866
-  LCLVersion = '1.7'
+  LCLVersion = '1.6.5.0'
   object Panel1: TPanel
     Left = 0
     Height = 165
@@ -20,7 +20,7 @@ object Form1: TForm1
     TabOrder = 0
     object Label1: TLabel
       Left = 1
-      Height = 15
+      Height = 18
       Top = 1
       Width = 864
       Align = alTop
@@ -29,8 +29,8 @@ object Form1: TForm1
     end
     object Memo1: TMemo
       Left = 1
-      Height = 148
-      Top = 16
+      Height = 145
+      Top = 19
       Width = 864
       Align = alClient
       Font.Name = 'Monospace,Courier'
@@ -58,7 +58,7 @@ object Form1: TForm1
     TabOrder = 1
     object Label2: TLabel
       Left = 1
-      Height = 15
+      Height = 18
       Top = 1
       Width = 864
       Align = alTop
@@ -67,8 +67,8 @@ object Form1: TForm1
     end
     object Memo2: TMemo
       Left = 1
-      Height = 144
-      Top = 16
+      Height = 141
+      Top = 19
       Width = 864
       Align = alClient
       Font.Name = 'Monospace,Courier'
@@ -102,7 +102,7 @@ object Form1: TForm1
     TabOrder = 2
     object Label3: TLabel
       Left = 1
-      Height = 15
+      Height = 18
       Top = 1
       Width = 864
       Align = alTop
@@ -111,8 +111,8 @@ object Form1: TForm1
     end
     object Memo3: TMemo
       Left = 1
-      Height = 148
-      Top = 16
+      Height = 145
+      Top = 19
       Width = 864
       Align = alClient
       Font.Height = -13
@@ -159,8 +159,8 @@ object Form1: TForm1
       Top = 34
       Width = 864
       Align = alClient
-      ClientHeight = 111
-      ClientWidth = 860
+      ClientHeight = 113
+      ClientWidth = 862
       Constraints.MinHeight = 115
       TabOrder = 0
       Visible = False
@@ -168,10 +168,10 @@ object Form1: TForm1
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Side = asrCenter
-        Left = 164
-        Height = 18
+        Left = 154
+        Height = 21
         Top = 55
-        Width = 183
+        Width = 180
         BorderSpacing.Around = 5
         Caption = 'convert encoding/entities'
         Checked = True
@@ -183,9 +183,9 @@ object Form1: TForm1
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = Label4
         AnchorSideTop.Side = asrCenter
-        Left = 352
-        Height = 25
-        Top = 52
+        Left = 339
+        Height = 24
+        Top = 54
         Width = 186
         ItemHeight = 0
         ItemIndex = 1
@@ -200,27 +200,27 @@ object Form1: TForm1
       end
       object Label4: TLabel
         Left = 0
-        Height = 15
+        Height = 18
         Top = 57
-        Width = 159
+        Width = 149
         Caption = 'Tree parsing options:      '
         ParentColor = False
       end
       object Label5: TLabel
         Left = 0
-        Height = 15
+        Height = 18
         Top = 0
-        Width = 114
+        Width = 110
         Caption = 'Template options:'
         ParentColor = False
       end
       object CheckBoxShortnotatin: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
-        Left = 164
-        Height = 18
+        Left = 154
+        Height = 21
         Top = 0
-        Width = 151
+        Width = 144
         BorderSpacing.Around = 5
         Caption = 'Allow short notation'
         Checked = True
@@ -229,19 +229,19 @@ object Form1: TForm1
       end
       object Label6: TLabel
         Left = 0
-        Height = 15
+        Height = 18
         Top = 28
-        Width = 84
+        Width = 80
         Caption = 'PXP-Options:'
         ParentColor = False
       end
       object CheckBoxObjects: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
-        Left = 164
-        Height = 18
+        Left = 154
+        Height = 21
         Top = 27
-        Width = 138
+        Width = 132
         BorderSpacing.Around = 5
         Caption = 'Allow dot notation'
         Checked = True
@@ -253,10 +253,10 @@ object Form1: TForm1
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxObjects
         AnchorSideTop.Side = asrCenter
-        Left = 352
-        Height = 18
+        Left = 339
+        Height = 21
         Top = 27
-        Width = 222
+        Width = 209
         Caption = 'Allow variables in string literals'
         Checked = True
         State = cbChecked
@@ -266,10 +266,10 @@ object Form1: TForm1
         AnchorSideLeft.Control = CheckBoxEntities
         AnchorSideTop.Control = CheckBoxEntities
         AnchorSideTop.Side = asrBottom
-        Left = 164
-        Height = 18
-        Top = 83
-        Width = 118
+        Left = 154
+        Height = 21
+        Top = 86
+        Width = 119
         BorderSpacing.Top = 10
         Caption = 'Verbose output'
         Checked = True
@@ -281,10 +281,10 @@ object Form1: TForm1
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxverbose
         AnchorSideTop.Side = asrCenter
-        Left = 287
-        Height = 18
-        Top = 83
-        Width = 75
+        Left = 278
+        Height = 21
+        Top = 86
+        Width = 76
         BorderSpacing.Around = 5
         Caption = 'text only'
         Checked = True
@@ -296,10 +296,10 @@ object Form1: TForm1
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxVarsInStrs
         AnchorSideTop.Side = asrCenter
-        Left = 589
-        Height = 18
+        Left = 563
+        Height = 21
         Top = 27
-        Width = 92
+        Width = 89
         BorderSpacing.Around = 15
         Caption = 'Allow JSON'
         Checked = True
@@ -348,9 +348,9 @@ object Form1: TForm1
       end
       object CheckBoxOptions: TCheckBox
         Left = 487
-        Height = 18
+        Height = 21
         Top = 9
-        Width = 70
+        Width = 72
         Caption = 'Options'
         Color = clNone
         OnChange = CheckBoxOptionsChange
@@ -370,4 +370,3 @@ object Form1: TForm1
     end
   end
 end
-
