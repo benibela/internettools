@@ -4,7 +4,7 @@ program tests;
 
 uses
   //bbheaptrc,
-  heaptrc,
+  //heaptrc,
   Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
   simplehtmltreeparser, xquery, xquery_utf8, internetaccess_tests, xpath3_tests, xquery3_tests, bigdecimal_tests, parsertests, simpleinternet_tests,
