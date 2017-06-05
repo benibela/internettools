@@ -10,8 +10,13 @@
 
 
 
+
+//internal checks
 {$IFDEF USE_FLRE_WITH_CACHE}{$DEFINE USE_FLRE}{$ENDIF}
 
+{$if not defined(USE_SOROKINS_REGEX) and not defined(USE_SOROKINS_DREGEX) and not defined(USE_FLRE) and not defined(USE_FLRE_WITH_CACHE)}
+{$error you need to enable one regex library define in internettoolsconfig.inc}
+{$endif}
 
 
 
