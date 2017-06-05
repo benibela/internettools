@@ -6,12 +6,12 @@
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
-        <IncludeFiles Value="data;../lazarus/dialogs"/>
-        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system;../../../components/pascal/import/flre/src"/>
+        <IncludeFiles Value="data;../lazarus/dialogs;import/synapse"/>
+        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system;../../../components/pascal/import/flre/src;import/flre/src"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
-    <Files Count="25">
+    <Files Count="26">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -112,6 +112,10 @@
         <Filename Value="internettoolsconfig.inc"/>
         <Type Value="Binary"/>
       </Item25>
+      <Item26>
+        <Filename Value="data/xquery_utf8.pas"/>
+        <UnitName Value="xquery_utf8"/>
+      </Item26>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>
