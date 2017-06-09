@@ -80,7 +80,7 @@ begin
 end;
 
 
-function mathPi({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function mathPi({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := xqv(pi);
 end;
