@@ -62,7 +62,7 @@ var
 
 implementation
 
-uses bbutils, {xquery_utf8, }xquery_json;
+uses bbutils, xquery_json;
 {$R *.lfm}
 
 { TForm1 }

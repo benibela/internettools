@@ -24,10 +24,8 @@ in https://www.w3.org/TR/xpath-functions/ and http://www.w3.org/TR/xpath-functio
 }
 unit xquery__functions;
 
-{$mode objfpc}
-{$modeswitch advancedrecords}
-{$H+}
-{$DEFINE ALLOW_EXTERNAL_DOC_DOWNLOAD}
+{$include ../internettoolsconfig.inc}
+
 interface
 
 uses
@@ -38,7 +36,13 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex;
+uses xquery, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex,
+
+  {$IFDEF USE_BBFLRE_UNICODE}FLREUnicode,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
+  {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
+  {$IFDEF USE_THEO_UNICODE}unicodeinfo{$ENDIF} //from http://wiki.lazarus.freepascal.org/Theodp
+
+  ;
 
 type TXQValueDateTimeBreaker= class(TXQValueDateTime) end;
      TXQVListBreaker = class(TXQVList) end;
@@ -1718,6 +1722,45 @@ begin
   end;
 end;
 
+
+function strIsUtf8Encoded(const s: RawByteString): boolean; inline;
+begin
+  {$IFDEF FPC_HAS_CPSTRING}
+  case strActualEncoding(s) of
+    CP_ACP, CP_UTF8, CP_NONE: result := true;
+    else result := false;
+  end;
+  {$ELSE}
+  result := true;
+  {$ENDIF}
+end;
+
+procedure strOffsetUTF8(const s: RawByteString; index: integer; var offset: integer);
+begin
+  while (index > 1) and (offset <= length(s)) do begin
+    dec(index);
+    strDecodeUTF8Character(s, offset);
+  end;
+end;
+
+function strCopyUTF8(const s: RawByteString; const from, len: integer): string;
+var
+  startOffset, endOffset: Integer;
+begin
+  startOffset := 1;
+  strOffsetUTF8(s, from, startOffset );
+  endOffset := startOffset;
+  strOffsetUTF8(s, len + 1, endOffset);
+  result := copy(s, startOffset, endOffset - startOffset);
+end;
+
+{$ifndef FPC_HAS_CPSTRING}
+procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean=True);
+begin
+
+end;
+{$endif}
+
 function xqFunctionCodepoints_to_string({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: TStrBuilder;
   res: string;
@@ -1736,21 +1779,20 @@ begin
   result := xqvalue(res);
 end;
 
+
+
+
 function xqFunctionString_to_codepoints({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var temp: string;
- i: Integer;
+var temp: RawByteString;
  cp: Integer;
  resseq: TXQValueSequence;
 begin
   temp := args[0].toString;
   if temp = '' then exit(xqvalue);
+  if not strIsUtf8Encoded(temp) then SetCodePage(temp, CP_UTF8);
   resseq := TXQValueSequence.create(length(temp));
-  i:=1;
-  while i <= length(temp) do begin
-    cp := strDecodeUTF8Character(temp, i);
-    if cp < 0 then break;
+  for cp in strIterator(temp) do
     resseq.add(xqvalue(cp));
-  end;
   result := resseq;
   xqvalueSeqSqueeze(result);
 end;
@@ -1806,24 +1848,35 @@ begin
   else result := xqvalue(args[0].toJoinedString(args[1].toString));
 end;
 
+
+
+
 function xqFunctionSubstring({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var s:string;
 var from, len: integer;
 
 begin
   s:=args[0].toString;
-  xpathRangeDefinition(argc, args, length(s), from, len);
-  result := xqvalue(copy(s,from,len));
+  xpathRangeDefinition(argc, args, length(s) {guess that should be utf-8 length for utf-8, but it does not seem to actually affect anything }, from, len);
+  if strIsUtf8Encoded(s) then s := strCopyUTF8(s,from,len)
+  else s := copy(s,from,len);
+  result := xqvalue(s);
 end;
+
+
 
 function xqFunctionString_length(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: String;
+  len: LongInt;
 begin
   if argc = 1 then temp := args[0].toString
   else temp := context.SeqValueAsString;
 
-  result := xqvalue(length(temp));
+  if strIsUtf8Encoded(temp) then len := strLengthUtf8(temp)
+  else len := length(temp);
+
+  result := xqvalue(len);
 end;
 
 function xqFunctionNormalize_space(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -1834,14 +1887,88 @@ begin
   result := xqvalue(strTrimAndNormalize(temp));
 end;
 
-function xqFunctionUpper_Case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+
+{$IFDEF USE_BBFLRE_UNICODE}
+function cpToUppercase(cp: integer): integer; inline;
+var
+  Value: LongInt;
 begin
-  result := xqvalue(UpperCase(args[0].toString));
+  result := cp;
+  if result<=$10ffff then begin
+    Value:=result shr FLREUnicodeUpperCaseDeltaArrayBlockBits;
+    result:=longword(longint(result+FLREUnicodeUpperCaseDeltaArrayBlockData[FLREUnicodeUpperCaseDeltaArrayIndexBlockData[FLREUnicodeUpperCaseDeltaArrayIndexIndexData[Value shr FLREUnicodeUpperCaseDeltaArrayIndexBlockBits],Value and FLREUnicodeUpperCaseDeltaArrayIndexBlockMask],result and FLREUnicodeUpperCaseDeltaArrayBlockMask]));
+   end;
+end;
+
+function cpToLowercase(cp: integer): integer; inline;
+var
+  Value: LongInt;
+begin
+  result := cp;
+  if result<=$10ffff then begin
+    Value:=result shr FLREUnicodeLowerCaseDeltaArrayBlockBits;
+    result:=longword(longint(result+FLREUnicodeLowerCaseDeltaArrayBlockData[FLREUnicodeLowerCaseDeltaArrayIndexBlockData[FLREUnicodeLowerCaseDeltaArrayIndexIndexData[Value shr FLREUnicodeLowerCaseDeltaArrayIndexBlockBits],Value and FLREUnicodeLowerCaseDeltaArrayIndexBlockMask],result and FLREUnicodeLowerCaseDeltaArrayBlockMask]));
+  end;
+end;
+{$ELSE}
+function cpToUppercase(cp: integer): integer; inline;
+begin
+  result := utf8proc_get_property(cp)^.uppercase_mapping;
+  if result = -1 then result := cp;
+end;
+
+function cpToLowercase(cp: integer): integer; inline;
+begin
+  result := utf8proc_get_property(cp)^.lowercase_mapping;
+  if result = -1 then result := cp;
+end;
+
+{$ENDIF}
+
+function strUpperUtf8(const s: RawByteString): string;
+var
+  cpup: LongInt;
+  cp: Integer;
+begin
+  result := '';
+  for cp in strIterator(s) do begin
+    cpup := cpToUppercase(cp);
+    if cpup = cp then result += strUpperCaseSpecialUTF8(cp)
+    else result += strGetUnicodeCharacter(cpup);
+  end;
+end;
+
+function strLowerUtf8(const s: RawByteString): string;
+var
+  cplow: LongInt;
+  cp: Integer;
+begin
+  result := '';
+  for cp in strIterator(s) do begin
+    cplow := cpToLowercase(cp);
+    if cplow = cp then result += strLowerCaseSpecialUTF8(cp)
+    else result += strGetUnicodeCharacter(cplow);
+  end;
+end;
+
+function xqFunctionUpper_Case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  s: String;
+begin
+  s := args[0].toString;
+  if strIsUtf8Encoded(s) then s := strUpperUtf8(s)
+  else s := UpperCase(s);
+  result := xqvalue(s);
 end;
 
 function xqFunctionLower_case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  s: String;
 begin
-  result := xqvalue(LowerCase(args[0].toString));
+  s := args[0].toString;
+  if strIsUtf8Encoded(s) then s := strLowerUtf8(s)
+  else s := LowerCase(s);
+  result := xqvalue(s);
 end;
 
 function xqFunctionCompare(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -1946,27 +2073,77 @@ end;
 
 
 
+
+
 function xqFunctionTranslate({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- temp3: String;
- temp: String;
- temp2: String;
- i: Integer;
- j: Integer;
+ i,j,cp: Integer;
+ resstr: RawByteString;
+ inIterator, mapIterator, transIterator: TStrIterator;
+ found: Boolean;
 begin
-  temp3 := args[0].toString;
-  temp := args[1].toString;
-  temp2 := args[2].toString;
-  for i:=length(temp3) downto 1 do
-    for j:=1 to length(temp) do
-       if temp3[i] = temp[j] then begin
-         if j <= length(temp2) then temp3[i] := temp2[j]
-         else delete(temp3, i, 1);
-         break;
-       end;
-  result := xqvalue(temp3);
+  inIterator := strIterator(args[0].toString);
+  mapIterator := strIterator(args[1].toString);
+  transIterator := strIterator(args[2].toString);
+  if strIsUtf8Encoded(mapIterator.s) or strIsUtf8Encoded(transIterator.s) or strIsUtf8Encoded(inIterator.s) then begin
+    if not strIsUtf8Encoded(mapIterator.s) then SetCodePage(mapIterator.s, CP_UTF8);
+    if not strIsUtf8Encoded(transIterator.s) then SetCodePage(transIterator.s, CP_UTF8);
+    if not strIsUtf8Encoded(inIterator.s) then SetCodePage(inIterator.s, CP_UTF8);
+    resstr := '';
+    for cp in inIterator do begin
+      mapIterator.pos := 1;
+      found := false;
+      i := 1;
+      while mapIterator.MoveNext do
+        if mapIterator.Current = cp then begin
+          found := true;
+          break;
+        end else inc(i);
+      if found then begin
+        transIterator.pos := 1;
+        while (i > 0) and transIterator.MoveNext do
+          dec(i);
+        if i = 0 then resstr += strGetUnicodeCharacter(transIterator.Current);
+      end else resstr += strGetUnicodeCharacter(cp);
+    end;
+  end else begin
+    resstr := inIterator.s;
+    for i:=length(resstr) downto 1 do
+      for j:=1 to length(mapIterator.s) do
+         if resstr[i] = mapIterator.s[j] then begin
+           if j <= length(transIterator.s) then resstr[i] := transIterator.s[j]
+           else delete(resstr, i, 1);
+           break;
+         end;
+  end;
+  result := xqvalue(resstr);
 
 end;
+
+function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  method: String;
+  p: pchar;
+begin
+  if args[0].toString = '' then exit(xqvalue(''));
+  method := 'NFC';
+  if argc = 2 then method := trim(UpperCase(args[1].toString));
+
+  p := pchar(args[0].toString);
+  case method of
+    'NFC':  p := utf8proc_NFC(p);
+    'NFD':  p := utf8proc_NFD(p);
+    'NFKC': p := utf8proc_NFKC(p);
+    'NFKD': p := utf8proc_NFKD(p);
+    //'FULLY-NORMALIZED': ??
+    '': exit(args[0]);
+    else raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
+  end;
+
+  result :=xqvalue(UTF8String(p));
+  Freemem(p);
+end;
+
 
 function xqFunctionRandom(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -5572,7 +5749,7 @@ begin
   fn.registerFunction('string',@xqFunctionString, ['() as xs:string', '($arg as item()?) as xs:string'], [xqcdFocusItem]);
   fn.registerFunction('string-length',@xqFunctionString_length, ['() as xs:integer', '($arg as xs:string?) as xs:integer'], [xqcdFocusItem]);
   fn.registerFunction('normalize-space',@xqFunctionNormalize_space, ['() as xs:string', '($arg as xs:string?) as xs:string'], [xqcdFocusItem]);
-  //TODO: normalize-unicode
+  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, ['($arg as xs:string?) as xs:string', '($arg as string?, $normalizationForm as xs:string) as xs:string']);
 
   fn.registerFunction('concatenate',2, 2, @xqFunctionConcatenate, []); //this should be an operator
   fn.registerFunction('index-of', @xqFunctionindex_of, ['($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType) as xs:integer*', '($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType, $collation as xs:string) as xs:integer*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);

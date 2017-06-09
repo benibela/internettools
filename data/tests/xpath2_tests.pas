@@ -4009,16 +4009,16 @@ begin
   t('hours-from-time(xs:untypedAtomic("17:12:34"))', '17');
   t('hours-from-dateTime(xs:untypedAtomic("2004-07-09T12:18:34"))', '12');
 
-
-  if ps.findNativeModule(XMLNamespaceURL_XPathFunctions).findBasicFunction('normalize-unicode', 1, xqpmXPath2) <> nil then begin
-    t('translate("Hallö", "aö", "äo")', 'Hällo');
-    t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
-    t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
-    t('normalize-unicode("e'#$CC#$81'", "")', 'e'#$CC#$81);
-    t('join(string-to-codepoints("XÄY"), " ")', '88 196 89');
-  //<a><a/></a> / ( if (a,2,3) then 5 else 6 )
-  //t('xs:dayTimeDuration("P3DT08H34M12.143S") =    xs:untypedAtomic("P3DT08H34M12.143S")
-  end;
+  DefaultSystemCodePage := CP_UTF8;
+  t('translate("Hallö", "aö", "äo")', 'Hällo');
+  DefaultSystemCodePage := CP_LATIN1;
+  t('translate("Hallö", "aö", "äo")', 'H'#$C3'll'#$A4'o');
+  DefaultSystemCodePage := CP_ACP;
+  t('translate("Hallö", "aö", "äo")', 'Hällo');
+  t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
+  t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
+  t('normalize-unicode("e'#$CC#$81'", "")', 'e'#$CC#$81);
+  t('join(string-to-codepoints("XÄY"), " ")', '88 196 89');
 
 
   t('local-name(html)', '',  '<html xmlns="foobar"><svg:abc xmlns:svg="svgNS" xmlns:svg2="svgNS" xmlns:svg3="nomatch"> <svg:a/> <svg2:b/> <svg3:c/> </svg:abc> </html>');
