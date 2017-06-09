@@ -378,6 +378,9 @@ function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
 function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+//this can return CP_ACP (perhaps i will change that)
+function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
+function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
  {$ENDIF}
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
@@ -843,8 +846,14 @@ end;
 
 //---------------------Comparison----------------------------
 
+function strActualEncoding(const str: RawByteString): TSystemCodePage;
+begin
+  result := strActualEncoding(StringCodePage(str));
+end;
+
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 begin
+  //this is basically TranslatePlaceholderCP, but that is unaccessible in fpc's astrings.inc
   case e of
     CP_ACP: result := {$IFDEF FPC_HAS_CPSTRING}DefaultSystemCodePage
                       {$else}{$ifdef windows}GetACP
