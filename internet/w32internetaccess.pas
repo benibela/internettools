@@ -364,7 +364,6 @@ var proxyStr:string;
     timeout: longint;
 begin
   init;
-  FLastHTTPHeaders:= TStringList.Create;
   if defaultInternetConfiguration.tryDefaultConfig then
     hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
                             INTERNET_OPEN_TYPE_PRECONFIG,
