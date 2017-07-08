@@ -1196,7 +1196,7 @@ procedure TInternetAccess.init;
 begin
   internetConfig:=@defaultInternetConfiguration;
   if defaultInternetConfiguration.userAgent='' then
-    defaultInternetConfiguration.userAgent:='Mozilla/3.0 (compatible)';
+    defaultInternetConfiguration.userAgent:='Mozilla/5.0 (compatible)';
 
   additionalHeaders := TStringList.Create;
   additionalHeaders.nameValueSeparator := ':';
