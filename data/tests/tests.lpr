@@ -5,6 +5,7 @@ program tests;
 uses
   //bbheaptrc,
   //heaptrc,
+  {$ifdef unix}cwstring,{$endif} //this is required to use strbuilder with non-utf8
   Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
   simplehtmltreeparser, xquery, internetaccess_tests, xpath3_tests, xquery3_tests, bigdecimal_tests, parsertests, simpleinternet_tests,

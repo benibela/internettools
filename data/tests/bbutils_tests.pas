@@ -50,6 +50,7 @@ end;
 {%END-REPEAT}
 
 procedure testStrResolveURI; forward;
+procedure testStrBuilder; forward;
 
 
 {$IFDEF FPC}
@@ -1308,6 +1309,9 @@ begin
 
   testStrResolveURI;
 
+  testStrBuilder();
+
+  writeln('bbutils tested');
 end;
 
 procedure testStrResolveURI;
@@ -1586,6 +1590,75 @@ begin
       end;
     end;
   end;
+
+end;
+
+procedure testStrBuilder;
+var sb: TStrBuilder;
+    buffer, utf8, latin1: string;
+    i, j: Integer;
+const tempAlpha: string = 'alpha';
+      tempAlpha2: string = 'alpha'#0#1#2;
+begin
+  for i := 1 to length(tempAlpha2) do begin
+    sb.init(@buffer, 0);
+    for j := 1 to i do sb.append(tempAlpha2[j]);
+    sb.final;
+    test(buffer, copy(tempAlpha2,1,i));
+  end;
+
+  sb.init(@buffer, 2);
+  sb.append(tempAlpha);
+  sb.appendHexEntity(1);
+  sb.final;
+  test(buffer, tempAlpha + '&#x1;');
+  sb.appendHexEntity(10);
+  sb.appendHexEntity($10);
+  sb.appendHexEntity($100);
+  sb.appendHexEntity($FFFF);
+  sb.appendHexEntity($3ABCD);
+  sb.final;
+  test(buffer, tempAlpha + '&#x1;&#xA;&#x10;&#x100;&#xFFFF;&#x3ABCD;');
+
+  sb.init(@buffer, 1);
+  sb.append(tempAlpha);
+  sb.appendCodePoint(0);
+  sb.appendCodePoint(1);
+  sb.appendCodePoint(2);
+  sb.final;
+  test(buffer, tempAlpha2);
+
+  utf8 := 'aäü';
+  SetCodePage(RawByteString(utf8), CP_UTF8, false);
+  test(length(utf8), 5);
+  latin1 := utf8;
+  SetCodePage(RawByteString(latin1), CP_LATIN1, true);
+  test(length(latin1), 3);
+
+  SetCodePage(RawByteString(buffer), CP_UTF8);
+  sb.init(@buffer, 3);
+  sb.appendCodePoint($24);
+  sb.appendCodePoint($A2);
+  sb.appendCodePoint($20AC);
+  sb.appendCodePoint($10348);
+  sb.append(' ');
+  sb.append(utf8);
+  sb.append(' ');
+  sb.append(latin1);
+  sb.final;
+  test(buffer, #$24#$C2#$A2#$E2#$82#$AC#$F0#$90#$8D#$88' aäü aäü');
+
+  SetCodePage(RawByteString(buffer), CP_LATIN1);
+  sb.init(@buffer, 3);
+  sb.appendCodePoint($24);
+  sb.appendCodePoint($A2);
+  sb.append(' ');
+  sb.append(utf8);
+  sb.append(' ');
+  sb.append(latin1);
+  sb.final;
+  test(length(buffer), 10);
+  test(buffer, #$24#$C2#$A2' aäü aäü');
 
 end;
 

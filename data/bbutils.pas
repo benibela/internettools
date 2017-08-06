@@ -81,12 +81,15 @@ uses
 
 type
 {$IFDEF FPC}
-     {$ifndef FPC_HAS_CPSTRING} RawByteString = AnsiString;{$endif}
+{$ifdef FPC_HAS_CPSTRING}{$define HAS_CPSTRING}{$endif}
+
 {$ifdef FPC_HAS_TYPE_Extended}float = extended;
 {$else} {$ifdef FPC_HAS_TYPE_Double}float = double;
 {$else} {$ifdef FPC_HAS_TYPE_Single}float = single;
 {$endif}{$endif}{$endif}
+
 {$else}
+//delphi
      float = extended;
      TTime = TDateTime;
      SizeInt = integer;
@@ -99,9 +102,10 @@ type
      PtrInt = int64;
 {$ENDIF}{$ENDIF}
 {$IFNDEF UNICODE}
-     RawByteString = ansistring;
      UnicodeString = WideString;
      PUnicodeChar = ^WideChar;
+{$else}
+  {$define HAS_CPSTRING}
 {$ENDIF}
 const
    NaN = 0.0/0.0;
@@ -110,6 +114,11 @@ const
    LineEnding = #13#10;
 
 {$endif}
+
+{$ifndef HAS_CPSTRING}
+  type RawByteString = AnsiString;
+{$endif}
+
 
 {$ifndef FPC_HAS_CPSTRING}
 type TSystemCodePage     = Word;
@@ -372,7 +381,7 @@ function strFromSIze(size: int64):string;
 function strLengthUtf8(str: RawByteString): longint;
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteString; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
-function strChangeEncoding(const str: RawByteString; from,toe: TSystemCodePage):RawByteString; //**< Changes the string encoding from @code(from) to @code(toe)
+function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString;
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 {$IFDEF fpc}
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
@@ -381,7 +390,10 @@ function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the 
 //this can return CP_ACP (perhaps i will change that)
 function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
- {$ENDIF}
+{$ENDIF}
+{$ifndef HAS_CPSTRING}
+procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean=True); //**< no-op function, so not every SetCodePage has to be wrapped in ifdefs
+{$endif}
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
@@ -1977,7 +1989,18 @@ begin
   end;
 end;
 
+
+
+{$ifndef HAS_CPSTRING}
+procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean);
+begin
+
+end;
+{$endif}
+
+
 {$IFDEF fpc}
+
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 var
   destptr: PInteger;
@@ -2041,7 +2064,7 @@ begin
       if len <> length(dest) then SetLength(dest, len);
      end
   end;
-  {$ifdef FPC_HAS_CPSTRING}SetCodePage(dest, cp, false);{$endif}
+  SetCodePage(dest, cp, false);
 end;
 
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);
@@ -2144,12 +2167,13 @@ begin
   end;
 end;
 
+
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage): RawByteString;
 begin
   setlength(result, strGetUnicodeCharacterUTFLength(character));
   strGetUnicodeCharacterUTF(character, @result[1]);
   case encoding of
-    CP_NONE, CP_UTF8: ;
+    CP_NONE, CP_UTF8: SetCodePage(result, CP_UTF8, false);
     else result:=strConvertFromUtf8(result, encoding);
   end;
 end;
@@ -3050,15 +3074,34 @@ begin
   result.pos := 1;
 end;
 
-procedure TStrBuilder.init(abuffer:pstring; basecapacity: integer);
+procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
+var temp: RawByteString;
+begin
+  temp := s;
+  SetCodePage(temp, encoding);
+  append(pchar(temp), length(temp));
+end;
+
+procedure TStrBuilder.appendCodePointWithEncodingConversion(const codepoint: integer);
+var
+  temp: RawByteString;
+begin
+  temp := strGetUnicodeCharacter(codepoint, CP_UTF8);
+  appendWithEncodingConversion(temp);
+end;
+
+procedure TStrBuilder.init(abuffer:pstring; basecapacity: SizeInt);
 begin
   buffer := abuffer;
+  if basecapacity <= 0 then basecapacity := 1;
   SetLength(buffer^, basecapacity); //need to create a new string to prevent aliasing
   //if length(buffer^) < basecapacity then
   //else UniqueString(buffer^);    //or could uniquestring be enough?
 
   next := pchar(buffer^);
   bufferend := next + length(buffer^);
+
+  encoding := strActualEncoding(buffer^);
 end;
 
 procedure TStrBuilder.clear;
@@ -3113,10 +3156,24 @@ procedure TStrBuilder.appendCodePoint(const codepoint: integer);
 var
   l: sizeint;
 begin
-  l := strGetUnicodeCharacterUTFLength(codepoint);
-  if next + l > bufferend then reserveadd(l);
-  strGetUnicodeCharacterUTF(codepoint, next);
-  inc(next, l);
+  case encoding of
+    CP_NONE, CP_UTF8: begin
+      l := strGetUnicodeCharacterUTFLength(codepoint);
+      if next + l > bufferend then reserveadd(l);
+      strGetUnicodeCharacterUTF(codepoint, next);
+      inc(next, l);
+      exit;
+    end;
+    CP_ASCII, CP_LATIN1: begin
+      if codepoint <= 127 then begin
+        if next + 1 > bufferend then reserveadd(1);
+        next^ := chr(codepoint);
+        inc(next);
+        exit;
+      end;
+    end;
+  end;
+  appendCodePointWithEncodingConversion(codepoint);
 end;
 
 procedure TStrBuilder.append(const p: pchar; const l: integer); inline;
