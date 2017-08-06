@@ -1773,7 +1773,7 @@ begin
     ok := tryValueToInteger(v^, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
     if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.toXQuery());
-    temp.add(codepoint);
+    temp.append(codepoint);
   end;
   temp.final;
   result := xqvalue(res);
@@ -2330,24 +2330,24 @@ begin
     for i := i to length(d) do
       case state of
         gdfsFirstDigits: if not (d[i] in ['0'..'9']) then begin
-          if i = start then begin inc(start); add('"'); add(d[i]); add('"'); continue; end;
-          if i - start > 3 then begin direction := gdfsYMD; add('yyyy'); end
-          else begin direction := gdfsDMY; add('d'); end;
+          if i = start then begin inc(start); append('"'); append(d[i]); append('"'); continue; end;
+          if i - start > 3 then begin direction := gdfsYMD; append('yyyy'); end
+          else begin direction := gdfsDMY; append('d'); end;
           state := gdfsFirstSeparator;
-          add(d[i]);
+          append(d[i]);
         end;
         gdfsFirstSeparator: case d[i] of
-          '0'..'9': begin add('m'); state := gdfsMiddleDigits; end;
-          'A'..'Z','a'..'z': begin add('mmm+'); state := gdfsMiddleLetters; end;
-          else add(d[i]);
+          '0'..'9': begin append('m'); state := gdfsMiddleDigits; end;
+          'A'..'Z','a'..'z': begin append('mmm+'); state := gdfsMiddleLetters; end;
+          else append(d[i]);
         end;
-        gdfsMiddleDigits: if not (d[i] in ['0'..'9']) then begin state := gdfsSecondSeparator; add(d[i]); end;
-        gdfsMiddleLetters: if d[i] in [#0..'@','['..'`', '{'..'~'] then begin state := gdfsSecondSeparator; add(d[i]); end;
+        gdfsMiddleDigits: if not (d[i] in ['0'..'9']) then begin state := gdfsSecondSeparator; append(d[i]); end;
+        gdfsMiddleLetters: if d[i] in [#0..'@','['..'`', '{'..'~'] then begin state := gdfsSecondSeparator; append(d[i]); end;
         gdfsSecondSeparator: if d[i] in ['0'..'9'] then begin
-          if direction = gdfsYMD then add('d')
-          else add('y+');
+          if direction = gdfsYMD then append('d')
+          else append('y+');
           break;
-        end else add(d[i]);
+        end else append(d[i]);
       end;
   builder.final;
 end;

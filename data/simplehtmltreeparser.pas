@@ -2809,24 +2809,24 @@ begin
   i := 1;
   while i <= length(s) do begin
     case s[i] of
-      '<': builder.add('&lt;');
-      '>': builder.add('&gt;');
-      '&': builder.add('&amp;');
-      '''': builder.add('&apos;');
-      '"': builder.add('&quot;');
-      #13: builder.add('&#xD;');
-      #10: if attrib then builder.add('&#xA;') else builder.add(#10);
-      #9: if attrib then builder.add('&#x9;') else builder.add(#9);
-      #0..#8,#11,#12,#14..#$1F,#$7F: builder.addhexentity(ord(s[i]));
-      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then builder.add(#$C2) else begin
+      '<': builder.append('&lt;');
+      '>': builder.append('&gt;');
+      '&': builder.append('&amp;');
+      '''': builder.append('&apos;');
+      '"': builder.append('&quot;');
+      #13: builder.append('&#xD;');
+      #10: if attrib then builder.append('&#xA;') else builder.append(#10);
+      #9: if attrib then builder.append('&#x9;') else builder.append(#9);
+      #0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i]));
+      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then builder.append(#$C2) else begin
         i+=1;
-        builder.addhexentity(ord(s[i]));
+        builder.appendhexentity(ord(s[i]));
       end;
-      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then builder.add(#$E2) else begin
-        builder.add('&#x2028;');
+      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then builder.append(#$E2) else begin
+        builder.append('&#x2028;');
         i+=2;
       end;
-      else builder.add(s[i]);
+      else builder.append(s[i]);
     end;
     i+=1;
   end;
@@ -2849,25 +2849,25 @@ begin
   if attrib then begin
     while i <= length(s) do begin
       case s[i] of
-        '&': builder.add('&amp;');
-        '"': builder.add('&quot;');
-        #$A0: if encoding = CP_WINDOWS1252 then builder.add('&nbsp;') else builder.add(s[i]);
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.add('&nbsp;'); i+=1; end else builder.add(s[i]);
-        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.addhexentity(ord(s[i])); not needed?
-        else builder.add(s[i]);
+        '&': builder.append('&amp;');
+        '"': builder.append('&quot;');
+        #$A0: if encoding = CP_WINDOWS1252 then builder.append('&nbsp;') else builder.append(s[i]);
+        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.append('&nbsp;'); i+=1; end else builder.append(s[i]);
+        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i])); not needed?
+        else builder.append(s[i]);
       end;
       i+=1;
     end
   end else begin
     while i <= length(s) do begin
       case s[i] of
-        '&': builder.add('&amp;');
-        '<': builder.add('&lt;');
-        '>': builder.add('&gt;');
-        #$A0: if encoding = CP_WINDOWS1252 then builder.add('&nbsp;') else builder.add(s[i]);
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.add('&nbsp;'); i+=1; end  else builder.add(s[i]);
-        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.addhexentity(ord(s[i]));
-        else builder.add(s[i]);
+        '&': builder.append('&amp;');
+        '<': builder.append('&lt;');
+        '>': builder.append('&gt;');
+        #$A0: if encoding = CP_WINDOWS1252 then builder.append('&nbsp;') else builder.append(s[i]);
+        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.append('&nbsp;'); i+=1; end  else builder.append(s[i]);
+        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i]));
+        else builder.append(s[i]);
       end;
       i+=1;
     end;

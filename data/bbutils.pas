@@ -474,13 +474,13 @@ type TStrBuilder = record
   procedure final;
   function count: integer; inline;
   procedure reserveadd(delta: integer);
-  procedure add(c: char); inline;
-  procedure add(const s: string); inline;
-  procedure add(const codepoint: integer); inline;
-  procedure add(const p: pchar; const l: integer); inline;
-  procedure addbuffer(const block; l: integer); inline;
-  procedure addhexentity(codepoint: integer);
-  procedure addhexnumber(codepoint: integer);
+  procedure append(c: char); inline;
+  procedure append(const s: string); inline;
+  procedure append(const codepoint: integer); inline;
+  procedure append(const p: pchar; const l: integer); inline;
+  procedure appendBuffer(const block; l: integer); inline;
+  procedure appendHexEntity(codepoint: integer);
+  procedure appendHexNumber(codepoint: integer);
 end;
 {$endif}
 
@@ -3087,14 +3087,14 @@ begin
   end;
 end;
 
-procedure TStrBuilder.add(c: char);
+procedure TStrBuilder.append(c: char);
 begin
   if next >= bufferend then reserveadd(1);
   next^ := c;
   inc(next);
 end;
 
-procedure TStrBuilder.add(const s: string);
+procedure TStrBuilder.append(const s: string);
 var
   l: sizeint;
 begin
@@ -3105,7 +3105,7 @@ begin
   inc(next, l);
 end;
 
-procedure TStrBuilder.add(const codepoint: integer);
+procedure TStrBuilder.append(const codepoint: integer);
 var
   l: sizeint;
 begin
@@ -3115,7 +3115,7 @@ begin
   inc(next, l);
 end;
 
-procedure TStrBuilder.add(const p: pchar; const l: integer); inline;
+procedure TStrBuilder.append(const p: pchar; const l: integer); inline;
 begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);
@@ -3123,7 +3123,7 @@ begin
   inc(next, l);
 end;
 
-procedure TStrBuilder.addbuffer(const block; l: integer);
+procedure TStrBuilder.appendbuffer(const block; l: integer);
 begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);
@@ -3132,23 +3132,23 @@ begin
 end;
 
 
-procedure TStrBuilder.addhexentity(codepoint: integer);
+procedure TStrBuilder.appendHexEntity(codepoint: integer);
 begin
-  add('&#x');
+  append('&#x');
   if codepoint <= $FF then begin
-    if codepoint > $F then add(charEncodeHexDigitUp( codepoint shr 4 ));
-    add(charEncodeHexDigitUp(  codepoint and $F ))
-  end else addhexnumber(codepoint);
-  add(';');
+    if codepoint > $F then append(charEncodeHexDigitUp( codepoint shr 4 ));
+    append(charEncodeHexDigitUp(  codepoint and $F ))
+  end else appendHexNumber(codepoint);
+  append(';');
 end;
 
-procedure TStrBuilder.addhexnumber(codepoint: integer);
+procedure TStrBuilder.appendHexNumber(codepoint: integer);
 var
   digits: Integer;
 begin
   digits := 1;
   while codepoint shr (4 * digits) > 0 do inc(digits);
-  add(IntToHex(codepoint, digits));
+  append(IntToHex(codepoint, digits));
 end;
 
 {$endif}

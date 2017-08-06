@@ -756,7 +756,7 @@ begin
     FOnTransferStart(self, method, url, data);
 
   builder.init(@result);
-  request(method, url, TInternetAccessDataBlock.create(data), TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.addbuffer, @builder)));
+  request(method, url, TInternetAccessDataBlock.create(data), TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.appendBuffer, @builder)));
   builder.final;
 
   if internetConfig^.logToPath<>'' then
@@ -1050,10 +1050,10 @@ begin
        and (pathMatches(target.path, cookies[i].path))
        and (not (cfSecure in cookies[i].flags) or ( striEqual(target.protocol, 'https') ) )
        then begin
-      if builder.count <> 0 then builder.add('; ');
-      builder.add(cookies[i].name);
-      builder.add('=');
-      builder.add(cookies[i].value);
+      if builder.count <> 0 then builder.append('; ');
+      builder.append(cookies[i].name);
+      builder.append('=');
+      builder.append(cookies[i].value);
     end;
   builder.final;
 end;
@@ -1066,17 +1066,17 @@ begin
   with builder do begin
     init(@result);
     for i := 0 to high(cookies) do with cookies[i] do begin
-      add('Set-Cookie: ');
-      add(name);
-      add('=');
-      add(value);
-      add('; Domain=');
-      add(domain);
-      add('; Path=');
-      add( TInternetAccess.urlEncodeData(path, ueURLPath));
-      if cfHostOnly in flags then add('; HostOnly');
-      if cfSecure in flags then add('; Secure');
-      add(#13#10);
+      append('Set-Cookie: ');
+      append(name);
+      append('=');
+      append(value);
+      append('; Domain=');
+      append(domain);
+      append('; Path=');
+      append( TInternetAccess.urlEncodeData(path, ueURLPath));
+      if cfHostOnly in flags then append('; HostOnly');
+      if cfSecure in flags then append('; Secure');
+      append(#13#10);
     end;
     final;
   end;
