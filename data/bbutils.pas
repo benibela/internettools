@@ -4392,7 +4392,7 @@ type TCompareFunctionWrapperData = record
   realFunction: TPointerCompareFunction;
   data: TObject;
 end;
-    PCompareFunctionWrapperData=^TCompareFunctionWrapperData;
+    //PCompareFunctionWrapperData=^TCompareFunctionWrapperData;
     PPointer=^Pointer;
 
 function compareFunctionWrapper(c:TObject; a,b:pointer):longint;
@@ -4478,6 +4478,7 @@ end;
 
 function compareString(c:TObject; a, b:pointer):longint;
 begin
+  ignore(c);
   result := striCompareClever(PString(a)^, PString(b)^);
 end;
 

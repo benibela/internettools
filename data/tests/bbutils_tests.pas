@@ -20,24 +20,28 @@ type PShortInt = ^ShortInt;
 
 function shortintCompareFunction(c:TObject; a,b:pointer):longint;
 begin
+  ignore(c);
   if PShortInt(a)^<PShortInt(b)^ then result := -1
   else if PShortInt(a)^>PShortInt(b)^ then result := 1
   else result := 0;
 end;
 function intCompareFunction(c:TObject; a,b:pointer):longint;
 begin
+  ignore(c);
   if pinteger(a)^<pinteger(b)^ then result := -1
   else if pinteger(a)^>pinteger(b)^ then result := 1
   else result := 0
 end;
 function int64CompareFunction(c:TObject; a,b:pointer):longint;
 begin
+  ignore(c);
   if pint64(a)^<pint64(b)^ then result := -1
   else if pint64(a)^>pint64(b)^ then result := 1
   else result := 0
 end;
 function stringCompareReverseFunction(c:TObject; a,b:pointer):longint;
 begin
+  ignore(c);
   result := - CompareText(PString(a)^,PString(b)^);
 end;
 procedure test(a, b: extended; name: string = '');overload;
@@ -57,10 +61,9 @@ procedure testStrBuilder; forward;
 procedure intArrayUnitTests;
 var a: TLongintArray;
     len:longint;
-    i: Integer;
-    j: Integer;
 begin
   //simple
+  a := nil;
   arrayAdd(a, 17);
   test(length(a) =1); test(a[0] = 17);
   arrayAdd(a, 23);
@@ -198,6 +201,7 @@ procedure stringArrayUnitTests;
 var a: TStringArray;
     len: integer;
 begin
+  a := nil;
   arrayAdd(a, 'hallo');
   test(arrayEqual(a, ['hallo']));
   arrayAdd(a, 'world');
