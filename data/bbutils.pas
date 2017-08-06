@@ -466,21 +466,26 @@ end;
 function strIterator(const s: RawByteString): TStrIterator;
 
 //** Str builder. Preliminary. Interface might change at any time
-type TStrBuilder = record
-  buffer: pstring;
+type TStrBuilder = object
+private
   next, bufferend: pchar; //next empty pchar and first pos after the string
-  procedure init(abuffer:pstring; basecapacity: integer = 64);
+  encoding: TSystemCodePage;
+  procedure appendWithEncodingConversion(const s: RawByteString);
+  procedure appendCodePointWithEncodingConversion(const codepoint: integer);
+  procedure appendHexNumber(codepoint: integer);
+public
+  buffer: pstring;
+  procedure init(abuffer:pstring; basecapacity: SizeInt = 64);
   procedure clear;
   procedure final;
   function count: integer; inline;
   procedure reserveadd(delta: integer);
   procedure append(c: char); inline;
-  procedure append(const s: string); inline;
-  procedure append(const codepoint: integer); inline;
+  procedure append(const s: RawByteString); inline;
+  procedure appendCodePoint(const codepoint: integer);
   procedure append(const p: pchar; const l: integer); inline;
   procedure appendBuffer(const block; l: integer); inline;
   procedure appendHexEntity(codepoint: integer);
-  procedure appendHexNumber(codepoint: integer);
 end;
 {$endif}
 
@@ -3094,18 +3099,17 @@ begin
   inc(next);
 end;
 
-procedure TStrBuilder.append(const s: string);
+procedure TStrBuilder.append(const s: RawByteString);
 var
   l: sizeint;
 begin
-  l := length(s);
-  if l = 0 then exit;
-  if next + l > bufferend then reserveadd(l);
-  move(pchar(pointer(s))^, next^, l);
-  inc(next, l);
+  if strActualEncoding(s) = encoding then begin
+    l := length(s);
+    append(pchar(pointer(s)), l);
+  end else appendWithEncodingConversion(s);
 end;
 
-procedure TStrBuilder.append(const codepoint: integer);
+procedure TStrBuilder.appendCodePoint(const codepoint: integer);
 var
   l: sizeint;
 begin
@@ -3123,7 +3127,7 @@ begin
   inc(next, l);
 end;
 
-procedure TStrBuilder.appendbuffer(const block; l: integer);
+procedure TStrBuilder.appendBuffer(const block; l: integer);
 begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);

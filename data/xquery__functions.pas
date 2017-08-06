@@ -1773,7 +1773,7 @@ begin
     ok := tryValueToInteger(v^, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
     if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.toXQuery());
-    temp.append(codepoint);
+    temp.appendCodePoint(codepoint);
   end;
   temp.final;
   result := xqvalue(res);

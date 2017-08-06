@@ -756,7 +756,7 @@ begin
     FOnTransferStart(self, method, url, data);
 
   builder.init(@result);
-  request(method, url, TInternetAccessDataBlock.create(data), TTransferClearEvent(makeMethod(@builder.clear, @builder)), TTransferBlockWriteEvent(makeMethod(@builder.appendBuffer, @builder)));
+  request(method, url, TInternetAccessDataBlock.create(data), TTransferClearEvent(@builder.clear), TTransferBlockWriteEvent(@builder.appendBuffer));
   builder.final;
 
   if internetConfig^.logToPath<>'' then
