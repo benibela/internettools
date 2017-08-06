@@ -490,13 +490,13 @@ public
   procedure init(abuffer:pstring; basecapacity: SizeInt = 64);
   procedure clear;
   procedure final;
-  function count: integer; inline;
-  procedure reserveadd(delta: integer);
+  function count: SizeInt; inline;
+  procedure reserveadd(delta: SizeInt);
   procedure append(c: char); inline;
   procedure append(const s: RawByteString); inline;
   procedure appendCodePoint(const codepoint: integer);
-  procedure append(const p: pchar; const l: integer); inline;
-  procedure appendBuffer(const block; l: integer); inline;
+  procedure append(const p: pchar; const l: SizeInt); inline;
+  procedure appendBuffer(const block; l: LongInt); inline;
   procedure appendHexEntity(codepoint: integer);
 end;
 {$endif}
@@ -3118,14 +3118,14 @@ begin
   end;
 end;
 
-function TStrBuilder.count: integer;
+function TStrBuilder.count: SizeInt;
 begin
   result := next - pointer(buffer^);
 end;
 
-procedure TStrBuilder.reserveadd(delta: integer);
+procedure TStrBuilder.reserveadd(delta: SizeInt);
 var
-  oldlen: Integer;
+  oldlen: SizeInt;
 begin
   if next + delta > bufferend then begin
     oldlen := count;
@@ -3176,7 +3176,7 @@ begin
   appendCodePointWithEncodingConversion(codepoint);
 end;
 
-procedure TStrBuilder.append(const p: pchar; const l: integer); inline;
+procedure TStrBuilder.append(const p: pchar; const l: SizeInt); inline;
 begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);
@@ -3184,7 +3184,7 @@ begin
   inc(next, l);
 end;
 
-procedure TStrBuilder.appendBuffer(const block; l: integer);
+procedure TStrBuilder.appendBuffer(const block; l: LongInt);
 begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);
