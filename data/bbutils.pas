@@ -4569,7 +4569,7 @@ function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; s
     if strict then raise Exception.Create('Entity parse error before ' + p);
   end;
 
-const compatibilityFallbackMap: array[$80..$9F] of word = (
+const compatibilityFallbackMap: array[$80..$9F] of word = ( //from html5 standard. perhaps it is a windows-1252 -> unicode map?
   $20AC,
   $81, //2 digit code points remain unchanged
   $201A, $0192, $201E, $2026, $2020, $2021, $02C6, $2030, $0160, $2039, $0152,
@@ -4585,6 +4585,7 @@ var j:integer;
     entity,entityStart, entityEnd, entityMid, entityBase: longint;
     ok: boolean;
     builder: TStrBuilder;
+    entityCode: pchar;
 begin
   encoding := strActualEncoding(encoding);
   builder.init(@result, l, encoding);
@@ -4683,7 +4684,32 @@ begin
     end;
   end;
   builder.final;
+
+
+  {
+  if p^ = entityCode^ then begin
+    if entityCode^ = ';' then begin
+      acceptPos := entityCode + 2;
+      break;
+    end;
+    inc(p);
+    inc(entityCode, 2);
+  end else begin
+    if entityCode^ = ';' then begin
+      if (ord((entityCode + 2)^) and ENTITY_CODE_ACCEPT) = 0 then
+        break;
+      if (ord((entityCode + 2)^) and ENTITY_CODE_ACCEPT_WITHOUT_SEMICOLON) <> 0 then
+        acceptPos := entityCode + 2;
+    end;
+    inc(entityCode);
+    inc(entityCode, ord(entityCode^));
+  end;
+  }
+
+
 end;
+
+
 
 
 end.

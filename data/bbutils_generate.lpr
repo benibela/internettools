@@ -17,13 +17,91 @@ uses
   {Attention: Bootstraping! This program generates bbutils, but need bbutils to be compiled.
                             If you don't have bbutils, you can use bbutils_template instead
   }
-  ,  bbutils
+  ,  bbutils, math
 //  , bbutils_template
   { you can add units after this };
 
 {$R *.res}
 
 const LineEnding = #13#10;
+
+type TByteCodedTrie = object
+private
+   stack: array[1..128] of record
+     c: char;
+     pos: integer;
+   end;
+   stackDepth: integer;
+   //class procedure tests;
+public
+  nodeStopSequence: string;
+  builder: TStrBuilder;
+  procedure init;
+  procedure addMapping(const key, value: string);
+end;
+
+{$if false}
+class procedure TByteCodedTrie.tests;
+var test: TByteCodedTrie;
+    s: string;
+begin
+  test.init;
+  test.nodeStopSequence := ':X';
+  test.builder.init(@s);
+  test.addMapping('ABC;', '12');
+  test.addMapping('ABCDEF;', 'x2');
+  test.addMapping('ABCDEG;', 'x3');
+  test.addMapping('FOO;', 'new');
+  test.addMapping('','');
+  test.builder.final;
+  writeln(s);
+end;
+{$endif}
+
+procedure TByteCodedTrie.init;
+begin
+  stackDepth := 0;
+end;
+
+procedure TByteCodedTrie.addMapping(const key, value: string);
+  procedure stackPop;
+  var delta: SizeInt;
+  begin
+    delta := builder.count - stack[stackDepth].pos + 1;
+    if delta > ord(high(char)) then
+      abort;
+    builder.buffer^[stack[stackDepth].pos] := chr(delta);
+    dec(stackDepth);
+  end;
+
+const TEMPCHAR = '?';
+var
+  i, longestPrefix: Integer;
+begin
+  longestPrefix := 0;
+  for i := 1 to min(stackDepth, length(key)) do
+    if stack[i].c = key[i] then longestPrefix := i
+    else break;
+  inc(longestPrefix);
+  if (stackDepth > longestPrefix) then begin
+    while (stackDepth > longestPrefix) do stackPop;
+    builder.append(nodeStopSequence);
+  end;
+  if (stackDepth > length(key)) or (( stackDepth > 0) and (stack[stackDepth].c <> key[stackDepth])) then begin
+    stackPop;
+  end;
+  if key = '' then exit;
+  while stackDepth < length(key) do begin
+    inc(stackDepth);
+    stack[stackDepth].c := key[stackDepth];
+    builder.append(key[stackDepth]);
+    builder.append(TEMPCHAR);
+    stack[stackDepth].pos := builder.count;
+  end;
+  builder.append(value);
+
+end;
+
 //This generate the strDecodeHTMLEntities function of bbutils.pas
 
 type TEntity=record s:string; c:longint; end;
@@ -2187,6 +2265,7 @@ const entities: array[1..2138] of TEntity=(
 function createEntityDecoder: string;
 
 var totalresult: string;
+  i: Integer;
 
 //Template for the strDecodeHTMLEntities function
 
@@ -2256,9 +2335,52 @@ begin
   totalresult+=s+LineEnding;
 end;
 
+var trie: TByteCodedTrie;
+    codebuffer: string;
+    tempEncodedEntityValue: string;
+
+//var entities2: array of TEntity2;
+
+var codeStarts: array[char, char] of integer;
+  c2, c3: Char;
+
+
+const ENTITY_CODE_ACCEPT: byte = 128;
+
 begin
+
   writeln_SDHE_Map();
   writeln_SDHE_Indices();
+
+  trie.nodeStopSequence := ';'#0#0;
+  trie.builder.init(@codebuffer);
+
+  FillChar(codeStarts,sizeof(codeStarts),-1);
+  c2 := #0; c3 := #0;
+  for i := low(entities) to high(entities) do begin
+    if length(entities[i].s) < 3 then Abort;
+    if (entities[i].s[1] <> '&') or not (entities[i].s[2] in ['0'..'9','a'..'z','A'..'Z']) or not (entities[i].s[3] in ['0'..'9','a'..'z','A'..'Z']) then abort;
+
+    if not strEndsWith(entities[i].s, ';') then continue;
+
+    if (entities[i].s[2] <> c2) or (entities[i].s[3] <> c3) then begin
+      trie.init;
+      c2 := entities[i].s[2];
+      c3 := entities[i].s[3];
+      if codeStarts[c2,c3] <> -1 then Abort;
+      codeStarts[c2,c3] := trie.builder.count;
+    end;
+
+    tempEncodedEntityValue := strGetUnicodeCharacter(entities[i].c);
+    if length(tempEncodedEntityValue) > 32 then abort;
+    tempEncodedEntityValue := chr(ENTITY_CODE_ACCEPT or length(tempEncodedEntityValue)) + tempEncodedEntityValue;
+
+    trie.addMapping(entities[i].s, tempEncodedEntityValue);
+  end;
+
+  trie.builder.final;
+
+  writeln(codebuffer);
 
   Result:=totalresult;
 end;
@@ -2274,6 +2396,8 @@ var
   i: Integer;
   s: String;
 begin
+  DefaultSystemCodePage:=CP_UTF8;
+  //TByteCodedTrie.test;
 
 
   for i:=low(entities)+1 to high(entities) do begin
