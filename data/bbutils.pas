@@ -486,6 +486,7 @@ private
   procedure appendWithEncodingConversion(const s: RawByteString);
   procedure appendCodePointWithEncodingConversion(const codepoint: integer);
   procedure appendHexNumber(codepoint: integer);
+  procedure appendRaw(const s: RawByteString); inline;
 public
   buffer: pstring;
   procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
@@ -3146,13 +3147,16 @@ begin
 end;
 
 procedure TStrBuilder.append(const s: RawByteString);
-var
-  l: sizeint;
 begin
   if strActualEncoding(s) = encoding then begin
-    l := length(s);
-    append(pchar(pointer(s)), l);
-  end else appendWithEncodingConversion(s);
+    appendRaw(s);
+  end else
+    appendWithEncodingConversion(s);
+end;
+
+procedure TStrBuilder.appendRaw(const s: RawByteString);
+begin
+  append(pchar(pointer(s)), length(s));
 end;
 
 procedure TStrBuilder.appendCodePoint(const codepoint: integer);
