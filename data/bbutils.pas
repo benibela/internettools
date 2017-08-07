@@ -4565,6 +4565,17 @@ function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; s
     if strict then raise Exception.Create('Entity parse error before ' + p);
   end;
 
+const compatibilityFallbackMap: array[$80..$9F] of word = (
+  $20AC,
+  $81, //2 digit code points remain unchanged
+  $201A, $0192, $201E, $2026, $2020, $2021, $02C6, $2030, $0160, $2039, $0152,
+  $8D,
+  $017D,
+  $8F, $90,
+  $2018, $2019, $201C, $201D, $2022, $2013, $2014, $02DC, $2122, $0161, $203A, $0153,
+  $9D,
+  $017E, $0178);
+
 var j:integer;
     lastChar, marker: pchar;
     entity,entityStart, entityEnd, entityMid, entityBase: longint;
@@ -4613,11 +4624,15 @@ begin
                 ';': inc(p);
                 else parseError;
               end;
-              if ((entity >= $D800) and (entity <= $DFFF)) or (entity > $10FFFF) then begin
+              if (entity <= 0) or ((entity >= $D800) and (entity <= $DFFF)) or (entity > $10FFFF) then begin
                 entity := $FFFD;
                 parseError;
               end else case entity of
-                $0001..$0008, $000B, $000D..$001F, $007F..$009F, $FDD0..$FDEF: parseError;
+                $0001..$0008, $000B, $000D..$001F, $007F, $FDD0..$FDEF: parseError;
+                low(compatibilityFallbackMap)..high(compatibilityFallbackMap): begin
+                  entity := compatibilityFallbackMap[entity];
+                  parseError;
+                end;
                 else if (entity and $FFFE) = $FFFE then parseError;
               end;
               appendCodePoint(entity);
