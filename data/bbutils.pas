@@ -412,10 +412,11 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 //** The function signature is preliminary and likely to change.
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
+
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(p:pansichar;l:longint;encoding:TSystemCodePage; strict: boolean = false):string; overload;
+function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; strict: boolean = false):string; overload;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
@@ -4557,6 +4558,114 @@ end;
 
 
 {$I bbutils.inc}
+
+function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; strict: boolean = false):string;
+  procedure parseError;
+  begin
+    if strict then raise Exception.Create('Entity parse error before ' + p);
+  end;
+
+var j:integer;
+    lastChar, marker: pchar;
+    entity,entityStart, entityEnd, entityMid, entityBase: longint;
+    ok: boolean;
+    builder: TStrBuilder;
+begin
+  encoding := strActualEncoding(encoding);
+  builder.init(@result, l, encoding);
+  lastChar:=@p[l-1];
+  with builder do begin
+    while (p<=lastChar) do begin
+      //see https://www.w3.org/TR/html5/syntax.html#tokenizing-character-references
+      case p^ of
+        //#0: break;
+        '&': begin
+          inc(p);
+          marker := p;
+          case p^ of
+            #9, #$A, #$C, ' ', '<', '&', #0: append('&');
+
+            '#': begin
+              inc(p);
+              if p^ in ['x', 'X'] then begin inc(p); entityBase := 16; end else entityBase:=10;
+              entity := 0;
+              while p <= lastChar do begin
+                case p^ of
+                  '0'..'9': entity := entity * entityBase + ord(p^) - ord('0');
+                  else begin
+                    if entityBase <> 16 then break;
+                    case p^ of
+                      'A'..'F': entity := entity * entityBase + ord(p^) - ord('A') + 10;
+                      'a'..'f': entity := entity * entityBase + ord(p^) - ord('a') + 10;
+                      else break;
+                    end;
+                  end
+                end;
+                inc(p);
+              end;
+              if (entity = 0) and ( ((marker + 1) = p) or ((entityBase = 16) and ((marker + 2) = p)) ) then begin
+                //no characters match the range
+                append('&');
+                p := marker;
+                continue;
+              end;
+              case p^ of
+                ';': inc(p);
+                else parseError;
+              end;
+              if ((entity >= $D800) and (entity <= $DFFF)) or (entity > $10FFFF) then begin
+                entity := $FFFD;
+                parseError;
+              end else case entity of
+                $0001..$0008, $000B, $000D..$001F, $007F..$009F, $FDD0..$FDEF: parseError;
+                else if (entity and $FFFE) = $FFFE then parseError;
+              end;
+              appendCodePoint(entity);
+            end;
+
+            else begin
+              if p^ in ['A'..'Z'] then begin entityStart := entityIndices[false][(ord(p^) - ord('A'))][0]; entityEnd := entityIndices[false][(ord(p^) - ord('A'))][1]; end
+              else if p^ in ['a'..'z'] then begin entityStart := entityIndices[true][(ord(p^) - ord('a'))][0]; entityEnd := entityIndices[true][(ord(p^) - ord('a'))][1]; end
+              else begin entityStart:=0; entityEnd := -1; end;
+              ok := false;
+              entity := -1;
+              while entityEnd > entityStart + 8 do begin
+                entityMid := (entityStart + entityEnd) div 2;
+                ok := true;
+                for j := 1 to length(entityMap[entityMid][0]) do
+                  if p[j] > entityMap[entityMid][0][j] then begin entityStart := entityMid + 1; ok := false; break; end
+                  else if p[j] < entityMap[entityMid][0][j] then begin entityEnd := entityMid - 1; ok := false; break; end;
+                if ok then begin entity := entityMid; break; end;
+                ok := false;
+              end;
+              if not ok then
+                for j:=entityStart to entityEnd do
+                  if strbeginswith(p+1, entityMap[j][0]) then begin entity:=j; break;end;
+              if (entity <> -1) then begin
+                if (entity > low(entityMap)) and (strBeginsWith(p+1, entityMap[entity-1][0])) then dec(entity); //some entities exist twice, with/out ;
+                inc(p, 1+length(entityMap[entity][0]));
+                case encoding of
+                   CP_UTF8, CP_NONE: append(pchar(entityMap[entity][1]), length(entityMap[entity][1]));
+                   else append(UTF8String(entityMap[entity][1]));
+                end;
+              end else begin
+                append('&');
+                p := marker;
+                parseError;
+              end;
+            end;
+          end;
+        end;
+        else begin
+          append(p^);
+          inc(p);
+        end;
+      end;
+    end;
+  end;
+  builder.final;
+end;
+
 
 end.
 

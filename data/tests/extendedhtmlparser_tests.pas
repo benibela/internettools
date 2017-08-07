@@ -15,6 +15,7 @@ uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser;
 
 type TXQueryEngineBreaker = class(TXQueryEngine)
 end;
+  Latin1String = {$ifdef FPC_HAS_CPSTRING}type ansistring(CP_LATIN1){$else}ansistring{$endif};
 
 procedure unitTests(testerrors: boolean);
 //test all possible (4*2) white space config options
@@ -917,7 +918,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   //no coding change latin1 -> latin1
   extParser.outputEncoding:=eWindows1252;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>ll(bin:'#$C4',ent:&Ouml;)ll</a></html>');
-  if extParser.variableChangeLog.ValuesString['test']<>'ll(bin:'#$C4',ent:'#$D6')ll' then
+  if extParser.variableChangeLog.ValuesString['test']<> Latin1String('ll(bin:'#$C4',ent:'#$D6')ll') then
     raise Exception.create('ergebnis ungültig latin1->latin1');
   //coding change latin1 -> utf-8
   extParser.outputEncoding:=eUTF8;
@@ -927,7 +928,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   //coding change utf8 -> latin1
   extParser.outputEncoding:=eWindows1252;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>ul(bin:'#$C3#$84',ent:&Ouml;)ul</a></html>');
-  if extParser.variableChangeLog.ValuesString['test']<>'ul(bin:'#$C4',ent:'#$D6')ul' then
+  if extParser.variableChangeLog.ValuesString['test']<>Latin1String('ul(bin:'#$C4',ent:'#$D6')ul') then
     raise Exception.create('ergebnis ungültig utf8->latin1');
 
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');

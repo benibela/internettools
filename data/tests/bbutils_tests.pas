@@ -55,7 +55,7 @@ end;
 
 procedure testStrResolveURI; forward;
 procedure testStrBuilder; forward;
-
+procedure testStrEntities; forward;
 
 {$IFDEF FPC}
 procedure intArrayUnitTests;
@@ -769,6 +769,8 @@ begin
 
   //basic string tests
   stringUnitTests();
+  testStrBuilder();
+  testStrEntities;
 
   if not strliequal(pansichar(''), '', 0) then raise Exception.Create('strliequal failed');
   if not strliequal(pansichar('abcd'), 'abc', 3) then raise Exception.Create('strliequal failed');
@@ -958,25 +960,7 @@ begin
 
 
    //html str decode
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*',CP_UTF8,true) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*?*' then
-    raise Exception.Create('HTML Umlaut -> UTF-8-Konvertierung fehlgeschlagen'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*?*',CP_UTF8,true));
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;',CP_WINDOWS1252,true) <> #$C4#$D6#$DC#$e4#$f6#$fc'?' then
-    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;?',CP_WINDOWS1252,true));
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',CP_WINDOWS1252, false) <> #$C4#$D6#$DC#$e4#$f6#$fc'&xyz;'#$C4 then
-    raise Exception.Create('HTML Umlaut -> Window-1252-Konvertierung fehlgeschlagen: '+strConvertToUtf8(strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#xC4',CP_WINDOWS1252, false),CP_WINDOWS1252));
-  if strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4',CP_UTF8,false) <> #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84 then
-    raise Exception.Create('HTML Umlaut -> UTF8-Konvertierung fehlgeschlagen : "'+strDecodeHTMLEntities('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78',CP_UTF8,false)+'"');
-  if strDecodeHTMLEntities('&#xA;:&#xD;',CP_UTF8,false) <> #10':'#13 then
-    raise Exception.Create('HTML Lineending -> UTF8-Konvertierung fehlgeschlagen');
-  test(strDecodeHTMLEntities('"&nbsp;"',CP_UTF8,false), '"'#$C2#$A0'"');
-  test(strDecodeHTMLEntities('"&nbsp;"',CP_WINDOWS1252,false), '"'#$A0'"');
-  test(strDecodeHTMLEntities('&nbsp;',CP_UTF8,false), #$C2#$A0);
-  test(strDecodeHTMLEntities('&nbsp;',CP_WINDOWS1252,false), #$A0);
-  test(strDecodeHTMLEntities('"&nbsp"',CP_UTF8,false), '"'#$C2#$A0'"');
-  test(strDecodeHTMLEntities('"&nbsp"',CP_WINDOWS1252,false), '"'#$A0'"');
-  test(strDecodeHTMLEntities('&nbsp',CP_UTF8,false), #$C2#$A0);
-  test(strDecodeHTMLEntities('&nbsp',CP_WINDOWS1252,false), #$A0);
-  test(strDecodeHTMLEntities('&123;&456',CP_UTF8,false), '&123;&456');
+   testStrEntities();
 
   test(StrToBoolDef('', false) = false);
   test(StrToBoolDef('', true) = true);
@@ -1313,7 +1297,6 @@ begin
 
   testStrResolveURI;
 
-  testStrBuilder();
 
   writeln('bbutils tested');
 end;
@@ -1639,8 +1622,7 @@ begin
   SetCodePage(RawByteString(latin1), CP_LATIN1, true);
   test(length(latin1), 3);
 
-  SetCodePage(RawByteString(buffer), CP_UTF8);
-  sb.init(@buffer, 3);
+  sb.init(@buffer, 3, CP_UTF8);
   sb.appendCodePoint($24);
   sb.appendCodePoint($A2);
   sb.appendCodePoint($20AC);
@@ -1652,8 +1634,7 @@ begin
   sb.final;
   test(buffer, #$24#$C2#$A2#$E2#$82#$AC#$F0#$90#$8D#$88' aäü aäü');
 
-  SetCodePage(RawByteString(buffer), CP_LATIN1);
-  sb.init(@buffer, 3);
+  sb.init(@buffer, 3, CP_LATIN1);
   sb.appendCodePoint($24);
   sb.appendCodePoint($A2);
   sb.append(' ');
@@ -1664,6 +1645,36 @@ begin
   test(length(buffer), 10);
   test(buffer, #$24#$C2#$A2' aäü aäü');
 
+end;
+
+procedure testStrEntities;
+  procedure html(const html, expected: string);//; flags: boolean);
+  var temp, tempexpected: RawByteString;
+  begin
+    test(strDecodeHTMLEntities(html, CP_UTF8, false), expected);
+    temp := strDecodeHTMLEntities(html, CP_LATIN1, false);
+    {$ifdef FPC_HAS_CPSTRING}
+    tempexpected := expected;
+    SetCodePage(tempexpected, CP_UTF8, false);
+    SetCodePage(tempexpected, CP_LATIN1, true);
+    test(StringCodePage(temp) = CP_LATIN1);
+    {$else}
+    tempexpected := strConvertFromUtf8(expected, CP_LATIN1);
+    {$endif}
+    test(temp, tempexpected);
+    test(length(temp) = length(tempexpected));
+  end;
+
+begin
+  html('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*', #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*&xyz;*');
+  html('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4', #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84);
+  html('&&&&;&;&#&#x&#X;&#a;&#A', '&&&&;&;&#&#x&#X;&#a;&#A');
+  html('&#xA;:&#xD;', #10':'#13);
+  html('&nbsp;', #$C2#$A0);
+  html('"&nbsp;"', '"'#$C2#$A0'"');
+  html('"&nbsp"',  '"'#$C2#$A0'"');
+  html('&nbsp', #$C2#$A0);
+  html('&123;&456', '&123;&456');
 end;
 
 

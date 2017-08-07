@@ -1228,8 +1228,6 @@ begin
 end;
 
 
-function strDecodeHTMLEntities(p:pchar;l:longint;encoding:TSystemCodePage;strict: boolean):string;
-
 const entityMap: array[1..2138] of array[0..1] of string=(
 ('Elig;',#195#134),	('Elig',#195#134),	('MP;',#38),	('MP',#38),	('acute;',#195#129),
 ('acute',#195#129),	('breve;',#196#130),	('circ;',#195#130),	('circ',#195#130),	('cy;',#208#144),
@@ -1672,83 +1670,6 @@ const entityIndices: array[boolean] of array[0..25] of array [0..1] of integer =
 (1536, 1596), 	(1597, 1665), 	(1666, 1676), 	(1677, 1779), 	(1780, 1934), 
 (1935, 1992), 	(1993, 2044), 	(2045, 2076), 	(2077, 2087), 	(2088, 2111), 
 (2112, 2125), 	(2126, 2138)	));
-var j,resLen:integer;
-    lastChar: pchar;
-    entity,entityStart, entityEnd, entityMid, entityBase: longint;
-    ok: boolean;
-    entityStr: string;
-begin
-  setLength(result,l);
-  lastChar:=@p[l-1];
-  ResLen:=0;
-
-    while (p<=lastChar) do begin
-      inc(resLen);
-      if (p^='&') and (strict or ((p+1)^ in ['a'..'z','A'..'Z','#'])) then begin
-         inc(p);
-         if p^ = #0 then break;
-         if p^ = '#' then begin
-           inc(p);
-           if p^ in ['x', 'X'] then begin inc(p); entityBase := 16; end else entityBase:=10;
-           entity := 0; 
-           while (p^ in ['0'..'9']) or ((entityBase = 16) and (p^ in ['A'..'F', 'a'..'z'])) do begin 
-             entity := entity * entityBase;
-             if p^ in ['0'..'9'] then entity := entity + ord(p^) - ord('0') 
-             else if p^ in ['A'..'F'] then entity := entity + ord(p^) - ord('A') + 10
-             else if p^ in ['a'..'f'] then entity := entity + ord(p^) - ord('a') + 10
-             else raise exception.create('Invalid symbol in hex entity: '+copy(string(p), 1, 10));
-             inc(p);
-           end;
-           entityStr := strGetUnicodeCharacter(entity, encoding);
-           for j:=1 to length(entityStr) do begin
-             result[reslen] := entityStr[j];
-             inc(reslen);
-           end; dec(reslen);
-           if p^ = ';' then inc(p)
-           else if strict then begin result[reslen] := '?'; inc(reslen); end;
-         end else begin
-           entity := -1; entityStart:=0; entityEnd := -1;
-           if p^ in ['A'..'Z'] then begin entityStart := entityIndices[false][(ord(p^) - ord('A'))][0]; entityEnd := entityIndices[false][(ord(p^) - ord('A'))][1]; end
-           else if p^ in ['a'..'z'] then begin entityStart := entityIndices[true][(ord(p^) - ord('a'))][0]; entityEnd := entityIndices[true][(ord(p^) - ord('a'))][1]; end
-           else raise Exception.Create('Expected letter after &, got: '+p);
-           ok := false;
-           while entityEnd > entityStart + 8 do begin
-             entityMid := (entityStart + entityEnd) div 2;
-             ok := true;
-             for j := 1 to length(entityMap[entityMid][0]) do
-               if p[j] > entityMap[entityMid][0][j] then begin entityStart := entityMid + 1; ok := false; break; end
-               else if p[j] < entityMap[entityMid][0][j] then begin entityEnd := entityMid - 1; ok := false; break; end;
-             if ok then begin entity := entityMid; break; end;
-             ok := false;
-           end;
-           if not ok then
-             for j:=entityStart to entityEnd do 
-               if strbeginswith(p+1, entityMap[j][0]) then begin entity:=j; break;end;
-           if (entity <> -1) then begin
-             if (entity > low(entityMap)) and (strBeginsWith(p+1, entityMap[entity-1][0])) then dec(entity); //some entities exist twice, with/out ;
-             inc(p, 1+length(entityMap[entity][0]));
-             entityStr := entityMap[entity][1];
-             case encoding of
-               CP_NONE, CP_UTF8: ;
-               else  entityStr := strConvertFromUtf8(entityStr, encoding);
-             end;
-             for j:=1 to length(entityStr) do begin
-               result[reslen] := entityStr[j];
-               inc(reslen);
-             end; dec(reslen);
-           end else if strict then begin
-             result[reslen] := '?';
-             while not (p^ in [';', #0]) do
-               inc(p);
-             if p^ <> #0 then inc(p);
-           end else begin result[reslen] := '&'; end;
-         end;
-      end else begin result[reslen]:=p^; inc(p); end;
-    end;
-  if resLen<>l then setLength(result,resLen)
-end;
-
-{$DEFINE BBUTILS_INCLUDE_COMPLETE}
 
 
 
