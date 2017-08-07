@@ -487,7 +487,7 @@ private
   procedure appendHexNumber(codepoint: integer);
 public
   buffer: pstring;
-  procedure init(abuffer:pstring; basecapacity: SizeInt = 64);
+  procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
   procedure clear;
   procedure final;
   function count: SizeInt; inline;
@@ -3090,7 +3090,7 @@ begin
   appendWithEncodingConversion(temp);
 end;
 
-procedure TStrBuilder.init(abuffer:pstring; basecapacity: SizeInt);
+procedure TStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
 begin
   buffer := abuffer;
   if basecapacity <= 0 then basecapacity := 1;
@@ -3101,7 +3101,9 @@ begin
   next := pchar(buffer^);
   bufferend := next + length(buffer^);
 
-  encoding := strActualEncoding(buffer^);
+  //encoding := strActualEncoding(buffer^);
+  SetCodePage(RawByteString(buffer^), aencoding, false);
+  encoding := strActualEncoding(aencoding);
 end;
 
 procedure TStrBuilder.clear;
