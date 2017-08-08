@@ -4580,12 +4580,15 @@ const compatibilityFallbackMap: array[$80..$9F] of word = ( //from html5 standar
   $9D,
   $017E, $0178);
 
-var j:integer;
+var
     lastChar, marker: pchar;
-    entity,entityStart, entityEnd, entityMid, entityBase: longint;
-    ok: boolean;
+    entity, entityBase: longint;
+    hasNode: boolean;
     builder: TStrBuilder;
-    entityCode: pchar;
+    entityCodePtr: pchar;
+    entityCodeStartPtr: PInteger;
+    nodeLen, i: Integer;
+    acceptPos: pchar;
 begin
   encoding := strActualEncoding(encoding);
   builder.init(@result, l, encoding);
@@ -4644,35 +4647,70 @@ begin
             end;
 
             else begin
-              if p^ in ['A'..'Z'] then begin entityStart := entityIndices[false][(ord(p^) - ord('A'))][0]; entityEnd := entityIndices[false][(ord(p^) - ord('A'))][1]; end
-              else if p^ in ['a'..'z'] then begin entityStart := entityIndices[true][(ord(p^) - ord('a'))][0]; entityEnd := entityIndices[true][(ord(p^) - ord('a'))][1]; end
-              else begin entityStart:=0; entityEnd := -1; end;
-              ok := false;
+              {entityCodeStarts[ p[0], p[1] ] is the offset in entityCode for all named entities starting with p[0]p[1] }
+              case p^ of
+                 'A'..'Z': entityCodeStartPtr := @entityCodeStarts[ord(p^)-ord('A'),0];
+                 'a'..'z': entityCodeStartPtr := @entityCodeStarts[ord(p^)-ord('a') + 26,0];
+                 else begin append('&'); continue; end;
+              end;
+              inc(p);
               entity := -1;
-              while entityEnd > entityStart + 8 do begin
-                entityMid := (entityStart + entityEnd) div 2;
-                ok := true;
-                for j := 1 to length(entityMap[entityMid][0]) do
-                  if p[j] > entityMap[entityMid][0][j] then begin entityStart := entityMid + 1; ok := false; break; end
-                  else if p[j] < entityMap[entityMid][0][j] then begin entityEnd := entityMid - 1; ok := false; break; end;
-                if ok then begin entity := entityMid; break; end;
-                ok := false;
+              case p^ of
+                 'A'..'Z': entity := entityCodeStartPtr[ord(p^)-ord('A')];
+                 'a'..'z': entity := entityCodeStartPtr[ord(p^)-ord('a') + 26];
               end;
-              if not ok then
-                for j:=entityStart to entityEnd do
-                  if strbeginswith(p+1, entityMap[j][0]) then begin entity:=j; break;end;
-              if (entity <> -1) then begin
-                if (entity > low(entityMap)) and (strBeginsWith(p+1, entityMap[entity-1][0])) then dec(entity); //some entities exist twice, with/out ;
-                inc(p, 1+length(entityMap[entity][0]));
-                case encoding of
-                   CP_UTF8, CP_NONE: append(pchar(entityMap[entity][1]), length(entityMap[entity][1]));
-                   else append(UTF8String(entityMap[entity][1]));
+              if entity = -1 then begin
+                 if p^ = ';' then parseError; //todo: add parse error, when digit and semicolon after arbitrary many alphas
+                 append('&');
+                 p := marker;
+                 continue;
+              end;
+
+              {Named references are stored in entityCode as byte-encoded trie.
+               Each trie node is stored as
+                 (accepting node ? $80 : 0) or childcount, first child character, offset to first child, ..., last child character, offset to last child, data
+               (A comma separates single bytes, only data has arbitrary many bytes.)
+               Offsets are relative to the byte containing the offset.
+               Data is: length of data, utf8 encoded entity value
+
+               To resolve an entity, find a child that has the same character as the current letter of the name of the entity,
+               then move to the node of that child and the next letter of the name
+
+               todo: compress nodes with a single child
+              }
+              entityCodePtr := @entityCode[entity];
+              inc(p);
+
+              acceptPos := nil;
+              hasNode := true;
+              while hasNode do begin
+                nodeLen := ord(entityCodePtr^) and $7F;
+                if ord(entityCodePtr^) and $80 = $80 then begin
+                  marker := p; //longest prefix matches.
+                  acceptPos := entityCodePtr + 2*nodeLen + 1;
                 end;
-              end else begin
-                append('&');
-                p := marker;
-                parseError;
+                inc(entityCodePtr);
+                hasNode := false;
+                for i := 1 to nodeLen do begin
+                  if p^ <> entityCodePtr^ then inc(entityCodePtr, 2)
+                  else begin
+                    inc(entityCodePtr);
+                    inc(entityCodePtr, ord(entityCodePtr^));
+                    inc(p);
+                    hasNode := true;
+                    break;
+                  end;
+                end;
               end;
+              p := marker;
+              if acceptPos <> nil then begin
+                case encoding of
+                   CP_UTF8, CP_NONE: append(acceptPos + 1, ord(acceptPos^));
+                   else append( strFromPchar(acceptPos + 1, ord(acceptPos^)) );
+                end;
+                if acceptPos[ord(acceptPos^)] <> ';' then parseError;
+              end else
+                append('&');
             end;
           end;
         end;
@@ -4684,29 +4722,6 @@ begin
     end;
   end;
   builder.final;
-
-
-  {
-  if p^ = entityCode^ then begin
-    if entityCode^ = ';' then begin
-      acceptPos := entityCode + 2;
-      break;
-    end;
-    inc(p);
-    inc(entityCode, 2);
-  end else begin
-    if entityCode^ = ';' then begin
-      if (ord((entityCode + 2)^) and ENTITY_CODE_ACCEPT) = 0 then
-        break;
-      if (ord((entityCode + 2)^) and ENTITY_CODE_ACCEPT_WITHOUT_SEMICOLON) <> 0 then
-        acceptPos := entityCode + 2;
-    end;
-    inc(entityCode);
-    inc(entityCode, ord(entityCode^));
-  end;
-  }
-
-
 end;
 
 

@@ -25,82 +25,69 @@ uses
 
 const LineEnding = #13#10;
 
-type TByteCodedTrie = object
+type
+TTrieNode = class
+  data: string;
+  childCount: integer;
+  children: array[char] of TTrieNode;
+  procedure add(const key, value: string);
+  function serialize(): string;
 private
-   stack: array[1..128] of record
-     c: char;
-     pos: integer;
-   end;
-   stackDepth: integer;
-   //class procedure tests;
-public
-  nodeStopSequence: string;
-  builder: TStrBuilder;
-  procedure init;
-  procedure addMapping(const key, value: string);
+//  {$define trietests}
+  {$ifdef trietests}class procedure tests;{$endif}
 end;
 
-{$if false}
-class procedure TByteCodedTrie.tests;
-var test: TByteCodedTrie;
-    s: string;
+procedure TTrieNode.add(const key, value: string);
 begin
-  test.init;
-  test.nodeStopSequence := ':X';
-  test.builder.init(@s);
-  test.addMapping('ABC;', '12');
-  test.addMapping('ABCDEF;', 'x2');
-  test.addMapping('ABCDEG;', 'x3');
-  test.addMapping('FOO;', 'new');
-  test.addMapping('','');
-  test.builder.final;
-  writeln(s);
+  if key = '' then data := value
+  else begin
+    if children[key[1]] = nil then begin
+      inc(childCount);
+      children[key[1]] := TTrieNode.Create;
+    end;
+    children[key[1]].add(strCopyFrom(key, 2), value);
+  end;
+end;
+
+function TTrieNode.serialize: string;
+var
+  p, flags, nodeHeaderLength: Integer;
+  serchildren: String;
+  c: Char;
+const FLAG_HAS_DATA = 128;
+begin
+  serchildren := '';
+  nodeHeaderLength := 1 + 2*childCount;
+  SetLength(result, nodeHeaderLength );
+  nodeHeaderLength += length(data);
+  if length(Result) > 255 then Abort;
+  flags := 0;
+  if data <> '' then
+    flags := flags or FLAG_HAS_DATA;
+  result[1] := chr(flags or childCount);
+  p := 2;
+  for c := low(children) to high(children) do begin
+    if children[c] = nil then continue;
+    result[p] := c;
+    result[p+1] := chr(nodeHeaderLength - p + length(serchildren)  );
+    inc(p, 2);
+    serchildren += children[c].serialize();
+  end;
+  result += data + serchildren;
+end;
+
+{$ifdef trietests}
+class procedure TTrieNode.tests;
+var test: TTrieNode;
+begin
+  test := TTrieNode.Create;
+  test.add('ABC;', '12');
+  test.add('ABCDEF;', 'x2');
+  test.add('ABCDEG;', 'x3');
+  test.add('FOO;', 'new');
+  writeln(test.serialize());
 end;
 {$endif}
-
-procedure TByteCodedTrie.init;
-begin
-  stackDepth := 0;
-end;
-
-procedure TByteCodedTrie.addMapping(const key, value: string);
-  procedure stackPop;
-  var delta: SizeInt;
-  begin
-    delta := builder.count - stack[stackDepth].pos + 1;
-    if delta > ord(high(char)) then
-      abort;
-    builder.buffer^[stack[stackDepth].pos] := chr(delta);
-    dec(stackDepth);
-  end;
-
-const TEMPCHAR = '?';
-var
-  i, longestPrefix: Integer;
-begin
-  longestPrefix := 0;
-  for i := 1 to min(stackDepth, length(key)) do
-    if stack[i].c = key[i] then longestPrefix := i
-    else break;
-  inc(longestPrefix);
-  if (stackDepth > longestPrefix) then begin
-    while (stackDepth > longestPrefix) do stackPop;
-    builder.append(nodeStopSequence);
-  end;
-  if (stackDepth > length(key)) or (( stackDepth > 0) and (stack[stackDepth].c <> key[stackDepth])) then begin
-    stackPop;
-  end;
-  if key = '' then exit;
-  while stackDepth < length(key) do begin
-    inc(stackDepth);
-    stack[stackDepth].c := key[stackDepth];
-    builder.append(key[stackDepth]);
-    builder.append(TEMPCHAR);
-    stack[stackDepth].pos := builder.count;
-  end;
-  builder.append(value);
-
-end;
 
 //This generate the strDecodeHTMLEntities function of bbutils.pas
 
@@ -2263,126 +2250,76 @@ const entities: array[1..2138] of TEntity=(
 (s:'&zwnj;';c:$0200C));
 
 function createEntityDecoder: string;
-
-var totalresult: string;
-  i: Integer;
-
 //Template for the strDecodeHTMLEntities function
 
-procedure writeln_SDHE_Map();
-var
-  //e: Integer;
-  enc: TSystemCodePage;
-  ent: Integer;
-  s: String;
-  i: Integer;
-begin
-  totalresult+=('const entityMap: array['+IntToStr(low(entities))+'..'+IntToStr(high(entities))+'] of array[0..1] of string=(')+LineEnding;
-  for ent:=low(entities) to high(entities) do begin
-    totalresult+=('('''+strcopyfrom(entities[ent].s,3)+''',');
-    enc:=CP_UTF8;
-    s := strGetUnicodeCharacter(entities[ent].c, enc);
-    for i:=1 to length(s) do
-      totalresult+='#'+IntToStr(ord(s[i]));
-    totalresult+=(')');
-    if ent <> high(entities) then totalresult+=(',');
-    if ent mod 5 = 0 then totalresult+=LineEnding
-    else totalresult+=#9;
-  end;
-  totalresult+=(');')+LineEnding;
-end;
-
-procedure writeln_SDHE_Indices();
-var
-  lowcase: Boolean;
-  cn: Char;
-  c: Char;
-  i: Integer;
-begin
-  totalresult+='const entityIndices: array[boolean] of array[0..25] of array [0..1] of integer = (';
-  for lowcase := false to true do begin
-    totalresult+='('+LineEnding;
-    for cn := 'a' to 'z' do begin
-      if not lowcase then c := upCase(cn)
-      else c := cn;
-      totalresult+='(';
-      for i := low(entities) to high(entities) do
-        if entities[i].s[2] = c then begin
-          totalresult+=IntToStr(i);
-          break;
-        end;
-      totalresult+=', ';
-      for i := high(entities) downto low(entities) do
-        if entities[i].s[2] = c then begin
-          totalresult+=IntToStr(i);
-          break;
-        end;
-
-      totalresult+=')';
-      if cn <> 'z' then totalresult+=', ';
-      if ord(cn) mod 5 = 0 then totalresult+=LineEnding
-      else totalresult+=#9;
-    end;
-    totalresult+=')';
-    if not lowcase then totalresult+=', ';
-  end;
-  totalresult+=');'+LineEnding;
-end;
-
-
-procedure reswriteln(s:string);
-begin
-  totalresult+=s+LineEnding;
-end;
-
-var trie: TByteCodedTrie;
+var i: Integer;
+    trie: TTrieNode;
+    builder: TStrBuilder;
     codebuffer: string;
     tempEncodedEntityValue: string;
 
-//var entities2: array of TEntity2;
-
 var codeStarts: array[char, char] of integer;
   c2, c3: Char;
-
-
-const ENTITY_CODE_ACCEPT: byte = 128;
+  lineLen: Integer;
 
 begin
-
-  writeln_SDHE_Map();
-  writeln_SDHE_Indices();
-
-  trie.nodeStopSequence := ';'#0#0;
-  trie.builder.init(@codebuffer);
-
+  trie := nil;
+  builder.init(@codebuffer);
   FillChar(codeStarts,sizeof(codeStarts),-1);
   c2 := #0; c3 := #0;
   for i := low(entities) to high(entities) do begin
     if length(entities[i].s) < 3 then Abort;
-    if (entities[i].s[1] <> '&') or not (entities[i].s[2] in ['0'..'9','a'..'z','A'..'Z']) or not (entities[i].s[3] in ['0'..'9','a'..'z','A'..'Z']) then abort;
-
-    if not strEndsWith(entities[i].s, ';') then continue;
+    if (entities[i].s[1] <> '&') or not (entities[i].s[2] in ['a'..'z','A'..'Z']) or not (entities[i].s[3] in ['a'..'z','A'..'Z']) then abort;
 
     if (entities[i].s[2] <> c2) or (entities[i].s[3] <> c3) then begin
-      trie.init;
+      if trie <> nil then builder.append(trie.serialize());
+      trie.Free;
+      trie := TTrieNode.Create;
       c2 := entities[i].s[2];
       c3 := entities[i].s[3];
       if codeStarts[c2,c3] <> -1 then Abort;
-      codeStarts[c2,c3] := trie.builder.count;
+      codeStarts[c2,c3] := builder.count;
     end;
 
     tempEncodedEntityValue := strGetUnicodeCharacter(entities[i].c);
-    if length(tempEncodedEntityValue) > 32 then abort;
-    tempEncodedEntityValue := chr(ENTITY_CODE_ACCEPT or length(tempEncodedEntityValue)) + tempEncodedEntityValue;
+    if length(tempEncodedEntityValue) > 255 then abort;
+    tempEncodedEntityValue := chr(length(tempEncodedEntityValue)) + tempEncodedEntityValue;
 
-    trie.addMapping(entities[i].s, tempEncodedEntityValue);
+    trie.add(strCopyFrom(entities[i].s,4), tempEncodedEntityValue);
   end;
+  builder.append(trie.serialize());
 
-  trie.builder.final;
+  builder.final;
 
-  writeln(codebuffer);
+  builder.init(@result);
+  builder.append('const entityCodeStarts: array[0..51, 0..51] of integer = ('+LineEnding);
+  for c2 in ['A'..'Z','a'..'z'] do begin
+    builder.append('  ');
+    if c2 <> 'A' then builder.append(',');
+    builder.append('(');
+    for c3 in ['A'..'Z','a'..'z'] do begin
+      if c3 <> 'A' then builder.append(', ');
+      builder.append(inttostr(codeStarts[c2,c3]));
+    end;
+    builder.append('  ) //'+c2+LineEnding);
 
-  Result:=totalresult;
+  end;
+  builder.append(');'+LineEnding);
+
+  builder.append('const entityCode: array[0..'+IntToStr(length(codebuffer)-1)+'] of byte = ('+LineEnding);
+  i := 1;
+  while i <= length(codebuffer) do begin
+    lineLen := min(length(codebuffer), i + 50);
+    while i <= lineLen do begin
+      if i <> 1 then builder.append(', ');
+      builder.append(IntToStr(ord(codebuffer[i])));
+      inc(i);
+    end;
+    builder.append(LineEnding);
+  end;
+  builder.append(');'+LineEnding);
+
+  builder.final;
 end;
 
 function special(name: string) : string;
@@ -2394,10 +2331,9 @@ end;
 
 var
   i: Integer;
-  s: String;
 begin
   DefaultSystemCodePage:=CP_UTF8;
-  //TByteCodedTrie.test;
+  {$ifdef trietests}TTrieNode.tests; exit; {$endif}
 
 
   for i:=low(entities)+1 to high(entities) do begin

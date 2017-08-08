@@ -1677,6 +1677,9 @@ begin
   html('"&nbsp"',  '"'#$C2#$A0'"');
   html('&nbsp', #$C2#$A0);
   html('&123;&456', '&123;&456');
+  html('&Poincareplane;&Poincare&Poincareplane', 'ℌ&Poincare&Poincareplane');
+  html('I''m &notit; I tell you', 'I''m ¬it; I tell you');
+  html('I''m &notin; I tell you', 'I''m ∉ I tell you');
 end;
 
 
