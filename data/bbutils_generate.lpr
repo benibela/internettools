@@ -28,9 +28,11 @@ const LineEnding = #13#10;
 type
 TTrieNode = class
   data: string;
+  mandatory: string;
   childCount: integer;
   children: array[char] of TTrieNode;
   procedure add(const key, value: string);
+  procedure compress;
   function serialize(): string;
 private
 //  {$define trietests}
@@ -49,31 +51,80 @@ begin
   end;
 end;
 
+procedure TTrieNode.compress;
+var
+  c, child: Char;
+begin
+  for c := low(children) to high(children) do
+    if children[c] <> nil then begin
+      child := c;
+      children[c].compress;
+    end;
+  if (childCount = 1) and (data = '') then begin
+    mandatory := child + children[child].mandatory;
+    data := children[child].data;
+    childCount := children[child].childCount;
+    children := children[child].children;
+  end;
+end;
+
 function TTrieNode.serialize: string;
 var
-  p, flags, nodeHeaderLength: Integer;
-  serchildren: String;
-  c: Char;
+  p, flags, oldDelta: Integer;
+  serializedMandatory, serchildren: String;
+  c, tooBigChild: Char;
+  serializedChildren: array[char] of string;
 const FLAG_HAS_DATA = 128;
+const FLAG_HAS_FIXED_PREFIX = 64;
 begin
   serchildren := '';
-  nodeHeaderLength := 1 + 2*childCount;
-  SetLength(result, nodeHeaderLength );
-  nodeHeaderLength += length(data);
+  serializedMandatory := '';
+  if mandatory <> '' then begin
+    serializedMandatory := chr(FLAG_HAS_FIXED_PREFIX or length(mandatory));
+    serializedMandatory += mandatory;
+  end;
+  SetLength(result, 1 + 2*childCount );
+  result += data;
+  oldDelta := length(data);
   if length(Result) > 255 then Abort;
   flags := 0;
   if data <> '' then
     flags := flags or FLAG_HAS_DATA;
+  if childCount >= FLAG_HAS_FIXED_PREFIX then abort;
+
+  tooBigChild := #0;
+  for c := low(children) to high(children) do begin
+    if children[c] = nil then continue;
+    serializedChildren[c] := children[c].serialize() ;
+    if length(serializedChildren[c]) >= 255 then begin
+      if tooBigChild <> #0 then
+        abort;
+      tooBigChild := c;
+    end;
+  end;
+
   result[1] := chr(flags or childCount);
   p := 2;
   for c := low(children) to high(children) do begin
     if children[c] = nil then continue;
+    if c = tooBigChild then continue;
     result[p] := c;
-    result[p+1] := chr(nodeHeaderLength - p + length(serchildren)  );
+    if oldDelta > 255 then
+      abort;
+    result[p+1] := chr( oldDelta );
     inc(p, 2);
-    serchildren += children[c].serialize();
+    serchildren := serializedChildren[c];
+    oldDelta := length(serchildren);
+    result += serchildren;
   end;
-  result += data + serchildren;
+  if tooBigChild <> #0 then begin
+    result[p] := tooBigChild;
+    if oldDelta > 255 then
+      abort;
+    result[p+1] := chr( oldDelta );
+    result += serializedChildren[tooBigChild];
+  end;
+  result := serializedMandatory + Result;
 end;
 
 {$ifdef trietests}
@@ -85,6 +136,7 @@ begin
   test.add('ABCDEF;', 'x2');
   test.add('ABCDEG;', 'x3');
   test.add('FOO;', 'new');
+  test.compress;
   writeln(test.serialize());
 end;
 {$endif}
@@ -2272,7 +2324,10 @@ begin
     if (entities[i].s[1] <> '&') or not (entities[i].s[2] in ['a'..'z','A'..'Z']) or not (entities[i].s[3] in ['a'..'z','A'..'Z']) then abort;
 
     if (entities[i].s[2] <> c2) or (entities[i].s[3] <> c3) then begin
-      if trie <> nil then builder.append(trie.serialize());
+      if trie <> nil then begin
+        trie.compress;
+        builder.append(trie.serialize());
+      end;
       trie.Free;
       trie := TTrieNode.Create;
       c2 := entities[i].s[2];
@@ -2287,6 +2342,7 @@ begin
 
     trie.add(strCopyFrom(entities[i].s,4), tempEncodedEntityValue);
   end;
+  trie.compress;
   builder.append(trie.serialize());
 
   builder.final;
@@ -2344,6 +2400,13 @@ begin
   strSaveToFile('bbutils.inc', convertTemplate(strLoadFromFile('bbutils_template.inc'), @special));
   strSaveToFile('bbutilsh.inc', convertTemplate(strLoadFromFile('bbutils_templateh.inc'), @special));
 
+
+{writeln(strDecodeHTMLEntities('&DoubleUpArrow;', CP_UTF8));
+writeln(strDecodeHTMLEntities('&DoubleUpDownArrow;', CP_UTF8));}
+
+  for i := low(entities) to high(entities) do
+    if strDecodeHTMLEntities(entities[i].s, CP_UTF8, strEndsWith(entities[i].s, ';')) <> strGetUnicodeCharacter(entities[i].c) then
+      writeln('Entity self test failed: ', entities[i].s, ' (this will happen when the entities are changed as it compares the old entities to the new ones. recompile and rerun) ');
 
  { try
   //readln(s);

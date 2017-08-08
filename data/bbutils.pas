@@ -4589,6 +4589,7 @@ var
     entityCodeStartPtr: PInteger;
     nodeLen, i: Integer;
     acceptPos: pchar;
+    nextNode: pchar;
 begin
   encoding := strActualEncoding(encoding);
   builder.init(@result, l, encoding);
@@ -4667,16 +4668,21 @@ begin
               end;
 
               {Named references are stored in entityCode as byte-encoded trie.
-               Each trie node is stored as
-                 (accepting node ? $80 : 0) or childcount, first child character, offset to first child, ..., last child character, offset to last child, data
+               There are three kind of trie nodes that are stored as:
+                 Normal node:              childcount, first child character, offset to first child, ..., last child character, offset to last child
+                 Accepting node:    $80 or childcount, first child character, offset to first child, ..., last child character, offset to last child, data
+                 Fixed string node: $40 or length, first char, ..., last char
+
                (A comma separates single bytes, only data has arbitrary many bytes.)
-               Offsets are relative to the byte containing the offset.
-               Data is: length of data, utf8 encoded entity value
+               The first offset is relative to the byte after the node, the next ones relative to the previous one. (so the sum of all previous offsets is relative to the byte after the node)
 
-               To resolve an entity, find a child that has the same character as the current letter of the name of the entity,
-               then move to the node of that child and the next letter of the name
+               - To resolve an entity, find a child that has the same character as the current letter of the name of the entity,
+               then move to the node of that child and to the next letter of the name.
+               - If an accepting node is reached, store the data as resolved entity (but continue to find a possible longer matching entity)
+                 (Data is: length of data, utf8 encoded entity value)
+               - If a fixed string node is reached, compare the length bytes of the node with the entity name.
+                 If they do not match abort, otherwise continue to the next node (which starts at the byte immediate after the current node)
 
-               todo: compress nodes with a single child
               }
               entityCodePtr := @entityCode[entity];
               inc(p);
@@ -4684,18 +4690,35 @@ begin
               acceptPos := nil;
               hasNode := true;
               while hasNode do begin
-                nodeLen := ord(entityCodePtr^) and $7F;
-                if ord(entityCodePtr^) and $80 = $80 then begin
-                  marker := p; //longest prefix matches.
-                  acceptPos := entityCodePtr + 2*nodeLen + 1;
+                nodeLen := ord(entityCodePtr^) and $3F;
+                case ord(entityCodePtr^) and $C0 of
+                  $80: begin
+                    marker := p; //longest prefix matches.
+                    acceptPos := entityCodePtr + 2*nodeLen + 1;
+                  end;
+                  $40: begin
+                    inc(entityCodePtr);
+                    i := 1;
+                    while (i <= nodeLen) and (p^ = entityCodePtr^) do begin
+                      inc(p);
+                      inc(entityCodePtr);
+                      inc(i);
+                    end;
+                    if i <= nodeLen then break
+                    else continue;
+                  end;
                 end;
                 inc(entityCodePtr);
                 hasNode := false;
+                nextNode := entityCodePtr + 2 * nodeLen;
                 for i := 1 to nodeLen do begin
-                  if p^ <> entityCodePtr^ then inc(entityCodePtr, 2)
-                  else begin
+                  if p^ <> entityCodePtr^ then begin
                     inc(entityCodePtr);
-                    inc(entityCodePtr, ord(entityCodePtr^));
+                    inc(nextNode, ord(entityCodePtr^));
+                    inc(entityCodePtr);
+                  end else begin
+                    inc(entityCodePtr);
+                    entityCodePtr := nextNode + ord(entityCodePtr^);
                     inc(p);
                     hasNode := true;
                     break;
@@ -4708,7 +4731,7 @@ begin
                    CP_UTF8, CP_NONE: append(acceptPos + 1, ord(acceptPos^));
                    else append( strFromPchar(acceptPos + 1, ord(acceptPos^)) );
                 end;
-                if acceptPos[ord(acceptPos^)] <> ';' then parseError;
+                if (p-1)^ <> ';' then parseError;
               end else
                 append('&');
             end;
