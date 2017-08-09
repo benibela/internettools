@@ -406,6 +406,7 @@ var
   res: TStringList;
 begin
   res := TStringList.Create;
+  res.CaseSensitive := True;
   for v in args[0] do
     if v is TXQValueObject then
       (v as TXQValueObject).enumerateKeys(res);

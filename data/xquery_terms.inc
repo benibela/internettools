@@ -2715,6 +2715,7 @@ begin
       case v^.kind of
         pvkObject: begin
           sl := TStringList.Create;
+          sl.CaseSensitive := true;
           (v^ as TXQValueObject).enumerateKeys(sl);
           resultSeq.add(xqvalue(sl));
           sl.free;
