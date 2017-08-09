@@ -1032,7 +1032,7 @@ procedure TTreeNode.changeEncoding(from, toe: TSystemCodePage; substituteEntitie
   begin
     result := strChangeEncoding(s, from, toe);
     result := strNormalizeLineEndings(result);
-    if substituteEntities then result := strDecodeHTMLEntities(result, toe, false);
+    if substituteEntities then result := strDecodeHTMLEntities(result, toe, []);
     if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
   end;
 
@@ -2490,7 +2490,7 @@ var
   nsurl: string;
 begin
   nsurl := strChangeEncoding(url, FXmlHeaderEncoding, FTargetEncoding);
-  nsurl := strDecodeHTMLEntities(nsurl, FTargetEncoding, false);
+  nsurl := strDecodeHTMLEntities(nsurl, FTargetEncoding, [dhefAttribute]);
   nsurl := xmlStrWhitespaceCollapse(nsurl);
 
   ns := TNamespace.Make(nsurl, prefix);

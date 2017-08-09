@@ -2425,6 +2425,7 @@ begin
   end;
 
 
+
   builder.init(@codebuffer);
   for c2 in ['A'..'Z','a'..'z'] do
     for c3 in ['A'..'Z','a'..'z'] do begin
@@ -2434,6 +2435,8 @@ begin
       builder.append(codeTries[c2,c3].serialize);
     end;
   builder.final;
+
+  //writeln(codeTries['a','m'].serialize());
 
   builder.init(@result);
   builder.append('const entityCodeStarts: array[0..51, 0..51] of integer = ('+LineEnding);
@@ -2487,6 +2490,8 @@ begin
 
 end;
 
+var testflags: array[boolean] of TDecodeHTMLEntitiesFlags = ([dhefAttribute],[dhefStrict,dhefAttribute]);
+
 begin
   DefaultSystemCodePage:=CP_UTF8;
   {$ifdef trietests}TTrieNode.tests; exit; {$endif}
@@ -2505,7 +2510,7 @@ begin
 writeln(strDecodeHTMLEntities('&DoubleUpDownArrow;', CP_UTF8));}
 
   for i := low(entities) to high(entities) do
-    if strDecodeHTMLEntities(entities[i].s, CP_UTF8, strEndsWith(entities[i].s, ';')) <> entities[i].getUtf8 then
+    if strDecodeHTMLEntities(entities[i].s, CP_UTF8, testflags[strEndsWith(entities[i].s, ';')]) <> entities[i].getUtf8 then
       writeln(stderr, 'Entity self test failed: ', entities[i].s, ' (this will happen when the entities are changed as it compares the old entities to the new ones. recompile and rerun) ');
  writeln(stderr, 'done');
  { try

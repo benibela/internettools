@@ -1648,11 +1648,11 @@ begin
 end;
 
 procedure testStrEntities;
-  procedure html(const html, expected: string);//; flags: boolean);
+  procedure html(const html, expected: string; flags: TDecodeHTMLEntitiesFlags = []);
   var temp, tempexpected: RawByteString;
   begin
-    test(strDecodeHTMLEntities(html, CP_UTF8, false), expected);
-    temp := strDecodeHTMLEntities(html, CP_LATIN1, false);
+    test(strDecodeHTMLEntities(html, CP_UTF8, flags), expected);
+    temp := strDecodeHTMLEntities(html, CP_LATIN1, flags);
     {$ifdef FPC_HAS_CPSTRING}
     tempexpected := expected;
     SetCodePage(tempexpected, CP_UTF8, false);
@@ -1665,6 +1665,8 @@ procedure testStrEntities;
     test(length(temp) = length(tempexpected));
   end;
 
+var
+  ok: Boolean;
 begin
   html('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*', #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*&xyz;*');
   html('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4', #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84);
@@ -1680,6 +1682,15 @@ begin
   html('&Poincareplane;&Poincare&Poincareplane', 'ℌ&Poincare&Poincareplane');
   html('I''m &notit; I tell you', 'I''m ¬it; I tell you');
   html('I''m &notin; I tell you', 'I''m ∉ I tell you');
+  html('&vnsub;&ThickSpace;&vnsup;&uopf;','⊂⃒  ⊃⃒𝕦');
+  html('&gt=&gta;&gt.', '>=>a;>.', []);
+  html('&gt=&gta;&gt.', '&gt=&gta;>.', [dhefAttribute]);
+  try
+    html('&gt=xx', '&gt=xx', [dhefAttribute,dhefStrict]);
+    test(false);
+  except
+    on e: EDecodeHTMLEntitiesException do ;
+  end;
 end;
 
 

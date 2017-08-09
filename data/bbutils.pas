@@ -413,14 +413,16 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
 
+type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute);
+     EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; strict: boolean = false):string; overload;
+function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):string; overload;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(s:RawByteString;encoding:TSystemCodePage; strict: boolean = false):string; overload;
+function strDecodeHTMLEntities(s:RawByteString;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):string; overload;
 //**Replace all occurences of x \in toEscape with escapeChar + x
 function strEscape(s:RawByteString; const toEscape: TCharSet; escapeChar: ansichar = '\'): RawByteString;
 //**Replace all occurences of x \in toEscape with escape + hex(ord(x))
@@ -2513,9 +2515,9 @@ begin
   result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
 end;
 
-function strDecodeHTMLEntities(s: RawByteString; encoding: TSystemCodePage; strict: boolean): string;
+function strDecodeHTMLEntities(s: RawByteString; encoding: TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []): string;
 begin
-  result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, strict);
+  result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, flags);
 end;
 
 function strDecodeHex(s: RawByteString): RawByteString;
@@ -4563,10 +4565,10 @@ end;
 
 {$I bbutils.inc}
 
-function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; strict: boolean = false):string;
+function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):string;
   procedure parseError;
   begin
-    if strict then raise Exception.Create('Entity parse error before ' + p);
+    if dhefStrict in flags then raise EDecodeHTMLEntitiesException.Create('Entity parse error before ' + p);
   end;
 
 const compatibilityFallbackMap: array[$80..$9F] of word = ( //from html5 standard. perhaps it is a windows-1252 -> unicode map?
@@ -4693,8 +4695,12 @@ begin
                 nodeLen := ord(entityCodePtr^) and $3F;
                 case ord(entityCodePtr^) and $C0 of
                   $80: begin
-                    marker := p; //longest prefix matches.
-                    acceptPos := entityCodePtr + 2*nodeLen + 1;
+                    if (dhefAttribute in flags) and ((p-1)^ <> ';') and (p^ in ['=','a'..'z','A'..'Z','0'..'9']) then begin
+                      if p^ = '=' then parseError;
+                    end else begin
+                      marker := p; //longest prefix matches.
+                      acceptPos := entityCodePtr + 2*nodeLen + 1;
+                    end;
                   end;
                   $40: begin
                     inc(entityCodePtr);
