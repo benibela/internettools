@@ -772,7 +772,7 @@ function TJavaEnv.inputStreamToStringAndDelete(stream: jobject; jmInputStreamRea
 var builder: TStrBuilder;
 begin
   builder.init(@result);
-  inputStreamReadAllAndDelete(stream, TStreamLikeWrite(makeMethod(@builder.appendBuffer, @builder)), jmInputStreamRead, jmInputStreamClose);
+  inputStreamReadAllAndDelete(stream, @builder.appendBuffer, jmInputStreamRead, jmInputStreamClose);
   builder.final;
 end;
 
