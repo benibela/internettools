@@ -2388,16 +2388,15 @@ end;
 {$IFDEF fpc}
 function strEncodingFromName(str: RawByteString): TSystemCodePage;
 begin
-  case UpperCase(str) of
-    'UTF-8', 'UTF8' {error preventive}, 'US-ASCII' {ascii is an utf-8 subset}: result:=CP_UTF8;
-    'CP1252', 'ISO-8859-1', 'LATIN1', 'ISO-8859-15': Result:=CP_WINDOWS1252;
-    'UTF-16': result := {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF};
-    'UTF-16LE': result := CP_UTF16;
-    'UTF-16BE': result := CP_UTF16BE;
-    'UTF-32': result := {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF};
-    'UTF-32LE': result := CP_UTF32;
-    'UTF-32BE': result := CP_UTF32BE;
-    else result:=CP_NONE;
+  result := CodePageNameToCodePage(str);
+  if result = $FFFF then begin
+    str := LowerCase(str);
+    case str of
+      'utf8': result := CP_UTF8;
+      'utf-32le': result := CP_UTF32;
+      'oem': result := CP_OEMCP;
+      else if strBeginsWith(str, 'cp') then result := StrToIntDef(strAfter(str, 'cp'), CP_NONE);
+    end;
   end;
 end;
 {$ENDIF}

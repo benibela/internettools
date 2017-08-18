@@ -975,12 +975,14 @@ begin
   testToUtf16( CP_LATIN1,      'x'#$E4'??', [ord('x'), $E4, $3F, $3F]);
   testToUtf16( CP_UTF8,      'xä€𤽜', [ord('x'), $E4, $20AC, $D853, $DF5C]);
 
-  //  testrawstr(fromUTF16(CP_UTF16BE, []), CP_UTF16BE, #0'x'#0'ä'#$20#$AC#$D8#$5C#$DF#$53);
 
-  {CP_UTF16, CP_UTF16BE
-  CP_UTF32, CP_UTF32BE
-  CP_WINDOWS1252, CP_LATIN1
-  CP_UTF8}
+  test(strEncodingFromName('UTF-8'), CP_UTF8);
+  test(strEncodingFromName('UTF8'), CP_UTF8);
+  test(strEncodingFromName('UTF-16'), CP_UTF16);
+  test(strEncodingFromName('UTF-16BE'), CP_UTF16BE);
+  test(strEncodingFromName('UTF-32LE'), CP_UTF32);
+  test(strEncodingFromName('UTF-32BE'), CP_UTF32BE);
+  test(strEncodingFromName('OEM'), CP_OEMCP);
 end;
 
 procedure testVariousStuff;
