@@ -1,7 +1,7 @@
 {
 A collection of often needed functions missing in FPC
 
-Copyright (C) 2008 - 2016  Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2017  Benito van der Zander (BeniBela)
                            benito@benibela.de
                            www.benibela.de
 
@@ -70,7 +70,7 @@ unit bbutils;
 interface
 
 uses
-  Classes, SysUtils,math//,LCLProc
+  Classes, SysUtils,math
   {$IFDEF windows}
   , windows
   {$ENDIF};
@@ -131,8 +131,8 @@ const
 {$endif}
 const CP_UTF32 = 12000;
       CP_UTF32BE = 12001;
-      CP_WINDOWS1252 = 1252;
-      CP_LATIN1 = 28591;
+      CP_WINDOWS1252 = 1252; //a super set of ISO 8859-1. ISO-8859-1 is a different superset of ISO 8859-1 (beware the dash). But most people mean this when they say iso-8859-1
+      CP_LATIN1 = 28591; //this is the actual ISO-8859-1.
 
 
 type
@@ -375,17 +375,24 @@ function strFromSIze(size: int64):string;
 
 
 //encoding things
+//Conversions between UTF-8 and 1-Byte encodings are in strConvert
+//Conversions between UTF-16 and UTF-8/32/1-Byte-encodings in the moveProcs
 //**length of an utf8 string @br
-//**A similar function exists in lclproc, but this unit should be independent of the lcl to make it easier to compile with fpc on the command line@br
 //**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
 function strLengthUtf8(str: RawByteString): longint;
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteString; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
-function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString;
+//** Converts a string from one encoding to another. @br
+//** It primarily converts between latin-1 and utf-8 without needing a widestring manager.
+//** It performs the conversion directly without converting to UTF-16, which should be much faster than fpc's default conversions. But there are no low-level optimizations @br
+//** For other encodings it falls back to the moveprocs (which allows to store utf-16/32 in RawByteString) and SetCodePage
+function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawByteString;
+function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString; {$ifdef HASINLINE} inline; deprecated 'Use strConvert';{$endif}
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in chars.
+procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in bytes
 {$IFDEF fpc}
-procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
-procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring
+procedure registerFallbackUnicodeConversion;
 function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 //this can return CP_ACP (perhaps i will change that)
 function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
@@ -486,6 +493,7 @@ private
   next, bufferend: pchar; //next empty pchar and first pos after the string
   encoding: TSystemCodePage;
   procedure appendWithEncodingConversion(const s: RawByteString);
+  procedure appendCodePointToUtf8String(const codepoint: integer); inline;
   procedure appendCodePointWithEncodingConversion(const codepoint: integer);
   procedure appendHexNumber(codepoint: integer);
   procedure appendRaw(const s: RawByteString); inline;
@@ -1717,6 +1725,21 @@ begin
   end;
 end;
 
+//native does not mean it is the encoding used on the platform, but that it is the endianness you get when accessing them as writing pword or pinteger
+const CP_UTF16_NATIVE = {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF};
+      CP_UTF32_NATIVE = {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF};
+
+const ENCODING_MAP_WINDOWS1252_TO_UNICODE: array[$80..$9F] of word = ( //from html5 standard. perhaps it is a windows-1252 -> unicode map?
+  $20AC,
+  $81, //2 digit code points remain unchanged
+  $201A, $0192, $201E, $2026, $2020, $2021, $02C6, $2030, $0160, $2039, $0152,
+  $8D,
+  $017D,
+  $8F, $90,
+  $2018, $2019, $201C, $201D, $2022, $2013, $2014, $02DC, $2122, $0161, $203A, $0153,
+  $9D,
+  $017E, $0178);
+
 procedure strSwapEndianWord(str: PWord; countofword: SizeInt);  overload;
 begin
   while countofword > 0 do begin
@@ -1750,179 +1773,279 @@ begin
 end;
 
 
-function strConvertToUtf8FromUTF32N(str: RawByteString): RawByteString;
-var i, reslen: Integer;
-begin
-  assert(length(str) and $3 = 0);
-  i := 1;
-  reslen := 0;
-  while i <= length(str) - 3 do begin
-    reslen := reslen + strGetUnicodeCharacterUTFLength(PDWord(@str[i])^);
-    i := i + 4;
-  end;
-
-  SetLength(result, reslen);
-  i := 1;
-  reslen := 1;
-  while i <= length(str) - 3 do begin
-    strGetUnicodeCharacterUTF(PDWord(@str[i])^, @result[reslen]);
-    reslen := reslen + strGetUnicodeCharacterUTFLength(PDWord(@str[i])^);
-    i := i + 4;
-  end;
-end;
-
-
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): RawByteString;
-var len: longint;
-    reslen: longint;
-    pos: longint;
-    i: Integer;
 begin
-  if length(str) = 0 then begin result := ''; exit; end;
-  from := strActualEncoding(from);
-  //use my own conversion, because i found no existing source which doesn't relies on iconv
-  //(AnsiToUtf8 doesn't work, since Ansi<>latin1)
-  //edit: okay, now i found lconvencoding, but i let this here, because i don't want to change it again
-  case from of
-    CP_ACP, CP_NONE, CP_ASCII, CP_UTF8: result:=str;
-    CP_WINDOWS1252, CP_LATIN1: begin //we actually use latin1, because unicode $00..$FF = latin-1 $00..$FF
-      len:=length(str); //character and byte length of latin1-str
-      //calculate length of resulting utf-8 string (gets larger)
-      reslen:=len;
-      for i:=1 to len do
-        if str[i] >= #$80 then inc(reslen);
-      //optimization
-      if reslen = len then
-        begin result := str; exit; end; //no special chars in str => utf-8=latin-8 => no conversion necessary
-      //reserve string
-      result := '';
-      SetLength(result, reslen);
-      pos:=1;
-      for i:=1 to len do begin
-        if str[i] < #$80 then
-          //below $80: utf-8 = latin-1
-          Result[pos]:=str[i]
-        else begin
-          //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
-          result[pos]:=chr($C0 or (ord(str[i]) shr 6));
-          inc(pos);
-          result[pos]:=chr($80 or (ord(str[i]) and $3F));
-        end;
-        inc(pos);
-      end;
-      assert(pos=reslen+1);
-    end;
-    {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF}: begin
-      SetLength(result, (length(str) * 3) div 2);
-      {$IFDEF FPC}
-      i := UnicodeToUtf8(pointer(result), length(result) + 1, pointer(str), length(str) div 2);
-      i := i - 1;
-      {$ELSE}
-      i := WideCharToMultiByte(CP_UTF8, 0, pointer(str), length(str) div 2, pointer(result), length(result), nil, nil);
-      {$ENDIF}
-      SetLength(result, max(i, 0));
-    end;
-    {$IFDEF ENDIAN_BIG}CP_UTF16{$ELSE}CP_UTF16BE{$ENDIF}: begin
-      result := str;
-      strSwapEndianWord(result);
-      result := strConvertToUtf8(result, {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
-    end;
-    {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF}: result := strConvertToUtf8FromUTF32N(str);
-    {$IFDEF ENDIAN_BIG}CP_UTF32{$ELSE}CP_UTF32BE{$ENDIF}: begin
-      result := str + '' {is this needed or not?};
-      strSwapEndianDWord(result);
-      result := strConvertToUtf8FromUTF32N(result);
-    end
-    else raise Exception.Create('Unknown encoding in strConvertToUtf8');
-  end;
-end;
-
-
-function strConvertFromUtf8ToUTF32N(str: RawByteString): RawByteString;
-var i, j: integer;
-begin
-  SetLength(result, strLengthUtf8(str) * 4);
-  j := 1;
-  i := 1;
-  while i <= length(str) do begin
-    PDWord(@result[j])^ := strDecodeUTF8Character(str, i);
-    j := j + 4;
-  end;
+  result := strConvert(str, from, CP_UTF8);
 end;
 
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString;
-var len, reslen, i, pos: longint;
 begin
-  if str = '' then begin
+  result := strConvert(str, CP_UTF8, toe);
+end;
+
+const INVALID_CHAR_1BYTE = '?';
+
+procedure strRemoveNonASCIIFromANSI(var s: RawByteString);
+var
+  i: Integer;
+begin
+  for i := 1 to length(s) do
+    if s[i] > #127 then s[i] := INVALID_CHAR_1BYTE;
+  SetCodePage(RawByteString(s), CP_ASCII, false);
+end;
+
+function charCodePointToCP1252Extensions(const cp: integer): char;
+begin
+  if (cp <= $7F) or ((cp > $9F) and (cp <= $FF)) then
+    result := chr(cp)
+  else
+   case cp  of
+    //reverse of ENCODING_MAP_WINDOWS1252_TO_UNICODE
+    //these are mandatory for roundtrip
+    8364: result := #128;
+    129: result := #129;
+    8218: result := #130;
+    402: result := #131;
+    8222: result := #132;
+    8230: result := #133;
+    8224: result := #134;
+    8225: result := #135;
+    710: result := #136;
+    8240: result := #137;
+    352: result := #138;
+    8249: result := #139;
+    338: result := #140;
+    141: result := #141;
+    381: result := #142;
+    143: result := #143;
+    144: result := #144;
+    8216: result := #145;
+    8217: result := #146;
+    8220: result := #147;
+    8221: result := #148;
+    8226: result := #149;
+    8211: result := #150;
+    8212: result := #151;
+    732: result := #152;
+    8482: result := #153;
+    353: result := #154;
+    8250: result := #155;
+    339: result := #156;
+    157: result := #157;
+    382: result := #158;
+    376: result := #159;
+    //some of http://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WindowsBestFit/bestfit1252.txt
+    //not all, just those that look nice to me. this table is already bigger than I want it to be
+    $2000..$2006: result :=	#$20;
+    $2010, $2011: result :=	#$2d;
+
+    $2205: result := #$d8; //Empty Set
+    $2212: result := #$2d; //Minus Sign
+    $2213: result := #$b1; //Minus-Or-Plus Sign
+    $2215: result := #$2f; //Division Slash
+    $2216: result := #$5c; //Set Minus
+    $2217: result := #$2a; //Asterisk Operator
+    $2218: result := #$b0; //Ring Operator
+    $2219: result := #$b7; //Bullet Operator
+    $221a: result := #$76; //Square Root
+    $221e: result := #$38; //Infinity
+    $2223: result := #$7c; //Divides
+    $2229: result := #$6e; //Intersection
+    $2236: result := #$3a; //Ratio
+    $223c: result := #$7e; //Tilde Operator
+    $2248: result := #$98; //Almost Equal To
+    $FF01..$FF5e: result := chr(cp - $FEE0); //fullwidth
+    else result := INVALID_CHAR_1BYTE;
+  end;
+end;
+function charCodePointToCP1252(const cp: integer): char; {$ifdef HASINLINE}inline;{$endif}
+begin
+  if (cp <= $7F) or ((cp > $9F) and (cp <= $FF)) then
+    result := chr(cp)
+  else
+    result := charCodePointToCP1252Extensions(cp);
+end;
+function charCodePointToLatin1(const cp: integer): char; {$ifdef HASINLINE}inline;{$endif}
+begin
+  if cp <= $FF then result := chr(cp)
+  else result := INVALID_CHAR_1BYTE;;
+end;
+
+function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawByteString;
+                           //beware the const aliasing! we might have pointer(result) = pointer(str), so result must not be changed before being recreated
+
+var toCPActual: TSystemCodePage;
+
+  procedure convertUtf8ToWesternEurope(var result: RawByteString);
+  var
+    i, cp: Integer;
+    reslen: LongInt;
+    p: pchar;
+    len: SizeInt;
+  begin
+    len := length(str);
+    reslen:=strLengthUtf8(str);//character len (this is the exact result length for valid utf-8, but invalid characters confuse it)
+    if reslen = len then begin
+      //no special chars in str => utf-8=latin-8 => no conversion necessary
+      result := str;
+      SetCodePage(result, toCP, false);
+      exit;
+    end;
     result := '';
+    SetLength(result,reslen);
+    p := pchar(pointer(str));
+    i := 1;
+    case toCPActual of
+      CP_LATIN1: while len > 0 do begin
+        cp := strDecodeUTF8Character(p, len);
+        if cp >= 0 then begin
+          result[i] := charCodePointToLatin1(cp);
+          inc(i);
+        end;
+      end;
+      CP_WINDOWS1252: while len > 0 do begin
+        cp := strDecodeUTF8Character(p, len);
+        if cp >= 0 then begin
+          result[i] := charCodePointToCP1252(cp);
+          inc(i);
+        end;
+      end;
+    end ;
+    if i - 1 <> reslen then SetLength(result, i - 1);
+    SetCodePage(result, toCP, false);
+  end;
+
+  procedure convertWesternEurope(var result: RawByteString);
+  var
+    i: Integer;
+  begin
+    result := str;
+    SetCodePage(result, toCP, false);
+    for i := 1 to length(result) do
+     if (result[i] >= #$80) and (result[i] <= #$9F) then
+       result := INVALID_CHAR_1BYTE;
+    SetCodePage(result, toCP, false);
+  end;
+
+  procedure convertWesternEuropeToUtf8(var result: RawByteString);
+  var
+    len, reslen, i: Integer;
+    builder: TStrBuilder;
+  begin ;
+    len:=length(str); //character and byte length of latin1-str
+    //guess length of resulting utf-8 string (for latin1 it is the exact length, but some 1252 characters map to 3 utf8 bytes)
+    reslen:=len;
+    for i:=1 to len do
+      if str[i] >= #$80 then inc(reslen);
+    //optimization
+    if reslen = len then begin
+      result := str;
+      SetCodePage(RawByteString(result), toCP, false);
+      exit;
+    end; //no special chars in str => utf-8=latin-8 => no conversion necessary
+    //reserve string
+    result := '';
+    builder.init(@result, reslen, CP_UTF8);
+    for i:=1 to len do begin
+      if str[i] < #$80 then
+        builder.append(str[i])
+      else if (ord(str[i]) <= high(ENCODING_MAP_WINDOWS1252_TO_UNICODE)) and (from = CP_WINDOWS1252) then
+        builder.appendCodePointToUtf8String(ENCODING_MAP_WINDOWS1252_TO_UNICODE[ord(str[i])])
+      else begin
+       //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
+        builder.append(chr($C0 or (ord(str[i]) shr 6)));
+        builder.append(chr($80 or (ord(str[i]) and $3F)));
+      end
+    end;
+    builder.final;
+  end;
+
+  //convert between utf-8, 16, 32
+  //this function works like fpc, but fpc does not officially support storing utf-16 or utf-32 in ansistrings
+  procedure convertExtendedUnicode;
+  var temp: UnicodeString; //temporary utf-16 representation. todo: convert directly. at least for utf-16
+  begin
+    temp := '';
+    strAnsi2UnicodeMoveProc(pchar(pointer(str)), from, temp, length(str));
+    strUnicode2AnsiMoveProc(PUnicodeChar(pointer(temp)), strConvert, toCP, length(temp));
+  end;
+
+
+begin
+  if (from=toCP) or (from=CP_NONE) or (toCP=CP_NONE) or (str = '') then begin
+    result := str;
+    if (toCP <> CP_NONE) then SetCodePage(result, toCP, false);
     exit;
   end;
-  toe := strActualEncoding(toe);
-  case toe of
-    CP_ACP, CP_NONE, CP_ASCII, CP_UTF8: result:=str;
-    CP_WINDOWS1252, CP_LATIN1: begin //actually latin-1
-      len:=length(str);//byte length
-      reslen:=strLengthUtf8(str);//character len = new byte length
-      //optimization
-      if reslen = len then
-        begin result := str; exit; end; //no special chars in str => utf-8=latin-8 => no conversion necessary
-      //conversion
-      result := '';
-      SetLength(result,reslen);
-      pos:=1;
-      for i:=1 to reslen do begin
-        //see strConvertToUtf8 for description
-        if str[pos] <= #$7F then result[i]:=str[pos]
-        else begin
-          //between $80.$FF: latin-1( abcdefgh ) = utf-8 ( 110000ab 10cdefgh )
-          result[i] := chr(((ord(str[pos]) and $3) shl 6) or (ord(str[pos+1]) and $3f));
-          inc(pos);
-        end;
-        inc(pos);
-      end ;
-    end;
-    {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF}: begin
-      SetLength(result, length(str)*2);
-      {$IFDEF FPC};
-      i := Utf8ToUnicode(pointer(result), length(result), pointer(str), length(str));
-      i := i - 1;
-      {$ELSE}
-      i := MultiByteToWideChar(CP_UTF8, 0, pointer(str), length(str), pointer(result), length(result) * 2);
-      {$ENDIF}
-      SetLength(result, max(i, 0) * 2);
-    end;
-    {$IFDEF ENDIAN_BIG}CP_UTF16{$ELSE}CP_UTF16BE{$ENDIF}: begin
-      result := strConvertFromUtf8(str, {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
-      strSwapEndianWord(result)
-    end;
-    {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF}: result := strConvertFromUtf8ToUTF32N(str);
-    {$IFDEF ENDIAN_BIG}CP_UTF32{$ELSE}CP_UTF32BE{$ENDIF}: begin
-      result := strConvertFromUtf8ToUTF32N(str);
-      strSwapEndianDWord(result);
-    end
-    else raise Exception.Create('Unknown encoding in strConvertFromUtf8');
+  from := strActualEncoding(from);
+  toCPActual := strActualEncoding(toCP);
+  if (from=toCPActual) then begin
+    result := str;
+    SetCodePage(result, toCP, false);
+    exit;
   end;
+  //quick conversion for 1-byte encodings: CP_UTF8 <-> CP_LATIN1, CP_WINDOWS1252
+  case from of
+    CP_ASCII:
+      case toCPActual of
+        CP_LATIN1, CP_WINDOWS1252, CP_UTF8: begin
+          result := str;
+          SetCodePage(result, toCP, false);
+          exit;
+        end;
+      end;
+    CP_UTF8:
+      case toCPActual of
+         CP_LATIN1, CP_WINDOWS1252: begin
+           convertUtf8ToWesternEurope(result);
+           exit;
+         end;
+         CP_ASCII: begin
+           convertUtf8ToWesternEurope(result);
+           strRemoveNonASCIIFromANSI(result);
+           exit;
+         end;
+      end;
+    CP_LATIN1, CP_WINDOWS1252:
+      case toCPActual of
+        CP_LATIN1, CP_WINDOWS1252: begin
+          convertWesternEurope(result);
+          exit;
+        end;
+        CP_ASCII: begin
+          result := str;
+          strRemoveNonASCIIFromANSI(result);
+          exit;
+        end;
+        CP_UTF8: begin
+          convertWesternEuropeToUtf8(result);
+          exit;
+        end;
+      end;
+  end;
+
+  //extended unicode conversion
+  case from of
+     CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: case toCPActual of
+        CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: begin
+          convertExtendedUnicode();
+          exit;
+        end;
+     end;
+  end;
+
+  {$ifndef FPC_HAS_CPSTRING}
+  raise EConvertError.Create('Unknown encoding conversion: from ' + IntToStr(from) + ' to ' + IntToStr(toCP));
+  {$endif}
+
+  result := str;
+  SetCodePage(result, from, false);
+  SetCodePage(result, toCP, true);
 end;
 
 function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString;
-var utf8temp: RawByteString;
 begin
-  if (from=toe) or (from=CP_NONE) or (toe=CP_NONE) then begin result := str; exit; end;
-  from := strActualEncoding(from);
-  toe := strActualEncoding(toe);
-  if (from=toe) then begin result := str; exit; end;
-
-  //two pass encoding: from -> utf8 -> to
-  utf8temp:=strConvertToUtf8(str, from);
-  result:=strConvertFromUtf8(utf8temp, toe);
-
-  {why did i use utf-8 as intermediate step (instead utf-16/ucs-2 like many others)?
-   - in many cases I have string just containing the English alphabet where latin1=utf8,
-     so this function will actually do nothing (except checking string lengths).
-     But utf-16 would require additional memory in any case
-   - I only convert between utf8-latin1 in the moment anyways, so just a single step is used
-   - utf-8 can store all unicode pages (unlike the often used ucs-2)
-  }
+  result := strConvert(str, from, toe);
 end;
 
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
@@ -1998,29 +2121,63 @@ end;
 {$ifndef HAS_CPSTRING}
 procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean);
 begin
-
+  UniqueString(s); //it does have some side effects
 end;
 {$endif}
 
 
 {$IFDEF fpc}
 
+var
+  oldUnicode2AnsiMoveProc : procedure(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
+  oldAnsi2UnicodeMoveProc : procedure(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);
+
+procedure myUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
+begin
+  case strActualEncoding(cp) of
+    CP_UTF32, CP_UTF32BE,
+    CP_UTF16, CP_UTF16BE,
+    CP_UTF8,
+    CP_WINDOWS1252, CP_LATIN1: strUnicode2AnsiMoveProc(source, dest, cp, len);
+    else oldUnicode2AnsiMoveProc(source, dest, cp, len);
+  end;
+end;
+
+procedure myAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);
+begin
+  case strActualEncoding(cp) of
+    CP_UTF32, CP_UTF32BE,
+    CP_UTF16, CP_UTF16BE,
+    CP_UTF8,
+    CP_WINDOWS1252, CP_LATIN1: strAnsi2UnicodeMoveProc(source, cp, dest, len);
+    else oldAnsi2UnicodeMoveProc(source, cp, dest, len);
+  end;
+end;
+
+procedure registerFallbackUnicodeConversion;
+begin
+  oldUnicode2AnsiMoveProc := widestringmanager.Unicode2AnsiMoveProc;
+  oldAnsi2UnicodeMoveProc := widestringmanager.Ansi2UnicodeMoveProc;
+  widestringmanager.Unicode2AnsiMoveProc := @myUnicode2AnsiMoveProc;
+  widestringmanager.Ansi2UnicodeMoveProc := @myAnsi2UnicodeMoveProc;
+end;
+
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 var
   destptr: PInteger;
   byteptr: PAnsiChar;
-  temp, charlen: Integer;
   last: Pointer;
+  builder: TStrBuilder;
 begin
   if len = 0 then begin
     dest := '';
     exit;
   end;
-  case cp of
+  case strActualEncoding(cp) of
     CP_UTF16, CP_UTF16BE: begin
       SetLength(dest, 2*len);
       move(source^, dest[1], 2 * len);
-      if cp <> {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF} then strSwapEndianWord(dest);
+      if cp <> CP_UTF16_NATIVE then strSwapEndianWord(dest);
     end;
     CP_UTF32, CP_UTF32BE: begin
       SetLength(dest, 4*len);
@@ -2033,39 +2190,33 @@ begin
         inc(len);
       end;
       if 4 * len <> length(dest) then SetLength(dest, 4*len);
-      if cp <> {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF} then strSwapEndianDWord(dest);
+      if cp <> CP_UTF32_NATIVE then strSwapEndianDWord(dest);
     end;
     CP_WINDOWS1252, CP_LATIN1: begin
       SetLength(dest, len);
       last := source + len;
       byteptr := @dest[1];
-      len := 0;
-      while source < last do begin
-        temp := strDecodeUTF16Character(source);
-        if temp > 255 then byteptr^ := '?'
-        else byteptr^ := chr(temp);
-        inc(byteptr);
-        inc(len);
+      case cp of
+        CP_LATIN1:
+          while source < last do begin
+            byteptr^ := charCodePointToLatin1(strDecodeUTF16Character(source));
+            inc(byteptr);
+          end;
+        CP_WINDOWS1252:
+          while source < last do begin
+            byteptr^ := charCodePointToCP1252(strDecodeUTF16Character(source));
+            inc(byteptr);
+          end;
       end;
-      if len <> length(dest) then SetLength(dest, len);
+      len := byteptr - @dest[1];
+      if len <> length(dest) then SetLength(dest, len); //if there were surrogates, the string becomes smaller
      end
     else begin//default utf8
-      SetLength(dest, len);
+      builder.init(@dest, len, CP_UTF8);
       last := source + len;
-      byteptr := @dest[1];
-      len := 0;
-      while source < last do begin
-        temp := strDecodeUTF16Character(source);
-        charlen := strGetUnicodeCharacterUTFLength(temp);
-        if len + charlen > length(dest) then begin
-          SetLength(dest, max(charlen, 2 * length(dest)));
-          byteptr := @dest[len+1];
-        end;
-        strGetUnicodeCharacterUTF(temp, byteptr);
-        inc(byteptr, charlen);
-        inc(len, charlen);
-      end;
-      if len <> length(dest) then SetLength(dest, len);
+      while source < last do
+        builder.appendCodePointToUtf8String(strDecodeUTF16Character(source));
+      builder.final;
      end
   end;
   SetCodePage(dest, cp, false);
@@ -2094,20 +2245,20 @@ var
 begin
   dest := '';
   if len = 0 then exit;
-  case cp of
+  case strActualEncoding(cp) of
     CP_UTF16, CP_UTF16BE: begin
       len := len - len and 1;
       if len = 0 then exit;
       SetLength(dest, len div 2);
       move(source^, dest[1], len);
-      if cp <> {$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF} then strSwapEndianWord(pointer(dest), length(dest));
+      if cp <> CP_UTF16_NATIVE then strSwapEndianWord(pointer(dest), length(dest));
     end;
     CP_UTF32, CP_UTF32BE: begin
       len := len - len and 3;
       if len = 0 then exit;
       SetLength(dest, len div 4);
       outlen := 0;
-      if cp = {$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF} then begin
+      if cp = CP_UTF32_NATIVE then begin
         for i := 1 to length(dest) do begin
           writeCodepoint(PInteger(source)^);
           inc(source, 4);
@@ -2127,12 +2278,22 @@ begin
       while len > 0 do
          writeCodepoint(strDecodeUTF8Character(source, len));
       if outlen <> length(dest) then SetLength(dest, outlen);
-     end
-     else begin
-       SetLength(dest, len);
-       for i := 0 to len - 1 do
-         dest[i+1] := widechar(byte(source[i]));
-     end;
+    end;
+    CP_WINDOWS1252: begin
+      SetLength(dest, len);
+      for i := 1 to len  do begin
+        if (ord(source^) < low(ENCODING_MAP_WINDOWS1252_TO_UNICODE)) or (ord(source^) > high(ENCODING_MAP_WINDOWS1252_TO_UNICODE)) then
+          dest[i] := widechar(byte(source^))
+         else
+          dest[i] := widechar(ENCODING_MAP_WINDOWS1252_TO_UNICODE[ord(source^)]);
+        inc(source);
+      end;
+    end
+    else begin
+      SetLength(dest, len);
+      for i := 0 to len - 1 do
+        dest[i+1] := widechar(byte(source[i]));
+    end;
   end;
 end;
 {$endif}
@@ -3088,6 +3249,16 @@ begin
   append(pchar(temp), length(temp));
 end;
 
+procedure TStrBuilder.appendCodePointToUtf8String(const codepoint: integer);
+var
+  l: Integer;
+begin
+  l := strGetUnicodeCharacterUTFLength(codepoint);
+  if next + l > bufferend then reserveadd(l);
+  strGetUnicodeCharacterUTF(codepoint, next);
+  inc(next, l);
+end;
+
 procedure TStrBuilder.appendCodePointWithEncodingConversion(const codepoint: integer);
 var
   temp: RawByteString;
@@ -3164,15 +3335,10 @@ begin
 end;
 
 procedure TStrBuilder.appendCodePoint(const codepoint: integer);
-var
-  l: sizeint;
 begin
   case encoding of
     CP_NONE, CP_UTF8: begin
-      l := strGetUnicodeCharacterUTFLength(codepoint);
-      if next + l > bufferend then reserveadd(l);
-      strGetUnicodeCharacterUTF(codepoint, next);
-      inc(next, l);
+      appendCodePointToUtf8String(codepoint);
       exit;
     end;
     CP_ASCII, CP_LATIN1: begin
@@ -4573,16 +4739,6 @@ function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; f
     if dhefStrict in flags then raise EDecodeHTMLEntitiesException.Create('Entity parse error before ' + p);
   end;
 
-const compatibilityFallbackMap: array[$80..$9F] of word = ( //from html5 standard. perhaps it is a windows-1252 -> unicode map?
-  $20AC,
-  $81, //2 digit code points remain unchanged
-  $201A, $0192, $201E, $2026, $2020, $2021, $02C6, $2030, $0160, $2039, $0152,
-  $8D,
-  $017D,
-  $8F, $90,
-  $2018, $2019, $201C, $201D, $2022, $2013, $2014, $02DC, $2122, $0161, $203A, $0153,
-  $9D,
-  $017E, $0178);
 
 var
     lastChar, marker: pchar;
@@ -4642,8 +4798,8 @@ begin
                 parseError;
               end else case entity of
                 $0001..$0008, $000B, $000D..$001F, $007F, $FDD0..$FDEF: parseError;
-                low(compatibilityFallbackMap)..high(compatibilityFallbackMap): begin
-                  entity := compatibilityFallbackMap[entity];
+                low(ENCODING_MAP_WINDOWS1252_TO_UNICODE)..high(ENCODING_MAP_WINDOWS1252_TO_UNICODE): begin
+                  entity := ENCODING_MAP_WINDOWS1252_TO_UNICODE[entity];
                   parseError;
                 end;
                 else if (entity and $FFFE) = $FFFE then parseError;

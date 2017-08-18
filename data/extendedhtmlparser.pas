@@ -1957,7 +1957,7 @@ begin
       cur := TTemplateElement(FTemplate.getLastTree.next);
       while cur <> nil do begin
         if (cur.templateAttributes<>nil) then
-          cur.templateAttributes.Text := strChangeEncoding(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
+          cur.templateAttributes.Text := strConvert(cur.templateAttributes.Text, ftemplate.getLastTree.getEncoding, OutputEncoding);
         if (cur.templateAttributes<>nil) or (cur.templateType in [tetCommandShortRead, tetCommandSiblingsHeaderOpen, tetCommandSiblingsOpen]) then
           cur.initializeCaches(self,true);
         cur := cur.templateNext;

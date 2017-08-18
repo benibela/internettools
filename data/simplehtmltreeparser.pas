@@ -1030,7 +1030,7 @@ end;
 procedure TTreeNode.changeEncoding(from, toe: TSystemCodePage; substituteEntities: boolean; trimText: boolean);
   function change(s: string): string;
   begin
-    result := strChangeEncoding(s, from, toe);
+    result := strConvert(s, from, toe);
     result := strNormalizeLineEndings(result);
     if substituteEntities then result := strDecodeHTMLEntities(result, toe, []);
     if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
@@ -1046,12 +1046,12 @@ begin
     case tree.typ of
       tetText: tree.value := change(tree.value);
       tetInternalDoNotUseCDATAText: begin
-        tree.value:=strNormalizeLineEndings(strChangeEncoding(tree.value, from, toe));
+        tree.value:=strNormalizeLineEndings(strConvert(tree.value, from, toe));
         tree.typ := tetText;
       end;
-      tetComment: tree.value:=strChangeEncoding(tree.value, from, toe);
+      tetComment: tree.value:=strConvert(tree.value, from, toe);
       tetProcessingInstruction: begin
-        tree.value:=trim(strNormalizeLineEndings(strChangeEncoding(tree.value, from, toe))); //line endings/trim needed?
+        tree.value:=trim(strNormalizeLineEndings(strConvert(tree.value, from, toe))); //line endings/trim needed?
         tree.hash := nodeNameHash(tree.value);
       end;
       tetDocument, tetOpen, tetClose: begin
@@ -2489,7 +2489,7 @@ var
   ns: INamespace;
   nsurl: string;
 begin
-  nsurl := strChangeEncoding(url, FXmlHeaderEncoding, FTargetEncoding);
+  nsurl := strConvert(url, FXmlHeaderEncoding, FTargetEncoding);
   nsurl := strDecodeHTMLEntities(nsurl, FTargetEncoding, [dhefAttribute]);
   nsurl := xmlStrWhitespaceCollapse(nsurl);
 

@@ -48,6 +48,13 @@ procedure test(a, b: extended; name: string = '');overload;
 begin
   if abs(a-b) > 0.0000001 then raise Exception.Create('test: '+name+': '+FloatToStr (a)+' <> '+FloatToStr(b));
 end;
+//test if a string has the encoding enc and the byte pattern b.
+procedure testrawstr(a: string; enc: TSystemCodePage; b: RawByteString; name: string = '');
+begin
+  {$ifdef FPC_HAS_CPSTRING}if enc <> CP_NONE then test(StringCodePage(a), enc, 'encoding' + name);{$endif}
+  SetCodePage(RawByteString(b), enc, false);
+  test(a, b, name);
+end;
 
 {%REPEAT}
 //{$DEFINE NO_ARRAY_UNITTEST}
@@ -56,6 +63,8 @@ end;
 procedure testStrResolveURI; forward;
 procedure testStrBuilder; forward;
 procedure testStrEntities; forward;
+procedure testStrConversions; forward;
+procedure testVariousStuff; forward;
 
 {$IFDEF FPC}
 procedure intArrayUnitTests;
@@ -611,18 +620,10 @@ const strs: array[1..20,1..2] of string=(
 
 var i:longint;
 
-var ar8: array[0..100] of shortint;
-    ar32: array[0..100] of longint;
-    ar64: array[0..100] of int64;
-    ai32: TLongintArray;
-    sa: TStringArray;
-    j: Integer;
-    y,m,d, allowYearZeroOffset: integer;
+var
+  y,m,d, allowYearZeroOffset: integer;
     ms: double;
     tz: TDateTime;
-    order: TBinarySearchChoosen;
-    e, f: TSystemCodePage;
-    unicodePages: array[1..5] of TSystemCodePage = (CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE );
 begin
   //parse date function
   for i:=1 to high(strs) do
@@ -771,6 +772,7 @@ begin
   stringUnitTests();
   testStrBuilder();
   testStrEntities;
+  testStrConversions;
 
   if not strliequal(pansichar(''), '', 0) then raise Exception.Create('strliequal failed');
   if not strliequal(pansichar('abcd'), 'abc', 3) then raise Exception.Create('strliequal failed');
@@ -813,45 +815,78 @@ begin
   test(strCompareClever('a00b000c2', 'a000b0000c1000'), -1);
   test(strCompareClever('a00b000c', 'a0b0000c'), 1);
 
+  testVariousStuff;
+end;
+
+procedure testStrConversions;
+var
+  temp: String;
+  e, f: TSystemCodePage;
+  unicodePages: array[1..5] of TSystemCodePage = (CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE );
+  asciiLikeCodePages: array[1..5] of TSystemCodePage = (CP_ACP, CP_ASCII, CP_LATIN1, CP_WINDOWS1252, CP_UTF8 );
+  i: Integer;
+
+function fromUTF16(cp: TSystemCodePage; const codes: array of word): RawByteString;
+var
+  p: PUnicodeChar;
+begin
+  if length(codes) = 0 then p := nil else p := PUnicodeChar(@codes[0]);
+  strUnicode2AnsiMoveProc(p, result, cp, length(codes));
+end;
+
+procedure testToUTF16(cp: TSystemCodePage; const s: RawByteString; const codes: array of word);
+var
+  temp16: unicodestring;
+  i: integer;
+begin
+  strAnsi2UnicodeMoveProc(pchar(s), cp, temp16, length(s));
+  test(length(temp16), length(codes));
+  for i := 0 to high(codes) do test(word(temp16[i+1]), codes[i]);
+end;
+
+begin
   //string conversion
   if strConvertToUtf8('a?=ßä'#$DF,CP_UTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
   if strConvertFromUtf8('a?=ßä'#$DF,CP_UTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
-  if strConvertToUtf8('abcdef',CP_Windows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
-  if strConvertFromUtf8('abcdef',CP_Windows1252)<>'abcdef' then raise Exception.Create('conversion of utf8=latin1 str failed');
-  if strConvertToUtf8('ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo',CP_Windows1252)<>'ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo' then
-     raise Exception.Create('conversion latin1->utf8 failed');
-  if strConvertFromUtf8('ha'#$C3#$84#$C3#$96#$C3#$9C'xyz'#$C3#$A4#$C3#$b6#$C3#$bc'llo',CP_Windows1252)<>'ha'#$C4#$D6#$DC'xyz'#$e4#$f6#$fc'llo' then
-     raise Exception.Create('conversion utf8->latin1 failed');
 
-  test(strGetUnicodeCharacter($79, CP_UTF16BE), #$00#$79);
-  test(strGetUnicodeCharacter($79, CP_UTF16), #$79#$00);
-  test(strGetUnicodeCharacter($20AC, CP_UTF16BE), #$20#$AC);
-  test(strGetUnicodeCharacter($20AC, CP_UTF16), #$AC#$20);
-  test(strGetUnicodeCharacter($1D11E, CP_UTF16BE), #$D8#$34#$DD#$1E);
-  test(strGetUnicodeCharacter($1D11E, CP_UTF16), #$34#$D8#$1E#$DD);
+  for e in asciiLikeCodePages do
+    for f in asciiLikeCodePages do begin
+      testrawstr(strConvert('abcdef'#$7F,e,f), f, 'abcdef'#$7F);
+      testrawstr(strConvert(#0#0#1,e,f), f, #0#0#1);
+    end;
 
-  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), CP_UTF16BE), #$D8#$34#$DD#$1E#$D8#$34#$DD#$1E);
-  test(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), CP_UTF16), #$34#$D8#$1E#$DD#$34#$D8#$1E#$DD);
+  //utf 16 endianness
+  testrawstr(strGetUnicodeCharacter($79, CP_UTF16BE), CP_UTF16BE, #$00#$79);
+  testrawstr(strGetUnicodeCharacter($79, CP_UTF16),  CP_UTF16, #$79#$00);
+  testrawstr(strGetUnicodeCharacter($20AC, CP_UTF16BE), CP_UTF16BE, #$20#$AC);
+  testrawstr(strGetUnicodeCharacter($20AC, CP_UTF16), CP_UTF16, #$AC#$20);
+  testrawstr(strGetUnicodeCharacter($1D11E, CP_UTF16BE), CP_UTF16BE, #$D8#$34#$DD#$1E);
+  testrawstr(strGetUnicodeCharacter($1D11E, CP_UTF16), CP_UTF16, #$34#$D8#$1E#$DD);
+
+  //utf-8 <-> utf-16
+  testrawstr(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), CP_UTF16BE), CP_UTF16BE, #$D8#$34#$DD#$1E#$D8#$34#$DD#$1E);
+  testrawstr(strConvertFromUtf8(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), CP_UTF16), CP_UTF16, #$34#$D8#$1E#$DD#$34#$D8#$1E#$DD);
 
   test('', strConvertToUtf8('', CP_UTF16BE));
   test('', strConvertToUtf8('', CP_UTF16));
-  test(#$79, strConvertToUtf8(#$00#$79, CP_UTF16BE));
-  test(#$79, strConvertToUtf8(#$79#$00, CP_UTF16));
-  test(#$79#$79, strConvertToUtf8(#$00#$79#$00#$79, CP_UTF16BE));
-  test(#$79#$79, strConvertToUtf8(#$79#$00#$79#$00, CP_UTF16));
+  testrawstr(strConvertToUtf8(#$00#$79, CP_UTF16BE), CP_UTF8, #$79);
+  testrawstr(strConvertToUtf8(#$79#$00, CP_UTF16), CP_UTF8, #$79);
+  testrawstr(strConvertToUtf8(#$00#$79#$00#$79, CP_UTF16BE), CP_UTF8, #$79#$79);
+  testrawstr(strConvertToUtf8(#$79#$00#$79#$00, CP_UTF16), CP_UTF8, #$79#$79);
   test(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), strConvertToUtf8(#$D8#$34#$DD#$1E#$D8#$34#$DD#$1E, CP_UTF16BE));
   test(strGetUnicodeCharacter($1D11E, CP_UTF8) + strGetUnicodeCharacter($1D11E, CP_UTF8), strConvertToUtf8(#$34#$D8#$1E#$DD#$34#$D8#$1E#$DD, CP_UTF16));
 
   test('', strConvertFromUtf8('', CP_UTF16BE));
   test('', strConvertFromUtf8('', CP_UTF16));
-  test(#$00#$79, strConvertFromUtf8(#$79, CP_UTF16BE));
-  test(#$79#$00, strConvertFromUtf8(#$79, CP_UTF16));
-  test(#$00#$79#$00#$79, strConvertFromUtf8(#$79#$79, CP_UTF16BE));
-  test(#$79#$00#$79#$00, strConvertFromUtf8(#$79#$79, CP_UTF16));
-  test(#00#00, strGetUnicodeCharacter(0, CP_UTF16BE));
-  test(#00#00, strGetUnicodeCharacter(0, CP_UTF16));
+  testrawstr(strConvertFromUtf8(#$79, CP_UTF16BE), CP_UTF16BE, #$00#$79);
+  testrawstr(strConvertFromUtf8(#$79, CP_UTF16), CP_UTF16, #$79#$00);
+  testrawstr(strConvertFromUtf8(#$79#$79, CP_UTF16BE), CP_UTF16BE, #$00#$79#$00#$79);
+  testrawstr(strConvertFromUtf8(#$79#$79, CP_UTF16), CP_UTF16, #$79#$00#$79#$00);
+  testrawstr(strGetUnicodeCharacter(0, CP_UTF16BE),CP_UTF16BE, #00#00);
+  testrawstr(strGetUnicodeCharacter(0, CP_UTF16), CP_UTF16, #00#00);
 
 
+  //utf-8 <-> utf-32
   test('', strConvertToUtf8('', CP_UTF32BE));
   test('', strConvertToUtf8('', CP_UTF32));
   test(#$79, strConvertToUtf8(#$00#$00#$00#$79, CP_UTF32BE));
@@ -861,26 +896,103 @@ begin
 
   test('', strConvertFromUtf8('', CP_UTF32BE));
   test('', strConvertFromUtf8('', CP_UTF32));
-  test(#$00#$00#$00#$79, strConvertFromUtf8(#$79, CP_UTF32BE));
-  test(#$79#$00#$00#$00, strConvertFromUtf8(#$79, CP_UTF32));
-  test(#$00#$00#$00#$79#$00#$00#$00#$79, strConvertFromUtf8(#$79#$79, CP_UTF32BE));
-  test(#$79#$00#$00#$00#$79#$00#$00#$00, strConvertFromUtf8(#$79#$79, CP_UTF32));
-  test(#00#00#00#00, strGetUnicodeCharacter(0, CP_UTF32BE));
-  test(#00#00#00#00, strGetUnicodeCharacter(0, CP_UTF32));
-
+  testrawstr(strConvertFromUtf8(#$79, CP_UTF32BE), CP_UTF32BE, #$00#$00#$00#$79);
+  testrawstr(strConvertFromUtf8(#$79, CP_UTF32), CP_UTF32, #$79#$00#$00#$00);
+  testrawstr(strConvertFromUtf8(#$79#$79, CP_UTF32BE), CP_UTF32BE, #$00#$00#$00#$79#$00#$00#$00#$79);
+  testrawstr(strConvertFromUtf8(#$79#$79, CP_UTF32), CP_UTF32, #$79#$00#$00#$00#$79#$00#$00#$00);
+  testrawstr(strGetUnicodeCharacter(0, CP_UTF32BE), CP_UTF32BE, #00#00#00#00);
+  testrawstr(strGetUnicodeCharacter(0, CP_UTF32), CP_UTF32, #00#00#00#00);
   for e in unicodePages do
     for f in unicodePages do begin
       test(strChangeEncoding('', e, f), '');
       test(strChangeEncoding(strGetUnicodeCharacter(0, e), e, f), strGetUnicodeCharacter(0, f));
       test(strChangeEncoding(strGetUnicodeCharacter($80, e), e, f), strGetUnicodeCharacter($80, f));
       test(strChangeEncoding(strGetUnicodeCharacter($123, e), e, f), strGetUnicodeCharacter($123, f));
-      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e), e, f), strGetUnicodeCharacter($1D11E, f));
-      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter($1D11F, f));
-      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(ord(' '), e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(ord(' '), f)+strGetUnicodeCharacter($1D11F, f));
-      test(strChangeEncoding(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(0, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(0, f)+strGetUnicodeCharacter($1D11F, f));
+      test(strConvert(strGetUnicodeCharacter($1D11E, e), e, f), strGetUnicodeCharacter($1D11E, f));
+      test(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter($1D11F, f));
+      test(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(ord(' '), e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(ord(' '), f)+strGetUnicodeCharacter($1D11F, f));
+      test(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(0, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(0, f)+strGetUnicodeCharacter($1D11F, f));
     end;
 
+  //1-Byte western encodings
+  setlength(temp, 256);
+  for i := 1 to length(temp) do temp[i] := chr(i-1);
+  for e in asciiLikeCodePages do
+    for f in asciiLikeCodePages do
+      testrawstr( strConvert(copy(temp, 1, $80), e, f), f, copy(temp, 1, $80));
+  testrawstr( strConvert(strCopyFrom(temp, $81), CP_LATIN1, CP_ASCII), CP_ASCII, strDup('?', 128));
+  testrawstr( strConvert(strCopyFrom(temp, $81), CP_WINDOWS1252, CP_ASCII), CP_ASCII, strDup('?', 128));
 
+  for e in unicodePages do begin
+    testrawstr( strConvert(strConvert(temp, CP_WINDOWS1252, e), e, CP_WINDOWS1252), CP_WINDOWS1252, temp);
+    testrawstr( strConvert(strConvert(temp, CP_LATIN1, e), e, CP_LATIN1), CP_LATIN1, temp);
+  end;
+
+  testrawstr( strConvert(temp, CP_UTF8, CP_LATIN1), CP_LATIN1, copy(temp, 1, $80) + #$C3 + strDup('?', 21)); //??? no idea what it is doing here, just making sure it does not crash on invalid utf-8
+  testrawstr( strConvert(temp, CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, copy(temp, 1, $80) + #$C3 + strDup('?', 21)); //???
+
+  for i := 0 to 255 do begin
+    temp := strGetUnicodeCharacter(i);
+    testrawstr(strConvert( chr(i), CP_LATIN1, CP_UTF8 ), CP_UTF8, temp);
+    testrawstr(strConvert( temp, CP_UTF8, CP_LATIN1 ), CP_LATIN1, chr(i));
+    if (i < $80) or (i > $9F) then begin
+      testrawstr(strConvert( chr(i), CP_WINDOWS1252, CP_LATIN1 ), CP_LATIN1, chr(i));
+      testrawstr(strConvert( chr(i), CP_LATIN1, CP_WINDOWS1252 ), CP_WINDOWS1252, chr(i));
+      testrawstr(strConvert( chr(i), CP_WINDOWS1252, CP_UTF8 ), CP_UTF8, temp);
+      testrawstr(strConvert( temp, CP_UTF8, CP_WINDOWS1252 ), CP_WINDOWS1252, chr(i));
+    end else begin
+      testrawstr(strConvert( chr(i), CP_WINDOWS1252, CP_LATIN1 ), CP_LATIN1, '?');
+      testrawstr(strConvert( chr(i), CP_LATIN1, CP_WINDOWS1252 ), CP_WINDOWS1252, '?');
+    end;
+  end;
+
+  testrawstr(strConvert(#128#129#130#131#132#133#134#135#136#137#138#139#140#141#142#143#144#145#146#147#148#149#150#151#152#153#154#155#156#157#158#159#160#161, CP_WINDOWS1252, CP_UTF8),CP_UTF8, '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ ¡');
+  testrawstr(strConvert('x'#$81#$82#$C0#$C1#$F5#$F6#$F7#$F8#$F9#$FA#$FB#$FC#$FD#$FE#$FF#$F0, CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, 'x'); //invalid utf-8
+  testrawstr(strConvert('x'#$81#$82#$C0#$C1#$F5#$F6#$F7#$F8#$F9#$FA#$FB#$FC#$FD#$FE#$FF#$F0, CP_UTF8, CP_LATIN1), CP_LATIN1, 'x'); //invalid utf-8
+  testrawstr(strConvert('€'#$C2#$81'•‹Ÿ', CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, #$80#$81#$95#$8B#$9F);
+
+  //more utf-16 tests
+  for e in unicodePages do test(fromUTF16(e,[]), '');
+  for e in asciiLikeCodePages do test(fromUTF16(e,[]), '');
+
+  for e in asciiLikeCodePages do testrawstr(fromUTF16(e, [$61, $62, $63, 0, 1, $7f]), e, 'abc'#0#1#$7F);
+
+  testrawstr(fromUTF16(CP_WINDOWS1252, [$20AC, $81, $2022, $2039, $178]), CP_WINDOWS1252, #$80#$81#$95#$8B#$9F);
+
+  testrawstr(fromUTF16(CP_UTF16,       [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_UTF16,   'x'#0#$E4#0#$AC#$20#$53#$D8#$5C#$DF);
+  testrawstr(fromUTF16(CP_UTF16BE,     [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_UTF16BE, #0'x'#0#$E4#$20#$AC#$D8#$53#$DF#$5C);
+  testrawstr(fromUTF16(CP_UTF32,       [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_UTF32,   'x'#0#0#0#$E4#0#0#0#$AC#$20#0#0#$5C#$4F#$02#0 );
+  testrawstr(fromUTF16(CP_UTF32BE,     [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_UTF32BE,  #0#0#0'x'#0#0#0#$E4#0#0#$20#$AC#0#$02#$4F#$5C);
+  testrawstr(fromUTF16(CP_WINDOWS1252, [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_WINDOWS1252, 'x'#$E4#$80'?');
+  testrawstr(fromUTF16(CP_LATIN1,      [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_LATIN1,      'x'#$E4'??');
+  testrawstr(fromUTF16(CP_UTF8,        [ord('x'), $E4, $20AC, $D853, $DF5C]), CP_UTF8,      'xä€𤽜');
+
+  testToUtf16( CP_UTF16,   'x'#0#$E4#0#$AC#$20#$53#$D8#$5C#$DF, [ord('x'), $E4, $20AC, $D853, $DF5C]);
+  testToUtf16( CP_UTF16BE, #0'x'#0#$E4#$20#$AC#$D8#$53#$DF#$5C, [ord('x'), $E4, $20AC, $D853, $DF5C]);
+  testToUtf16( CP_UTF32,   'x'#0#0#0#$E4#0#0#0#$AC#$20#0#0#$5C#$4F#$02#0 , [ord('x'), $E4, $20AC, $D853, $DF5C]);
+  testToUtf16( CP_UTF32BE,  #0#0#0'x'#0#0#0#$E4#0#0#$20#$AC#0#$02#$4F#$5C, [ord('x'), $E4, $20AC, $D853, $DF5C]);
+  testToUtf16( CP_WINDOWS1252, 'x'#$E4#$80'?', [ord('x'), $E4, $20AC, $3F]);
+  testToUtf16( CP_LATIN1,      'x'#$E4'??', [ord('x'), $E4, $3F, $3F]);
+  testToUtf16( CP_UTF8,      'xä€𤽜', [ord('x'), $E4, $20AC, $D853, $DF5C]);
+
+  //  testrawstr(fromUTF16(CP_UTF16BE, []), CP_UTF16BE, #0'x'#0'ä'#$20#$AC#$D8#$5C#$DF#$53);
+
+  {CP_UTF16, CP_UTF16BE
+  CP_UTF32, CP_UTF32BE
+  CP_WINDOWS1252, CP_LATIN1
+  CP_UTF8}
+end;
+
+procedure testVariousStuff;
+var
+  i, j: Integer;
+var ar8: array[0..100] of shortint;
+    ar32: array[0..100] of longint;
+    ar64: array[0..100] of int64;
+    ai32: TLongintArray;
+    sa: TStringArray;
+    order: TBinarySearchChoosen;
+begin
   test(strNormalizeLineEndings(#13#10), #10);
   test(strNormalizeLineEndings('foo'#10'b'#13'ar'#13#10), 'foo'#10'b'#10'ar'#10);
 
@@ -1665,8 +1777,6 @@ procedure testStrEntities;
     test(length(temp) = length(tempexpected));
   end;
 
-var
-  ok: Boolean;
 begin
   html('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;*&xyz;*', #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'*&xyz;*');
   html('&Auml;&Ouml;&Uuml;&auml;&ouml;&uuml;&xyz;&#78;&#x78;&#xC4', #$C3#$84#$C3#$96#$C3#$9C#$C3#$A4#$C3#$b6#$C3#$bc'&xyz;'#78#$78#$C3#$84);

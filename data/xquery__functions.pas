@@ -1807,7 +1807,7 @@ begin
   else raise EXQEvaluationException.create('pxp:binary', 'Unknown binary type: '+args[0].typeAnnotation.name);
 
   if argc > 1 then
-    exit(xqvalue(strChangeEncoding(raw, strEncodingFromName(args[1].toString), CP_UTF8)));
+    exit(xqvalue(strConvert(raw, strEncodingFromName(args[1].toString), CP_UTF8)));
 
   result := xqvalue(raw);
 end;
@@ -1817,7 +1817,7 @@ var
 begin
   //(string, encoding?) => binary
   data := args[0].toString;
-  if argc > 1 then data := strChangeEncoding(data, CP_UTF8, strEncodingFromName(args[1].toString));
+  if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
   result := TXQValueString.create(baseSchema.hexBinary, strEncodeHex(data));
 end;
 function xqFunctionString_To_base64Binary(argc: SizeInt; args: PIXQValue): IXQValue;
@@ -1826,7 +1826,7 @@ var
 begin
   //(string, encoding?) => binary
   data := args[0].toString;
-  if argc > 1 then data := strChangeEncoding(data, CP_UTF8, strEncodingFromName(args[1].toString));
+  if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
   result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
 end;
 
