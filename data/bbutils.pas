@@ -2815,10 +2815,12 @@ end;
 function strDup(rep: RawByteString; const count: integer): RawByteString;
 var
   i: Integer;
+  builder: TStrBuilder;
 begin
-  result := '';
+  builder.init(@result, length(rep) * count);
   for i:=1 to count do
-    result := result + rep;
+    builder.append(rep);
+  builder.final;
 end;
 
 function strIsAbsoluteURI(const s: RawByteString): boolean;
