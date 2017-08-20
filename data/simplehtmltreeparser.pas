@@ -1111,15 +1111,21 @@ end;
 
 function TTreeNode.deepNodeText(separator: string): string;
 var cur:TTreeNode;
+    builder: TStrBuilder;
 begin
   result:='';
   if self = nil then exit;
   cur := next;
+  builder.init(@result);
   while (cur<>nil) and (cur <> reverse) do begin
-    if cur.typ = tetText then result:=result+cur.value+separator;
+    if cur.typ = tetText then begin
+      builder.append(cur.value);
+      builder.append(separator);
+    end;
     cur := cur.next;
   end;
-  if (result<>'') and (separator<>'') then setlength(result,length(result)-length(separator));
+  if (not builder.isEmpty) and (separator<>'') then builder.chop(length(separator));
+  builder.final;
 end;
 
 function TTreeNode.outerXML(insertLineBreaks: boolean = false): string;
@@ -1583,7 +1589,8 @@ begin
   result := false;
 end;
 
-function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): string;
+function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): RawByteString;
+var builder: TStrBuilder;
 var known: TNamespaceList;
   encoding: TSystemCodePage;
   function requireNamespace(n: INamespace): string;
@@ -1593,9 +1600,9 @@ var known: TNamespaceList;
     result := ' ' + n.serialize;
   end;
 
-  function inner(n: TTreeNode): string; forward;
+  procedure inner(n: TTreeNode); forward;
 
-  function outer(n: TTreeNode): string;
+  procedure outer(n: TTreeNode);
     function attribEscape(const s: string): string; inline;
     begin
       if html then result := htmlStrEscape(s, true, encoding)
@@ -1607,22 +1614,31 @@ var known: TNamespaceList;
       i: Integer;
       temp: INamespace;
   begin
-    with n do
+    with n do with builder do
     case typ of
       tetText:
-        if not html then result := xmlStrEscape(value)
-        else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then result := value
-        else result := htmlStrEscape(value, false, encoding);
-      tetClose: result := '</'+getNodeName()+'>';
-      tetComment: result := '<!--'+value+'-->';
+        if not html then append(xmlStrEscape(value))
+        else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then append(value)
+        else append(htmlStrEscape(value, false, encoding));
+      tetClose:  begin;
+        append('</');
+        append(getNodeName());
+        append('>');
+      end;
+      tetComment: begin
+        append('<!--');
+        append(value);
+        append('-->');
+      end;
       tetProcessingInstruction: begin
-        result := '<?'+value;
-        if attributes <> nil then result += ' '+getAttribute('');
-        result += '?>';
+        append('<?'+value);
+        if attributes <> nil then append(' '+getAttribute(''));
+        append('?>');
       end;
       tetOpen: begin
         oldnamespacecount:=known.Count;
-        result := '<' + getNodeName();
+        append('<');
+        append(getNodeName());
 
         {
         writeln(stderr,'--');
@@ -1637,66 +1653,74 @@ var known: TNamespaceList;
           if (known.items[i].getURL <> '') or
              (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
                 and (isNamespaceUsed(known.items[i])
-                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then
-            result += ' '+known.items[i].serialize;
+                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
+                       append(' ');
+                       append(known.items[i].serialize);
+                     end;
 
         if namespace <> nil then result += requireNamespace(namespace)
         else if known.hasNamespacePrefix('', temp) then
           if temp.getURL <> '' then begin
             known.add(TNamespace.Make('', ''));
-            result += ' xmlns=""';
+            append(' xmlns=""');
           end;
         if attributes <> nil then
           for attrib in attributes do
-            result += requireNamespace(attrib.namespace);
+            append(requireNamespace(attrib.namespace));
 
 
         if attributes <> nil then
           for attrib in attributes do
-            if not attrib.isNamespaceNode then
-              result += ' ' + attrib.getNodeName()+'="'+ attribEscape(attrib.realvalue)+'"';
+            if not attrib.isNamespaceNode then begin
+              append(' ');
+              append(attrib.getNodeName());
+              append('="');
+              append(attribEscape(attrib.realvalue));
+              append('"');
+            end;
 
         if (next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
-          if html then result += '>'
-          else result += '/>';
+          if html then append('>')
+          else append('/>');
           if insertLineBreaks then Result+=LineEnding;
           while known.count > oldnamespacecount do
             known.Delete(known.count-1);
           exit();
         end;
-        result +='>';
-        if insertLineBreaks then Result+=LineEnding;
-        result += inner(n);
-        result+='</'+n.getNodeName()+'>';
+        append('>');
+        if insertLineBreaks then append(LineEnding);
+        inner(n);
+        append('</'); append(n.getNodeName()); append('>');
         if insertLineBreaks then Result+=LineEnding;
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
-      tetDocument: if html then result := innerHTML(insertLineBreaks) else result := innerXML(insertLineBreaks);
-      else result := ''; //should not happen
+      tetDocument: inner(n);
+      else; //should not happen
     end;
   end;
 
-  function inner(n: TTreeNode): string;
+  procedure inner(n: TTreeNode);
   var sub: TTreeNode;
   begin
-    result := '';
     if not (n.typ in TreeNodesWithChildren) then exit;
     sub := n.next;
     while sub <> n.reverse do begin
-      result += outer(sub);
+      outer(sub);
       if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
       else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
       else sub := sub.reverse.next;
     end;
   end;
 begin
+  builder.init(@result);
   known := TNamespaceList.Create;
   encoding := CP_NONE;
   if base.document is TTreeDocument then encoding := TTreeDocument(base.document).FEncoding;
-  if nodeSelf then result := outer(base)
-  else result := inner(base);
+  if nodeSelf then outer(base)
+  else inner(base);
   known.free;
+  builder.final;
 end;
 
 function TTreeNode.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
