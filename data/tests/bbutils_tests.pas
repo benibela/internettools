@@ -1709,8 +1709,11 @@ begin
   end;
 
   sb.init(@buffer, 2);
+  test(sb.isEmpty);
   sb.append(tempAlpha);
+  test(not sb.isEmpty);
   sb.appendHexEntity(1);
+  test(not sb.isEmpty);
   sb.final;
   test(buffer, tempAlpha + '&#x1;');
   sb.appendHexEntity(10);
@@ -1760,11 +1763,14 @@ begin
   test(buffer, #$24#$C2#$A2' aäü aäü');
 
   sb.chop(1);
+  test(not sb.isEmpty);
   sb.final;
   test(buffer, #$24#$C2#$A2' aäü aä');
 
   sb.chop(100);
+  test(sb.isEmpty);
   sb.append('x');
+  test(not sb.isEmpty);
   sb.final;
   test(buffer, 'x');
 

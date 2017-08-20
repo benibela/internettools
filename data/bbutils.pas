@@ -503,6 +503,7 @@ public
   procedure clear;
   procedure final;
   function count: SizeInt; inline;
+  function isEmpty: boolean; inline;
   procedure reserveadd(delta: SizeInt);
   procedure append(c: char); inline;
   procedure append(const s: RawByteString); inline;
@@ -3300,6 +3301,11 @@ end;
 function TStrBuilder.count: SizeInt;
 begin
   result := next - pointer(buffer^);
+end;
+
+function TStrBuilder.isEmpty: boolean;
+begin
+  result := pchar(buffer^) = next;
 end;
 
 procedure TStrBuilder.reserveadd(delta: SizeInt);
