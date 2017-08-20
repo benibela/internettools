@@ -510,6 +510,7 @@ public
   procedure append(const p: pchar; const l: SizeInt); inline;
   procedure appendBuffer(const block; l: LongInt); inline;
   procedure appendHexEntity(codepoint: integer);
+  procedure chop(removedCount: SizeInt);
 end;
 {$endif}
 
@@ -3377,6 +3378,12 @@ begin
     append(charEncodeHexDigitUp(  codepoint and $F ))
   end else appendHexNumber(codepoint);
   append(';');
+end;
+
+procedure TStrBuilder.chop(removedCount: SizeInt);
+begin
+  dec(next, removedCount);
+  if next < pointer(buffer^) then next := pointer(buffer^);
 end;
 
 procedure TStrBuilder.appendHexNumber(codepoint: integer);

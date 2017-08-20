@@ -1759,6 +1759,15 @@ begin
   test(length(buffer), 10);
   test(buffer, #$24#$C2#$A2' aäü aäü');
 
+  sb.chop(1);
+  sb.final;
+  test(buffer, #$24#$C2#$A2' aäü aä');
+
+  sb.chop(100);
+  sb.append('x');
+  sb.final;
+  test(buffer, 'x');
+
 end;
 
 procedure testStrEntities;
