@@ -2279,7 +2279,7 @@ begin
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
       attrib.hash := nodeNameHashCheckASCII(attrib.value);
     end;
-    if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and (FCurrentTree.baseURI = '') and new.hasAttribute('href') then
+    if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and ( (FCurrentTree.baseURI = '') or (FCurrentTree.baseURI = FCurrentTree.documentURI) ) and new.hasAttribute('href') then
       FCurrentTree.baseURI := strResolveURI(new.getAttribute('href'), FCurrentTree.documentURI);
   end;
   if (pos(':', new.value) > 0) then begin
