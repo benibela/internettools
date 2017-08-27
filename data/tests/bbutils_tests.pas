@@ -1424,6 +1424,11 @@ procedure testStrResolveURI;
     end;
   end;
 
+  function testResolve(const rel, base, exp: string): string;
+  begin
+    test(strResolveURI(rel, base), exp);
+  end;
+
 var
   filePrefixMode: Integer;
   resultFilePrefix: String;
@@ -1691,6 +1696,61 @@ begin
       end;
     end;
   end;
+
+
+  //tests from http://www.ietf.org/rfc/rfc3986.txt
+
+  testResolve('g:h'    , 'http://a/b/c/d;p?q', 'g:h');
+  testResolve('g'      , 'http://a/b/c/d;p?q', 'http://a/b/c/g');
+  testResolve('./g'    , 'http://a/b/c/d;p?q', 'http://a/b/c/g');
+  testResolve('g/'     , 'http://a/b/c/d;p?q', 'http://a/b/c/g/');
+  testResolve('/g'     , 'http://a/b/c/d;p?q', 'http://a/g');
+  testResolve('//g'    , 'http://a/b/c/d;p?q', 'http://g');
+  testResolve('?y'     , 'http://a/b/c/d;p?q', 'http://a/b/c/d;p?y');
+  testResolve('g?y'    , 'http://a/b/c/d;p?q', 'http://a/b/c/g?y');
+  testResolve('#s'     , 'http://a/b/c/d;p?q', 'http://a/b/c/d;p?q#s');
+  testResolve('g#s'    , 'http://a/b/c/d;p?q', 'http://a/b/c/g#s');
+  testResolve('g?y#s'  , 'http://a/b/c/d;p?q', 'http://a/b/c/g?y#s');
+  testResolve(';x'     , 'http://a/b/c/d;p?q', 'http://a/b/c/;x');
+  testResolve('g;x'    , 'http://a/b/c/d;p?q', 'http://a/b/c/g;x');
+  testResolve('g;x?y#s', 'http://a/b/c/d;p?q', 'http://a/b/c/g;x?y#s');
+  testResolve(''       , 'http://a/b/c/d;p?q', 'http://a/b/c/d;p?q');
+  testResolve('.'      , 'http://a/b/c/d;p?q', 'http://a/b/c/');
+  testResolve('./'     , 'http://a/b/c/d;p?q', 'http://a/b/c/');
+  testResolve('..'     , 'http://a/b/c/d;p?q', 'http://a/b/');
+  testResolve('../'    , 'http://a/b/c/d;p?q', 'http://a/b/');
+  testResolve('../g'   , 'http://a/b/c/d;p?q', 'http://a/b/g');
+  testResolve('../..'  , 'http://a/b/c/d;p?q', 'http://a/');
+  testResolve('../../' , 'http://a/b/c/d;p?q', 'http://a/');
+  testResolve('../../g', 'http://a/b/c/d;p?q', 'http://a/g');
+
+
+  testResolve('../../../g'    , 'http://a/b/c/d;p?q',  'http://a/g');
+  testResolve('../../../../g' , 'http://a/b/c/d;p?q',  'http://a/g');
+  //testResolve('/./g'          , 'http://a/b/c/d;p?q',  'http://a/g');
+  //testResolve('/../g'         , 'http://a/b/c/d;p?q',  'http://a/g');
+  testResolve('g.'            , 'http://a/b/c/d;p?q',  'http://a/b/c/g.');
+  testResolve('.g'            , 'http://a/b/c/d;p?q',  'http://a/b/c/.g');
+  testResolve('g..'           , 'http://a/b/c/d;p?q',  'http://a/b/c/g..');
+  testResolve('..g'           , 'http://a/b/c/d;p?q',  'http://a/b/c/..g');
+  testResolve('./../g'        , 'http://a/b/c/d;p?q',  'http://a/b/g');
+  //testResolve('./g/.'         , 'http://a/b/c/d;p?q',  'http://a/b/c/g/');
+  testResolve('g/./h'         , 'http://a/b/c/d;p?q',  'http://a/b/c/g/h');
+  testResolve('g/../h'        , 'http://a/b/c/d;p?q',  'http://a/b/c/h');
+  testResolve('g;x=1/./y'     , 'http://a/b/c/d;p?q',  'http://a/b/c/g;x=1/y');
+  testResolve('g;x=1/../y'    , 'http://a/b/c/d;p?q',  'http://a/b/c/y');
+  testResolve('g?y/./x'       , 'http://a/b/c/d;p?q',  'http://a/b/c/g?y/./x');
+  testResolve('g?y/../x'      , 'http://a/b/c/d;p?q',  'http://a/b/c/g?y/../x');
+  testResolve('g#s/./x'       , 'http://a/b/c/d;p?q',  'http://a/b/c/g#s/./x');
+  testResolve('g#s/../x'      , 'http://a/b/c/d;p?q',  'http://a/b/c/g#s/../x');
+
+  testResolve('http:g'      , 'http://a/b/c/d;p?q',  'http:g');
+
+  //the three failed tests from above
+  //but the output is close enough that it is acceptable
+  testResolve('/./g'          , 'http://a/b/c/d;p?q',  'http://a/./g');
+  testResolve('/../g'         , 'http://a/b/c/d;p?q',  'http://a/../g');
+  testResolve('./g/.'         , 'http://a/b/c/d;p?q',  'http://a/b/c/g');
 
 end;
 

@@ -3016,8 +3016,10 @@ var
 begin
   p := pos('#', base);
   if p > 0 then delete(base, p, length(base) - p + 1);
-  p := pos('?', base);
-  if p > 0 then delete(base, p, length(base) - p + 1);
+  if (rel <> '') and not strbeginswith(rel, '#') then begin //keeping base query, if rel is empty except for fragment
+    p := pos('?', base);
+    if p > 0 then delete(base, p, length(base) - p + 1);
+  end;
   schemeLength := pos(':', base); inc(schemeLength);
   if (schemeLength <= length(base)) and (base[schemeLength] = '/') then inc(schemeLength);
   if (schemeLength <= length(base)) and (base[schemeLength] = '/') then inc(schemeLength);
