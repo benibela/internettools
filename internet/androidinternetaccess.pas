@@ -317,6 +317,8 @@ var
   m: THttpMethod;
   jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext: jobject;
   args: array[0..1] of jvalue;
+  connectionResetRepeat: integer;
+  connectionReset: Boolean;
 begin
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
@@ -327,77 +329,99 @@ begin
   m := methodStringToMethod(method);
   with stack do begin
     classInfos := initializeClasses(); //todo: cache?
+
+    connectionResetRepeat := 5;
+    connectionReset := true;
     try
-      with classInfos do begin;
-        //HttpGet httpget = new HttpGet(url);
-        jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
-        jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
-        if ExceptionCheckAndClear then exit;
-        j.DeleteLocalRef(jUrl);
-
-        enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, @stack);
-        if (not data.isEmpty) and (m in [hmPut, hmPost]) then
-          if not setRequestData() then begin
-            lastErrorDetails:= 'Failed to set request data';
-            exit;
-          end;
-
-        jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
-        if ExceptionCheckAndClear then exit;
-
-        if url.username <> '' then
-          //problem: this is host specific, so it does not work for redirections
-          if not setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ) then begin
-            lastErrorDetails:= 'Failed to set credentials';
-            exit;
-          end;
-
-
-        //send
-        args[0].l := jRequest;
-        args[1].l := jContext;
-        jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @args);;
-
-        if ExceptionCheckAndClear then exit;
-
+      while connectionReset do begin
+        connectionReset := false;
         try
-          //process
-          jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
-          if ExceptionCheckAndClear then exit;
+          with classInfos do begin;
+            //HttpGet httpget = new HttpGet(url);
+            jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
+            jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
+            if ExceptionCheckAndClear then exit;
+            j.DeleteLocalRef(jUrl);
 
-          jStatusLine := j.callObjectMethodChecked(jResponse, jmHttpResponseGetStatusLine);
-          lastHTTPResultCode := j.callIntMethodChecked(jStatusLine, jmStatusLineGetStatusCode);
-          lastErrorDetails := j.jStringToStringAndDelete(j.callObjectMethodChecked(jStatusLine, jmStatusLineGetReasonPhrase));
-          j.DeleteLocalRef(jStatusLine);
+            enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, @stack);
+            if (not data.isEmpty) and (m in [hmPut, hmPost]) then
+              if not setRequestData() then begin
+                lastErrorDetails:= 'Failed to set request data';
+                exit;
+              end;
 
-          try
-            lastHTTPHeaders.Clear;
-            jHeaderIterator := j.callObjectMethodChecked(jResponse,  jmHttpMessageHeaderIterator);
-            while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
-              jHeader := j.callObjectMethodChecked(jHeaderIterator,  jmHeaderIteratorNextHeader);
-              lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetName)) + ':'+
-                                  j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetValue)));
-              j.DeleteLocalRef(jHeader);
+            jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
+            if ExceptionCheckAndClear then exit;
+
+            if url.username <> '' then
+              //problem: this is host specific, so it does not work for redirections
+              if not setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ) then begin
+                lastErrorDetails:= 'Failed to set credentials';
+                exit;
+              end;
+
+
+            //send
+            args[0].l := jRequest;
+            args[1].l := jContext;
+            jResponse := j.CallObjectMethod(jhttpclient,  jmDefaultHttpClientExecute, @args);;
+
+            if ExceptionCheckAndClear then exit;
+
+            try
+              //process
+              jResult := j.CallObjectMethod(jResponse,  jmHttpResponseGetEntity);
+              if ExceptionCheckAndClear then exit;
+
+              jStatusLine := j.callObjectMethodChecked(jResponse, jmHttpResponseGetStatusLine);
+              lastHTTPResultCode := j.callIntMethodChecked(jStatusLine, jmStatusLineGetStatusCode);
+              lastErrorDetails := j.jStringToStringAndDelete(j.callObjectMethodChecked(jStatusLine, jmStatusLineGetReasonPhrase));
+              j.DeleteLocalRef(jStatusLine);
+
+              try
+                lastHTTPHeaders.Clear;
+                jHeaderIterator := j.callObjectMethodChecked(jResponse,  jmHttpMessageHeaderIterator);
+                while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
+                  jHeader := j.callObjectMethodChecked(jHeaderIterator,  jmHeaderIteratorNextHeader);
+                  lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetName)) + ':'+
+                                      j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetValue)));
+                  j.DeleteLocalRef(jHeader);
+                end;
+                j.DeleteLocalRef(jHeaderIterator);
+
+                j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @writeBlock);
+              finally
+                j.DeleteLocalRef(jResult);
+              end;
+
+              if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
+                ExceptionCheckAndClear
+                //log('Warning: Ignoring exception');
+              end;
+
+            finally
+              if  jResponse <> nil then
+                j.DeleteLocalRef(jResponse);
             end;
-            j.DeleteLocalRef(jHeaderIterator);
 
-            j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @writeBlock);
-          finally
-            j.DeleteLocalRef(jResult);
+            j.deleteLocalRef(jRequest);
+            j.deleteLocalRef(jContext);
           end;
-
-          if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
-            ExceptionCheckAndClear
-            //log('Warning: Ignoring exception');
+        except
+          on e: EAndroidInterfaceException do begin
+            if (connectionResetRepeat > 0)
+               and (
+                 (strContains(e.Message, 'javax.net.ssl.SSLException') and strContains(e.Message, 'I/O error during system call'))
+                 or (strContains(e.Message, 'java.net.SocketException') and strContains(e.Message, 'recvfrom failed: ETIMEDOUT'))
+                 or (strContains(e.Message, 'javax.net.ssl.SSLHandshakeException') and strContains(e.Message, 'I/O error during system call'))
+               )
+            then begin
+              dec(connectionResetRepeat);
+              Sleep(2000);
+              connectionReset := true;
+            end else raise e;
           end;
-
-        finally
-          if  jResponse <> nil then
-            j.DeleteLocalRef(jResponse);
         end;
-
-        j.deleteLocalRef(jRequest);
-        j.deleteLocalRef(jContext);
       end;
     finally
       freeClasses(classInfos);
