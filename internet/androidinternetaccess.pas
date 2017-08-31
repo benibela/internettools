@@ -318,7 +318,7 @@ var
   jUrl, jResponse, jResult, jStatusLine, jHeaderIterator, jHeader, jContext: jobject;
   args: array[0..1] of jvalue;
   connectionResetRepeat: integer;
-  connectionReset: Boolean;
+  connectionReset, needRequestData: Boolean;
 begin
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
@@ -327,6 +327,7 @@ begin
   end;
 
   m := methodStringToMethod(method);
+  needRequestData := m in [hmPut, hmPost];
   with stack do begin
     classInfos := initializeClasses(); //todo: cache?
 
@@ -344,7 +345,7 @@ begin
             j.DeleteLocalRef(jUrl);
 
             enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, @stack);
-            if (not data.isEmpty) and (m in [hmPut, hmPost]) then
+            if (not data.isEmpty) and needRequestData then
               if not setRequestData() then begin
                 lastErrorDetails:= 'Failed to set request data';
                 exit;
@@ -411,9 +412,13 @@ begin
           on e: EAndroidInterfaceException do begin
             if (connectionResetRepeat > 0)
                and (
-                 (strContains(e.Message, 'javax.net.ssl.SSLException') and strContains(e.Message, 'I/O error during system call'))
-                 or (strContains(e.Message, 'java.net.SocketException') and strContains(e.Message, 'recvfrom failed: ETIMEDOUT'))
-                 or (strContains(e.Message, 'javax.net.ssl.SSLHandshakeException') and strContains(e.Message, 'I/O error during system call'))
+                ((strContains(e.Message, 'javax.net.ssl.SSLHandshakeException') and strContains(e.Message, 'I/O error during system call')))
+                or (not needRequestData and
+                    (
+                    (strContains(e.Message, 'javax.net.ssl.SSLException') and strContains(e.Message, 'I/O error during system call'))
+                    or (strContains(e.Message, 'java.net.SocketException') and strContains(e.Message, 'recvfrom failed: ETIMEDOUT'))
+                    )
+                   )
                )
             then begin
               dec(connectionResetRepeat);
