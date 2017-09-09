@@ -262,6 +262,7 @@ var
   pv: PIXQValue;
   first: Boolean;
   enum: TXQValueEnumeratorPtrUnsafe;
+  n: TTreeNode;
 begin
   case kind of
     pvkUndefined:  result := '()';
@@ -274,7 +275,14 @@ begin
     pvkQName, pvkDateTime:
       result := qualifiedTypeName(escapeToXQueryString(toString), '' );
 
-    pvkNode:       result := toNode.outerXML();
+    pvkNode:       begin
+      n := toNode;
+      case n.typ of
+        tetDocument: result := 'document { ' + n.outerXML() + ' }';
+        tetAttribute: result := 'attribute ' + n.getNodeName() + ' {' + escapeToXQueryString(TTreeAttribute(n).realvalue) +  '}';
+        else result := toNode.outerXML();
+      end;
+    end;
     pvkObject:     result := jsonSerialize(tnsXML);
     pvkArray, pvkSequence:      begin
       if kind = pvkSequence then begin
