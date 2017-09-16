@@ -896,6 +896,7 @@ begin
   result := strActualEncoding(StringCodePage(str));
 end;
 
+
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 begin
   //this is basically TranslatePlaceholderCP, but that is unaccessible in fpc's astrings.inc
@@ -904,6 +905,10 @@ begin
                       {$else}{$ifdef windows}GetACP
                       {$else}CP_UTF8
                       {$endif}{$endif};
+    {$ifdef windows}{$ifndef WINCE}
+    CP_OEMCP: result := GetOEMCP;
+    {$endif}{$endif}
+
     else result := e;
   end;
 end;
