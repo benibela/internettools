@@ -123,6 +123,8 @@ const
 {$ifndef FPC_HAS_CPSTRING}
 type TSystemCodePage     = Word;
 const
+  CP_ACP = 0;
+  CP_OEMCP   = 1;
   CP_UTF16   = 1200;
   CP_UTF16BE = 1201;
   CP_UTF8    = 65001;
@@ -392,13 +394,14 @@ function strDecodeUTF16Character(var source: PUnicodeChar): integer;
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in chars.
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in bytes
 {$IFDEF fpc}
-procedure registerFallbackUnicodeConversion;
+procedure registerFallbackUnicodeConversion; {$ifndef HAS_CPSTRING} deprecated 'Codepage aware extension requires fpc >=3';{$endif}
 function strEncodingFromName(str:RawByteString):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 //this can return CP_ACP (perhaps i will change that)
 function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 {$ENDIF}
 {$ifndef HAS_CPSTRING}
+function StringCodePage(const str: RawByteString): TSystemCodePage;
 procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean=True); //**< no-op function, so not every SetCodePage has to be wrapped in ifdefs
 {$endif}
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
@@ -874,6 +877,17 @@ begin
   move(source^,dest^,min(sourceLen,destLen)*sizeof(widechar));
   result:=dest;
 end;
+
+{$ifndef HAS_CPSTRING}
+function StringCodePage(const str: RawByteString): TSystemCodePage;
+begin
+  result := CP_ACP;
+end;
+procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean);
+begin
+  UniqueString(s); //it does have some side effects
+end;
+{$endif}
 
 //---------------------Comparison----------------------------
 
@@ -2120,13 +2134,6 @@ end;
 
 
 
-{$ifndef HAS_CPSTRING}
-procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean);
-begin
-  UniqueString(s); //it does have some side effects
-end;
-{$endif}
-
 
 {$IFDEF fpc}
 
@@ -2158,10 +2165,12 @@ end;
 
 procedure registerFallbackUnicodeConversion;
 begin
+  {$ifdef FPC_HAS_CPSTRING}
   oldUnicode2AnsiMoveProc := widestringmanager.Unicode2AnsiMoveProc;
   oldAnsi2UnicodeMoveProc := widestringmanager.Ansi2UnicodeMoveProc;
   widestringmanager.Unicode2AnsiMoveProc := @myUnicode2AnsiMoveProc;
   widestringmanager.Ansi2UnicodeMoveProc := @myAnsi2UnicodeMoveProc;
+  {$endif}
 end;
 
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
@@ -2390,13 +2399,17 @@ end;
 {$IFDEF fpc}
 function strEncodingFromName(str: RawByteString): TSystemCodePage;
 begin
-  result := CodePageNameToCodePage(str);
+  result := {$ifdef HAS_CPSTRING}CodePageNameToCodePage(str){$else}$FFFF{$endif};
   if result = $FFFF then begin
     str := LowerCase(str);
     case str of
-      'utf8': result := CP_UTF8;
+      //missing in fpc3
+       'utf8': result := CP_UTF8;
       'utf-32le': result := CP_UTF32;
       'oem': result := CP_OEMCP;
+      //fpc 2 compatibility
+      'utf-8': result := CP_UTF8;
+      'latin1': result := CP_LATIN1;
       else if strBeginsWith(str, 'cp') then result := StrToIntDef(strAfter(str, 'cp'), CP_NONE);
     end;
   end;
