@@ -38,7 +38,7 @@ implementation
 
 uses xquery, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex,
 
-  {$IFDEF USE_BBFLRE_UNICODE}FLREUnicode,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
+  {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
   {$IFDEF USE_THEO_UNICODE}unicodeinfo{$ENDIF} //from http://wiki.lazarus.freepascal.org/Theodp
 
@@ -1890,25 +1890,13 @@ end;
 
 {$IFDEF USE_BBFLRE_UNICODE}
 function cpToUppercase(cp: integer): integer; inline;
-var
-  Value: LongInt;
 begin
-  result := cp;
-  if result<=$10ffff then begin
-    Value:=result shr FLREUnicodeUpperCaseDeltaArrayBlockBits;
-    result:=longword(longint(result+FLREUnicodeUpperCaseDeltaArrayBlockData[FLREUnicodeUpperCaseDeltaArrayIndexBlockData[FLREUnicodeUpperCaseDeltaArrayIndexIndexData[Value shr FLREUnicodeUpperCaseDeltaArrayIndexBlockBits],Value and FLREUnicodeUpperCaseDeltaArrayIndexBlockMask],result and FLREUnicodeUpperCaseDeltaArrayBlockMask]));
-   end;
+  result := PUCUUnicodeGetUpperCaseDeltaFromTable(cp);
 end;
 
 function cpToLowercase(cp: integer): integer; inline;
-var
-  Value: LongInt;
 begin
-  result := cp;
-  if result<=$10ffff then begin
-    Value:=result shr FLREUnicodeLowerCaseDeltaArrayBlockBits;
-    result:=longword(longint(result+FLREUnicodeLowerCaseDeltaArrayBlockData[FLREUnicodeLowerCaseDeltaArrayIndexBlockData[FLREUnicodeLowerCaseDeltaArrayIndexIndexData[Value shr FLREUnicodeLowerCaseDeltaArrayIndexBlockBits],Value and FLREUnicodeLowerCaseDeltaArrayIndexBlockMask],result and FLREUnicodeLowerCaseDeltaArrayBlockMask]));
-  end;
+  result := PUCUUnicodeGetLowerCaseDeltaFromTable(cp);
 end;
 {$ELSE}
 function cpToUppercase(cp: integer): integer; inline;
