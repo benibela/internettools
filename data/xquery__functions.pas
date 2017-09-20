@@ -1891,12 +1891,12 @@ end;
 {$IFDEF USE_BBFLRE_UNICODE}
 function cpToUppercase(cp: integer): integer; inline;
 begin
-  result := PUCUUnicodeGetUpperCaseDeltaFromTable(cp);
+  result := cp + PUCUUnicodeGetUpperCaseDeltaFromTable(cp);
 end;
 
 function cpToLowercase(cp: integer): integer; inline;
 begin
-  result := PUCUUnicodeGetLowerCaseDeltaFromTable(cp);
+  result := cp + PUCUUnicodeGetLowerCaseDeltaFromTable(cp);
 end;
 {$ELSE}
 function cpToUppercase(cp: integer): integer; inline;
