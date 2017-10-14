@@ -240,7 +240,7 @@ end;
 {%END-REPEAT}
 
 //=========================Conditional additions======================
-{%REPEAT T__ElementType__, [integer, cardinal, RawByteString, int64]}
+{%REPEAT T__ElementType__, [integer, cardinal, string, int64]}
 function unequal(const a, b: T__ElementType__): boolean;
 begin
   result := a <> b;
@@ -265,7 +265,7 @@ end;
 
 
 {%REPEAT strLastIndexOf, [ strLastIndexOf, striLastIndexOf ] }
-function strLastIndexOf(const str: RawByteString; const searched: RawByteString): longint;
+function strLastIndexOf(const str: string; const searched: string): longint;
 begin
   result := strLastIndexOf(str, searched, 1);
 end;
@@ -275,7 +275,7 @@ end;
 
 {%REPEAT _CASESENSITIVEMODIFIER_, [, i]}
 
-function str_CASESENSITIVEMODIFIER_Between(const s, from, till: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_Between(const s, from, till: string): string;
 var
   i, j: Integer;
 begin
@@ -291,7 +291,7 @@ end;
 
 {%REPEAT _LASTMODIFIER_, [, Last]}
 
-function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -300,7 +300,7 @@ begin
   else result := copy(s, 1, i-1);
 end;
 
-function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: string): string;
 var
   i: Integer;
 begin

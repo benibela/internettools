@@ -1335,7 +1335,8 @@ begin
   result := true;
 end;}
 
-type TXQCollationStrBoolFunction = function (const a,b: RawByteString): boolean;
+type TXQCollationRawStrBoolFunction = function (const a,b: RawByteString): boolean;
+type TXQCollationStrBoolFunction = function (const a,b: string): boolean;
 
 function THtmlTemplateParser.templateElementFitHTMLOpen(html: TTreeNode;
   template: TTemplateElement): Boolean;
@@ -1350,7 +1351,12 @@ var
   regexp: TWrappedRegExpr;
   caseSensitive: Boolean;
 
-  function fi(cs, csi: TXQCollationStrBoolFunction): TXQCollationStrBoolFunction;inline;
+  function fir(cs, csi: TXQCollationRawStrBoolFunction): TXQCollationRawStrBoolFunction;inline; overload;
+  begin
+    if caseSensitive then result := cs
+    else result := csi;
+  end;
+  function fis(cs, csi: TXQCollationStrBoolFunction): TXQCollationStrBoolFunction;inline; overload;
   begin
     if caseSensitive then result := cs
     else result := csi;
@@ -1378,20 +1384,20 @@ begin
     end;
     case strategy of
       'eq', 'is' {is is deprecated}:
-        if not fi(@strEqual, @striEqual)(html.getAttribute(name), attrib.realvalue) then
+        if not fir(@strEqual, @striEqual)(html.getAttribute(name), attrib.realvalue) then
           exit(false);
       'list-contains': begin
         templateList := strSplit(attrib.realvalue, ' ', false);
         htmlList := strSplit(html.getAttribute(name), ' ', false);
         for j:=0 to high(templateList) do begin
           found := false;
-          for k:= 0 to high(htmlList) do if fi(@strEqual, @striEqual)(templateList[j], htmlList[k]) then begin found := true; break; end;
+          for k:= 0 to high(htmlList) do if fir(@strEqual, @striEqual)(templateList[j], htmlList[k]) then begin found := true; break; end;
           if not found then exit(false);
         end;
       end;
-      'starts-with': if not fi(@strBeginsWith, @striBeginsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
-      'ends-with':   if not fi(@strEndsWith, @striEndsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
-      'contains':    if not fi(@strContains, @striContains)(html.getAttribute(name), attrib.realvalue) then exit(false);
+      'starts-with': if not fis(@strBeginsWith, @striBeginsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
+      'ends-with':   if not fis(@strEndsWith, @striEndsWith)(html.getAttribute(name), attrib.realvalue) then exit(false);
+      'contains':    if not fis(@strContains, @striContains)(html.getAttribute(name), attrib.realvalue) then exit(false);
       'matches':     begin
         if caseSensitive then regexp:=wregexprParse(attrib.realvalue, [wrfSingleLine])
         else regexp:=wregexprParse(attrib.realvalue,  [wrfIgnoreCase,wrfSingleLine]);

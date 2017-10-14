@@ -314,11 +314,11 @@ function unequal(const a, b, c: cardinal): boolean; overload;
 function unequal(const a: array of cardinal): boolean; overload;
 
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b: RawByteString): boolean; overload;
+function unequal(const a, b: string): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a, b, c: RawByteString): boolean; overload;
+function unequal(const a, b, c: string): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
-function unequal(const a: array of RawByteString): boolean; overload;
+function unequal(const a: array of string): boolean; overload;
 
 //**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b: int64): boolean; overload;
@@ -330,31 +330,31 @@ function unequal(const a: array of int64): boolean; overload;
 
 
 //** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
-function strBetween(const s, from, till: RawByteString): RawByteString;
+function strBetween(const s, from, till: string): string;
 
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function strBefore(const s, sep: RawByteString): RawByteString; overload;
+function strBefore(const s, sep: string): string; overload;
 //** If the string s has the form '...sepEND' it returns 'END'
-function strAfter(const s, sep: RawByteString): RawByteString; overload;
+function strAfter(const s, sep: string): string; overload;
 
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function strBeforeLast(const s, sep: RawByteString): RawByteString; overload;
+function strBeforeLast(const s, sep: string): string; overload;
 //** If the string s has the form '...sepEND' it returns 'END'
-function strAfterLast(const s, sep: RawByteString): RawByteString; overload;
+function strAfterLast(const s, sep: string): string; overload;
 
 
 //** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
-function striBetween(const s, from, till: RawByteString): RawByteString;
+function striBetween(const s, from, till: string): string;
 
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function striBefore(const s, sep: RawByteString): RawByteString; overload;
+function striBefore(const s, sep: string): string; overload;
 //** If the string s has the form '...sepEND' it returns 'END'
-function striAfter(const s, sep: RawByteString): RawByteString; overload;
+function striAfter(const s, sep: string): string; overload;
 
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function striBeforeLast(const s, sep: RawByteString): RawByteString; overload;
+function striBeforeLast(const s, sep: string): string; overload;
 //** If the string s has the form '...sepEND' it returns 'END'
-function striAfterLast(const s, sep: RawByteString): RawByteString; overload;
+function striAfterLast(const s, sep: string): string; overload;
 
 
 

@@ -77,7 +77,7 @@ function arrayEqual(a, b: array of T__ElementType__; slice1a: integer = -1; slic
 {%END-REPEAT}
 
 //-----------------------Conditional additions------------------------
-{%REPEAT T__ElementType__, [integer, cardinal, RawByteString, int64]}
+{%REPEAT T__ElementType__, [integer, cardinal, string, int64]}
 //**Checks if all elements are pairwise @noAutoLink(unequal)
 function unequal(const a, b: T__ElementType__): boolean; overload;
 //**Checks if all elements are pairwise @noAutoLink(unequal)
@@ -88,12 +88,12 @@ function unequal(const a: array of T__ElementType__): boolean; overload;
 
 {%REPEAT _CASESENSITIVEMODIFIER_, [, i]}
 //** If the string s has the form '...fromMIDDLEtill...' it returns 'MIDDLE'
-function str_CASESENSITIVEMODIFIER_Between(const s, from, till: RawByteString): RawByteString;
+function str_CASESENSITIVEMODIFIER_Between(const s, from, till: string): string;
 {%REPEAT _LASTMODIFIER_, [, Last]}
 //** If the string s has the form 'STARTsep...' it returns 'START'
-function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: RawByteString): RawByteString; overload;
+function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: string): string; overload;
 //** If the string s has the form '...sepEND' it returns 'END'
-function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: RawByteString): RawByteString; overload;
+function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: string): string; overload;
 {%END-REPEAT}
 {%END-REPEAT}
 

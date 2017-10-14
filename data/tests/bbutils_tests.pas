@@ -780,7 +780,7 @@ begin
   if strliequal(pansichar('abcd'), 'abcd', 3) then raise Exception.Create('strliequal failed');
 
   if strLengthUtf8('hallo') <> 5 then raise Exception.Create('strLengthUtf8 failed, 1');
-  if strLengthUtf8('hallo'#$C3#$84'<<') <> 8 then raise Exception.Create('strLengthUtf8 failed, 2');
+  test(strLengthUtf8('hallo'#$C3#$84'<<'), 8);
   if strGetUnicodeCharacter($C4) <> #$C3#$84 then raise Exception.Create('strGetUnicodeCharacter failed, 1');
 
 
@@ -846,8 +846,8 @@ end;
 
 begin
   //string conversion
-  if strConvertToUtf8('a?=ßä'#$DF,CP_UTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
-  if strConvertFromUtf8('a?=ßä'#$DF,CP_UTF8)<>'a?=ßä'#$DF then raise Exception.Create('Non conversion failed');
+  testrawstr(strConvertToUtf8('a?=ßä'#$DF,CP_UTF8), CP_UTF8, 'a?=ßä'#$DF);
+  testrawstr(strConvertFromUtf8(UTF8String('a?=ßä'#$DF),CP_UTF8), CP_UTF8, UTF8String('a?=ßä'#$DF));
 
   for e in asciiLikeCodePages do
     for f in asciiLikeCodePages do begin

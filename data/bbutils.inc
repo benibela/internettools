@@ -1172,17 +1172,17 @@ begin
   result := false;
 end;
 
-function unequal(const a, b: RawByteString): boolean;
+function unequal(const a, b: string): boolean;
 begin
   result := a <> b;
 end;
 
-function unequal(const a, b, c: RawByteString): boolean;
+function unequal(const a, b, c: string): boolean;
 begin
   result := (a <> b) or (a <> c) or (b <> c);
 end;
 
-function unequal(const a: array of RawByteString): boolean;
+function unequal(const a: array of string): boolean;
 var
   i,j: Integer;
 begin
@@ -1217,12 +1217,12 @@ end;
 
 
 
-function strLastIndexOf(const str: RawByteString; const searched: RawByteString): longint;
+function strLastIndexOf(const str: string; const searched: string): longint;
 begin
   result := strLastIndexOf(str, searched, 1);
 end;
 
-function striLastIndexOf(const str: RawByteString; const searched: RawByteString): longint;
+function striLastIndexOf(const str: string; const searched: string): longint;
 begin
   result := striLastIndexOf(str, searched, 1);
 end;
@@ -1786,7 +1786,7 @@ const entityCode: array[0..25382] of byte = (
 
 
 
-function strBetween(const s, from, till: RawByteString): RawByteString;
+function strBetween(const s, from, till: string): string;
 var
   i, j: Integer;
 begin
@@ -1802,7 +1802,7 @@ end;
 
 
 
-function strBefore(const s, sep: RawByteString): RawByteString;
+function strBefore(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1811,7 +1811,7 @@ begin
   else result := copy(s, 1, i-1);
 end;
 
-function strAfter(const s, sep: RawByteString): RawByteString;
+function strAfter(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1822,7 +1822,7 @@ end;
 
 
 
-function strBeforeLast(const s, sep: RawByteString): RawByteString;
+function strBeforeLast(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1831,7 +1831,7 @@ begin
   else result := copy(s, 1, i-1);
 end;
 
-function strAfterLast(const s, sep: RawByteString): RawByteString;
+function strAfterLast(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1844,7 +1844,7 @@ end;
 
 
 
-function striBetween(const s, from, till: RawByteString): RawByteString;
+function striBetween(const s, from, till: string): string;
 var
   i, j: Integer;
 begin
@@ -1860,7 +1860,7 @@ end;
 
 
 
-function striBefore(const s, sep: RawByteString): RawByteString;
+function striBefore(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1869,7 +1869,7 @@ begin
   else result := copy(s, 1, i-1);
 end;
 
-function striAfter(const s, sep: RawByteString): RawByteString;
+function striAfter(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1880,7 +1880,7 @@ end;
 
 
 
-function striBeforeLast(const s, sep: RawByteString): RawByteString;
+function striBeforeLast(const s, sep: string): string;
 var
   i: Integer;
 begin
@@ -1889,7 +1889,7 @@ begin
   else result := copy(s, 1, i-1);
 end;
 
-function striAfterLast(const s, sep: RawByteString): RawByteString;
+function striAfterLast(const s, sep: string): string;
 var
   i: Integer;
 begin
