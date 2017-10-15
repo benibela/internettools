@@ -26,7 +26,8 @@ end;
 
 function collection(fakeself, sender: TObject; const variable: string; var value: IXQValue): boolean;
 begin
-  if variable = '' then
+  result := variable = '';
+  if result then
     value := xqvalue('foobar');
 end;
 
@@ -4050,10 +4051,10 @@ begin
   f('$ABC', 'err:XPST0008');
 
 
-  xml.parseTree('<?xml encoding="utf-8"?><html/>'); if xml.getLastTree.getEncoding <> eUTF8 then raise Exception.Create('xml encoding detection failed 1');
-  xml.parseTree('<?xml encoding="windows-1252"?><html/>'); if xml.getLastTree.getEncoding <> eWindows1252 then raise Exception.Create('xml encoding detection failed 2');
-  xml.parseTree('<?xml encoding="utf-8" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> eUTF8 then raise Exception.Create('xml encoding detection failed 3');
-  xml.parseTree('<?xml encoding="windows-1252" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> eWindows1252 then raise Exception.Create('xml encoding detection failed 4');
+  xml.parseTree('<?xml encoding="utf-8"?><html/>'); if xml.getLastTree.getEncoding <> CP_UTF8 then raise Exception.Create('xml encoding detection failed 1');
+  xml.parseTree('<?xml encoding="windows-1252"?><html/>'); if xml.getLastTree.getEncoding <> CP_Windows1252 then raise Exception.Create('xml encoding detection failed 2');
+  xml.parseTree('<?xml encoding="utf-8" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> CP_UTF8 then raise Exception.Create('xml encoding detection failed 3');
+  xml.parseTree('<?xml encoding="windows-1252" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> CP_WINDOWS1252 then raise Exception.Create('xml encoding detection failed 4');
 
   //HTML parsing tests
   xml.parsingModel:=pmHTML;
@@ -4138,7 +4139,7 @@ begin
   t('outer-html(/)', '<html><head></head><body>&nbsp;'#228'&nbsp;</body></html>', '<html>&nbsp&auml;&nbsp;</html>');
 
   xml.parsingModel:=pmStrict;
-  xml.TargetEncoding:=eUTF8;
+  xml.TargetEncoding:=CP_UTF8;
   t('outer-html(/)', '<html><script>ä</script></html>', '<html><script>&auml;</script></html>');
   t('outer-html(/)', '<html><script>&auml;</script></html>', '<html><script><![CDATA[&auml;]]></script></html>');
   t('outer-xml(/)', '<html><script>&amp;auml;</script></html>', '<html><script><![CDATA[&auml;]]></script></html>');

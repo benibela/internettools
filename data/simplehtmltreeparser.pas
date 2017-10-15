@@ -321,7 +321,7 @@ TTreeAttribute = class(TTreeNode)
   realvalue: string;
   function isNamespaceNode: boolean;
   function toNamespace: INamespace;
-  constructor create(const aname, avalue: string; const anamespace: INamespace = nil);
+  constructor create(const aname, avalue: string; const anamespace: INamespace = nil); reintroduce;
 
   procedure setDataTypeHack(i: integer);
   function getDataTypeHack(): integer;
@@ -336,7 +336,7 @@ protected
   FCreator: TTreeParser;
 
 public
-  constructor create(creator: TTreeParser);
+  constructor create(creator: TTreeParser); reintroduce;
   property baseURI: string read FBaseURI write FBaseURI;
   property documentURI: string read FDocumentURI write FDocumentURI;
   property baseEncoding: TSystemCodePage read FBaseEncoding;

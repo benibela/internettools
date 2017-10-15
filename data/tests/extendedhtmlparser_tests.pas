@@ -911,28 +911,28 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   //---special encoding tests---
   extParser.parseTemplate('<a><template:read source="text()" var="test"/></a>');
   //no coding change utf-8 -> utf-8
-  extParser.outputEncoding:=eUTF8;
+  extParser.outputEncoding:=CP_UTF8;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>uu(bin:'#$C3#$84',ent:&Ouml;)uu</a></html>');
   if extParser.variableChangeLog.ValuesString['test']<>'uu(bin:'#$C3#$84',ent:'#$C3#$96')uu' then //ÄÖ
     raise Exception.create('ergebnis ungültig utf8->utf8');
   //no coding change latin1 -> latin1
-  extParser.outputEncoding:=eWindows1252;
+  extParser.outputEncoding:=CP_Windows1252;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>ll(bin:'#$C4',ent:&Ouml;)ll</a></html>');
   if extParser.variableChangeLog.ValuesString['test']<> Latin1String('ll(bin:'#$C4',ent:'#$D6')ll') then
     raise Exception.create('ergebnis ungültig latin1->latin1');
   //coding change latin1 -> utf-8
-  extParser.outputEncoding:=eUTF8;
+  extParser.outputEncoding:=CP_UTF8;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" /><a>lu(bin:'#$C4',ent:&Ouml;)lu</a></html>');
   if extParser.variableChangeLog.ValuesString['test']<>'lu(bin:'#$C3#$84',ent:'#$C3#$96')lu' then
     raise Exception.create('ergebnis ungültig latin1->utf8');
   //coding change utf8 -> latin1
-  extParser.outputEncoding:=eWindows1252;
+  extParser.outputEncoding:=CP_Windows1252;
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><a>ul(bin:'#$C3#$84',ent:&Ouml;)ul</a></html>');
   if extParser.variableChangeLog.ValuesString['test']<>Latin1String('ul(bin:'#$C4',ent:'#$D6')ul') then
     raise Exception.create('ergebnis ungültig utf8->latin1');
 
   extParser.parseHTML('<html><head><meta http-equiv="Content-Type" content="text/html; charset=" /><a>bin:'#$C4#$D6',ent:&Ouml;</a></html>');
-  extParser.outputEncoding:=eUTF8;
+  extParser.outputEncoding:=CP_UTF8;
 
 
 

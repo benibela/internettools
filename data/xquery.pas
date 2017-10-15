@@ -3012,7 +3012,7 @@ begin
      errCode := 'XPTY0117'; //wtf?
      break;
     end;
-  errMessage := 'Invalid types for function '+name+'.'+LineEnding;
+  errMessage := 'Invalid types for function '+name+'#'+IntToStr(count)+'.'+LineEnding;
   errMessage += 'Got: ';
   for i := 0 to high(types) do begin
     if i <> 0 then errMessage += ', ';

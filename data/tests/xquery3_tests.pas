@@ -27,7 +27,6 @@ var
   xml: TTreeParser;
 
   function performUnitTest(s1,s2,s3: string): string;
-  var rooted: Boolean;
   begin
     if s3 <> '' then xml.parseTree(s3);
     ps.parseXQuery3(s1);
