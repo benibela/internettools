@@ -375,14 +375,14 @@ begin
   {%END-COMPARE}
 end;
 
-function arrayBinarySearch(a: T__ArrayType__; const value: T__ElementType__; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: T__ArrayType__; const value: T__ElementType__; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt;
 var
   element: Pointer;
 begin
   if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @T__ArrayType__Compare, tobject(@value), choosen, condition);
   if element = nil then begin result := -1; exit; end;
-  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+  result := (PtrToUInt(element) - PtrToUInt(@a[0])) div sizeof(a[0]);
 end;
 {%END-REPEAT}
 

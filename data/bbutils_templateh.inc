@@ -55,7 +55,7 @@ function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: intege
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: T__ArrayType__; slice1: integer = -1;slice2: integer = -1);overload;
@@ -120,7 +120,7 @@ function intBound(min, i, max: T__INT__NUMBER__): T__INT__NUMBER__; overload;
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: T__ArrayType__; const value: T__ElementType__; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
+function arrayBinarySearch(a: T__ArrayType__; const value: T__ElementType__; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt; overload;
 {%END-REPEAT}
 
 

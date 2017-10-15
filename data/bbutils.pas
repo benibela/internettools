@@ -156,11 +156,16 @@ type
   TCharSet = set of ansichar;
 
 
-//-----------------------Flow/Thread control functions------------------------
+//-----------------------Pointer functions------------------------
 type TProcedureOfObject=procedure () of object;
      TStreamLikeWrite = procedure(const Buffer; Count: Longint) of object;
 function procedureToMethod(proc: TProcedure): TMethod;
 function makeMethod(code, data: pointer): TMethod; {$IFDEF HASINLINE} inline; {$ENDIF}
+
+function PtrToUInt(p: pointer): UIntPtr; inline;
+function UIntToPtr(i: UIntPtr): pointer; inline;
+function ObjToUInt(p: TObject): UIntPtr; inline;
+function UIntToObj(i: UIntPtr): TObject; inline;
 
 //**Calls proc in an new thread
 procedure threadedCall(proc: TProcedureOfObject; isfinished: TNotifyEvent); overload;
@@ -835,6 +840,26 @@ end;
 procedure threadedCallBase(proc: TProcedureOfObject; isfinished: TNotifyEvent);
 begin
   TThreadedCall.Create(proc,isfinished);
+end;
+
+function PtrToUInt(p: pointer): UIntPtr;
+begin
+  result := {%H-}UIntPtr(p);
+end;
+
+function UIntToPtr(i: UIntPtr): pointer;
+begin
+  result := {%H-}pointer(i);
+end;
+
+function ObjToUInt(p: TObject): UIntPtr;
+begin
+  result := UIntPtr(p);
+end;
+
+function UIntToObj(i: UIntPtr): TObject;
+begin
+  result := TObject(i);
 end;
 
 procedure threadedCall(proc: TProcedureOfObject; isfinished: TNotifyEvent);
@@ -2941,7 +2966,7 @@ end;
 
 function strFromPtr(p: pointer): string;
 begin
-  result:=IntToHex(PtrUInt(p), 2*sizeof(Pointer));
+  result:=IntToHex(PtrToUInt(p), 2*sizeof(Pointer));
 end;
 
 function strFromInt(i: int64; displayLength: longint): string;
@@ -4620,9 +4645,9 @@ begin
   result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
 end;
 function compareRawMemory(c:TObject; a, b:pointer):longint;
-var size: integer;
+var size: SizeInt;
 begin
-  size := PtrInt(pointer(c));
+  size := PtrToUInt(c);
   result := CompareByte(a^, b^, size);
 end;
 
@@ -4647,7 +4672,7 @@ begin
   setlength(tempArray,length);
   if {$IFNDEF FPC}@{$ENDIF}compareFunction = nil then begin
     compareFunction:=@compareRawMemory; //todo: use different wrappers for the two if branches
-    compareFunctionData:=tobject(pointer(PtrInt(size)));
+    compareFunctionData:=UIntToObj(size);
   end;
   if size < sizeof(TSortData) then begin
     //copy the values in the temp array
@@ -4738,7 +4763,7 @@ begin
 
 
   l := 0;
-  h := (PtrUInt(b) - PtrUInt(a)) div size;
+  h := (PtrToUInt(b) - PtrToUInt(a)) div size;
 
 
   moveFlags[-1] := true; //bsGreater in condition;

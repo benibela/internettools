@@ -40,7 +40,7 @@ function arrayIndexOfSmallest(const a: array of string; slice1: integer = -1; sl
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of string; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of string; const e: string; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TStringArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -99,7 +99,7 @@ function arrayIndexOfSmallest(const a: array of longint; slice1: integer = -1; s
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of longint; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of longint; const e: longint; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongintArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -158,7 +158,7 @@ function arrayIndexOfSmallest(const a: array of longword; slice1: integer = -1; 
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of longword; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of longword; const e: longword; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TLongwordArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -217,7 +217,7 @@ function arrayIndexOfSmallest(const a: array of int64; slice1: integer = -1; sli
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of int64; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of int64; const e: int64; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TInt64Array; slice1: integer = -1;slice2: integer = -1);overload;
@@ -276,7 +276,7 @@ function arrayIndexOfSmallest(const a: array of float; slice1: integer = -1; sli
 //**Find the largest element in the array/slice (see above)
 function arrayIndexOfLargest(const a: array of float; slice1: integer = -1; slice2: integer = -1): integer; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of float; const e: float; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
 procedure arrayInvert(a: TFloatArray; slice1: integer = -1;slice2: integer = -1);overload;
@@ -380,7 +380,7 @@ function intBound(min, i, max: int64): int64; overload;
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TStringArray; const value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
+function arrayBinarySearch(a: TStringArray; const value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt; overload;
 
 //** Binary search in a longint array @br
 //** @br @code(a) the ascending, sorted array
@@ -388,7 +388,7 @@ function arrayBinarySearch(a: TStringArray; const value: string; choosen: TBinar
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TLongintArray; const value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
+function arrayBinarySearch(a: TLongintArray; const value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt; overload;
 
 //** Binary search in a longword array @br
 //** @br @code(a) the ascending, sorted array
@@ -396,7 +396,7 @@ function arrayBinarySearch(a: TLongintArray; const value: longint; choosen: TBin
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TLongwordArray; const value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
+function arrayBinarySearch(a: TLongwordArray; const value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt; overload;
 
 //** Binary search in a int64 array @br
 //** @br @code(a) the ascending, sorted array
@@ -404,7 +404,7 @@ function arrayBinarySearch(a: TLongwordArray; const value: longword; choosen: TB
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TInt64Array; const value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
+function arrayBinarySearch(a: TInt64Array; const value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt; overload;
 
 //** Binary search in a float array @br
 //** @br @code(a) the ascending, sorted array
@@ -412,7 +412,7 @@ function arrayBinarySearch(a: TInt64Array; const value: int64; choosen: TBinaryS
 //** @br @code(choosen) which value it should return, if there are multiple possible matches
 //** @br @code(condition) how the reference value should be compared with the values in the array (e.g. [bsGreater, bsEqual] will only return a match that is greater-or-equal-than @code(value))
 //** returns the index of the found match or -1 if there is no match
-function arrayBinarySearch(a: TFloatArray; const value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer; overload;
+function arrayBinarySearch(a: TFloatArray; const value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt; overload;
 
 
 

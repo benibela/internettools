@@ -1994,14 +1994,14 @@ begin
   
 end;
 
-function arrayBinarySearch(a: TStringArray; const value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TStringArray; const value: string; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt;
 var
   element: Pointer;
 begin
   if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TStringArrayCompare, tobject(@value), choosen, condition);
   if element = nil then begin result := -1; exit; end;
-  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+  result := (PtrToUInt(element) - PtrToUInt(@a[0])) div sizeof(a[0]);
 end;
 
 function TLongintArrayCompare(searched: TObject; current: pointer): integer;
@@ -2015,14 +2015,14 @@ begin
   
 end;
 
-function arrayBinarySearch(a: TLongintArray; const value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TLongintArray; const value: longint; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt;
 var
   element: Pointer;
 begin
   if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TLongintArrayCompare, tobject(@value), choosen, condition);
   if element = nil then begin result := -1; exit; end;
-  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+  result := (PtrToUInt(element) - PtrToUInt(@a[0])) div sizeof(a[0]);
 end;
 
 function TLongwordArrayCompare(searched: TObject; current: pointer): integer;
@@ -2036,14 +2036,14 @@ begin
   
 end;
 
-function arrayBinarySearch(a: TLongwordArray; const value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TLongwordArray; const value: longword; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt;
 var
   element: Pointer;
 begin
   if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TLongwordArrayCompare, tobject(@value), choosen, condition);
   if element = nil then begin result := -1; exit; end;
-  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+  result := (PtrToUInt(element) - PtrToUInt(@a[0])) div sizeof(a[0]);
 end;
 
 function TInt64ArrayCompare(searched: TObject; current: pointer): integer;
@@ -2057,14 +2057,14 @@ begin
   
 end;
 
-function arrayBinarySearch(a: TInt64Array; const value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TInt64Array; const value: int64; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt;
 var
   element: Pointer;
 begin
   if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TInt64ArrayCompare, tobject(@value), choosen, condition);
   if element = nil then begin result := -1; exit; end;
-  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+  result := (PtrToUInt(element) - PtrToUInt(@a[0])) div sizeof(a[0]);
 end;
 
 function TFloatArrayCompare(searched: TObject; current: pointer): integer;
@@ -2078,14 +2078,14 @@ begin
   
 end;
 
-function arrayBinarySearch(a: TFloatArray; const value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): integer;
+function arrayBinarySearch(a: TFloatArray; const value: float; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): SizeInt;
 var
   element: Pointer;
 begin
   if length(a) = 0 then begin result := -1; exit; end;
   element := binarySearch(@a[0], @a[high(a)], sizeof(a[0]), @TFloatArrayCompare, tobject(@value), choosen, condition);
   if element = nil then begin result := -1; exit; end;
-  result := (PtrUInt(element) - PtrUInt(@a[0])) div sizeof(a[0]);
+  result := (PtrToUInt(element) - PtrToUInt(@a[0])) div sizeof(a[0]);
 end;
 
 
