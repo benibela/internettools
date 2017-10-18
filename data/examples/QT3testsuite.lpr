@@ -1655,23 +1655,18 @@ begin
 end;
 
 type
-
-{ TFailInternetAccess }
-
- TFailInternetAccess = class(TMockInternetAccess)
-  function doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string; override;
+TQT3FakeInternetAccess = class(TMockInternetAccess)
+  procedure doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock); override;
 end;
 
 var i: integer;
   clr: TCommandLineReader;
 
-{ TFailInternetAccess }
-
-function TFailInternetAccess.doTransferunChecked(method: string; const url: TDecodedUrl; data: string): string;
+procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
   procedure searchURL(e: TEnvironment);
   var
     r: Pointer;
-    ur: String;
+    ur, temp: String;
     i: integer;
   begin
     ur := url.combined();
@@ -1681,7 +1676,7 @@ function TFailInternetAccess.doTransferunChecked(method: string; const url: TDec
           lastHTTPHeaders.Clear;
           lastHTTPHeaders.Add('Content-Type: ' + TResource(r).typ + '; charset=' + TResource(r).encoding);
           if TResource(r).data = '' then TResource(r).data := strLoadFromFile(TResource(r).filename);
-          result := TResource(r).data;
+          writeBlock(pchar(TResource(r).data)^, length(TResource(r).data));
           lastHTTPResultCode := 200;
           exit;
         end;// else writeln(TResource(r).uri + ' <> ' + url.combined() );
@@ -1693,7 +1688,8 @@ function TFailInternetAccess.doTransferunChecked(method: string; const url: TDec
       for i := 0 to e.sources.Count - 1 do
         if (TSource(e.sources[i]).role = '.') and (ur = TSource(e.sources[i]).tree.getDocument().documentURI) then begin
           lastHTTPResultCode := 200;
-          result := strLoadFromFile(TSource(e.sources[i]).filename);
+          temp := strLoadFromFile(TSource(e.sources[i]).filename);
+          writeBlock(pchar(temp)^, length(temp));
         end;
 
     end;
@@ -1840,7 +1836,7 @@ begin
   xq.StaticContext.useLocalNamespaces:=false;
   xq.AutomaticallyRegisterParsedModules := true;
   baseSchema.version := xsd11;
-  defaultInternetAccessClass := TFailInternetAccess;
+  defaultInternetAccessClass := TQT3FakeInternetAccess;
 
   case clr.readString('format') of
     'text': logger := TTextLogger.create(clr);
