@@ -1850,6 +1850,7 @@ var xpathText: TTreeNode;
     siblings := templateStart;
     data := TCommandSiblingData(siblings.data);
 
+    found := true;
     with FSiblingMatching[data.id] do begin
       for i := 0 to high(order) do begin
         templateStart := data.children[order[i]];
@@ -1864,8 +1865,8 @@ var xpathText: TTreeNode;
           htmlStart := tempHtmlStart.getNextSibling();
         end;
       end;
-      if not found then begin htmlStart := htmlEnd.next; templateStart := siblings;  exit; end;
     end;
+    if not found then begin htmlStart := htmlEnd.next; templateStart := siblings;  exit; end;
 
     templateStart := siblings.templateReverse.templateNext; //accept
   end;
