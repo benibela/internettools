@@ -144,10 +144,13 @@
         <StackChecks Value="True"/>
       </Checks>
       <Optimizations>
-        <OptimizationLevel Value="0"/>
+        <OptimizationLevel Value="4"/>
       </Optimizations>
     </CodeGeneration>
     <Linking>
+      <Debugging>
+        <UseHeaptrc Value="True"/>
+      </Debugging>
       <Options>
         <Win32>
           <GraphicApplication Value="True"/>
