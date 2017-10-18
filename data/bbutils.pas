@@ -2081,8 +2081,8 @@ begin
 
   //extended unicode conversion
   case from of
-     CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: case toCPActual of
-        CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: begin
+     CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: case toCPActual of
+        CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: begin
           convertExtendedUnicode();
           exit;
         end;
