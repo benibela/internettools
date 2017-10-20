@@ -69,9 +69,9 @@ public
   textRead: TTextEvent;
   
   fileEncoding,outputEncoding: TSystemCodePage;
-  function enterTagEvent (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
-  function leaveTagEvent(tagName: pchar; tagNameLen: longint):TParsingResult;
-  function textEvent(text: pchar; textLen: longint; flags: TTextFlags):TParsingResult;
+  function enterTagEvent (tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
+  function leaveTagEvent(tagName: pchar; tagNameLen: SizeInt):TParsingResult;
+  function textEvent(text: pchar; textLen: SizeInt; flags: TTextFlags):TParsingResult;
 end;
 
 { THTMLEventHandler }
@@ -85,7 +85,7 @@ begin
   result:=strChangeEncoding(result,fileEncoding,outputEncoding);
 end;
 
-function THTMLEventHandler.enterTagEvent(tagName: pchar; tagNameLen: longint;
+function THTMLEventHandler.enterTagEvent(tagName: pchar; tagNameLen: SizeInt;
   properties: THTMLProperties): TParsingResult;
 var xmlProperties: TProperties;
     i:longint;
@@ -108,14 +108,14 @@ begin
   
 end;
 
-function THTMLEventHandler.leaveTagEvent(tagName: pchar; tagNameLen: longint
+function THTMLEventHandler.leaveTagEvent(tagName: pchar; tagNameLen: SizeInt
   ): TParsingResult;
 begin
   if not assigned(leaveTag) then exit(prContinue);
   result:=leaveTag(convToStr(tagName,tagNameLen));
 end;
 
-function THTMLEventHandler.textEvent(text: pchar; textLen: longint; flags: TTextFlags): TParsingResult;
+function THTMLEventHandler.textEvent(text: pchar; textLen: SizeInt; flags: TTextFlags): TParsingResult;
 begin
   result:=prContinue;
   if not assigned(textRead) then exit();

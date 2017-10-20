@@ -40,13 +40,13 @@ type
   end;
   THTMLProperties=array of THTMLProperty;
   TParsingResult = (prContinue, prStop);
-  TEnterTagEvent=function (tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult of object;
-  TLeaveTagEvent=function (tagName: pchar; tagNameLen: longint):TParsingResult of object;
-  TCommentEvent=function (comment: pchar; commentLen: longint):TParsingResult of object;
+  TEnterTagEvent=function (tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult of object;
+  TLeaveTagEvent=function (tagName: pchar; tagNameLen: SizeInt):TParsingResult of object;
+  TCommentEvent=function (comment: pchar; commentLen: SizeInt):TParsingResult of object;
   TTextFlags = set of (tfCDATA);
-  TTextEvent=function (text: pchar; textLen: longint; textFlags: TTextFlags):TParsingResult of object;
+  TTextEvent=function (text: pchar; textLen: SizeInt; textFlags: TTextFlags):TParsingResult of object;
 
-  function pcharStartEqual(p1,p2:pchar;l1,l2: longint):boolean;
+  function pcharStartEqual(p1,p2:pchar;l1,l2: SizeInt):boolean;
 
 
   //**This parses html data
@@ -85,7 +85,7 @@ type
 implementation
 uses bbutils;
 
-function pcharStartEqual(p1,p2:pchar;l1,l2: longint):boolean;
+function pcharStartEqual(p1,p2:pchar;l1,l2: SizeInt):boolean;
 begin
   if l1>l2 then l1:=l2
   else l2:=l1;
@@ -295,12 +295,12 @@ type TTempSearchClassText=class
   lastLinkURL: THTMLProperty;
   lastLink: boolean;
   searchedText:string;
-  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
-  function readText(text: pchar; textLen: longint; {%H-}tf: TTextFlags):TParsingResult;
+  function enterTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
+  function readText(text: pchar; textLen: SizeInt; {%H-}tf: TTextFlags):TParsingResult;
 end;
 
 
-function TTempSearchClassText.enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
+function TTempSearchClassText.enterTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
 var i:integer;
 begin
   result:=prContinue;
@@ -315,7 +315,7 @@ begin
     lastLink:=false ;
   end else lastLink:=false;
 end;
-function TTempSearchClassText.readText(text: pchar; textLen: longint; tf: TTextFlags):TParsingResult;
+function TTempSearchClassText.readText(text: pchar; textLen: SizeInt; tf: TTextFlags):TParsingResult;
 begin
   if lastLink and strlequal(text,@searchedText[1],textLen,length(searchedText)) then begin
     setlength(self.result,lastLinkURL.valueLen);
@@ -340,11 +340,11 @@ end;
 type TTempSearchClass=class
   result: string;
   tag,prop_to_get,prop_must_match,value: string;
-  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
+  function enterTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
 end;
 
-function TTempSearchClass.enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
-var i,j:integer;
+function TTempSearchClass.enterTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
+var i,j:SizeInt;
 begin
   result:=prContinue;
   if strliequal(tagName,@tag[1],tagNameLen,length(tag)) then begin

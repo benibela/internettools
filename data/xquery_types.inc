@@ -495,7 +495,7 @@ var tempContext: TXQEvaluationContext;
   var
     f: TInternetToolsFormat;
     p: PChar;
-    l: Integer;
+    l: SizeInt;
     tempv: IXQValue;
   begin
     f := guessFormat(data, uri, contenttype);

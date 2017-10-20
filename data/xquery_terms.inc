@@ -1643,7 +1643,7 @@ end;
   end;
   PFlowerSortingData = ^TFlowerSortingData;
 
-function flowerTupleCompareFunction(data: TObject; xa, xb: pointer): longint;
+function flowerTupleCompareFunction(data: TObject; xa, xb: pointer): SizeInt;
 var meta: PFlowerSortingData;
 
   function isGreaterThan(w, v: IXQValue; emptyLeast: boolean; const collation: TXQCollation): boolean;
@@ -1722,7 +1722,7 @@ begin
   end;
 end;
 
-function flowerTupleGroupCompareFunction(data: TObject; xa, xb: pointer): longint;
+function flowerTupleGroupCompareFunction(data: TObject; xa, xb: pointer): SizeInt;
 var meta: PFlowerGroupingData;
 begin
   meta := PFlowerGroupingData(data);
@@ -1839,7 +1839,7 @@ var
 
     var
       matchIdxList: array of integer;
-      matchIdxListLength, i: integer;
+      matchIdxListLength, i: SizeInt;
     begin
       stackSizeIndex := 1;
       window := TXQTermFlowerWindow(children[pos]);

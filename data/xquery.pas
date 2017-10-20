@@ -5808,7 +5808,7 @@ begin
   setBufferSize(0);
 end;
 
-function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
+function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): SizeInt;
 type PIXQValue = ^IXQValue;
 begin
   ignore(temp);

@@ -14,16 +14,16 @@
           (TFloatArray, float, 0, move)]
 }
 
-function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__): longint;
+function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__): SizeInt;
 begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
 end;
 
-function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):longint;
+function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := length(a);
   setlength(a, result + length(a2));
@@ -42,7 +42,7 @@ end;
 
 
 
-function arrayDelete(var a: T__ArrayType__; const i: longint): T__ElementType__;
+function arrayDelete(var a: T__ArrayType__; const i: SizeInt): T__ElementType__;
 begin
   if (i<0) or (i>high(a)) then begin result := __ELEMENT__DEFAULT__; exit; end;
   result := a[i];
@@ -52,7 +52,7 @@ begin
 end;
 
 
-function arrayDeleteUnordered(var a: T__ArrayType__; const i: longint): T__ElementType__;
+function arrayDeleteUnordered(var a: T__ArrayType__; const i: SizeInt): T__ElementType__;
 begin
   if (i<0) or (i>high(a)) then begin result := __ELEMENT__DEFAULT__; exit; end;
   result:=a[i];
@@ -60,7 +60,7 @@ begin
   SetLength(a,high(a));
 end;
 
-procedure arrayReserveFast(var a: T__ArrayType__; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: T__ArrayType__; const len: SizeInt; const reserveLength: SizeInt);
 begin
   if reserveLength <= len then exit;
   if reserveLength <= length(a) then exit;
@@ -73,7 +73,7 @@ begin
   else SetLength(a, reserveLength);
 end;
 
-function arrayAddFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__): longint;
+function arrayAddFast(var a: T__ArrayType__; var len: SizeInt; const e: T__ElementType__): SizeInt;
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -82,7 +82,7 @@ begin
   a[result] := e;
 end;
 
-procedure arrayPrependFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__);
+procedure arrayPrependFast(var a: T__ArrayType__; var len: SizeInt; const e: T__ElementType__);
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -93,7 +93,7 @@ begin
 end;
 
 
-function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint): T__ElementType__;
+function arrayDeleteFast(var a: T__ArrayType__; var len: SizeInt; const i: SizeInt): T__ElementType__;
 begin
   if (i<0) or (i>=len) then begin result := __ELEMENT__DEFAULT__; exit; end;
   result:=a[i];
@@ -102,7 +102,7 @@ begin
   dec(len);
 end;
 
-function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: longint; const i: longint): T__ElementType__;
+function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: SizeInt; const i: SizeInt): T__ElementType__;
 begin
   if (i<0) or (i>=len) then begin result := __ELEMENT__DEFAULT__; exit; end;
   result:=a[i];
@@ -110,7 +110,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arrayInsert(var a: T__ArrayType__; i: longint; const e: T__ElementType__);
+procedure arrayInsert(var a: T__ArrayType__; i: SizeInt; const e: T__ElementType__);
 begin
   if (i < 0) then i := 0
   else if i > length(a) then i := length(a);
@@ -120,9 +120,9 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: T__ArrayType__; var len: longint; i: longint; const e: T__ElementType__);
+procedure arrayInsertFast(var a: T__ArrayType__; var len: SizeInt; i: SizeInt; const e: T__ElementType__);
 var
-  oldlen: LongInt;
+  oldlen: SizeInt;
 begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
@@ -136,8 +136,8 @@ begin
 end;
 
 function arrayIndexOf(const a: array of T__ElementType__; const e: T__ElementType__;
- slice1: integer; slice2: integer): integer;
-var i:longint;
+ slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
@@ -146,10 +146,10 @@ begin
   result:=-1;
 end;
 
-function arraySlice(a: array of T__ElementType__; slice1: integer; slice2: integer
+function arraySlice(a: array of T__ElementType__; slice1: SizeInt; slice2: SizeInt
  ): T__ArrayType__;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := nil;
@@ -158,8 +158,8 @@ begin
     result[i] := a[slice1+i];
 end;
 
-function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -168,8 +168,8 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -178,14 +178,14 @@ begin
        Result:=i;
 end;
 
-function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer; slice2: integer): boolean;
+function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: SizeInt; slice2: SizeInt): boolean;
 begin
   result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
-procedure arrayInvert(a: T__ArrayType__; slice1: integer; slice2: integer);
+procedure arrayInvert(a: T__ArrayType__; slice1: SizeInt; slice2: SizeInt);
 var temp: T__ElementType__;
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
@@ -195,7 +195,7 @@ begin
   end;
 end;
 
-function arrayGet(a: array of T__ElementType__; const i: integer): T__ElementType__;
+function arrayGet(a: array of T__ElementType__; const i: SizeInt): T__ElementType__;
 begin
   if i < 0 then result:=a[length(a) + i]
   else result := a[i];
@@ -213,10 +213,10 @@ begin
   else result := a[high(a)];
 end;
 
-function arrayCompare(a, b: array of T__ElementType__; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): longint;
+function arrayCompare(a, b: array of T__ElementType__; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): longint;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1a, slice2a);
   arraySliceIndices(high(b), slice1b, slice2b);
@@ -231,8 +231,8 @@ begin
   result := 0;
 end;
 
-function arrayEqual(a, b: array of T__ElementType__; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): boolean;
+function arrayEqual(a, b: array of T__ElementType__; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): boolean;
 begin
   result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
@@ -253,7 +253,7 @@ end;
 
 function unequal(const a: array of T__ElementType__): boolean;
 var
-  i,j: Integer;
+  i,j: SizeInt;
 begin
   result := true;
   for i:=0 to high(a) do
@@ -265,7 +265,7 @@ end;
 
 
 {%REPEAT strLastIndexOf, [ strLastIndexOf, striLastIndexOf ] }
-function strLastIndexOf(const str: string; const searched: string): longint;
+function strLastIndexOf(const str: string; const searched: string): SizeInt;
 begin
   result := strLastIndexOf(str, searched, 1);
 end;
@@ -277,7 +277,7 @@ end;
 
 function str_CASESENSITIVEMODIFIER_Between(const s, from, till: string): string;
 var
-  i, j: Integer;
+  i, j: SizeInt;
 begin
   i := str_CASESENSITIVEMODIFIER_IndexOf(s, from);
   if i = 0 then result := ''
@@ -293,7 +293,7 @@ end;
 
 function str_CASESENSITIVEMODIFIER_Before_LASTMODIFIER_(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := str_CASESENSITIVEMODIFIER__LASTMODIFIER_IndexOf(s, sep);
   if i = 0 then result := ''
@@ -302,7 +302,7 @@ end;
 
 function str_CASESENSITIVEMODIFIER_After_LASTMODIFIER_(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := str_CASESENSITIVEMODIFIER__LASTMODIFIER_IndexOf(s, sep);
   if i = 0 then result := ''

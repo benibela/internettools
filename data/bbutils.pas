@@ -188,18 +188,18 @@ function charDecodeHexDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDI
 
 //copy
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
-function strlmove(dest,source:pansichar;destLen,sourceLen: longint):pansichar;
+function strlmove(dest,source:pansichar;destLen,sourceLen: SizeInt):pansichar;
 //**Copies min(sourceLen, destLen) characters from source to dest and returns dest
-function widestrlmove(dest,source:pwidechar;destLen,sourceLen: longint):pwidechar;
+function widestrlmove(dest,source:pwidechar;destLen,sourceLen: SizeInt):pwidechar;
 //**Returns the substring of s containing all characters after start (including s[start]
-function strCopyFrom(const s: string; start:longint): string; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strCopyFrom(const s: string; start:SizeInt): string; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Returns a string with all characters between first and last (including first, last)
 function strSlice(const first,last:pansichar):string; overload;
 //**Returns a string with all characters between start and last (including start, last)
-function strSlice(const s: string; start,last:longint): string; overload;
+function strSlice(const s: string; start,last:SizeInt): string; overload;
 
 //**Like move: moves count strings from source memory to dest memory. Keeps the reference count intact. Size is count of strings * sizeof(string)!
-procedure strMoveRef(var source: string; var dest: string; const size: longint); {$IFDEF HASINLINE} inline; {$ENDIF}
+procedure strMoveRef(var source: string; var dest: string; const size: SizeInt); {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //comparison
 
@@ -207,20 +207,20 @@ procedure strMoveRef(var source: string; var dest: string; const size: longint);
 //all pansichar<->string comparisons are null-terminated iff the string doesn't contain #0 characters
 
 //length limited
-function strlEqual(const p1,p2:pansichar;const l: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pansichar;const l: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlsEqual(const p1,p2:pansichar;const l: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(const p1,p2:pansichar;const l: longint):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(const p1,p2:pansichar;const l1,l2: longint):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsequal(p: pansichar; const s: string; l: longint): boolean; overload;
+function strlEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strliEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
+function strlsEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsiEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+function strlsequal(p: pansichar; const s: string; l: SizeInt): boolean; overload;
 
-function strlEqual(p:pansichar;const s:string; l: longint):boolean; overload; //**< Tests if the strings are case-sensitive equal (same length and same characters)
-function strliEqual(p:pansichar;const s:string;l: longint):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters)
-function strlBeginsWith(const p:pansichar; l:longint; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
-function strliBeginsWith(const p:pansichar;l: longint;const expectedStart:string):boolean; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Test if p begins with expectedStart (__STRICT_HELP__, case-insensitive)
+function strlEqual(p:pansichar;const s:string; l: SizeInt):boolean; overload; //**< Tests if the strings are case-sensitive equal (same length and same characters)
+function strliEqual(p:pansichar;const s:string;l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters)
+function strlBeginsWith(const p:pansichar; l:SizeInt; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
+function strliBeginsWith(const p:pansichar;l: SizeInt;const expectedStart:string):boolean; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Test if p begins with expectedStart (__STRICT_HELP__, case-insensitive)
 
 
 //not length limited
@@ -236,58 +236,58 @@ function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**<
 
 //**Case sensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function strCompareClever(const s1, s2: string): integer;
+function strCompareClever(const s1, s2: string): SizeInt;
 //**Case insensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function striCompareClever(const s1, s2: string): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
+function striCompareClever(const s1, s2: string): SizeInt; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //search
 //**Searchs the last index of c in s
-function strRpos(c:ansichar;const s:string):longint;
+function strRpos(c:ansichar;const s:string):SizeInt;
 //**Counts all occurrences of searched in searchIn (case sensitive)
-function strCount(const str: string; const searched: ansichar; from: longint = 1): longint; overload;
+function strCount(const str: string; const searched: ansichar; from: SizeInt = 1): SizeInt; overload;
 //**Counts all occurrences of searched in searchIn (case sensitive)
-function strCount(const str: string; const searched: TCharSet; from: longint = 1): longint; overload;
+function strCount(const str: string; const searched: TCharSet; from: SizeInt = 1): SizeInt; overload;
 
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsIndexOf(str,searched:pansichar; l1, l2: longint): longint; overload;
+function strlsIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt; overload;
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint; overload;
+function strlsIndexOf(str:pansichar; const searched: TCharSet; length: SizeInt): SizeInt; overload;
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
-function strlsiIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+function strlsiIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt;
 
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function strIndexOf(const str,searched:string):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str: string; const searched: TCharSet):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function strIndexOf(const str: string; const searched: TCharSet):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function striIndexOf(const str,searched:string):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str: string; const searched: TCharSet; from: longint):longint; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function strIndexOf(const str: string; const searched: TCharSet; from: SizeInt):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function striIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence  (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsLastIndexOf(str,searched:pansichar; l1, l2: longint): longint; overload;
+function strlsLastIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt; overload;
 //**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
-function strlsLastIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint; overload;
+function strlsLastIndexOf(str:pansichar; const searched: TCharSet; length: SizeInt): SizeInt; overload;
 //**Searchs @code(searched) in @code(str), case-insensitive, returns -1 on no occurrence (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
-function strlsiLastIndexOf(str,searched:pansichar; l1, l2: longint): longint;
+function strlsiLastIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt;
 
 //**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
-function strLastIndexOf(const str: string; const searched: string):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strLastIndexOf(const str: string; const searched: string):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
-function strLastIndexOf(const str: string; const searched: string; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strLastIndexOf(const str: string; const searched: string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
-function strLastIndexOf(const str: string; const searched: TCharSet):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strLastIndexOf(const str: string; const searched: TCharSet):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
-function strLastIndexOf(const str: string; const searched: TCharSet; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strLastIndexOf(const str: string; const searched: TCharSet; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
-function striLastIndexOf(const str: string; const searched: string):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function striLastIndexOf(const str: string; const searched: string):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
-function striLastIndexOf(const str: string; const searched: string; from: longint):longint; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function striLastIndexOf(const str: string; const searched: string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
@@ -297,22 +297,22 @@ function strContains(const str:string; const searched: TCharSet):boolean;overloa
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striContains(const str,searched:string):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str,searched:string; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function strContains(const str,searched:string; from: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strContains(const str:string; const searched: TCharSet; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function strContains(const str:string; const searched: TCharSet; from: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striContains(const str,searched:string; from: longint):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function striContains(const str,searched:string; from: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //more specialized
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
-procedure strlTrimLeft(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+procedure strlTrimLeft(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
-procedure strlTrimRight(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+procedure strlTrimRight(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
 //**Removes all occurrences of trimCharacter from the left/right side of the string@br
 //**It will move the pointer and change length, not modifying the memory pointed to
-procedure strlTrim(var p: pansichar; var l: integer; const trimCharacters: TCharSet = [#0..' ']);
+procedure strlTrim(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
 
 //**Removes all occurrences of trimCharacter from the left/right side of the string
 function strTrimLeft(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; {$IFDEF HASINLINE} inline; {$ENDIF}
@@ -342,7 +342,7 @@ procedure strSplit(out splitted: TStringArray;s: string; sep:string=',';includeE
 //**Splits the string s into the array splitted at every occurrence of sep
 function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
 
-function strWrapSplit(const Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
+function strWrapSplit(const Line: string; MaxCol: SizeInt = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
 function strWrap(Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
 
 function strReverse(s: string): string; //**< reverses a string. Assumes the encoding is utf-8
@@ -366,7 +366,7 @@ function strJoin(const sl: TStrings; const sep: string = ', '; limit: Integer=0;
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
-function strJoin(const sl: TStringArray; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
+function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt=0; const limitStr: string='...'): string;overload;
 
 //**Converts a str to a bool (for fpc versions previous 2.2)
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
@@ -395,7 +395,7 @@ function strFromSIze(size: int64):string;
 //Conversions between UTF-16 and UTF-8/32/1-Byte-encodings in the moveProcs
 //**length of an utf8 string @br
 //**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
-function strLengthUtf8(const str: RawByteString): longint;
+function strLengthUtf8(const str: RawByteString): SizeInt;
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): UTF8String; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
 //** Converts a string from one encoding to another. @br
@@ -421,7 +421,7 @@ procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: 
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
-function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strEncodingFromBOMRemove(var str:string):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
 
@@ -460,7 +460,7 @@ function strDecodeHex(s:string):string; {$ifdef HASDeprecated}deprecated;{$endif
 //**Encodes to a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strEscapeToHex)
 function strEncodeHex(s:string; const code: string = '0123456789ABCDEF'):string;{$ifdef HASDeprecated}deprecated;{$endif}
 //**Returns the first l bytes of p (copies them so O(n))
-function strFromPchar(p:pansichar;l:longint):string;
+function strFromPchar(p:pansichar;l:SizeInt):string;
 
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
@@ -468,7 +468,7 @@ function strFromPtr(p: pointer): string;
 function strFromInt(i: int64; displayLength: longint): string;
 
 //**Creates count copies of rep
-function strDup(rep: string; const count: integer): string;
+function strDup(rep: string; const count: SizeInt): string;
 
 //**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
 function strIsAbsoluteURI(const s: string): boolean;
@@ -488,7 +488,7 @@ procedure fileSaveSafe(filename: string; callback: TFileSaveSafe; data: pointer)
 
 //**Levenshtein distance between s and t
 //**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
-function strSimilarity(const s, t: string): integer;
+function strSimilarity(const s, t: string): SizeInt;
 
 {$ifdef fpc}
 //** Str iterator. Preliminary. Interface might change at any time
@@ -496,7 +496,7 @@ type TStrIterator = record
   FCurrent: integer;
 
   s: RawByteString;
-  pos: integer;
+  pos: SizeInt;
   property Current: integer read FCurrent;
   function MoveNext: Boolean;
   function GetEnumerator: TStrIterator;
@@ -721,13 +721,13 @@ procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //**Compare function to compare the two values to which a and b, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same call convention like a method
-type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
+type TPointerCompareFunction = function (data: TObject; a, b: pointer): SizeInt;
 //**General stable sort function @br
 //**a is the first element in the array to sort, and b is the last. size is the size of every element@br
 //**compareFunction is a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers). @br
 //**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
 //**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
-procedure stableSort(a,b: pointer; size: longint; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
+procedure stableSort(a,b: pointer; size: SizeInt; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
 //**general stable sort functions for arrays (modifying the array inline and returning it)
 function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil): TLongintArray; overload;
 function stableSort(strArray: TStringArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TStringArray; overload;
@@ -753,7 +753,7 @@ type TBinarySearchFunction = function (data: TObject; a: pointer): longint;
 //** @br Beware of the pointers. You need to be very carefully. @code(a) and @code(b) point to the first and last elements. They are not the element, they are pointers to the location of the element in the array. If a = b, the array has one element. You need to pass a < b for empty arrays.
 //** @br The first parameter of @code(compareFunction) is user defined data, so it can be anything. The second parameter is a pointer to the location of an array element. It is not the array element itself, not even on a list of pointers.
 //** @br The same holds for the pointer returned by the function, i.e. it is like that second parameter.
-function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
+function binarySearch(a,b: pointer; size: SizeInt; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
 
 function eUTF8: TSystemCodePage; {$IFDEF HASINLINE} inline; {$ENDIF} {$ifdef HASDeprecated}deprecated;{$endif}
 function eWindows1252: TSystemCodePage; {$IFDEF HASINLINE} inline; {$ENDIF} {$ifdef HASDeprecated}deprecated;{$endif}
@@ -765,7 +765,7 @@ implementation
 const MinsPerDay = 24 * 60;
 
 {$IFNDEF HASSIGN}
-function Sign(a: integer): TValueSign;
+function Sign(a: SizeInt): TValueSign;
 begin
   if a < 0 then result := -1
   else if a > 0 then result := 1
@@ -787,7 +787,7 @@ end;
 
 //========================array functions========================
 
-procedure arraySliceIndices(const higha: integer; var slice1, slice2: integer); overload;
+procedure arraySliceIndices(const higha: SizeInt; var slice1, slice2: SizeInt); overload;
 begin
   if (slice2 = -1) and (slice1 = -1) then begin
     slice2 := higha;
@@ -900,13 +900,13 @@ end;
 
 //=========================String functions======================
 
-function strlmove(dest, source: pansichar; destLen, sourceLen: longint): pansichar;
+function strlmove(dest, source: pansichar; destLen, sourceLen: SizeInt): pansichar;
 begin
   move(source^,dest^,min(sourceLen,destLen));
   result:=dest;
 end;
 
-function widestrlmove(dest, source: pwidechar; destLen, sourceLen: longint): pwidechar;
+function widestrlmove(dest, source: pwidechar; destLen, sourceLen: SizeInt): pwidechar;
 begin
   move(source^,dest^,min(sourceLen,destLen)*sizeof(widechar));
   result:=dest;
@@ -948,34 +948,34 @@ begin
 end;
 
 //--Length-limited
-function strlEqual(const p1, p2: pansichar; const l: longint): boolean;
+function strlEqual(const p1, p2: pansichar; const l: SizeInt): boolean;
 begin
   result:=(strlcomp(p1, p2, l) = 0);
 end;
 
 //Length limited && null terminated
 //equal comparison, case sensitive, stopping at #0-bytes
-function strlequal(const p1,p2:pansichar;const l1,l2: longint):boolean;
+function strlequal(const p1,p2:pansichar;const l1,l2: SizeInt):boolean;
 begin
   result:=(l1=l2) and (strlcomp(p1, p2,l1) = 0);
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes
-function strliEqual(const p1, p2: pansichar; const l: longint): boolean;
+function strliEqual(const p1, p2: pansichar; const l: SizeInt): boolean;
 begin
   result:=(strlicomp(p1,p2,l)=0);
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes
-function strliequal(const p1,p2:pansichar;const l1,l2: longint):boolean;
+function strliequal(const p1,p2:pansichar;const l1,l2: SizeInt):boolean;
 begin
   result:=(l1=l2) and (strlicomp(p1,p2,l1)=0);
 end;
 
 {$IFNDEF FPC}
-function compareByte(const a, b; size: integer):longint;
+function compareByte(const a, b; size: SizeInt): SizeInt;
 var ap, bp: pansichar;
-    i: Integer;
+    i: SizeInt;
 begin
   ap := @a;
   bp := @b;
@@ -990,19 +990,20 @@ end;
 {$ENDIF}
 
 //equal comparison, case sensitive, ignoring #0-bytes
-function strlsequal(const p1,p2:pansichar;const l: longint):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strlsequal(const p1,p2:pansichar;const l: SizeInt):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
   result:= (CompareByte(p1^, p2^, l) = 0);
 end;
 
 //equal comparison, case sensitive, ignoring #0-bytes
-function strlsequal(const p1,p2:pansichar;const l1,l2: longint):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strlsequal(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
   result:= (l1=l2) and (CompareByte(p1^, p2^, l1) = 0);
 end;
 
-function strlsiEqual(const p1, p2: pansichar; const l: longint): boolean;
-var i, c1, c2:integer;
+function strlsiEqual(const p1, p2: pansichar; const l: SizeInt): boolean;
+var i: SizeInt;
+    c1, c2:integer;
 begin
   result := true;
   for i := 0 to l-1 do
@@ -1016,15 +1017,15 @@ begin
 end;
 
 //equal comparison, case insensitive, ignoring #0-bytes
-function strlsiequal(const p1, p2: pansichar; const l1, l2: longint): boolean;
+function strlsiequal(const p1, p2: pansichar; const l1, l2: SizeInt): boolean;
 begin
   result:=(l1=l2) and strlsiequal(p1, p2, l1);
 end;
 
 
 //equal comparison, case sensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
-function strlnsequal(p1,p2:pansichar;l2: longint):boolean;
-var i:integer;
+function strlnsequal(p1,p2:pansichar;l2: SizeInt):boolean;
+var i:SizeInt;
 begin
   for i:=0 to l2-1 do begin
     if p1[i]<>p2[i] then
@@ -1036,8 +1037,8 @@ begin
 end;
 
 //equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
-function strlnsiequal(p1,p2:pansichar;l2: longint):boolean;
-var i:integer;
+function strlnsiequal(p1,p2:pansichar;l2: SizeInt):boolean;
+var i:SizeInt;
 begin
   for i:=0 to l2-1 do begin
     if upcase(p1[i])<>upcase(p2[i]) then
@@ -1049,17 +1050,17 @@ begin
 end;
 
 
-function strlsequal(p: pansichar; const s: string; l: longint): boolean;
+function strlsequal(p: pansichar; const s: string; l: SizeInt): boolean;
 begin
   result:=(l = length(s)) and ((l = 0) or (strlsequal(p, pansichar(pointer(s)),l,l)));
 end;
 
-function strlequal(p: pansichar; const s: string; l: longint): boolean;
+function strlequal(p: pansichar; const s: string; l: SizeInt): boolean;
 begin
   result := (l = length(s)) and ( (l = 0) or strlsequal(p, pansichar(pointer(s)), l, l));
 end;
 
-function strliequal(p: pansichar; const s:string;l: longint): boolean;
+function strliequal(p: pansichar; const s:string;l: SizeInt): boolean;
 begin
   result := (l = length(s)) and ( (l = 0) or strlsiequal(p, pansichar(pointer(s)), l, l));
 end;
@@ -1091,12 +1092,12 @@ begin
   result:=CompareText(s1,s2)=0;
 end;
 
-function strlbeginswith(const p: pansichar; l: longint; const expectedStart: string): boolean;
+function strlbeginswith(const p: pansichar; l: SizeInt; const expectedStart: string): boolean;
 begin
   result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsequal(p,pansichar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
 end;
 
-function strlibeginswith(const p: pansichar; l: longint; const expectedStart: string): boolean;
+function strlibeginswith(const p: pansichar; l: SizeInt; const expectedStart: string): boolean;
 begin
   result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsiequal(p,pansichar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
 end;
@@ -1136,7 +1137,7 @@ begin
               (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
 end;
 
-function strlsIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+function strlsIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
 var last: pansichar;
 begin
   if l2<=0 then begin result := 0; exit; end;
@@ -1153,7 +1154,7 @@ begin
   result:=-1;
 end;
 
-function strlsIndexOf(str:pansichar; const searched: TCharSet; length: longint): longint;
+function strlsIndexOf(str:pansichar; const searched: TCharSet; length: SizeInt): SizeInt;
 var last: pansichar;
 begin
   if length<1 then begin result := -1; exit; end;
@@ -1168,7 +1169,7 @@ begin
   result:=-1;
 end;
 
-function strlsiIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+function strlsiIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
 var last: pansichar;
 begin
   if l2<=0 then begin result := 0; exit; end;
@@ -1185,22 +1186,22 @@ begin
   result:=-1;
 end;
 
-function strIndexOf(const str, searched: string): longint;
+function strIndexOf(const str, searched: string): SizeInt;
 begin
   result := strIndexOf(str, searched, 1);      //no default paramert, so you can take the address of both functions
 end;
 
-function strIndexOf(const str: string; const searched: TCharSet): longint;
+function strIndexOf(const str: string; const searched: TCharSet): SizeInt;
 begin
   result := strIndexOf(str, searched, 1);
 end;
 
-function striIndexOf(const str, searched: string): longint;
+function striIndexOf(const str, searched: string): SizeInt;
 begin
   result := striIndexOf(str, searched, 1);
 end;
 
-function strindexof(const str, searched: string; from: longint): longint;
+function strindexof(const str, searched: string; from: SizeInt): SizeInt;
 begin
   if from > length(str) then begin result := 0; exit; end;
   result := strlsIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
@@ -1208,9 +1209,9 @@ begin
   inc(result,  from);
 end;
 
-function strIndexOf(const str: string; const searched: TCharSet; from: longint): longint;
+function strIndexOf(const str: string; const searched: TCharSet; from: SizeInt): SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   for i := from to length(str) do
     if str[i] in searched then begin
@@ -1220,7 +1221,7 @@ begin
   result := 0;
 end;
 
-function striindexof(const str, searched: string; from: longint): longint;
+function striindexof(const str, searched: string; from: SizeInt): SizeInt;
 begin
   if from > length(str) then begin result := 0; exit; end;
   result := strlsiIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
@@ -1228,7 +1229,7 @@ begin
   inc(result,  from);
 end;
 
-function strlsLastIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+function strlsLastIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
 var last: pansichar;
 begin
   if l2<=0 then begin result := 0; exit; end;
@@ -1245,7 +1246,7 @@ begin
   result:=-1;
 end;
 
-function strlsLastIndexOf(str: pansichar; const searched: TCharSet; length: longint): longint;
+function strlsLastIndexOf(str: pansichar; const searched: TCharSet; length: SizeInt): SizeInt;
 var last: pansichar;
 begin
   if length<1 then begin result := -1; exit; end;
@@ -1260,7 +1261,7 @@ begin
   result:=-1;
 end;
 
-function strlsiLastIndexOf(str, searched: pansichar; l1, l2: longint): longint;
+function strlsiLastIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
 var last: pansichar;
 begin
   if l2<=0 then begin result := 0; exit; end;
@@ -1278,7 +1279,7 @@ begin
 end;
 
 
-function strLastIndexOf(const str: string; const searched: string; from: longint): longint;
+function strLastIndexOf(const str: string; const searched: string; from: SizeInt): SizeInt;
 begin
   if from > length(str) then begin result := 0; exit; end;
   result := strlsLastIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
@@ -1286,9 +1287,9 @@ begin
   inc(result,  from);
 end;
 
-function strLastIndexOf(const str: string; const searched: TCharSet; from: longint): longint;
+function strLastIndexOf(const str: string; const searched: TCharSet; from: SizeInt): SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   for i := length(str) downto from do
     if str[i] in searched then begin
@@ -1298,7 +1299,7 @@ begin
   result := 0;
 end;
 
-function striLastIndexOf(const str: string; const searched: string; from: longint): longint;
+function striLastIndexOf(const str: string; const searched: string; from: SizeInt): SizeInt;
 begin
   if from > length(str) then begin result := 0; exit; end;
   result := strlsiLastIndexOf(pansichar(pointer(str))+from-1, pansichar(pointer(searched)), length(str) - from + 1, length(searched));
@@ -1306,7 +1307,7 @@ begin
   inc(result,  from);
 end;
 
-function strLastIndexOf(const str: string; const searched: TCharSet): longint;
+function strLastIndexOf(const str: string; const searched: TCharSet): SizeInt;
 begin
   result := strLastIndexOf(str, searched, 1);
 end;
@@ -1327,36 +1328,36 @@ begin
   result := striContains(str, searched, 1);
 end;
 
-function strcontains(const str, searched: string; from: longint): boolean;
+function strcontains(const str, searched: string; from: SizeInt): boolean;
 begin
   result:=strindexof(str, searched, from) > 0;
 end;
 
-function strContains(const str: string; const searched: TCharSet; from: longint): boolean;
+function strContains(const str: string; const searched: TCharSet; from: SizeInt): boolean;
 begin
   result:=strindexof(str, searched, from) > 0;
 end;
 
-function stricontains(const str, searched: string; from: longint): boolean;
+function stricontains(const str, searched: string; from: SizeInt): boolean;
 begin
   result:=striindexof(str, searched, from) > 0;
 end;
 
-function strcopyfrom(const s: string; start: longint): string; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strcopyfrom(const s: string; start: SizeInt): string; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
   result:=copy(s,start,length(s)-start+1);
 end;
 
-function strslice(const s: string; start, last: longint): string;
+function strslice(const s: string; start, last: SizeInt): string;
 begin
   result:=copy(s,start,last-start+1);
 end;
 
 
-procedure strMoveRef(var source: string; var dest: string; const size: longint); {$IFDEF HASINLINE} inline; {$ENDIF}
+procedure strMoveRef(var source: string; var dest: string; const size: SizeInt); {$IFDEF HASINLINE} inline; {$ENDIF}
 var clearFrom: PAnsiChar;
     clearTo: PAnsiChar;
-    countHighSize: integer;
+    countHighSize: SizeInt;
 begin
   if size <= 0 then exit;
 
@@ -1391,8 +1392,8 @@ begin
     FillChar(clearFrom^, PtrUInt(clearTo - clearFrom) + sizeof(string), 0);
 end;
 
-function strrpos(c: ansichar; const s: string): longint;
-var i:longint;
+function strrpos(c: ansichar; const s: string): SizeInt;
+var i:SizeInt;
 begin
   for i:=length(s) downto 1 do
     if s[i]=c then
@@ -1400,9 +1401,9 @@ begin
   result := 0;
 end;
 
-function strlcount(const search: ansichar; const searchIn: pansichar; const len: longint): longint;
+function strlcount(const search: ansichar; const searchIn: pansichar; const len: SizeInt): SizeInt;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result:=0;
   for i:=0 to len-1 do begin
@@ -1414,18 +1415,18 @@ begin
 end;
 
 
-function strCount(const str: string; const searched: ansichar; from: longint): longint;
+function strCount(const str: string; const searched: ansichar; from: SizeInt): SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := 0;
   for i := from to length(str) do
     if str[i] = searched then inc(result);
 end;
 
-function strCount(const str: string; const searched: TCharSet; from: longint): longint;
+function strCount(const str: string; const searched: TCharSet; from: SizeInt): SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := 0;
   for i := from to length(str) do
@@ -1441,7 +1442,7 @@ begin
   move(first^,result[1],length(result));
 end;
 
-procedure strlTrimLeft(var p: pansichar; var l: integer; const trimCharacters: TCharSet);
+procedure strlTrimLeft(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet);
 begin
   while (l > 0) and (p^ in trimCharacters) do begin
     inc(p);
@@ -1449,24 +1450,24 @@ begin
   end;
 end;
 
-procedure strlTrimRight(var p: pansichar; var l: integer; const trimCharacters: TCharSet);
+procedure strlTrimRight(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet);
 begin
   while (l > 0) and (p[l-1] in trimCharacters) do
     dec(l);
 end;
 
-procedure strlTrim(var p: pansichar; var l: integer; const trimCharacters: TCharSet);
+procedure strlTrim(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet);
 begin
   strlTrimLeft(p,l,trimCharacters);
   strlTrimRight(p,l,trimCharacters);
 end;
 
-type TStrTrimProcedure = procedure (var p: pansichar; var l: integer; const trimCharacters: TCharSet);
+type TStrTrimProcedure = procedure (var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet);
 
 function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
 var p: pansichar;
-    l: Integer;
-    cutOffFront: integer;
+    l: SizeInt;
+    cutOffFront: SizeInt;
 begin
   result := s;
   l := length(Result);
@@ -1496,7 +1497,7 @@ end;
 
 function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet
  ): string;
-var i,j: integer;
+var i,j: SizeInt;
 begin
  result:=strTrim(s,trimCharacters);
  j:=1;
@@ -1515,7 +1516,7 @@ end;
 
 function strNormalizeLineEndings(const s: string): string;
 var
-  i, p: Integer;
+  i, p: SizeInt;
 begin
   result := s;
   if s = '' then exit;
@@ -1542,7 +1543,7 @@ end;
 
 function strNormalizeLineEndingsUTF8(const s: RawByteString): utf8string;
 var
-  i, p: Integer;
+  i, p: SizeInt;
 begin
   //utf 8 $2028 = e280a8, $85 = C285
   result := s;
@@ -1614,10 +1615,10 @@ begin
   end;
 end;
 
-function strWrapSplit(const Line: string; MaxCol: Integer; const BreakChars: TCharSet): TStringArray;
-var i: integer;
-    lastTextStart, lastBreakChance: integer;
-    tempBreak: Integer;
+function strWrapSplit(const Line: string; MaxCol: SizeInt; const BreakChars: TCharSet): TStringArray;
+var i: SizeInt;
+    lastTextStart, lastBreakChance: SizeInt;
+    tempBreak: SizeInt;
 begin
   result := nil;
   lastTextStart:=1;
@@ -1656,7 +1657,7 @@ end;
 
 function strReverse(s: string): string;
 var
-  oldlen, charlen: Integer;
+  oldlen, charlen: SizeInt;
   len: sizeint;
   p: PChar;
   q: Pchar;
@@ -1678,8 +1679,7 @@ end;
 //the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
 //If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
 function strSplitGetUntilBracketClosing(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
-var pos: integer;
-  opened: Integer;
+var pos, opened: SizeInt;
 begin
   opened := 1;
   pos := 1;
@@ -1719,9 +1719,9 @@ begin
 end;
 
 procedure strSplit(out splitted: TStringArray; s, sep: string; includeEmpty: boolean);
-var p:longint;
-    m: longint;
-    reslen: longint;
+var p:SizeInt;
+    m: SizeInt;
+    reslen: SizeInt;
 begin
   SetLength(splitted,0);
   reslen := 0;
@@ -1754,9 +1754,9 @@ begin
 end;
 
 //based on wikipedia
-function strLengthUtf8(const str: RawByteString): longint;
+function strLengthUtf8(const str: RawByteString): SizeInt;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := 0;
   i := 1;
@@ -1842,7 +1842,7 @@ const INVALID_CHAR_1BYTE = '?';
 
 procedure strRemoveNonASCIIFromANSI(var s: RawByteString);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 1 to length(s) do
     if s[i] > #127 then s[i] := INVALID_CHAR_1BYTE;
@@ -1933,8 +1933,8 @@ var toCPActual: TSystemCodePage;
 
   procedure convertUtf8ToWesternEurope(var result: RawByteString);
   var
-    i, cp: Integer;
-    reslen: LongInt;
+    cp: Integer;
+    i, reslen: SizeInt;
     p: pchar;
     len: SizeInt;
   begin
@@ -1972,7 +1972,7 @@ var toCPActual: TSystemCodePage;
 
   procedure convertWesternEurope(var result: RawByteString);
   var
-    i: Integer;
+    i: SizeInt;
   begin
     result := str;
     SetCodePage(result, toCP, false);
@@ -1984,7 +1984,7 @@ var toCPActual: TSystemCodePage;
 
   procedure convertWesternEuropeToUtf8(var result: RawByteString);
   var
-    len, reslen, i: Integer;
+    len, reslen, i: SizeInt;
     builder: TStrBuilder;
   begin ;
     len:=length(str); //character and byte length of latin1-str
@@ -2393,7 +2393,7 @@ begin
   end;
 end;
 
-function strDecodeUTF8Character(const str: RawByteString; var curpos: integer): integer;
+function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer;
 begin
   if curpos > length(str) then begin result := -2; exit; end;
   case ord(str[curpos]) of
@@ -2635,7 +2635,7 @@ end;
 
 function strEscape(s: string; const toEscape: TCharSet; escapeChar: ansichar): string;
 var
- i: Integer;
+ i: SizeInt;
 begin
   result := '';
   if length(s) = 0 then exit;
@@ -2656,9 +2656,8 @@ end;
 
 function strEscapeToHex(s:string; const toEscape: TCharSet; escape: string): string;
 var
-  p: Integer;
-  i: Integer;
-  escapeCount: integer;
+  p, i: SizeInt;
+  escapeCount: SizeInt;
   escapeP: pansichar;
 begin
   result := s;
@@ -2687,9 +2686,9 @@ end;
 
 function strUnescapeHex(s: string; escape: string): string;
 var
-  f, t: Integer;
-  start: Integer;
-  last: Integer;
+  f, t: SizeInt;
+  start: SizeInt;
+  last: SizeInt;
 begin
   if escape = '' then begin
     result := strDecodeHex(s);
@@ -2736,7 +2735,7 @@ end;
 
 function strDecodeHex(s: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   assert(length(s) and 1 = 0);
   result := '';
@@ -2749,7 +2748,7 @@ function strEncodeHex(s: string; const code: string): string;
 var
   o: Integer;
   pcode: pansichar;
-  i: Integer;
+  i: SizeInt;
 begin
   assert(length(code) = 16);
   pcode := @code[1];
@@ -2762,7 +2761,7 @@ begin
   end;
 end;
 
-function strFromPchar(p: pansichar; l: longint): string;
+function strFromPchar(p: pansichar; l: SizeInt): string;
 begin
   if l=0 then begin result := ''; exit; end;
   result := '';
@@ -2771,7 +2770,7 @@ begin
 end;
 
 function strBeforeLast(const s: string; const sep: TCharSet): string;
-var i: Integer;
+var i: SizeInt;
 begin
   i := strLastIndexOf(s, sep);
   if i = 0 then result := ''
@@ -2780,7 +2779,7 @@ end;
 
 function strAfterLast(const s: string; const sep: TCharSet): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := strLastIndexOf(s, sep);
   if i = 0 then result := ''
@@ -2791,7 +2790,7 @@ end;
 
 
 function strJoin(const sl: TStrings; const sep: string  = ', '; limit: Integer=0; const limitStr: string='...'): string; overload;
-var i:longint;
+var i:Integer;
 begin
   Result:='';
   if sl.Count=0 then exit;
@@ -2813,9 +2812,9 @@ begin
 end;
 
 
-function strJoin(const sl: TStringArray; const sep: string = ', '; limit: Integer = 0;
+function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt = 0;
  const limitStr: string = '...'): string; overload;
-var i:longint;
+var i:SizeInt;
 begin
   Result:='';
   if length(sl)=0 then exit;
@@ -2978,10 +2977,10 @@ begin
 end;
 
 //case-sensitive, intelligent string compare (splits in text, number parts)
-function strCompareClever(const s1, s2: string): integer;
+function strCompareClever(const s1, s2: string): SizeInt;
 var t1,t2:string; //lowercase text
-    i,j,ib,jb,p: longint;
-    iz, jz: longint;
+    i,j,ib,jb,p: SizeInt;
+    iz, jz: SizeInt;
 begin
   result:=0;
   t1 := s1;
@@ -3021,14 +3020,14 @@ begin
     result:=sign(length(t1) - length(t2));
 end;
 
-function striCompareClever(const s1, s2: string): integer;
+function striCompareClever(const s1, s2: string): SizeInt;
 begin
   result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
 
-function strDup(rep: string; const count: integer): string;
+function strDup(rep: string; const count: SizeInt): string;
 var
-  i: Integer;
+  i: SizeInt;
   builder: TStrBuilder;
 begin
   builder.init(@result, length(rep) * count);
@@ -3040,7 +3039,7 @@ end;
 function strIsAbsoluteURI(const s: string): boolean;
 var
   p: SizeInt;
-  i: Integer;
+  i: SizeInt;
 begin
   result := false;
   if s = '' then exit;
@@ -3063,7 +3062,7 @@ var
   schemeLength: SizeInt;
   p: SizeInt;
   relsplit, basesplit: TStringArray;
-  i: Integer;
+  i: SizeInt;
   relparams: string;
 begin
   p := pos('#', base);
@@ -3115,7 +3114,7 @@ end;
 function strResolveURI(rel, base: string): string;
   function strIsRelative(const r: string): boolean; //this is weird, but the XQTS3 has "non-hierarchical uris" as test case for fn:resolve-urih
   var
-    i: Integer;
+    i: SizeInt;
   begin
     result := true;
     for i := 1 to length(r) do
@@ -3132,7 +3131,7 @@ var
   baseIsAbsolute: Boolean;
   fileSchemaPrefixLength: Integer;
   returnBackslashes: Boolean;
-  i: Integer;
+  i: SizeInt;
 begin
   if not strIsRelative(rel) or (base = '') then begin result := rel; exit; end;
 
@@ -3240,10 +3239,10 @@ end;
 
 
 
-function strSimilarity(const s, t: string): integer;
+function strSimilarity(const s, t: string): SizeInt;
 //see http://en.wikipedia.org/wiki/Levenshtein_distance
-var v: array[0..1] of array of integer;
-  i,j : Integer;
+var v: array[0..1] of array of SizeInt;
+  i,j : SizeInt;
   cost, v0, v1: Integer;
 begin
   if s = t then begin result := 0; exit; end;
@@ -4638,27 +4637,26 @@ end;
     //PCompareFunctionWrapperData=^TCompareFunctionWrapperData;
     PPointer=^Pointer;
 
-function compareFunctionWrapper(c:TObject; a,b:pointer):longint;
+function compareFunctionWrapper(c:TObject; a,b:pointer):SizeInt;
 var data: ^TCompareFunctionWrapperData absolute c;
 begin
 //  data:=PCompareFunctionWrapperData(c);
   result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
 end;
-function compareRawMemory(c:TObject; a, b:pointer):longint;
+function compareRawMemory(c:TObject; a, b:pointer):SizeInt;
 var size: SizeInt;
 begin
   size := PtrToUInt(c);
   result := CompareByte(a^, b^, size);
 end;
 
-procedure stableSort(a,b: pointer; size: longint;
+procedure stableSort(a,b: pointer; size: SizeInt;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
 var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(TSortData)
-    tempBackArray: array of longint;
-    length:longint;
+    tempBackArray: array of longint; //todo: 64-bit index where needed
+    i, length:SizeInt;
     data: TCompareFunctionWrapperData;
     tempData: pansichar;
-    i: Integer;
 begin
   if size=sizeof(TSortData) then begin
     stableSortSD(a,b,compareFunction,compareFunctionData);
@@ -4719,7 +4717,7 @@ begin
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
 
-function compareString(c:TObject; a, b:pointer):longint;
+function compareString(c:TObject; a, b:pointer):SizeInt;
 begin
   ignore(c);
   result := striCompareClever(PString(a)^, PString(b)^);
@@ -4734,9 +4732,9 @@ begin
 end;
 
 
-function binarySearch(a,b: pointer; size: longint; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
+function binarySearch(a,b: pointer; size: SizeInt; compareFunction: TBinarySearchFunction = nil; compareFunctionData: TObject=nil; choosen: TBinarySearchChoosen = bsAny; condition: TBinarySearchAcceptedConditions = [bsEqual]): pointer;
 var temp: PAnsiChar;
-  l, h, m: Integer;
+  l, h, m: SizeInt;
   acceptedFlags, moveFlags: array[TValueSign] of boolean;
   cmpResult: TValueSign;
 begin

@@ -982,7 +982,7 @@ function TXSSchema.isValidNCName(const s: string): boolean;
 const AsciiNameStartChar = ['A'..'Z', '_', 'a'..'z'];
       AsciiNameChar = AsciiNameStartChar + ['-', '.', '0'..'9'];
 var
-  curpos: Integer;
+  curpos: SizeInt;
   cp: Integer;
 begin
   result := false;

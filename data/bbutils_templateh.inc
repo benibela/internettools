@@ -18,62 +18,62 @@ const __ELEMENT__DEFAULT__: T__ElementType__ = '';
 }
 
 //**Adds element @code(e) to array @code(a). Returns i with a[i]=e
-function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__):longint; overload;
+function arrayAdd(var a: T__ArrayType__; const e: T__ElementType__):SizeInt; overload;
 //**Adds elements from a2 @code(e) to array @code(a). Returns the OLD length of a
-function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):longint; overload;
+function arrayAdd(var a: T__ArrayType__; const a2: array of T__ElementType__):SizeInt; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
 procedure arrayPrepend(var a: T__ArrayType__; const e: T__ElementType__); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
-function arrayDelete(var a: T__ArrayType__; const i: longint):T__ElementType__; overload;
+function arrayDelete(var a: T__ArrayType__; const i: SizeInt):T__ElementType__; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
-function arrayDeleteUnordered(var a: T__ArrayType__; const i: longint):T__ElementType__; overload;
+function arrayDeleteUnordered(var a: T__ArrayType__; const i: SizeInt):T__ElementType__; overload;
 
 //**Ensures that @code(a) has at least @code(reserveLength) elements
-procedure arrayReserveFast(var a: T__ArrayType__; const len: longint; const reserveLength: longint); overload;
+procedure arrayReserveFast(var a: T__ArrayType__; const len: SizeInt; const reserveLength: SizeInt); overload;
 //**returns i with a[i]=e
-function arrayAddFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__): longint; overload;
+function arrayAddFast(var a: T__ArrayType__; var len: SizeInt; const e: T__ElementType__): SizeInt; overload;
 //**Prepends @code(e) to @code(a), i.e. inserts @code(e) at position 0. (Quite slow, O(n))
-procedure arrayPrependFast(var a: T__ArrayType__; var len: longint; const e: T__ElementType__); overload;
+procedure arrayPrependFast(var a: T__ArrayType__; var len: SizeInt; const e: T__ElementType__); overload;
 //**Removes element at position i from a@br
 //**Returns e=a[i]
-function arrayDeleteFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
+function arrayDeleteFast(var a: T__ArrayType__; var len: SizeInt; const i: SizeInt):T__ElementType__; overload;
 //**Removes element at position i from a (destroying the order of the elements)@br
 //**Returns e=a[i]
-function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: longint; const i: longint):T__ElementType__; overload;
+function arrayDeleteUnorderedFast(var a: T__ArrayType__; var len: SizeInt; const i: SizeInt):T__ElementType__; overload;
 
 //**Inserts element e at position i in a
-procedure arrayInsert(var a: T__ArrayType__; i: longint; const e: T__ElementType__); overload;
+procedure arrayInsert(var a: T__ArrayType__; i: SizeInt; const e: T__ElementType__); overload;
 //**Inserts element e at position i in a
-procedure arrayInsertFast(var a: T__ArrayType__; var len: longint; i: longint; const e: T__ElementType__); overload;
+procedure arrayInsertFast(var a: T__ArrayType__; var len: SizeInt; i: SizeInt; const e: T__ElementType__); overload;
 
 //**Find element e in the array/slice (see above)
-function arrayIndexOf(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer; overload;
+function arrayIndexOf(const a: array of T__ElementType__; const e: T__ElementType__; slice1: SizeInt = -1; slice2: SizeInt = -1): SizeInt; overload;
 //**Find the smallest element, in the array/slice (see above)
-function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer; overload;
+function arrayIndexOfSmallest(const a: array of T__ElementType__; slice1: SizeInt = -1; slice2: SizeInt = -1): SizeInt; overload;
 //**Find the largest element in the array/slice (see above)
-function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: integer = -1; slice2: integer = -1): integer; overload;
+function arrayIndexOfLargest(const a: array of T__ElementType__; slice1: SizeInt = -1; slice2: SizeInt = -1): SizeInt; overload;
 //**Tests if element e exists in the array/slice (see above)
-function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: integer = -1; slice2: integer = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
+function arrayContains(const a: array of T__ElementType__; const e: T__ElementType__; slice1: SizeInt = -1; slice2: SizeInt = -1): boolean; overload; //{$IFDEF HASINLINE} inline; {$ENDIF}
 
 //**Inverts the order of the elements in the array/slice (see above)
-procedure arrayInvert(a: T__ArrayType__; slice1: integer = -1;slice2: integer = -1);overload;
+procedure arrayInvert(a: T__ArrayType__; slice1: SizeInt = -1;slice2: SizeInt = -1);overload;
 
 //**Extracts a array slice
-function arraySlice(a: array of T__ElementType__; slice1: integer = -1;slice2: integer = -1): T__ArrayType__; overload;
+function arraySlice(a: array of T__ElementType__; slice1: SizeInt = -1;slice2: SizeInt = -1): T__ArrayType__; overload;
 
 //**Returns the i-th element of the array. If i < 0, the indices are taken from the end of the array. (which is actually the only use case)
-function arrayGet(a: array of T__ElementType__; const i: integer): T__ElementType__; overload;
+function arrayGet(a: array of T__ElementType__; const i: SizeInt): T__ElementType__; overload;
 //**Returns the last element of the array, raises exception, iff the array is empty
 function arrayLast(a: array of T__ElementType__): T__ElementType__; overload;
 //**Returns the last element of the array, returns default, iff the array is empty
 function arrayLast(a: array of T__ElementType__; const default: T__ElementType__): T__ElementType__; overload;
 
 //**Compares two array/slices (interleaved slice parameters, so arrayEqual(a,b,3,3) compares the first 3 elements)
-function arrayCompare(a, b: array of T__ElementType__; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): longint; overload;
+function arrayCompare(a, b: array of T__ElementType__; slice1a: SizeInt = -1; slice1b: SizeInt = -1; slice2a: SizeInt = -1; slice2b: SizeInt = -1): longint; overload;
 //**Tests if two array/slices are equal (interleaved slice parameters, so arrayEqual(a,b,3,3) tests the first 3 elements)
-function arrayEqual(a, b: array of T__ElementType__; slice1a: integer = -1; slice1b: integer = -1; slice2a: integer = -1; slice2b: integer = -1): boolean; overload;
+function arrayEqual(a, b: array of T__ElementType__; slice1a: SizeInt = -1; slice1b: SizeInt = -1; slice2a: SizeInt = -1; slice2b: SizeInt = -1): boolean; overload;
 {%END-REPEAT}
 
 //-----------------------Conditional additions------------------------

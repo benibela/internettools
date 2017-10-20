@@ -166,7 +166,7 @@ type
    staticContext: TXQStaticContext;
    changedDefaultsTypeNamespaces: TInterfaceList;
    implicitNamespaceCounts: TLongintArray;
-   implicitNamespaceCountsLength: integer;
+   implicitNamespaceCountsLength: SizeInt;
    checker: TFlowerVariableChecker;
    //globalVariableHack: TXQVariableChangeLog;
    procedure declare(v: PXQTermVariable); override;
@@ -1606,7 +1606,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
       else
         parent.push(TXQTermConstant.create(xqvalue(s)));
     end;
-    function strIsWhitespace(p: pchar; l: longint): boolean;
+    function strIsWhitespace(p: pchar; l: SizeInt): boolean;
     begin
       if l = 0 then exit(true);
       strlTrimRight(p, l, WHITE_SPACE);
@@ -3450,7 +3450,7 @@ var declarationDuplicateChecker: TStringList;
 
     procedure setChar(c: TXQDecimalFormatProperty);
     var
-      p: Integer;
+      p: SizeInt;
     begin
       p := 1;
       decimalFormat.formats.chars[c] := strDecodeUTF8Character(value, p);

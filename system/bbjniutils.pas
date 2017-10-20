@@ -547,7 +547,7 @@ end;
 function repairModifiedUTF8(const s: string): string; //valid utf is converted, invalid characters are removed
 const ERRMARKER = '?';
 var res: string;
-    p: integer;
+    p: SizeInt;
   procedure needLength(d: integer); inline;
   begin
     if p + d - 1 > length(res) then
@@ -600,7 +600,7 @@ var res: string;
     inc(p);
   end;
 
-var i: integer;
+var i: SizeInt;
   procedure reencode; inline;
   begin
     pushUnicodeChar(strDecodeUTF8Character(s, i));

@@ -1735,7 +1735,7 @@ begin
   {$ENDIF}
 end;
 
-procedure strOffsetUTF8(const s: RawByteString; index: integer; var offset: integer);
+procedure strOffsetUTF8(const s: RawByteString; index: SizeInt; var offset: SizeInt);
 begin
   while (index > 1) and (offset <= length(s)) do begin
     dec(index);
@@ -1743,9 +1743,9 @@ begin
   end;
 end;
 
-function strCopyUTF8(const s: RawByteString; const from, len: integer): string;
+function strCopyUTF8(const s: RawByteString; const from, len: SizeInt): string;
 var
-  startOffset, endOffset: Integer;
+  startOffset, endOffset: SizeInt;
 begin
   startOffset := 1;
   strOffsetUTF8(s, from, startOffset );
@@ -4209,7 +4209,7 @@ var
   encoding: String;
   contenttype: string;
   enc: TSystemCodePage;
-  pos: integer;
+  pos: SizeInt;
 begin
 
   if args[0].isUndefined then exit(args[0]);
@@ -4584,7 +4584,7 @@ end;
 
 function strBeginsWithUnicodeNumber(const picture: string): boolean;
 var
-  temp: Integer;
+  temp: SizeInt;
 begin
   temp := 1;
   result := charUnicodeZero(strDecodeUTF8Character(picture, temp)) > 0;
@@ -4861,9 +4861,9 @@ var picture: string;
     if result <= 0 then raiseInvalidPictureFOFD1340('width: ' + width+#13#10'Hint: Use - ([X,3-3]) to separate min/max width');
   end;
 
-  function countDigits(const s: string; zerodp: PInteger = nil; allDigits: PBoolean = nil): integer;
+  function countDigits(const s: string; zerodp: PInteger = nil; allDigits: PBoolean = nil): SizeInt;
   var
-    j: Integer;
+    j: SizeInt;
     zerocp: Integer;
   begin
     j := 1;
@@ -4906,7 +4906,7 @@ var
   commapos: SizeInt;
   tempstrmin, tempstrmax: string;
   last: Integer;
-  i: Integer;
+  i, j: SizeInt;
   calendarNamespace: string;
   dateTime: PXQValueDateTimeData;
   number: Integer;
@@ -4914,7 +4914,6 @@ var
   sublang: String;
   formatted: String;
   missingCharacterCount: Integer;
-  j: Integer;
   zerocp: Integer;
   allDigits: Boolean;
   tz, tempcount: Integer;

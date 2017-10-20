@@ -1389,7 +1389,7 @@ var
   u: IXQValue;
   i: Integer;
   decimalformat: TXQDecimalFormat;
-  temp: Integer;
+  temp: SizeInt;
   att: TTreeAttribute;
   temps: String;
 begin

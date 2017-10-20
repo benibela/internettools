@@ -368,7 +368,7 @@ TParsingModel = (pmStrict, pmHTML, pmUnstrictXML);
 //**If TargetEncoding is not CP_NONE, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
 //**You can change the class used for the elements in the tree with the field treeNodeClass.
 TTreeParser = class
-  function processingInstruction(text: pchar; textLen: longint; {%H-}unusedParameter: TTextFlags): TParsingResult;
+  function processingInstruction(text: pchar; textLen: SizeInt; {%H-}unusedParameter: TTextFlags): TParsingResult;
 protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
@@ -386,18 +386,18 @@ protected
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
 
-  function newTreeNode(typ:TTreeNodeType; text: pchar; len:longint):TTreeNode;
-  function newTreeNode(typ:TTreeNodeType; s: string; offset: integer):TTreeNode;
+  function newTreeNode(typ:TTreeNodeType; text: pchar; len:SizeInt):TTreeNode;
+  function newTreeNode(typ:TTreeNodeType; s: string; offset: SizeInt):TTreeNode;
   procedure autoCloseLastTag();
   function autoCloseTill(const ctag: string): TTreeNode;
 
   function prependTag(const tag: string): TTreeNode;
   procedure doRepairMissingStartTags(const tag: string);
 
-  function enterTag(tagName: pchar; tagNameLen: longint; properties: THTMLProperties):TParsingResult;
-  function leaveTag(tagName: pchar; tagNameLen: longint):TParsingResult;
-  function readText(text: pchar; textLen: longint; tf: TTextFlags):TParsingResult;
-  function readComment(text: pchar; textLen: longint):TParsingResult;
+  function enterTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
+  function leaveTag(tagName: pchar; tagNameLen: SizeInt):TParsingResult;
+  function readText(text: pchar; textLen: SizeInt; tf: TTextFlags):TParsingResult;
+  function readComment(text: pchar; textLen: SizeInt):TParsingResult;
 
 private
   //in-scope namespaces
@@ -1975,11 +1975,10 @@ end;
 
 { THTMLTreeParser }
 
-function TTreeParser.processingInstruction(text: pchar; textLen: longint; unusedParameter: TTextFlags): TParsingResult;
+function TTreeParser.processingInstruction(text: pchar; textLen: SizeInt; unusedParameter: TTextFlags): TParsingResult;
   function cutproperty(var remainingtext: string; out value: string): string;
   var
-    eq: LongInt;
-    closing: LongInt;
+    eq, closing: SizeInt;
   begin
     result := '';
     eq := strIndexOf(remainingtext, '=');
@@ -2045,12 +2044,12 @@ begin
   new.initialized;
 end;
 
-function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: longint): TTreeNode;
+function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: SizeInt): TTreeNode;
 begin
   result := newTreeNode(typ, strFromPchar(text, len), longint(text - @FCurrentFile[1]));
 end;
 
-function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string; offset: integer): TTreeNode;
+function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string; offset: SizeInt): TTreeNode;
 begin
   result:=treeNodeClass.Create;
   result.typ := typ;
@@ -2203,7 +2202,7 @@ begin
   //if FBasicParsingState = bpmInBody, bpmInFrameset..;
   end;
 
-function TTreeParser.enterTag(tagName: pchar; tagNameLen: longint;
+function TTreeParser.enterTag(tagName: pchar; tagNameLen: SizeInt;
   properties: THTMLProperties): TParsingResult;
 var
   tag: String;
@@ -2319,7 +2318,7 @@ begin
   new.initialized;
 end;
 
-function TTreeParser.leaveTag(tagName: pchar; tagNameLen: longint): TParsingResult;
+function TTreeParser.leaveTag(tagName: pchar; tagNameLen: SizeInt): TParsingResult;
 var
   new,last,temp: TTreeNode;
   match: longint;
@@ -2474,9 +2473,9 @@ begin
   end;
 end;
 
-function TTreeParser.readText(text: pchar; textLen: longint; tf: TTextFlags): TParsingResult;
+function TTreeParser.readText(text: pchar; textLen: SizeInt; tf: TTextFlags): TParsingResult;
 var
-  tempLen: LongInt;
+  tempLen: SizeInt;
   temp: PChar;
   typ: TTreeNodeType;
 begin
@@ -2518,7 +2517,7 @@ begin
   newTreeNode(typ, text, textLen).initialized;
 end;
 
-function TTreeParser.readComment(text: pchar; textLen: longint): TParsingResult;
+function TTreeParser.readComment(text: pchar; textLen: SizeInt): TParsingResult;
 begin
   result:=prContinue;
   if not FReadComments then
@@ -2822,7 +2821,7 @@ end;
 
 procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);
   function strIsEmpty(const s: string): boolean;
-  var p: pchar; l: longint;
+  var p: pchar; l: SizeInt;
   begin
     p := pointer(s);
     l := length(s);
@@ -2938,7 +2937,7 @@ end;
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 var
   tdata: PChar;
-  tdatalength: Integer;
+  tdatalength: SizeInt;
   function checkRawDataForHtml: boolean; //following http://mimesniff.spec.whatwg.org/ (except allowing #9 as TT ) todo: what is with utf-16?
   var tocheck: array[1..16] of string = ('<!DOCTYPE HTML', '<HTML', '<HEAD', '<SCRIPT', '<IFRAME', '<H1', '<DIV', '<FONT', '<TABLE', '<A', '<STYLE', '<TITLE', '<B', '<BODY', '<BR', '<P');
     i: Integer;

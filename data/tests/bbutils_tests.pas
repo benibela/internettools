@@ -18,28 +18,28 @@ uses bbutils,math;
 type PShortInt = ^ShortInt;
      PInteger = ^integer;
 
-function shortintCompareFunction(c:TObject; a,b:pointer):longint;
+function shortintCompareFunction(c:TObject; a,b:pointer):SizeInt;
 begin
   ignore(c);
   if PShortInt(a)^<PShortInt(b)^ then result := -1
   else if PShortInt(a)^>PShortInt(b)^ then result := 1
   else result := 0;
 end;
-function intCompareFunction(c:TObject; a,b:pointer):longint;
+function intCompareFunction(c:TObject; a,b:pointer):SizeInt;
 begin
   ignore(c);
   if pinteger(a)^<pinteger(b)^ then result := -1
   else if pinteger(a)^>pinteger(b)^ then result := 1
   else result := 0
 end;
-function int64CompareFunction(c:TObject; a,b:pointer):longint;
+function int64CompareFunction(c:TObject; a,b:pointer):SizeInt;
 begin
   ignore(c);
   if pint64(a)^<pint64(b)^ then result := -1
   else if pint64(a)^>pint64(b)^ then result := 1
   else result := 0
 end;
-function stringCompareReverseFunction(c:TObject; a,b:pointer):longint;
+function stringCompareReverseFunction(c:TObject; a,b:pointer):SizeInt;
 begin
   ignore(c);
   result := - CompareText(PString(a)^,PString(b)^);
@@ -69,7 +69,7 @@ procedure testVariousStuff; forward;
 {$IFDEF FPC}
 procedure intArrayUnitTests;
 var a: TLongintArray;
-    len:longint;
+    len:SizeInt;
 begin
   //simple
   a := nil;
@@ -208,7 +208,7 @@ end;
 
 procedure stringArrayUnitTests;
 var a: TStringArray;
-    len: integer;
+    len: SizeInt;
 begin
   a := nil;
   arrayAdd(a, 'hallo');
@@ -987,13 +987,16 @@ end;
 
 procedure testVariousStuff;
 var
-  i, j: Integer;
+  i, j: SizeInt;
 var ar8: array[0..100] of shortint;
     ar32: array[0..100] of longint;
     ar64: array[0..100] of int64;
     ai32: TLongintArray;
     sa: TStringArray;
     order: TBinarySearchChoosen;
+    astr: ansistring;
+    ustr: UTF8String;
+    pa: PAnsiChar;
 begin
   test(strNormalizeLineEndings(#13#10), #10);
   test(strNormalizeLineEndings('foo'#10'b'#13'ar'#13#10), 'foo'#10'b'#10'ar'#10);
@@ -1072,6 +1075,30 @@ begin
     if strTrim(strdup(' ', i) + 'abc1' + strdup(' ', j)) <> 'abc1' then
       raise Exception.Create('failed test: "'+strdup(' ', i) + 'abc1' + strdup(' ', j)+'"');
 
+  //make sure fpc does is not confused  by pchar/string overload
+  i := 1;
+  test(strDecodeUTF8Character('abc', i), ord('a'));
+  test(strDecodeUTF8Character('abc', i), ord('b'));
+  test(strDecodeUTF8Character('abc', i), ord('c'));
+  test(i, 4);
+  i := 1;
+  astr := 'abc';
+  test(strDecodeUTF8Character(astr, i), ord('a'));
+  test(strDecodeUTF8Character(astr, i), ord('b'));
+  test(strDecodeUTF8Character(astr, i), ord('c'));
+  test(i, 4);
+  i := 1;
+  ustr := 'abc';
+  test(strDecodeUTF8Character(ustr, i), ord('a'));
+  test(strDecodeUTF8Character(ustr, i), ord('b'));
+  test(strDecodeUTF8Character(ustr, i), ord('c'));
+  test(i, 4);
+  pa := pchar(astr);
+  i := 3;
+  test(strDecodeUTF8Character(pa, i), ord('a'));
+  test(strDecodeUTF8Character(pa, i), ord('b'));
+  test(strDecodeUTF8Character(pa, i), ord('c'));
+  test(i, 0);
 
    //html str decode
    testStrEntities();

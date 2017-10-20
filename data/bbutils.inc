@@ -3,16 +3,16 @@
 
 
 
-function arrayAdd(var a: TStringArray; const e: string): longint;
+function arrayAdd(var a: TStringArray; const e: string): SizeInt;
 begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TStringArray; const a2: array of string):longint;
+function arrayAdd(var a: TStringArray; const a2: array of string):SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := length(a);
   setlength(a, result + length(a2));
@@ -31,7 +31,7 @@ end;
 
 
 
-function arrayDelete(var a: TStringArray; const i: longint): string;
+function arrayDelete(var a: TStringArray; const i: SizeInt): string;
 begin
   if (i<0) or (i>high(a)) then begin result := ''; exit; end;
   result := a[i];
@@ -41,7 +41,7 @@ begin
 end;
 
 
-function arrayDeleteUnordered(var a: TStringArray; const i: longint): string;
+function arrayDeleteUnordered(var a: TStringArray; const i: SizeInt): string;
 begin
   if (i<0) or (i>high(a)) then begin result := ''; exit; end;
   result:=a[i];
@@ -49,7 +49,7 @@ begin
   SetLength(a,high(a));
 end;
 
-procedure arrayReserveFast(var a: TStringArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TStringArray; const len: SizeInt; const reserveLength: SizeInt);
 begin
   if reserveLength <= len then exit;
   if reserveLength <= length(a) then exit;
@@ -62,7 +62,7 @@ begin
   else SetLength(a, reserveLength);
 end;
 
-function arrayAddFast(var a: TStringArray; var len: longint; const e: string): longint;
+function arrayAddFast(var a: TStringArray; var len: SizeInt; const e: string): SizeInt;
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -71,7 +71,7 @@ begin
   a[result] := e;
 end;
 
-procedure arrayPrependFast(var a: TStringArray; var len: longint; const e: string);
+procedure arrayPrependFast(var a: TStringArray; var len: SizeInt; const e: string);
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -82,7 +82,7 @@ begin
 end;
 
 
-function arrayDeleteFast(var a: TStringArray; var len: longint; const i: longint): string;
+function arrayDeleteFast(var a: TStringArray; var len: SizeInt; const i: SizeInt): string;
 begin
   if (i<0) or (i>=len) then begin result := ''; exit; end;
   result:=a[i];
@@ -91,7 +91,7 @@ begin
   dec(len);
 end;
 
-function arrayDeleteUnorderedFast(var a: TStringArray; var len: longint; const i: longint): string;
+function arrayDeleteUnorderedFast(var a: TStringArray; var len: SizeInt; const i: SizeInt): string;
 begin
   if (i<0) or (i>=len) then begin result := ''; exit; end;
   result:=a[i];
@@ -99,7 +99,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arrayInsert(var a: TStringArray; i: longint; const e: string);
+procedure arrayInsert(var a: TStringArray; i: SizeInt; const e: string);
 begin
   if (i < 0) then i := 0
   else if i > length(a) then i := length(a);
@@ -109,9 +109,9 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: TStringArray; var len: longint; i: longint; const e: string);
+procedure arrayInsertFast(var a: TStringArray; var len: SizeInt; i: SizeInt; const e: string);
 var
-  oldlen: LongInt;
+  oldlen: SizeInt;
 begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
@@ -125,8 +125,8 @@ begin
 end;
 
 function arrayIndexOf(const a: array of string; const e: string;
- slice1: integer; slice2: integer): integer;
-var i:longint;
+ slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
@@ -135,10 +135,10 @@ begin
   result:=-1;
 end;
 
-function arraySlice(a: array of string; slice1: integer; slice2: integer
+function arraySlice(a: array of string; slice1: SizeInt; slice2: SizeInt
  ): TStringArray;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := nil;
@@ -147,8 +147,8 @@ begin
     result[i] := a[slice1+i];
 end;
 
-function arrayIndexOfSmallest(const a: array of string; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfSmallest(const a: array of string; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -157,8 +157,8 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: array of string; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfLargest(const a: array of string; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -167,14 +167,14 @@ begin
        Result:=i;
 end;
 
-function arrayContains(const a: array of string; const e: string; slice1: integer; slice2: integer): boolean;
+function arrayContains(const a: array of string; const e: string; slice1: SizeInt; slice2: SizeInt): boolean;
 begin
   result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
-procedure arrayInvert(a: TStringArray; slice1: integer; slice2: integer);
+procedure arrayInvert(a: TStringArray; slice1: SizeInt; slice2: SizeInt);
 var temp: string;
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
@@ -184,7 +184,7 @@ begin
   end;
 end;
 
-function arrayGet(a: array of string; const i: integer): string;
+function arrayGet(a: array of string; const i: SizeInt): string;
 begin
   if i < 0 then result:=a[length(a) + i]
   else result := a[i];
@@ -202,10 +202,10 @@ begin
   else result := a[high(a)];
 end;
 
-function arrayCompare(a, b: array of string; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): longint;
+function arrayCompare(a, b: array of string; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): longint;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1a, slice2a);
   arraySliceIndices(high(b), slice1b, slice2b);
@@ -220,24 +220,24 @@ begin
   result := 0;
 end;
 
-function arrayEqual(a, b: array of string; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): boolean;
+function arrayEqual(a, b: array of string; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): boolean;
 begin
   result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
 
-function arrayAdd(var a: TLongintArray; const e: longint): longint;
+function arrayAdd(var a: TLongintArray; const e: longint): SizeInt;
 begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TLongintArray; const a2: array of longint):longint;
+function arrayAdd(var a: TLongintArray; const a2: array of longint):SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := length(a);
   setlength(a, result + length(a2));
@@ -256,7 +256,7 @@ end;
 
 
 
-function arrayDelete(var a: TLongintArray; const i: longint): longint;
+function arrayDelete(var a: TLongintArray; const i: SizeInt): longint;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
@@ -266,7 +266,7 @@ begin
 end;
 
 
-function arrayDeleteUnordered(var a: TLongintArray; const i: longint): longint;
+function arrayDeleteUnordered(var a: TLongintArray; const i: SizeInt): longint;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
@@ -274,7 +274,7 @@ begin
   SetLength(a,high(a));
 end;
 
-procedure arrayReserveFast(var a: TLongintArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TLongintArray; const len: SizeInt; const reserveLength: SizeInt);
 begin
   if reserveLength <= len then exit;
   if reserveLength <= length(a) then exit;
@@ -287,7 +287,7 @@ begin
   else SetLength(a, reserveLength);
 end;
 
-function arrayAddFast(var a: TLongintArray; var len: longint; const e: longint): longint;
+function arrayAddFast(var a: TLongintArray; var len: SizeInt; const e: longint): SizeInt;
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -296,7 +296,7 @@ begin
   a[result] := e;
 end;
 
-procedure arrayPrependFast(var a: TLongintArray; var len: longint; const e: longint);
+procedure arrayPrependFast(var a: TLongintArray; var len: SizeInt; const e: longint);
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -307,7 +307,7 @@ begin
 end;
 
 
-function arrayDeleteFast(var a: TLongintArray; var len: longint; const i: longint): longint;
+function arrayDeleteFast(var a: TLongintArray; var len: SizeInt; const i: SizeInt): longint;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -316,7 +316,7 @@ begin
   dec(len);
 end;
 
-function arrayDeleteUnorderedFast(var a: TLongintArray; var len: longint; const i: longint): longint;
+function arrayDeleteUnorderedFast(var a: TLongintArray; var len: SizeInt; const i: SizeInt): longint;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -324,7 +324,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arrayInsert(var a: TLongintArray; i: longint; const e: longint);
+procedure arrayInsert(var a: TLongintArray; i: SizeInt; const e: longint);
 begin
   if (i < 0) then i := 0
   else if i > length(a) then i := length(a);
@@ -334,9 +334,9 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: TLongintArray; var len: longint; i: longint; const e: longint);
+procedure arrayInsertFast(var a: TLongintArray; var len: SizeInt; i: SizeInt; const e: longint);
 var
-  oldlen: LongInt;
+  oldlen: SizeInt;
 begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
@@ -350,8 +350,8 @@ begin
 end;
 
 function arrayIndexOf(const a: array of longint; const e: longint;
- slice1: integer; slice2: integer): integer;
-var i:longint;
+ slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
@@ -360,10 +360,10 @@ begin
   result:=-1;
 end;
 
-function arraySlice(a: array of longint; slice1: integer; slice2: integer
+function arraySlice(a: array of longint; slice1: SizeInt; slice2: SizeInt
  ): TLongintArray;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := nil;
@@ -372,8 +372,8 @@ begin
     result[i] := a[slice1+i];
 end;
 
-function arrayIndexOfSmallest(const a: array of longint; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfSmallest(const a: array of longint; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -382,8 +382,8 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: array of longint; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfLargest(const a: array of longint; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -392,14 +392,14 @@ begin
        Result:=i;
 end;
 
-function arrayContains(const a: array of longint; const e: longint; slice1: integer; slice2: integer): boolean;
+function arrayContains(const a: array of longint; const e: longint; slice1: SizeInt; slice2: SizeInt): boolean;
 begin
   result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
-procedure arrayInvert(a: TLongintArray; slice1: integer; slice2: integer);
+procedure arrayInvert(a: TLongintArray; slice1: SizeInt; slice2: SizeInt);
 var temp: longint;
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
@@ -409,7 +409,7 @@ begin
   end;
 end;
 
-function arrayGet(a: array of longint; const i: integer): longint;
+function arrayGet(a: array of longint; const i: SizeInt): longint;
 begin
   if i < 0 then result:=a[length(a) + i]
   else result := a[i];
@@ -427,10 +427,10 @@ begin
   else result := a[high(a)];
 end;
 
-function arrayCompare(a, b: array of longint; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): longint;
+function arrayCompare(a, b: array of longint; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): longint;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1a, slice2a);
   arraySliceIndices(high(b), slice1b, slice2b);
@@ -445,24 +445,24 @@ begin
   result := 0;
 end;
 
-function arrayEqual(a, b: array of longint; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): boolean;
+function arrayEqual(a, b: array of longint; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): boolean;
 begin
   result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
 
-function arrayAdd(var a: TLongwordArray; const e: longword): longint;
+function arrayAdd(var a: TLongwordArray; const e: longword): SizeInt;
 begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TLongwordArray; const a2: array of longword):longint;
+function arrayAdd(var a: TLongwordArray; const a2: array of longword):SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := length(a);
   setlength(a, result + length(a2));
@@ -481,7 +481,7 @@ end;
 
 
 
-function arrayDelete(var a: TLongwordArray; const i: longint): longword;
+function arrayDelete(var a: TLongwordArray; const i: SizeInt): longword;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
@@ -491,7 +491,7 @@ begin
 end;
 
 
-function arrayDeleteUnordered(var a: TLongwordArray; const i: longint): longword;
+function arrayDeleteUnordered(var a: TLongwordArray; const i: SizeInt): longword;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
@@ -499,7 +499,7 @@ begin
   SetLength(a,high(a));
 end;
 
-procedure arrayReserveFast(var a: TLongwordArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TLongwordArray; const len: SizeInt; const reserveLength: SizeInt);
 begin
   if reserveLength <= len then exit;
   if reserveLength <= length(a) then exit;
@@ -512,7 +512,7 @@ begin
   else SetLength(a, reserveLength);
 end;
 
-function arrayAddFast(var a: TLongwordArray; var len: longint; const e: longword): longint;
+function arrayAddFast(var a: TLongwordArray; var len: SizeInt; const e: longword): SizeInt;
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -521,7 +521,7 @@ begin
   a[result] := e;
 end;
 
-procedure arrayPrependFast(var a: TLongwordArray; var len: longint; const e: longword);
+procedure arrayPrependFast(var a: TLongwordArray; var len: SizeInt; const e: longword);
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -532,7 +532,7 @@ begin
 end;
 
 
-function arrayDeleteFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
+function arrayDeleteFast(var a: TLongwordArray; var len: SizeInt; const i: SizeInt): longword;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -541,7 +541,7 @@ begin
   dec(len);
 end;
 
-function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: longint; const i: longint): longword;
+function arrayDeleteUnorderedFast(var a: TLongwordArray; var len: SizeInt; const i: SizeInt): longword;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -549,7 +549,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arrayInsert(var a: TLongwordArray; i: longint; const e: longword);
+procedure arrayInsert(var a: TLongwordArray; i: SizeInt; const e: longword);
 begin
   if (i < 0) then i := 0
   else if i > length(a) then i := length(a);
@@ -559,9 +559,9 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: TLongwordArray; var len: longint; i: longint; const e: longword);
+procedure arrayInsertFast(var a: TLongwordArray; var len: SizeInt; i: SizeInt; const e: longword);
 var
-  oldlen: LongInt;
+  oldlen: SizeInt;
 begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
@@ -575,8 +575,8 @@ begin
 end;
 
 function arrayIndexOf(const a: array of longword; const e: longword;
- slice1: integer; slice2: integer): integer;
-var i:longint;
+ slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
@@ -585,10 +585,10 @@ begin
   result:=-1;
 end;
 
-function arraySlice(a: array of longword; slice1: integer; slice2: integer
+function arraySlice(a: array of longword; slice1: SizeInt; slice2: SizeInt
  ): TLongwordArray;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := nil;
@@ -597,8 +597,8 @@ begin
     result[i] := a[slice1+i];
 end;
 
-function arrayIndexOfSmallest(const a: array of longword; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfSmallest(const a: array of longword; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -607,8 +607,8 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: array of longword; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfLargest(const a: array of longword; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -617,14 +617,14 @@ begin
        Result:=i;
 end;
 
-function arrayContains(const a: array of longword; const e: longword; slice1: integer; slice2: integer): boolean;
+function arrayContains(const a: array of longword; const e: longword; slice1: SizeInt; slice2: SizeInt): boolean;
 begin
   result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
-procedure arrayInvert(a: TLongwordArray; slice1: integer; slice2: integer);
+procedure arrayInvert(a: TLongwordArray; slice1: SizeInt; slice2: SizeInt);
 var temp: longword;
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
@@ -634,7 +634,7 @@ begin
   end;
 end;
 
-function arrayGet(a: array of longword; const i: integer): longword;
+function arrayGet(a: array of longword; const i: SizeInt): longword;
 begin
   if i < 0 then result:=a[length(a) + i]
   else result := a[i];
@@ -652,10 +652,10 @@ begin
   else result := a[high(a)];
 end;
 
-function arrayCompare(a, b: array of longword; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): longint;
+function arrayCompare(a, b: array of longword; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): longint;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1a, slice2a);
   arraySliceIndices(high(b), slice1b, slice2b);
@@ -670,24 +670,24 @@ begin
   result := 0;
 end;
 
-function arrayEqual(a, b: array of longword; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): boolean;
+function arrayEqual(a, b: array of longword; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): boolean;
 begin
   result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
 
-function arrayAdd(var a: TInt64Array; const e: int64): longint;
+function arrayAdd(var a: TInt64Array; const e: int64): SizeInt;
 begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TInt64Array; const a2: array of int64):longint;
+function arrayAdd(var a: TInt64Array; const a2: array of int64):SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := length(a);
   setlength(a, result + length(a2));
@@ -706,7 +706,7 @@ end;
 
 
 
-function arrayDelete(var a: TInt64Array; const i: longint): int64;
+function arrayDelete(var a: TInt64Array; const i: SizeInt): int64;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
@@ -716,7 +716,7 @@ begin
 end;
 
 
-function arrayDeleteUnordered(var a: TInt64Array; const i: longint): int64;
+function arrayDeleteUnordered(var a: TInt64Array; const i: SizeInt): int64;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
@@ -724,7 +724,7 @@ begin
   SetLength(a,high(a));
 end;
 
-procedure arrayReserveFast(var a: TInt64Array; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TInt64Array; const len: SizeInt; const reserveLength: SizeInt);
 begin
   if reserveLength <= len then exit;
   if reserveLength <= length(a) then exit;
@@ -737,7 +737,7 @@ begin
   else SetLength(a, reserveLength);
 end;
 
-function arrayAddFast(var a: TInt64Array; var len: longint; const e: int64): longint;
+function arrayAddFast(var a: TInt64Array; var len: SizeInt; const e: int64): SizeInt;
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -746,7 +746,7 @@ begin
   a[result] := e;
 end;
 
-procedure arrayPrependFast(var a: TInt64Array; var len: longint; const e: int64);
+procedure arrayPrependFast(var a: TInt64Array; var len: SizeInt; const e: int64);
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -757,7 +757,7 @@ begin
 end;
 
 
-function arrayDeleteFast(var a: TInt64Array; var len: longint; const i: longint): int64;
+function arrayDeleteFast(var a: TInt64Array; var len: SizeInt; const i: SizeInt): int64;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -766,7 +766,7 @@ begin
   dec(len);
 end;
 
-function arrayDeleteUnorderedFast(var a: TInt64Array; var len: longint; const i: longint): int64;
+function arrayDeleteUnorderedFast(var a: TInt64Array; var len: SizeInt; const i: SizeInt): int64;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -774,7 +774,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arrayInsert(var a: TInt64Array; i: longint; const e: int64);
+procedure arrayInsert(var a: TInt64Array; i: SizeInt; const e: int64);
 begin
   if (i < 0) then i := 0
   else if i > length(a) then i := length(a);
@@ -784,9 +784,9 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: TInt64Array; var len: longint; i: longint; const e: int64);
+procedure arrayInsertFast(var a: TInt64Array; var len: SizeInt; i: SizeInt; const e: int64);
 var
-  oldlen: LongInt;
+  oldlen: SizeInt;
 begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
@@ -800,8 +800,8 @@ begin
 end;
 
 function arrayIndexOf(const a: array of int64; const e: int64;
- slice1: integer; slice2: integer): integer;
-var i:longint;
+ slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
@@ -810,10 +810,10 @@ begin
   result:=-1;
 end;
 
-function arraySlice(a: array of int64; slice1: integer; slice2: integer
+function arraySlice(a: array of int64; slice1: SizeInt; slice2: SizeInt
  ): TInt64Array;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := nil;
@@ -822,8 +822,8 @@ begin
     result[i] := a[slice1+i];
 end;
 
-function arrayIndexOfSmallest(const a: array of int64; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfSmallest(const a: array of int64; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -832,8 +832,8 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: array of int64; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfLargest(const a: array of int64; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -842,14 +842,14 @@ begin
        Result:=i;
 end;
 
-function arrayContains(const a: array of int64; const e: int64; slice1: integer; slice2: integer): boolean;
+function arrayContains(const a: array of int64; const e: int64; slice1: SizeInt; slice2: SizeInt): boolean;
 begin
   result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
-procedure arrayInvert(a: TInt64Array; slice1: integer; slice2: integer);
+procedure arrayInvert(a: TInt64Array; slice1: SizeInt; slice2: SizeInt);
 var temp: int64;
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
@@ -859,7 +859,7 @@ begin
   end;
 end;
 
-function arrayGet(a: array of int64; const i: integer): int64;
+function arrayGet(a: array of int64; const i: SizeInt): int64;
 begin
   if i < 0 then result:=a[length(a) + i]
   else result := a[i];
@@ -877,10 +877,10 @@ begin
   else result := a[high(a)];
 end;
 
-function arrayCompare(a, b: array of int64; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): longint;
+function arrayCompare(a, b: array of int64; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): longint;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1a, slice2a);
   arraySliceIndices(high(b), slice1b, slice2b);
@@ -895,24 +895,24 @@ begin
   result := 0;
 end;
 
-function arrayEqual(a, b: array of int64; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): boolean;
+function arrayEqual(a, b: array of int64; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): boolean;
 begin
   result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
 
 
 
-function arrayAdd(var a: TFloatArray; const e: float): longint;
+function arrayAdd(var a: TFloatArray; const e: float): SizeInt;
 begin
   result:=length(a);
   setlength(a,result+1);
   a[result]:=e;
 end;
 
-function arrayAdd(var a: TFloatArray; const a2: array of float):longint;
+function arrayAdd(var a: TFloatArray; const a2: array of float):SizeInt;
 var
-  i: LongInt;
+  i: SizeInt;
 begin
   result := length(a);
   setlength(a, result + length(a2));
@@ -931,7 +931,7 @@ end;
 
 
 
-function arrayDelete(var a: TFloatArray; const i: longint): float;
+function arrayDelete(var a: TFloatArray; const i: SizeInt): float;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result := a[i];
@@ -941,7 +941,7 @@ begin
 end;
 
 
-function arrayDeleteUnordered(var a: TFloatArray; const i: longint): float;
+function arrayDeleteUnordered(var a: TFloatArray; const i: SizeInt): float;
 begin
   if (i<0) or (i>high(a)) then begin result := 0; exit; end;
   result:=a[i];
@@ -949,7 +949,7 @@ begin
   SetLength(a,high(a));
 end;
 
-procedure arrayReserveFast(var a: TFloatArray; const len: longint; const reserveLength: longint);
+procedure arrayReserveFast(var a: TFloatArray; const len: SizeInt; const reserveLength: SizeInt);
 begin
   if reserveLength <= len then exit;
   if reserveLength <= length(a) then exit;
@@ -962,7 +962,7 @@ begin
   else SetLength(a, reserveLength);
 end;
 
-function arrayAddFast(var a: TFloatArray; var len: longint; const e: float): longint;
+function arrayAddFast(var a: TFloatArray; var len: SizeInt; const e: float): SizeInt;
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -971,7 +971,7 @@ begin
   a[result] := e;
 end;
 
-procedure arrayPrependFast(var a: TFloatArray; var len: longint; const e: float);
+procedure arrayPrependFast(var a: TFloatArray; var len: SizeInt; const e: float);
 begin
   if len >= length(a) then
     arrayReserveFast(a, len, len+1);
@@ -982,7 +982,7 @@ begin
 end;
 
 
-function arrayDeleteFast(var a: TFloatArray; var len: longint; const i: longint): float;
+function arrayDeleteFast(var a: TFloatArray; var len: SizeInt; const i: SizeInt): float;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -991,7 +991,7 @@ begin
   dec(len);
 end;
 
-function arrayDeleteUnorderedFast(var a: TFloatArray; var len: longint; const i: longint): float;
+function arrayDeleteUnorderedFast(var a: TFloatArray; var len: SizeInt; const i: SizeInt): float;
 begin
   if (i<0) or (i>=len) then begin result := 0; exit; end;
   result:=a[i];
@@ -999,7 +999,7 @@ begin
   a[i]:=a[len];
 end;
 
-procedure arrayInsert(var a: TFloatArray; i: longint; const e: float);
+procedure arrayInsert(var a: TFloatArray; i: SizeInt; const e: float);
 begin
   if (i < 0) then i := 0
   else if i > length(a) then i := length(a);
@@ -1009,9 +1009,9 @@ begin
   a[i] := e;
 end;
 
-procedure arrayInsertFast(var a: TFloatArray; var len: longint; i: longint; const e: float);
+procedure arrayInsertFast(var a: TFloatArray; var len: SizeInt; i: SizeInt; const e: float);
 var
-  oldlen: LongInt;
+  oldlen: SizeInt;
 begin
   oldlen := len;
   if i >= length(a) then arrayReserveFast(a, len, i+1)
@@ -1025,8 +1025,8 @@ begin
 end;
 
 function arrayIndexOf(const a: array of float; const e: float;
- slice1: integer; slice2: integer): integer;
-var i:longint;
+ slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=slice1 to slice2 do
@@ -1035,10 +1035,10 @@ begin
   result:=-1;
 end;
 
-function arraySlice(a: array of float; slice1: integer; slice2: integer
+function arraySlice(a: array of float; slice1: SizeInt; slice2: SizeInt
  ): TFloatArray;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := nil;
@@ -1047,8 +1047,8 @@ begin
     result[i] := a[slice1+i];
 end;
 
-function arrayIndexOfSmallest(const a: array of float; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfSmallest(const a: array of float; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -1057,8 +1057,8 @@ begin
        Result:=i;
 end;
 
-function arrayIndexOfLargest(const a: array of float; slice1: integer; slice2: integer): integer;
-var i:longint;
+function arrayIndexOfLargest(const a: array of float; slice1: SizeInt; slice2: SizeInt): SizeInt;
+var i:SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   result := slice1;
@@ -1067,14 +1067,14 @@ begin
        Result:=i;
 end;
 
-function arrayContains(const a: array of float; const e: float; slice1: integer; slice2: integer): boolean;
+function arrayContains(const a: array of float; const e: float; slice1: SizeInt; slice2: SizeInt): boolean;
 begin
   result := arrayIndexOf(a, e, slice1, slice2) >= 0;
 end;
 
-procedure arrayInvert(a: TFloatArray; slice1: integer; slice2: integer);
+procedure arrayInvert(a: TFloatArray; slice1: SizeInt; slice2: SizeInt);
 var temp: float;
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1, slice2);
   for i:=0 to (slice2-slice1) div 2 do begin
@@ -1084,7 +1084,7 @@ begin
   end;
 end;
 
-function arrayGet(a: array of float; const i: integer): float;
+function arrayGet(a: array of float; const i: SizeInt): float;
 begin
   if i < 0 then result:=a[length(a) + i]
   else result := a[i];
@@ -1102,10 +1102,10 @@ begin
   else result := a[high(a)];
 end;
 
-function arrayCompare(a, b: array of float; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): longint;
+function arrayCompare(a, b: array of float; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): longint;
 var
- i: Integer;
+ i: SizeInt;
 begin
   arraySliceIndices(high(a), slice1a, slice2a);
   arraySliceIndices(high(b), slice1b, slice2b);
@@ -1120,8 +1120,8 @@ begin
   result := 0;
 end;
 
-function arrayEqual(a, b: array of float; slice1a: integer; slice1b: integer;
- slice2a: integer; slice2b: integer): boolean;
+function arrayEqual(a, b: array of float; slice1a: SizeInt; slice1b: SizeInt;
+ slice2a: SizeInt; slice2b: SizeInt): boolean;
 begin
   result := arrayCompare(a,b,slice1a, slice1b, slice2a, slice2b) = 0;
 end;
@@ -1142,7 +1142,7 @@ end;
 
 function unequal(const a: array of integer): boolean;
 var
-  i,j: Integer;
+  i,j: SizeInt;
 begin
   result := true;
   for i:=0 to high(a) do
@@ -1163,7 +1163,7 @@ end;
 
 function unequal(const a: array of cardinal): boolean;
 var
-  i,j: Integer;
+  i,j: SizeInt;
 begin
   result := true;
   for i:=0 to high(a) do
@@ -1184,7 +1184,7 @@ end;
 
 function unequal(const a: array of string): boolean;
 var
-  i,j: Integer;
+  i,j: SizeInt;
 begin
   result := true;
   for i:=0 to high(a) do
@@ -1205,7 +1205,7 @@ end;
 
 function unequal(const a: array of int64): boolean;
 var
-  i,j: Integer;
+  i,j: SizeInt;
 begin
   result := true;
   for i:=0 to high(a) do
@@ -1217,12 +1217,12 @@ end;
 
 
 
-function strLastIndexOf(const str: string; const searched: string): longint;
+function strLastIndexOf(const str: string; const searched: string): SizeInt;
 begin
   result := strLastIndexOf(str, searched, 1);
 end;
 
-function striLastIndexOf(const str: string; const searched: string): longint;
+function striLastIndexOf(const str: string; const searched: string): SizeInt;
 begin
   result := striLastIndexOf(str, searched, 1);
 end;
@@ -1788,7 +1788,7 @@ const entityCode: array[0..25382] of byte = (
 
 function strBetween(const s, from, till: string): string;
 var
-  i, j: Integer;
+  i, j: SizeInt;
 begin
   i := strIndexOf(s, from);
   if i = 0 then result := ''
@@ -1804,7 +1804,7 @@ end;
 
 function strBefore(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := strIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1813,7 +1813,7 @@ end;
 
 function strAfter(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := strIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1824,7 +1824,7 @@ end;
 
 function strBeforeLast(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := strLastIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1833,7 +1833,7 @@ end;
 
 function strAfterLast(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := strLastIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1846,7 +1846,7 @@ end;
 
 function striBetween(const s, from, till: string): string;
 var
-  i, j: Integer;
+  i, j: SizeInt;
 begin
   i := striIndexOf(s, from);
   if i = 0 then result := ''
@@ -1862,7 +1862,7 @@ end;
 
 function striBefore(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := striIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1871,7 +1871,7 @@ end;
 
 function striAfter(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := striIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1882,7 +1882,7 @@ end;
 
 function striBeforeLast(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := striLastIndexOf(s, sep);
   if i = 0 then result := ''
@@ -1891,7 +1891,7 @@ end;
 
 function striAfterLast(const s, sep: string): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   i := striLastIndexOf(s, sep);
   if i = 0 then result := ''
