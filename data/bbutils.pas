@@ -826,9 +826,9 @@ end;
 function procedureToMethod(proc: TProcedure): TMethod;
 begin
   assert(sizeof(result.code) = sizeof(proc));
+  result.Data:=nil;
   move(proc, result.code, sizeof(proc));
   //result.code:=proc;
-  result.Data:=nil;
 end;
 
 function makeMethod(code, data: pointer): TMethod;
@@ -3688,17 +3688,17 @@ var sysTime: TSYSTEMTIME;
     temp: TFILETIME;
 begin
   DateTimeToSystemTime(date,sysTime);
-  SystemTimeToFileTime(sysTime,temp);
-  LocalFileTimeToFileTime(temp,result);
+  SystemTimeToFileTime(@sysTime,@temp);
+  LocalFileTimeToFileTime(@temp,@result);
 end;
 
 function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: boolean=true): TDateTime;
 var sysTime: TSystemTime;
     localFileTime: tfiletime;
 begin
-  if convertTolocalTimeZone then FileTimeToLocalFileTime(filetime,localFileTime)
+  if convertTolocalTimeZone then FileTimeToLocalFileTime(@filetime,@localFileTime)
   else localFileTime:=filetime;
-  FileTimeToSystemTime(localFileTime, sysTime);
+  FileTimeToSystemTime(@localFileTime, @sysTime);
   result:=SystemTimeToDateTime(sysTime);
 end;
 {$ENDIF}
