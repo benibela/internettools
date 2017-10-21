@@ -594,7 +594,7 @@ function fileTimeToDateTime(const fileTime: TFileTime;convertTolocalTimeZone: bo
 
 
 //**cumulative sum of month days (so. days in month i = dmdcs[i] - dmdcs[i-1])
-const DateMonthDaysCumSum: array[false..true,0..12] of Cardinal =
+const DateMonthDaysCumSum: array[false..true,0..12] of integer =
      ((00, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365),
      (00, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366));
 
