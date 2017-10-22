@@ -15,7 +15,7 @@ var setCodePageCanConvertEncodings: boolean = {$ifdef FPC_HAS_CPSTRING}true{$els
 
 implementation
 
-uses bbutils,math;
+uses bbutils;
 
 
 
@@ -50,6 +50,7 @@ begin
 end;
 procedure test(a, b: extended; name: string = '');overload;
 begin
+  inc(globalTestCount);
   if abs(a-b) > 0.0000001 then raise Exception.Create('test: '+name+': '+FloatToStr (a)+' <> '+FloatToStr(b));
 end;
 //test if a string has the encoding enc and the byte pattern b.
@@ -625,71 +626,70 @@ const strs: array[1..20,1..2] of string=(
 var i:longint;
 
 var
-  y,m,d, allowYearZeroOffset: integer;
-    ms: double;
-    tz: TDateTime;
+  y,m,d, ns, allowYearZeroOffset, tz: integer;
+
 begin
   //parse date function
   for i:=1 to high(strs) do
       if dateParse(strs[i,1],strs[i,2])<>trunc(EncodeDate(dates[i,1],dates[i,2],dates[i,3])) then
         raise Exception.create('Unit Test '+inttostr(i)+' in Unit bbutils fehlgeschlagen.'#13#10'Falsches Ergebnis: '+FormatDateTime('yyyy-mm-dd', dateParse(strs[i,1],strs[i,2])) + ' expected '+FormatDateTime('yyyy-mm-dd',EncodeDate(dates[i,1],dates[i,2],dates[i,3])));
 
-  dateParsePartsOld('2010-05-06Z','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
-  dateParsePartsOld('2010-05-06+01','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
-  dateParsePartsOld('2010-05-06-01','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1/24);
-  dateParsePartsOld('2010-05-06+0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1.5/24);
-  dateParsePartsOld('2010-05-06-0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -1.5/24);
-  dateParsePartsOld('2010-05-06+02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 2.5/24);
-  dateParsePartsOld('2010-05-06-02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -2.5/24);
-  dateParsePartsOld('2010-05-06Z','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
-  dateParsePartsOld('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 1/24);
-  dateParsePartsOld('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan: ' + FloatToStr(tz));
-  dateParsePartsOld('-0753-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, -753); test(m, 05); test(d, 07); if not isnan(tz) then test(false, 'tz <> nan');
-  dateParsePartsOld('-0123-05-07','y+-mm-dd[Z]', @y, @m, @d, @tz); test(y, -123);
-  dateParsePartsOld('---07','---dd', @y, @m, @d, @tz); test(d, 7);
-  dateParsePartsOld('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
-  dateParsePartsOld('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
-  timeParsePartsOld('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
-  timeParsePartsOld('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d); test(y, 12); test(m, 13); test(d, 14);
-  timeParsePartsOld('14:30:21','hh:nn:ss', @y, @m, @d, @ms); test(y, 14); test(m, 30); test(d, 21);
-  timeParsePartsOld('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14);
-  timeParsePartsOld('12:13:14.1','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 0.100);
-  timeParsePartsOld('12:13:14.02','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 0.020);
-  timeParsePartsOld('12:13:14.004','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 0.004);
-  timeParsePartsOld('12:13:14.1235','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 0.123);
-  timeParsePartsOld('12:13:14.1235','hh:nn:ss[.z[z[z[z]]]]', @y, @m, @d, @ms); test(y, 12); test(m, 13); test(d, 14); test(ms, 0.1235);
-  timeParsePartsOld('9:45:10','h:n:s[ am/pm]', @y, @m, @d, @ms); test(y, 9); test(m, 45); test(d, 10);
-  timeParsePartsOld('9:45:10 am','h:n:s[ am/pm]', @y, @m, @d, @ms); test(y, 9); test(m, 45); test(d, 10);
-  timeParsePartsOld('9:45:10 pm','h:n:s[ am/pm]', @y, @m, @d, @ms); test(y, 21); test(m, 45); test(d, 10);
-  timeParsePartsOld('am3','am/pmh', @y, @m, @d, @ms); test(y, 3);
-  timeParsePartsOld('pm5','am/pmh', @y, @m, @d, @ms); test(y, 17);
-  timeParsePartsOld('a4','a/ph', @y, @m, @d, @ms); test(y, 4);
-  timeParsePartsOld('p6','a/ph', @y, @m, @d, @ms); test(y, 18);
-  timeParsePartsOld('a12','ah', @y, @m, @d, @ms); test(y, 12);
-  dateParsePartsOld('12M10D', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 12); test(d, 10);
-  dateParsePartsOld('08M', '[mmM][ddD]', @y, @m, @d, @ms); test(m, 08); test(d, high(integer));
-  dateParsePartsOld('09D', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, 9);
-  dateParsePartsOld('', '[ddD]', @y, @m, @d, @ms); test(m, high(integer)); test(d, high(integer));
-  dateParsePartsOld('dd05', '"dd"mm', @y, @m, @d, @ms); test(m, 05); test(d, high(integer));
-  dateParsePartsOld('X10M12D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, high(integer)); test(m, 10); test(d, 12);
-  dateParsePartsOld('X09M', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, high(integer)); test(m, 9); test(d, high(integer));
-  dateParsePartsOld('X03M17D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, high(integer)); test(m, 03); test(d, 17);
-  dateParsePartsOld('1017Y', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, high(integer));test(d, high(integer));
-  dateParsePartsOld('1017YX13D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, high(integer));test(d, 13);
-  dateParsePartsOld('1017YX45M13D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 45);test(d, 13);
-  dateParsePartsOld('1017YX47M13D', '[yyyy"Y"][X[[m]mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 47);test(d, 13);
-  dateParsePartsOld('1017YX2M13D', '[yyyy"Y"][X[[m]mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 2);test(d, 13);
-  dateParsePartsOld('1017YX8M13D', '[yyyy"Y"][X[mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 8);test(d, 13);
-  dateParsePartsOld('1017YX54M13D', '[yyyy"Y"][X[[m]mM][ddD]]',  @y, @m, @d, @ms); test(y, 1017); test(m, 54);test(d, 13);
-  dateParsePartsOld('P7Y3M', 'Py"Y"mM',  @y, @m, @d, @ms); test(y, 2007); test(m, 3);
-  dateParsePartsOld('P7Y3M', 'PY"Y"mM',  @y, @m, @d, @ms); test(y, 7); test(m, 3);
-  dateParsePartsOld('P8Y2M', 'PY"Y"mM$',  @y, @m, @d, @ms); test(y, 8); test(m, 2);
-  dateParsePartsOld('P8Y456M', 'PY"Y"m+M$',  @y, @m, @d, @ms); test(y, 8); test(m, 456);
-  dateParsePartsOld('P3Y4M', '[-]P[Y+"Y"][mM]',  @y, @m, @d, @ms); test(y, 3); test(m, 4);
-  dateParsePartsOld('P23Y05M', '[-]P[Y+"Y"][mM]',  @y, @m, @d, @ms); test(y, 23); test(m, 05);
-  dateParsePartsOld('P4D', 'PdD$',  @y, @m, @d, @ms); test(d, 04);
-  dateParsePartsOld('P4D', 'PdD$',  @y, @m, @d, @ms); test(d, 04);
-  dateParsePartsOld('P4D', '[-]PdD[T[hH][nM][s[.z+]S]]$',  @y, @m, @d, @ms); test(d, 04);
+  dateParseParts('2010-05-06Z','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
+  dateParseParts('2010-05-06+01','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 60);
+  dateParseParts('2010-05-06-01','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -60);
+  dateParseParts('2010-05-06+0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 90);
+  dateParseParts('2010-05-06-0130','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -90);
+  dateParseParts('2010-05-06+02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 150);
+  dateParseParts('2010-05-06-02:30','yyyy-mm-ddZ', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, -150);
+  dateParseParts('2010-05-06Z','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 0);
+  dateParseParts('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 60);
+  dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if tz <> high(integer) then test(false, 'tz <> nan: ' + FloatToStr(tz));
+  dateParseParts('-0753-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, -753); test(m, 05); test(d, 07); if tz <> high(integer) then test(false, 'tz <> nan');
+  dateParseParts('-0123-05-07','y+-mm-dd[Z]', @y, @m, @d, @tz); test(y, -123);
+  dateParseParts('---07','---dd', @y, @m, @d, @tz); test(d, 7);
+  dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
+  dateParseParts('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
+  timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
+  timeParseParts('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d); test(y, 12); test(m, 13); test(d, 14);
+  timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d, @ns); test(y, 14); test(m, 30); test(d, 21);
+  timeParseParts('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14);
+  timeParseParts('12:13:14.1','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14); test(ns,         100000000);
+  timeParseParts('12:13:14.02','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14); test(ns,        020000000);
+  timeParseParts('12:13:14.004','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14); test(ns,       004000000);
+  timeParseParts('12:13:14.1235','hh:nn:ss[.z[z[z]]]', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14); test(ns,      123000000);
+  timeParseParts('12:13:14.1235','hh:nn:ss[.z[z[z[z]]]]', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14); test(ns,   123500000);
+  timeParseParts('9:45:10','h:n:s[ am/pm]', @y, @m, @d, @ns); test(y, 9); test(m, 45); test(d, 10);
+  timeParseParts('9:45:10 am','h:n:s[ am/pm]', @y, @m, @d, @ns); test(y, 9); test(m, 45); test(d, 10);
+  timeParseParts('9:45:10 pm','h:n:s[ am/pm]', @y, @m, @d, @ns); test(y, 21); test(m, 45); test(d, 10);
+  timeParseParts('am3','am/pmh', @y, @m, @d, @ns); test(y, 3);
+  timeParseParts('pm5','am/pmh', @y, @m, @d, @ns); test(y, 17);
+  timeParseParts('a4','a/ph', @y, @m, @d, @ns); test(y, 4);
+  timeParseParts('p6','a/ph', @y, @m, @d, @ns); test(y, 18);
+  timeParseParts('a12','ah', @y, @m, @d, @ns); test(y, 12);
+  dateParseParts('12M10D', '[mmM][ddD]', @y, @m, @d, @ns); test(m, 12); test(d, 10);
+  dateParseParts('08M', '[mmM][ddD]', @y, @m, @d, @ns); test(m, 08); test(d, high(integer));
+  dateParseParts('09D', '[ddD]', @y, @m, @d, @ns); test(m, high(integer)); test(d, 9);
+  dateParseParts('', '[ddD]', @y, @m, @d, @ns); test(m, high(integer)); test(d, high(integer));
+  dateParseParts('dd05', '"dd"mm', @y, @m, @d, @ns); test(m, 05); test(d, high(integer));
+  dateParseParts('X10M12D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ns); test(y, high(integer)); test(m, 10); test(d, 12);
+  dateParseParts('X09M', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ns); test(y, high(integer)); test(m, 9); test(d, high(integer));
+  dateParseParts('X03M17D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ns); test(y, high(integer)); test(m, 03); test(d, 17);
+  dateParseParts('1017Y', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, high(integer));test(d, high(integer));
+  dateParseParts('1017YX13D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, high(integer));test(d, 13);
+  dateParseParts('1017YX45M13D', '[yyyy"Y"][X[mmM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, 45);test(d, 13);
+  dateParseParts('1017YX47M13D', '[yyyy"Y"][X[[m]mM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, 47);test(d, 13);
+  dateParseParts('1017YX2M13D', '[yyyy"Y"][X[[m]mM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, 2);test(d, 13);
+  dateParseParts('1017YX8M13D', '[yyyy"Y"][X[mM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, 8);test(d, 13);
+  dateParseParts('1017YX54M13D', '[yyyy"Y"][X[[m]mM][ddD]]',  @y, @m, @d, @ns); test(y, 1017); test(m, 54);test(d, 13);
+  dateParseParts('P7Y3M', 'Py"Y"mM',  @y, @m, @d, @ns); test(y, 2007); test(m, 3);
+  dateParseParts('P7Y3M', 'PY"Y"mM',  @y, @m, @d, @ns); test(y, 7); test(m, 3);
+  dateParseParts('P8Y2M', 'PY"Y"mM$',  @y, @m, @d, @ns); test(y, 8); test(m, 2);
+  dateParseParts('P8Y456M', 'PY"Y"m+M$',  @y, @m, @d, @ns); test(y, 8); test(m, 456);
+  dateParseParts('P3Y4M', '[-]P[Y+"Y"][mM]',  @y, @m, @d, @ns); test(y, 3); test(m, 4);
+  dateParseParts('P23Y05M', '[-]P[Y+"Y"][mM]',  @y, @m, @d, @ns); test(y, 23); test(m, 05);
+  dateParseParts('P4D', 'PdD$',  @y, @m, @d, @ns); test(d, 04);
+  dateParseParts('P4D', 'PdD$',  @y, @m, @d, @ns); test(d, 04);
+  dateParseParts('P4D', '[-]PdD[T[hH][nM][s[.z+]S]]$',  @y, @m, @d, @ns); test(d, 04);
   test(dateFormat('yyyy-mm-dd', 2012, 12, 21), '2012-12-21');
   test(dateFormat('[yy]yy-mm-dd', 2012, 12, 21), '2012-12-21');
   test(dateFormat('[yy]yy-mm-dd', 0, 12, 21), '00-12-21');
@@ -698,41 +698,41 @@ begin
   test(dateFormat('[y+]-mm-dd', 0, 12, 21), '-12-21');
   test(dateFormat('[y+]-mm-dd', -23, 12, 21), '-23-12-21');
   test(dateFormat('yyyy-mm-dd', -23, 12, 21), '-0023-12-21');
-  test(timeFormatOld('[hH][nM][sS]', 99, 88, 77), '99H88M77S');
-  test(timeFormatOld('[hH][nM][sS]', 99, high(integer), 77), '99H77S');
-  test(timeFormatOld('[hH][nM][sS]', high(integer), high(integer), 77), '77S');
-  test(timeFormatOld('[hH][nM][sS]', high(integer), high(integer), high(integer)), '');
-  test(timeFormatOld('[hH][T[nM][sS]]', high(integer), high(integer), high(integer)), '');
-  test(timeFormatOld('s.zzz', high(integer), high(integer), 12, 0.999), '12.999');
-  test(timeFormatOld('s.zzz', high(integer), high(integer), 12, 0.9992), '12.999');
-  test(timeFormatOld('s.zzz', high(integer), high(integer), 12, 0.9997), '13.000');
-  test(timeFormatOld('s.z', high(integer), high(integer), 12, 0.9997), '13.0');
-  test(timeFormatOld('s[.z]', high(integer), high(integer), 12, 0.9997), '13');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.9997), '12.9997');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.9999997), '13');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.9), '12.9');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.09), '12.09');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.000009), '12.000009');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.0000009), '12.000001');
-  test(timeFormatOld('s[.z+]', high(integer), high(integer), 12, 0.00000009), '12.0'); //TODO: fix this case (? print either 12.000000 or 12)
-  test(dateTimeFormatNEW('s.z', 0,0,0,0,0, 45, 123456789), '45.1');
-  test(dateTimeFormatNEW('s.zz', 0,0,0,0,0, 45, 123456789), '45.12');
-  test(dateTimeFormatNEW('s.zzz', 0,0,0,0,0, 45, 123456789), '45.123');
-  test(dateTimeFormatNEW('s.zzzz', 0,0,0,0,0, 45, 123456789), '45.1235');
-  test(dateTimeFormatNEW('s.zzzzz', 0,0,0,0,0, 45, 123456789), '45.12346');
-  test(dateTimeFormatNEW('s.zzzzzz', 0,0,0,0,0, 45, 123456789), '45.123457');
-  test(dateTimeFormatNEW('s.zzzzzzz', 0,0,0,0,0, 45, 123456789), '45.1234568');
-  test(dateTimeFormatNEW('s.zzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.12345679');
-  test(dateTimeFormatNEW('s.zzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.123456789');
-  test(dateTimeFormatNEW('s.zzzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.1234567890'); //digits >= 10 are are always 0
-  test(dateTimeFormatNEW('s.zzzzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.12345678900');
-  test(dateTimeParseNew('2000-01-02 12:23:45+03', 'yyyy-mm-dd hh:nn:ssZ') , dateTimeParseNew('2000-01-02 9:23:45', 'yyyy-mm-dd h:nn:ss'));
+  test(timeFormat('[hH][nM][sS]', 99, 88, 77), '99H88M77S');
+  test(timeFormat('[hH][nM][sS]', 99, high(integer), 77), '99H77S');
+  test(timeFormat('[hH][nM][sS]', high(integer), high(integer), 77), '77S');
+  test(timeFormat('[hH][nM][sS]', high(integer), high(integer), high(integer)), '');
+  test(timeFormat('[hH][T[nM][sS]]', high(integer), high(integer), high(integer)), '');
+  test(timeFormatNew('s.zzz', high(integer), high(integer), 12,  999000000), '12.999');
+  test(timeFormatNew('s.zzz', high(integer), high(integer), 12,  999200000), '12.999');
+  test(timeFormatNew('s.zzz', high(integer), high(integer), 12,  999700000), '13.000');
+  test(timeFormatNew('s.z', high(integer), high(integer), 12,    999700000), '13.0');
+  test(timeFormatNew('s[.z]', high(integer), high(integer), 12,  999700000), '13');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 999700000), '12.9997');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 999999700), '13');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 900000000), '12.9');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 090000000), '12.09');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 000009000), '12.000009');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 000000900), '12.000001');
+  test(timeFormatNew('s[.z+]', high(integer), high(integer), 12, 000000090), '12.0'); //TODO: fix this case (? print either 12.000000 or 12)
+  test(dateTimeFormat('s.z', 0,0,0,0,0, 45, 123456789), '45.1');
+  test(dateTimeFormat('s.zz', 0,0,0,0,0, 45, 123456789), '45.12');
+  test(dateTimeFormat('s.zzz', 0,0,0,0,0, 45, 123456789), '45.123');
+  test(dateTimeFormat('s.zzzz', 0,0,0,0,0, 45, 123456789), '45.1235');
+  test(dateTimeFormat('s.zzzzz', 0,0,0,0,0, 45, 123456789), '45.12346');
+  test(dateTimeFormat('s.zzzzzz', 0,0,0,0,0, 45, 123456789), '45.123457');
+  test(dateTimeFormat('s.zzzzzzz', 0,0,0,0,0, 45, 123456789), '45.1234568');
+  test(dateTimeFormat('s.zzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.12345679');
+  test(dateTimeFormat('s.zzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.123456789');
+  test(dateTimeFormat('s.zzzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.1234567890'); //digits >= 10 are are always 0
+  test(dateTimeFormat('s.zzzzzzzzzzz', 0,0,0,0,0, 45, 123456789), '45.12345678900');
+  test(dateTimeParse('2000-01-02 12:23:45+03', 'yyyy-mm-dd hh:nn:ssZ') , dateTimeParse('2000-01-02 9:23:45', 'yyyy-mm-dd h:nn:ss'));
 
-  test(datetimeFormatOld('yyyy-mm-dd hh:nn:ss.zz', -1, 12, 31, 23, 59, 59, 0.999), '0001-01-01 00:00:00.00');
+  test(datetimeFormat('yyyy-mm-dd hh:nn:ss.zz', -1, 12, 31, 23, 59, 59, 999000000), '0001-01-01 00:00:00.00');
   test(dateFormat('yyyymmdd', 2012, 12, 21), '20121221');
-  test(datetimeFormatOld('yyyymmddhhnnss', 2012, 12, 21, 17,00,00), '20121221170000');
-  test(datetimeFormatOld('yyyymmdd[hhnnss]', 2012, 12, 21, 17,00,00), '20121221170000');
-  test(datetimeFormatOld('yyyymmdd[hhnnss]', 2987, 12, 31, high(integer),high(integer),high(integer)), '29871231');
+  test(datetimeFormat('yyyymmddhhnnss', 2012, 12, 21, 17,00,00), '20121221170000');
+  test(datetimeFormat('yyyymmdd[hhnnss]', 2012, 12, 21, 17,00,00), '20121221170000');
+  test(datetimeFormat('yyyymmdd[hhnnss]', 2987, 12, 31, high(integer),high(integer),high(integer)), '29871231');
 
   test(dateEncode(1,1,1), EncodeDate(1,1,1));
   test(dateEncode(2012,10,31), EncodeDate(2012,10,31));
@@ -769,7 +769,9 @@ begin
   end;
   }
   test(dateEncode(1,2,3) = EncodeDate(1,2,3));
-  test(dateTimeEncodeOLD(1,2,3,4,5,6) = EncodeDate(1,2,3) + EncodeTime(4,5,6,0));
+  test(dateTimeEncode(1,2,3,4,5,6) = EncodeDate(1,2,3) + EncodeTime(4,5,6,0));
+  test(dateTimeEncode(1,2,3,4,5,6,100000000) = EncodeDate(1,2,3) + EncodeTime(4,5,6,100));
+  test(dateTimeEncode(1,2,3,4,5,6,  1000000) , EncodeDate(1,2,3) + EncodeTime(4,5,6,1));
 
 
   //basic string tests
@@ -835,6 +837,7 @@ var
   p: PUnicodeChar;
 begin
   if length(codes) = 0 then p := nil else p := PUnicodeChar(@codes[0]);
+  result := '';
   strUnicode2AnsiMoveProc(p, result, cp, length(codes));
 end;
 
@@ -843,6 +846,7 @@ var
   temp16: unicodestring;
   i: integer;
 begin
+  temp16 := '';
   strAnsi2UnicodeMoveProc(pchar(s), cp, temp16, length(s));
   test(length(temp16), length(codes));
   for i := 0 to high(codes) do test(word(temp16[i+1]), codes[i]);
@@ -908,10 +912,10 @@ begin
   testrawstr(strGetUnicodeCharacter(0, CP_UTF32), CP_UTF32, #00#00#00#00);
   for e in unicodePages do
     for f in unicodePages do begin
-      test(strChangeEncoding('', e, f), '');
-      test(strChangeEncoding(strGetUnicodeCharacter(0, e), e, f), strGetUnicodeCharacter(0, f));
-      test(strChangeEncoding(strGetUnicodeCharacter($80, e), e, f), strGetUnicodeCharacter($80, f));
-      test(strChangeEncoding(strGetUnicodeCharacter($123, e), e, f), strGetUnicodeCharacter($123, f));
+      test(strConvert('', e, f), '');
+      test(strConvert(strGetUnicodeCharacter(0, e), e, f), strGetUnicodeCharacter(0, f));
+      test(strConvert(strGetUnicodeCharacter($80, e), e, f), strGetUnicodeCharacter($80, f));
+      test(strConvert(strGetUnicodeCharacter($123, e), e, f), strGetUnicodeCharacter($123, f));
       testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e), e, f), f, strGetUnicodeCharacter($1D11E, f));
       testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter($1D11F, e), e, f), f, strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter($1D11F, f));
       testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(ord(' '), e)+strGetUnicodeCharacter($1D11F, e), e, f), f, strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(ord(' '), f)+strGetUnicodeCharacter($1D11F, f));
@@ -1457,7 +1461,7 @@ procedure testStrResolveURI;
     end;
   end;
 
-  function testResolve(const rel, base, exp: string): string;
+  procedure testResolve(const rel, base, exp: string);
   begin
     test(strResolveURI(rel, base), exp);
   end;

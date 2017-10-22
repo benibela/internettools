@@ -11,9 +11,11 @@ procedure test(condition: boolean; name: string='');overload;
 procedure test(a, b: string; name: string = '');overload;
 procedure test(a, b: integer; name: string = '');overload;
 
+var globalTestCount: integer = 0;
 implementation
 procedure test(condition: boolean; name: string='');overload;
 begin
+  inc(globalTestCount);
   if not condition then raise Exception.Create('test: '+name);
 end;
 procedure test(a, b: string; name: string = '');overload;
@@ -22,6 +24,7 @@ var
   needhex: Boolean;
   message: String;
 begin
+  inc(globalTestCount);
   if a <> b then begin
     message := 'test: ' + name + LineEnding;
     needhex := false;
@@ -42,6 +45,7 @@ begin
 end;
 procedure test(a, b: integer; name: string = '');overload;
 begin
+  inc(globalTestCount);
   if a <> b then
     raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
 end;
