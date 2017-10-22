@@ -983,6 +983,7 @@ begin
   test(strEncodingFromName('UTF-8'), CP_UTF8);
   test(strEncodingFromName('UTF8'), CP_UTF8);
   test(strEncodingFromName('UTF-16'), CP_UTF16);
+  test(strEncodingFromName('UTF-16LE'), CP_UTF16);
   test(strEncodingFromName('UTF-16BE'), CP_UTF16BE);
   test(strEncodingFromName('UTF-32LE'), CP_UTF32);
   test(strEncodingFromName('UTF-32BE'), CP_UTF32BE);

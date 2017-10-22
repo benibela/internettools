@@ -2445,11 +2445,17 @@ begin
     case str of
       //missing in fpc3
        'utf8': result := CP_UTF8;
-      'utf-32le': result := CP_UTF32;
+       'utf-32le': result := CP_UTF32;
       'oem': result := CP_OEMCP;
       //fpc 2 compatibility
+      {$ifndef FPC_HAS_CPSTRING}
       'utf-8': result := CP_UTF8;
       'latin1': result := CP_LATIN1;
+      'utf-16', 'utf-16le': result := CP_UTF16;
+      'utf-16be': result := CP_UTF16BE;
+      'utf-32be': result := CP_UTF32BE;
+      'utf-32': result := CP_UTF32;
+      {$endif}
       else if strBeginsWith(str, 'cp') then result := StrToIntDef(strAfter(str, 'cp'), CP_NONE);
     end;
   end;
