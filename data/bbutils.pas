@@ -442,11 +442,11 @@ type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):string; overload;
+function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):RawByteString; overload;
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
-function strDecodeHTMLEntities(s:string;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):string; overload;
+function strDecodeHTMLEntities(s:string;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):RawByteString; overload;
 //**Replace all occurences of x \in toEscape with escapeChar + x
 function strEscape(s:string; const toEscape: TCharSet; escapeChar: ansichar = '\'): string;
 //**Replace all occurences of x \in toEscape with escape + hex(ord(x))
@@ -461,6 +461,7 @@ function strDecodeHex(s:string):string; {$ifdef HASDeprecated}deprecated;{$endif
 function strEncodeHex(s:string; const code: string = '0123456789ABCDEF'):string;{$ifdef HASDeprecated}deprecated;{$endif}
 //**Returns the first l bytes of p (copies them so O(n))
 function strFromPchar(p:pansichar;l:SizeInt):string;
+//function strFromPchar(p:pansichar;l:SizeInt; encoding: TSystemCodePage):RawByteString;
 
 //**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
 function strFromPtr(p: pointer): string;
@@ -2728,7 +2729,7 @@ begin
   result := strEscape(s, ['(','|', '.', '*', '?', '^', '$', '-', '[', '{', '}', ']', ')', '\'], '\');
 end;
 
-function strDecodeHTMLEntities(s: string; encoding: TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []): string;
+function strDecodeHTMLEntities(s: string; encoding: TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []): RawByteString;
 begin
   result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, flags);
 end;
@@ -2768,6 +2769,15 @@ begin
   setlength(result,l);
   move(p^,result[1],l);
 end;
+
+{function strFromPchar(p: pansichar; l: SizeInt; encoding: TSystemCodePage): RawByteString;
+begin
+  if l=0 then begin result := ''; exit; end;
+  result := '';
+  setlength(result,l);
+  move(p^,result[1],l);
+  SetCodePage(result, encoding, false);
+end;}
 
 function strBeforeLast(const s: string; const sep: TCharSet): string;
 var i: SizeInt;
@@ -3314,11 +3324,8 @@ begin
 end;
 
 procedure TStrBuilder.appendCodePointWithEncodingConversion(const codepoint: integer);
-var
-  temp: RawByteString;
 begin
-  temp := strGetUnicodeCharacter(codepoint, CP_UTF8);
-  appendWithEncodingConversion(temp);
+  appendRaw(strGetUnicodeCharacter(codepoint, encoding));
 end;
 
 procedure TStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
@@ -4797,7 +4804,7 @@ end;
 
 {$I bbutils.inc}
 
-function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):string;
+function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):RawByteString;
   procedure parseError;
   begin
     if dhefStrict in flags then raise EDecodeHTMLEntitiesException.Create('Entity parse error before ' + p);
@@ -4957,7 +4964,7 @@ begin
               if acceptPos <> nil then begin
                 case encoding of
                    CP_UTF8, CP_NONE: append(acceptPos + 1, ord(acceptPos^));
-                   else append( strFromPchar(acceptPos + 1, ord(acceptPos^)) );
+                   else append( strConvert( strFromPchar(acceptPos + 1, ord(acceptPos^)), CP_UTF8, encoding) );
                 end;
                 if (p-1)^ <> ';' then parseError;
               end else

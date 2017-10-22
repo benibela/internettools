@@ -42,7 +42,8 @@ begin
 end;
 procedure test(a, b: integer; name: string = '');overload;
 begin
-  if a <> b then raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
+  if a <> b then
+    raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
 end;
 
 end.

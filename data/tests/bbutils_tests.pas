@@ -11,9 +11,13 @@ uses
 
 procedure unitTests();
 
+var setCodePageCanConvertEncodings: boolean = {$ifdef FPC_HAS_CPSTRING}true{$else}false{$endif};
+
 implementation
 
 uses bbutils,math;
+
+
 
 type PShortInt = ^ShortInt;
      PInteger = ^integer;
@@ -49,7 +53,7 @@ begin
   if abs(a-b) > 0.0000001 then raise Exception.Create('test: '+name+': '+FloatToStr (a)+' <> '+FloatToStr(b));
 end;
 //test if a string has the encoding enc and the byte pattern b.
-procedure testrawstr(a: string; enc: TSystemCodePage; b: RawByteString; name: string = '');
+procedure testrawstr(a: RawByteString; enc: TSystemCodePage; b: RawByteString; name: string = '');
 begin
   {$ifdef FPC_HAS_CPSTRING}if enc <> CP_NONE then test(StringCodePage(a), enc, 'encoding' + name);{$endif}
   SetCodePage(RawByteString(b), enc, false);
@@ -781,7 +785,7 @@ begin
 
   if strLengthUtf8('hallo') <> 5 then raise Exception.Create('strLengthUtf8 failed, 1');
   test(strLengthUtf8('hallo'#$C3#$84'<<'), 8);
-  if strGetUnicodeCharacter($C4) <> #$C3#$84 then raise Exception.Create('strGetUnicodeCharacter failed, 1');
+  testrawstr(strGetUnicodeCharacter($C4), CP_UTF8, #$C3#$84);
 
 
   test(strCompareClever('1000', '100'), 1);
@@ -908,10 +912,10 @@ begin
       test(strChangeEncoding(strGetUnicodeCharacter(0, e), e, f), strGetUnicodeCharacter(0, f));
       test(strChangeEncoding(strGetUnicodeCharacter($80, e), e, f), strGetUnicodeCharacter($80, f));
       test(strChangeEncoding(strGetUnicodeCharacter($123, e), e, f), strGetUnicodeCharacter($123, f));
-      test(strConvert(strGetUnicodeCharacter($1D11E, e), e, f), strGetUnicodeCharacter($1D11E, f));
-      test(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter($1D11F, f));
-      test(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(ord(' '), e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(ord(' '), f)+strGetUnicodeCharacter($1D11F, f));
-      test(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(0, e)+strGetUnicodeCharacter($1D11F, e), e, f), strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(0, f)+strGetUnicodeCharacter($1D11F, f));
+      testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e), e, f), f, strGetUnicodeCharacter($1D11E, f));
+      testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter($1D11F, e), e, f), f, strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter($1D11F, f));
+      testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(ord(' '), e)+strGetUnicodeCharacter($1D11F, e), e, f), f, strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(ord(' '), f)+strGetUnicodeCharacter($1D11F, f));
+      testrawstr(strConvert(strGetUnicodeCharacter($1D11E, e)+strGetUnicodeCharacter(0, e)+strGetUnicodeCharacter($1D11F, e), e, f), f, strGetUnicodeCharacter($1D11E, f)+strGetUnicodeCharacter(0, f)+strGetUnicodeCharacter($1D11F, f));
     end;
 
   //1-Byte western encodings
@@ -1003,10 +1007,11 @@ begin
 
   test(strNormalizeLineEndingsUTF8(#13#10), #10);
   test(strNormalizeLineEndingsUTF8('foo'#10'b'#13'ar'#13#10), 'foo'#10'b'#10'ar'#10);
-  test(strNormalizeLineEndingsUTF8('foo' + strGetUnicodeCharacter($85)), 'foo'#10);
-  test(strNormalizeLineEndingsUTF8('foo'#13 + strGetUnicodeCharacter($85)), 'foo'#10);
-  test(strNormalizeLineEndingsUTF8('foo'#13 + strGetUnicodeCharacter($2028)), 'foo'#10#10);
-  test(strNormalizeLineEndingsUTF8('foo'#13 + strGetUnicodeCharacter($2028) + strGetUnicodeCharacter($2027) + strGetUnicodeCharacter($2029) + 'xyz' + strGetUnicodeCharacter($85) + 'äöüÄÖÜ'), 'foo'#10#10+strGetUnicodeCharacter($2027)+strGetUnicodeCharacter($2029)+'xyz'#10'äöüÄÖÜ');
+  testrawstr(strNormalizeLineEndingsUTF8('foo' + UTF8String(strGetUnicodeCharacter($85))), CP_UTF8, 'foo'#10);
+  testrawstr(strNormalizeLineEndingsUTF8('foo'#13 + UTF8String(strGetUnicodeCharacter($85))), CP_UTF8, 'foo'#10);
+  testrawstr(strNormalizeLineEndingsUTF8('foo'#13 + UTF8String(strGetUnicodeCharacter($2028))), CP_UTF8,  'foo'#10#10);
+  testrawstr(strNormalizeLineEndingsUTF8('foo'#13 + UTF8String(strGetUnicodeCharacter($2028)) + UTF8String(strGetUnicodeCharacter($2027)) + UTF8String(strGetUnicodeCharacter($2029)) + 'xyz' + strGetUnicodeCharacter($85) + 'äöüÄÖÜ'),
+            CP_UTF8, UTF8String('foo'#10#10)+strGetUnicodeCharacter($2027)+strGetUnicodeCharacter($2029)+UTF8String('xyz'#10'äöüÄÖÜ'));
 
   //splitting
   test(strSplit('hallo,welt,maus')[1] = 'welt');
@@ -1823,8 +1828,11 @@ begin
   SetCodePage(RawByteString(utf8), CP_UTF8, false);
   test(length(utf8), 5);
   latin1 := utf8;
-  SetCodePage(RawByteString(latin1), CP_LATIN1, true);
-  test(length(latin1), 3);
+  if setCodePageCanConvertEncodings then begin
+    SetCodePage(RawByteString(latin1), CP_LATIN1, true);
+    if length(latin1) <> 3 then raise Exception.Create('SetCodePage did not convert UTF8 to latin1. This happens if you run the tests on fpc3 without including cwstrings or calling registerFallbackUnicodeConversion');
+    testrawstr(latin1, CP_LATIN1, 'a'#$E4#$FC);
+  end;
 
   sb.init(@buffer, 3, CP_UTF8);
   sb.appendCodePoint($24);
@@ -1836,7 +1844,9 @@ begin
   sb.append(' ');
   sb.append(latin1);
   sb.final;
-  test(buffer, #$24#$C2#$A2#$E2#$82#$AC#$F0#$90#$8D#$88' aäü aäü');
+  testrawstr(buffer, CP_UTF8, #$24#$C2#$A2#$E2#$82#$AC#$F0#$90#$8D#$88' aäü aäü');
+
+  if not setCodePageCanConvertEncodings then exit;
 
   sb.init(@buffer, 3, CP_LATIN1);
   sb.appendCodePoint($24);
@@ -1847,12 +1857,12 @@ begin
   sb.append(latin1);
   sb.final;
   test(length(buffer), 10);
-  test(buffer, #$24#$C2#$A2' aäü aäü');
+  testrawstr(buffer, CP_LATIN1, #$24#$A2' a'#$E4#$FC' a'#$E4#$FC);
 
   sb.chop(1);
   test(not sb.isEmpty);
   sb.final;
-  test(buffer, #$24#$C2#$A2' aäü aä');
+  testrawstr(buffer, CP_LATIN1, #$24#$A2' a'#$E4#$FC' a'#$E4);
 
   sb.chop(100);
   test(sb.isEmpty);
@@ -1867,18 +1877,16 @@ procedure testStrEntities;
   procedure html(const html, expected: string; flags: TDecodeHTMLEntitiesFlags = []);
   var temp, tempexpected: RawByteString;
   begin
-    test(strDecodeHTMLEntities(html, CP_UTF8, flags), expected);
+    testrawstr(strDecodeHTMLEntities(html, CP_UTF8, flags), CP_UTF8, expected);
     temp := strDecodeHTMLEntities(html, CP_LATIN1, flags);
-    {$ifdef FPC_HAS_CPSTRING}
-    tempexpected := expected;
-    SetCodePage(tempexpected, CP_UTF8, false);
-    SetCodePage(tempexpected, CP_LATIN1, true);
-    test(StringCodePage(temp) = CP_LATIN1);
-    {$else}
-    tempexpected := strConvertFromUtf8(expected, CP_LATIN1);
-    {$endif}
-    test(temp, tempexpected);
-    test(length(temp) = length(tempexpected));
+    if setCodePageCanConvertEncodings then begin
+      tempexpected := expected;
+      SetCodePage(tempexpected, CP_UTF8, false);
+      SetCodePage(tempexpected, CP_LATIN1, true);
+      test(StringCodePage(temp) = CP_LATIN1);
+    end else
+      tempexpected := strConvertFromUtf8(expected, CP_LATIN1);
+    testrawstr(temp, CP_LATIN1, tempexpected);
   end;
 
 begin
