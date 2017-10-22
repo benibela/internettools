@@ -23,7 +23,7 @@ var
   message: String;
 begin
   if a <> b then begin
-    message := 'test: '+name + LineEnding;
+    message := 'test: ' + name + LineEnding;
     needhex := false;
     for i := 1 to length(a) do if a[i] in [#0..#31,#$7F..#$FF] then needhex := true;
     for i := 1 to length(b) do if b[i] in [#0..#31,#$7F..#$FF] then needhex := true;
