@@ -6,7 +6,8 @@ uses
   //bbheaptrc,
   //heaptrc,
   {$ifdef unix}cwstring,{$endif} //this is required to use strbuilder with non-utf8
-  Classes, xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
+  Classes, bbutils,
+  xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
   simplehtmltreeparser, xquery, internetaccess_tests, xpath3_tests, xquery3_tests, bigdecimal_tests, parsertests, simpleinternet_tests,
 commontestutils, extendedhtmlparser;
@@ -27,6 +28,7 @@ begin
 
   start := now;
   //bigdecimal_tests.unittests;
+  bbutils.registerFallbackUnicodeConversion; //that seems to be more stable across platforms. I think I saw some systems where unicode 10ffff was converted to latin1 '?' and others where it was '??'
   bbutils_tests.unitTests;
   internetaccess_tests.unittests;
   parsertests.unittests(testerrors);

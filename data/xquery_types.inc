@@ -1136,7 +1136,7 @@ var
   v: TXQValueDateTimeData;
 begin
   if typeAnnotation = baseSchema.dateTime then
-    result := bbutils.dateTimeFormatNEW('yyyy-mm-ddThh:nn:ss[.z+][Z]', value.year, value.month, value.day, value.hour, value.min, value.seconds, value.microsecs * 1000, value.timezone)
+    result := bbutils.dateTimeFormat('yyyy-mm-ddThh:nn:ss[.z+][Z]', value.year, value.month, value.day, value.hour, value.min, value.seconds, value.microsecs * 1000, value.timezone)
   else begin
     fac := 1;
     if (typeAnnotation as TXSDateTimeType).isDuration then begin
@@ -1145,7 +1145,7 @@ begin
       setDayTime(v, v.toDayTime);
       setMonths(v, v.toMonths, true);
     end else v := value;
-    result := bbutils.dateTimeFormatNEW((typeAnnotation as TXSDateTimeType).fixedDateTimePattern, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.seconds, fac * v.microsecs * 1000, v.timezone);
+    result := bbutils.dateTimeFormat((typeAnnotation as TXSDateTimeType).fixedDateTimePattern, fac * v.year, fac * v.month, fac * v.day, fac * v.hour, fac * v.min, fac * v.seconds, fac * v.microsecs * 1000, v.timezone);
     if (fac < 0) and (result <> 'P') then result := '-' + result;
   end;
   if (result = 'P') then begin
