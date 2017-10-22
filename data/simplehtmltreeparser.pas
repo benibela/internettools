@@ -1678,7 +1678,7 @@ var known: TNamespaceList;
                        append(known.items[i].serialize);
                      end;
 
-        if namespace <> nil then result += requireNamespace(namespace)
+        if namespace <> nil then append(requireNamespace(namespace))
         else if known.hasNamespacePrefix('', temp) then
           if temp.getURL <> '' then begin
             known.add(TNamespace.Make('', ''));
@@ -1699,10 +1699,10 @@ var known: TNamespaceList;
               append('"');
             end;
 
-        if (next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
+        if (n.next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
           if html then append('>')
           else append('/>');
-          if insertLineBreaks then Result+=LineEnding;
+          if insertLineBreaks then append(LineEnding);
           while known.count > oldnamespacecount do
             known.Delete(known.count-1);
           exit();
@@ -1711,7 +1711,7 @@ var known: TNamespaceList;
         if insertLineBreaks then append(LineEnding);
         inner(n);
         append('</'); append(n.getNodeName()); append('>');
-        if insertLineBreaks then Result+=LineEnding;
+        if insertLineBreaks then append(LineEnding);
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
