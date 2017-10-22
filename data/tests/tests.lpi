@@ -70,7 +70,7 @@
         <PackageName Value="LCLBase"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="12">
+    <Units Count="13">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -119,6 +119,10 @@
         <Filename Value="commontestutils.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit11>
+      <Unit12>
+        <Filename Value="commontestutilsxquery.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit12>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

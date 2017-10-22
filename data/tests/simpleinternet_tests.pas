@@ -5,7 +5,7 @@ unit simpleinternet_tests;
 interface
 
 uses
-  Classes, SysUtils, commontestutils;
+  Classes, SysUtils, commontestutils, commontestutilsxquery;
 
 procedure unitTests();
 
