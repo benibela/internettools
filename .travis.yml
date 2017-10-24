@@ -10,13 +10,13 @@ install:
   - wget http://mirrors.iwi.me/lazarus/releases/Lazarus%20Linux%20amd64%20DEB/Lazarus%201.8.0RC5/fpc_3.0.4-rc1_amd64.deb
   - sudo dpkg --force-overwrite -i *.deb
   - git clone https://github.com/benibela/flre.git flre; cd flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ..
-  - find
+  - git clone https://github.com/benibela/rcmdline.git rcmdline
   
 
 script:
   - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/tests/tests.lpr 
   - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/examples/xqueryExample.pas
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/examples/QT3testsuite.lpr
+  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER -Furcmdline  data/examples/QT3testsuite.lpr
   - data/tests/tests
 
 notifications:
