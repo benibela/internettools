@@ -13,9 +13,9 @@ install:
   
 
 script:
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -DUSE_NO_WRAPPER data/tests/tests.lpr 
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -DUSE_NO_WRAPPER data/examples/xqueryExample.pas
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -DUSE_NO_WRAPPER data/examples/QT3testsuite.lpr
+  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/tests/tests.lpr 
+  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/examples/xqueryExample.pas
+  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/examples/QT3testsuite.lpr
   - data/tests/tests
 
 notifications:
