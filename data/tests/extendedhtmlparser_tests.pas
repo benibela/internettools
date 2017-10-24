@@ -11,7 +11,7 @@ procedure unitTests(testerrors: boolean);
 
 implementation
 
-uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser;
+uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser, commontestutils;
 
 type TXQueryEngineBreaker = class(TXQueryEngine)
 end;
@@ -91,6 +91,7 @@ var previoushtml, temp: string;
   tempobj: TXQValueObject;
     procedure t(const template, html, expected: string);
     begin
+      inc(globalTestCount);
       if html<>'' then previoushtml:=html;
       if template='' then exit;
       extParser.parseTemplate(template);
@@ -102,6 +103,7 @@ var previoushtml, temp: string;
     var
       ok: Boolean;
     begin
+      inc(globalTestCount);
       if html<>'' then previoushtml:=html;
       if not testerrors then exit;
       extParser.parseTemplate(template);
@@ -124,6 +126,7 @@ var previoushtml, temp: string;
       query: IXQuery;
       got: String;
     begin
+      inc(globalTestCount);
       query := extParser.QueryEngine.parseXQuery1(template);
       query.getTerm.getContextDependencies;
       //if html <> '' then extParser.parseh;
@@ -137,6 +140,7 @@ var previoushtml, temp: string;
       query: IXQuery;
       got: String;
     begin
+      inc(globalTestCount);
       query := extParser.QueryEngine.parseXQuery3(template);
       //if html <> '' then extParser.parseh;
       got := query.evaluate(extParser.HTMLTree).toString;
@@ -151,6 +155,7 @@ var previoushtml, temp: string;
       err: String;
     begin
       if not testerrors then exit;
+      inc(globalTestCount);
       err := '<no error>';
       try
         query := extParser.QueryEngine.parseXQuery1(template);

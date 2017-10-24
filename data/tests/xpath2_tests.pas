@@ -13,12 +13,8 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex;
+uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils;
 
-procedure equal(const s1, s2, testname: string);
-begin
-  if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
-end;
 
 type TXQueryEngineBreaker = class(TXQueryEngine)
 end;
@@ -4214,14 +4210,14 @@ begin
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(ps.evaluateXPath2('"&quot;"').toString, '&quot;', 'evaluateXPath2 failed');
-  equal(ps.evaluateXPath2('2*.', xqvalue(7)).toString, '14', 'evaluateXPath2(ixqvalue) failed');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(TXQueryEngine.evaluateStaticXPath2('1 + 1 + 1').toString, '3', 'evaluateStaticXPath2 a failed');
-  equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{$abc}{0}b')).evaluate().toString, 'aalphabet0b', 'xstring0');
-  equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{1+2+3}b')).evaluate().toString, 'a6b', 'xstring1');
-  equal(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{concat("x","y","z")}b')).evaluate().toString, 'axyzb', 'xstring2');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(ps.evaluateXPath2('"&quot;"').toString, '&quot;', 'evaluateXPath2 failed');
+  test(ps.evaluateXPath2('2*.', xqvalue(7)).toString, '14', 'evaluateXPath2(ixqvalue) failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(TXQueryEngine.evaluateStaticXPath2('1 + 1 + 1').toString, '3', 'evaluateStaticXPath2 a failed');
+  test(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{$abc}{0}b')).evaluate().toString, 'aalphabet0b', 'xstring0');
+  test(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{1+2+3}b')).evaluate().toString, 'a6b', 'xstring1');
+  test(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{concat("x","y","z")}b')).evaluate().toString, 'axyzb', 'xstring2');
 
   for i := 1 to 5 do begin
     xqv := query('1 to $_1', [xqvalue(i)]);

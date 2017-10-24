@@ -39,5 +39,6 @@ begin
   extendedhtmlparser_tests.unitTests(testerrors);
   simpleinternet_tests.unittests();
   writeln('OK  (time: ', (now-start)*24*60*60*1000:5:5,')');
+  writeln(globalTestCount, ' tests successful');
 end.
 

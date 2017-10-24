@@ -5,18 +5,24 @@ dist: trusty
 os:
   - linux
 
+env:
+  matrix:
+    INTERNETACCESS=USE_NO_WRAPPER
+    INTERNETACCESS=USE_SYNAPSE_WRAPPER
+
 install:
+  SEARCHPATHS="-Fudata -Fidata -Fuinternet -Fuflre/src/"
 #  - sudo apt-get update -qq
   - wget http://mirrors.iwi.me/lazarus/releases/Lazarus%20Linux%20amd64%20DEB/Lazarus%201.8.0RC5/fpc_3.0.4-rc1_amd64.deb
   - sudo dpkg --force-overwrite -i *.deb
   - git clone https://github.com/benibela/flre.git flre; cd flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ..
   - git clone https://github.com/benibela/rcmdline.git rcmdline
-  
+  - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; SEARCHPATHS="$SEARCHPATHS -Fusynapse"; fi
 
 script:
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/tests/tests.lpr 
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER data/examples/xqueryExample.pas
-  - fpc -O2 -gl -Fudata -Fidata -Fuinternet -Fuflre/src/ -dUSE_NO_WRAPPER -Furcmdline  data/examples/QT3testsuite.lpr
+  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
+  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/examples/xqueryExample.pas
+  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS -Furcmdline  data/examples/QT3testsuite.lpr
   - data/tests/tests
 
 notifications:

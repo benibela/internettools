@@ -11,7 +11,7 @@ uses
 procedure unittests(testerrors: boolean);
 
 implementation
-uses bbutils;
+uses bbutils, commontestutils;
 
 type
 
@@ -27,10 +27,6 @@ type
   procedure ImportModule(sender: TObject; const namespace: string; const at: array of string);
 end;
 
-procedure equal(const s1, s2, testname: string);
-begin
-  if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
-end;
 
 function collection(fakeself, sender: TObject; const variable: string; var value: IXQValue): boolean;
 begin
@@ -48,6 +44,7 @@ var
   function performUnitTest(s1,s2,s3: string): string;
   var rooted: Boolean;
   begin
+    inc(globalTestCount);
     if s3 <> '' then xml.parseTree(s3);
     ps.parseXQuery1(s1);
   //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
@@ -1900,17 +1897,17 @@ begin
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(ps.evaluateXQuery1('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
-  equal(ps.evaluateXQuery1('<a>2</a>*.', xqvalue(7)).toString, '14', 'evaluateXQuery1(ixqvalue) failed');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(TXQueryEngine.evaluateStaticXQuery1('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(ps.evaluateXQuery1('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
+  test(ps.evaluateXQuery1('<a>2</a>*.', xqvalue(7)).toString, '14', 'evaluateXQuery1(ixqvalue) failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(TXQueryEngine.evaluateStaticXQuery1('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
 
 
-  equal(ps.evaluateXQuery1('declare function local:foobar(){123}; 0').toString, '0', 'interface test failed');
-  equal(ps.evaluateXQuery1('declare function local:foobar2(){456}; local:foobar()').toString, '123', 'interface test failed');
-  equal(ps.evaluateXQuery1('declare function local:foobar3(){1000}; local:foobar() + local:foobar2()').toString, '579', 'interface test failed');
-  equal(ps.evaluateXQuery1('declare function local:foobar(){111}; local:foobar() + local:foobar3()').toString, '1111', 'interface test foverride failed');
+  test(ps.evaluateXQuery1('declare function local:foobar(){123}; 0').toString, '0', 'interface test failed');
+  test(ps.evaluateXQuery1('declare function local:foobar2(){456}; local:foobar()').toString, '123', 'interface test failed');
+  test(ps.evaluateXQuery1('declare function local:foobar3(){1000}; local:foobar() + local:foobar2()').toString, '579', 'interface test failed');
+  test(ps.evaluateXQuery1('declare function local:foobar(){111}; local:foobar() + local:foobar3()').toString, '1111', 'interface test foverride failed');
 
   writeln('XQuery 1.0: ', count, ' completed');
 

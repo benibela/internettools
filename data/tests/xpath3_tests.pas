@@ -12,12 +12,7 @@ procedure unittests(TestErrors, testerrmath:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, xquery_module_math, math;
-
-procedure equal(const s1, s2, testname: string);
-begin
-  if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
-end;
+uses xquery, simplehtmltreeparser, xquery_module_math, math, commontestutils;
 
 procedure unittests(testerrors, testerrmath: boolean);
 var
@@ -29,6 +24,7 @@ var
 
   function performUnitTest(s1,s2,s3: string): string;
   begin
+    inc(globalTestCount);
     if s3 <> '' then xml.parseTree(s3);
     ps.parseXPath3(s1);
     ps.LastQuery.getTerm.getContextDependencies;
@@ -370,11 +366,11 @@ begin
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(ps.evaluateXPath3('let $a  := "&quot;" return $a').toString, '&quot;', 'evaluateXPath3 failed');
-  equal(ps.evaluateXPath3('let $x := 2*. return $x', xqvalue(7)).toString, '14', 'evaluateXPath3(ixqvalue) failed');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(TXQueryEngine.evaluateStaticXPath3('1 + 1 + (let $t := 10 return $t)').toString, '12', 'evaluateStaticXPath3 a failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(ps.evaluateXPath3('let $a  := "&quot;" return $a').toString, '&quot;', 'evaluateXPath3 failed');
+  test(ps.evaluateXPath3('let $x := 2*. return $x', xqvalue(7)).toString, '14', 'evaluateXPath3(ixqvalue) failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(TXQueryEngine.evaluateStaticXPath3('1 + 1 + (let $t := 10 return $t)').toString, '12', 'evaluateStaticXPath3 a failed');
 
 
   writeln('XPath 3: ', count, ' completed');

@@ -12,10 +12,11 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser;
-procedure equal(const s1, s2, testname: string);
+uses xquery, simplehtmltreeparser, commontestutils;
+
+procedure test(a: IXQValue; b: string); overload;
 begin
-  if s1 <> s2 then raise exception.Create(s1 + ' <> ' + s2 + ' ('+testname+')');
+  test(a.toJoinedString(), b, 'ni');
 end;
 
 procedure newinterfacetests; forward;
@@ -28,6 +29,7 @@ var
 
   function performUnitTest(s1,s2,s3: string): string;
   begin
+    inc(globalTestCount);
     if s3 <> '' then xml.parseTree(s3);
     ps.parseXQuery3(s1);
     ps.LastQuery.getTerm.getContextDependencies;
@@ -412,11 +414,11 @@ begin
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(ps.evaluateXQuery3('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
-  equal(ps.evaluateXQuery3('<a>2</a> || .', xqvalue(7)).toString, '27', 'evaluateXQuery1(ixqvalue) failed');
-  equal(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  equal(TXQueryEngine.evaluateStaticXQuery3('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(ps.evaluateXQuery3('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
+  test(ps.evaluateXQuery3('<a>2</a> || .', xqvalue(7)).toString, '27', 'evaluateXQuery1(ixqvalue) failed');
+  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(TXQueryEngine.evaluateStaticXQuery3('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
 
 
   newinterfacetests;
@@ -430,10 +432,6 @@ begin
 end;
 
 
-procedure test(a: IXQValue; b: string);
-begin
-  equal(a.toJoinedString(), b, 'ni');
-end;
 
 procedure newinterfacetests;
 begin
