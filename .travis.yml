@@ -11,7 +11,7 @@ env:
     INTERNETACCESS=USE_SYNAPSE_WRAPPER
 
 install:
-  SEARCHPATHS="-Fudata -Fidata -Fuinternet -Fuflre/src/"
+  - SEARCHPATHS="-Fudata -Fidata -Fuinternet -Fuflre/src/"
 #  - sudo apt-get update -qq
   - wget http://mirrors.iwi.me/lazarus/releases/Lazarus%20Linux%20amd64%20DEB/Lazarus%201.8.0RC5/fpc_3.0.4-rc1_amd64.deb
   - sudo dpkg --force-overwrite -i *.deb
