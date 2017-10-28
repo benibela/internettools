@@ -1959,17 +1959,17 @@ var toCPActual: TSystemCodePage;
     p := pchar(pointer(str));
     i := 1;
     case toCPActual of
-      CP_LATIN1: while len > 0 do begin
-        cp := strDecodeUTF8Character(p, len);
-        if cp >= 0 then begin
-          result[i] := charCodePointToLatin1(cp);
-          inc(i);
-        end;
-      end;
       CP_WINDOWS1252: while len > 0 do begin
         cp := strDecodeUTF8Character(p, len);
         if cp >= 0 then begin
           result[i] := charCodePointToCP1252(cp);
+          inc(i);
+        end;
+      end;
+      else{CP_LATIN1:} while len > 0 do begin
+        cp := strDecodeUTF8Character(p, len);
+        if cp >= 0 then begin
+          result[i] := charCodePointToLatin1(cp);
           inc(i);
         end;
       end;

@@ -15,8 +15,9 @@ commontestutils, extendedhtmlparser;
 var
   start: TDateTime;
   testerrors: boolean = false;
+  commonEncodings: array [0..3] of TSystemCodePage = (CP_UTF8, CP_LATIN1, CP_WINDOWS1252, CP_ASCII);
+  e: TSystemCodePage;
 begin
-  //DefaultSystemCodePage := CP_UTF8;
   testerrors := true;
   if testerrors then begin
     try raise EXQEvaluationException.create('pxp:INTERNAL', 'These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EXQEvaluationException do ; end;
@@ -30,8 +31,14 @@ begin
   //bigdecimal_tests.unittests;
   bbutils.registerFallbackUnicodeConversion; //that seems to be more stable across platforms. I think I saw some systems where unicode 10ffff was converted to latin1 '?' and others where it was '??'
   bbutils_tests.unitTests;
+
   internetaccess_tests.unittests;
-  parsertests.unittests(testerrors);
+  for e in commonEncodings do begin
+    DefaultSystemCodePage := e;
+    parsertests.unittests(testerrors);
+  end;
+
+  DefaultSystemCodePage := CP_UTF8;
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
   xpath3_tests.unittests(testerrors, false); //}

@@ -1449,7 +1449,7 @@ begin
   testStrResolveURI;
 
 
-  writeln('bbutils tested');
+  writeln('bbutils tested' {$ifdef FPC_HAS_CPSTRING}, ', cp: ', DefaultSystemCodePage{$endif});
 end;
 
 procedure testStrResolveURI;
