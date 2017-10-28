@@ -12,7 +12,7 @@
       </SearchPaths>
     </CompilerOptions>
     <Description Value="This is an auto updater class related to the Internet Tools package. It depends on the LCL for its progress dialog and thus needs an additional package"/>
-    <Files Count="4">
+    <Files Count="3">
       <Item1>
         <Filename Value="internet/autoupdate.pas"/>
         <UnitName Value="autoupdate"/>
@@ -22,13 +22,9 @@
         <Type Value="LFM"/>
       </Item2>
       <Item3>
-        <Filename Value="../lazarus/dialogs/progressdialog.lrs"/>
-        <Type Value="LRS"/>
-      </Item3>
-      <Item4>
         <Filename Value="../lazarus/dialogs/progressdialog.pas"/>
         <UnitName Value="progressdialog"/>
-      </Item4>
+      </Item3>
     </Files>
     <RequiredPkgs Count="3">
       <Item1>

@@ -30,7 +30,7 @@ type
 
 implementation
 
-{ ProgressBarDialog }
+{$R *.lfm}
 
 constructor TProgressBarDialog.create(title,description: string; maxprogress: longint=100);
 begin
@@ -65,8 +65,6 @@ begin
   setProgress(progress);
 end;
 
-initialization
-  {$I progressdialog.lrs}
 
 end.
 
