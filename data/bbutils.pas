@@ -1926,18 +1926,18 @@ begin
   else result := INVALID_CHAR_1BYTE;;
 end;
 
+procedure strRemoveNonASCIIFromANSI(var s: RawByteString);
+var
+  i: SizeInt;
+begin
+  for i := 1 to length(s) do
+    if s[i] > #127 then s[i] := INVALID_CHAR_1BYTE;
+end;
+
 function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawByteString;
                            //beware the const aliasing! we might have pointer(result) = pointer(str), so result must not be changed before being recreated
 
 var toCPActual: TSystemCodePage;
-  procedure strRemoveNonASCIIFromANSI(var s: RawByteString);
-  var
-    i: SizeInt;
-  begin
-    for i := 1 to length(s) do
-      if s[i] > #127 then s[i] := INVALID_CHAR_1BYTE;
-    SetCodePage(RawByteString(s), toCP, false);
-  end;
 
   procedure convertUtf8ToWesternEurope(var result: RawByteString);
   var
@@ -2067,6 +2067,7 @@ begin
          CP_ASCII: begin
            convertUtf8ToWesternEurope(result);
            strRemoveNonASCIIFromANSI(result);
+           SetCodePage(result, toCP, false);
            exit;
          end;
       end;
@@ -2079,6 +2080,7 @@ begin
         CP_ASCII: begin
           result := str;
           strRemoveNonASCIIFromANSI(result);
+          SetCodePage(result, toCP, false);
           exit;
         end;
         CP_UTF8: begin
@@ -2090,8 +2092,8 @@ begin
 
   //extended unicode conversion
   case from of
-     CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: case toCPActual of
-        CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: begin
+     CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII: case toCPActual of
+        CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII: begin
           convertExtendedUnicode();
           exit;
         end;
@@ -2253,21 +2255,23 @@ begin
       if 4 * len <> length(dest) then SetLength(dest, 4*len);
       if cp <> CP_UTF32_NATIVE then strSwapEndianDWord(dest);
     end;
-    CP_WINDOWS1252, CP_LATIN1: begin
+    CP_WINDOWS1252, CP_LATIN1, CP_ASCII: begin
       SetLength(dest, len);
       last := source + len;
       byteptr := @dest[1];
       case cpactual of
-        CP_LATIN1:
-          while source < last do begin
-            byteptr^ := charCodePointToLatin1(strDecodeUTF16Character(source));
-            inc(byteptr);
-          end;
         CP_WINDOWS1252:
           while source < last do begin
             byteptr^ := charCodePointToCP1252(strDecodeUTF16Character(source));
             inc(byteptr);
           end;
+        else begin
+          while source < last do begin
+            byteptr^ := charCodePointToLatin1(strDecodeUTF16Character(source));
+            inc(byteptr);
+          end;
+          if cpactual = CP_ASCII then strRemoveNonASCIIFromANSI(dest);
+        end;
       end;
       len := byteptr - @dest[1];
       if len <> length(dest) then SetLength(dest, len); //if there were surrogates, the string becomes smaller

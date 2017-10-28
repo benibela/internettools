@@ -4013,10 +4013,10 @@ begin
   t('translate("Hallö", "aö", "äo")', 'Hällo');
   DefaultSystemCodePage := CP_LATIN1;
   t('translate("Hallö", "aö", "äo")', 'H'#$C3'll'#$A4'o');
-  {$ifndef windows}
+  {
   DefaultSystemCodePage := CP_ACP;
   t('translate("Hallö", "aö", "äo")', 'Hällo');
-  {$endif}
+  }
   DefaultSystemCodePage := CP_UTF8;
   t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
   t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
