@@ -20,9 +20,15 @@ unit synapseinternetaccess;
 
 {$mode objfpc}{$H+}
 
-{$IFNDEF WINDOWS}
-{$DEFINE COMPILE_SYNAPSE_INTERNETACCESS} //If this unit should be compiled. Not enabled on windows, since you can use w32internetaccess there
-{$DEFINE USE_SYNAPSE_WRAPPER}
+
+
+{$IFNDEF WINDOWS} //If this unit should be compiled. Not enabled on windows, since you can use w32internetaccess there
+ {$IFNDEF USE_WININET_WRAPPER}{$IFNDEF USE_ANDROID_WRAPPER}{$IFNDEF USE_NO_WRAPPER}
+  {$DEFINE USE_SYNAPSE_WRAPPER}
+ {$ENDIF}{$ENDIF}{$ENDIF}
+{$ENDIF}
+{$IFDEF USE_SYNAPSE_WRAPPER}
+ {$DEFINE COMPILE_SYNAPSE_INTERNETACCESS}
 {$ENDIF}
 
 
