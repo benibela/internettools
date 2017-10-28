@@ -10,9 +10,12 @@ env:
     - WINEPREFIX=~/.winelaz
     - DISPLAY=:99.0
   matrix:
-    - INTERNETACCESS=USE_NO_WRAPPER
-    - INTERNETACCESS=USE_SYNAPSE_WRAPPER
     - LAZ_VER=1.8.0RC5
+
+matrix:
+  include:
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=linux INTERNETACCESS=USE_NO_WRAPPER
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=linux INTERNETACCESS=USE_SYNAPSE_WRAPPER
 
 before_install:
   # Start virtual display server
@@ -27,13 +30,6 @@ install:
   - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; echo "-Fusynapse" >> ~/.fpc.cfg; fi
   - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
   - travis-lazarus/.travis.install.py
-
-script:
-  - lazbuild $LAZ_OPT my_lazarus_tests.lpi               # Build my_lazarus_test project
-  - $LAZ_ENV ./bin/my_lazarus_tests --all --format=plain # Run my_lazarus_test testsuite
-
-
-install:
 
 script:
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
