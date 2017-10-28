@@ -24,7 +24,7 @@ before_install:
   - Xvfb $DISPLAY &
 
 install:
-  - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
+  - git clone https://github.com/benibela/travis-lazarus travis-lazarus
   - travis-lazarus/.travis.install.py
   - if [[ ! -e ~/.fpc.cfg ]]; then echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg; fi
   - mkdir -p import
