@@ -74,6 +74,8 @@ begin
   fparser.Options.Namespaces := True;
   fparser.Options.PreserveWhitespace := True;
   fparser.Options.Validate := true;
+  if not assigned(widestringmanager.Unicode2AnsiMoveProc) then
+    raise Exception.Create('Need widestringmanager.Unicode2AnsiMoveProc');
 end;
 
 destructor TTreeParserDOMBase.destroy;
@@ -85,6 +87,12 @@ end;
 function TTreeParserDOMBase.import(dom: TDOMDocument; fragment: boolean): TTreeDocument;
 var doc: TTreeDocument;
   namespaces: TNamespaceList;
+
+  function convert(const u: UnicodeString): string;
+  begin
+    widestringmanager.Unicode2AnsiMoveProc(PWideChar(u), result, TargetEncoding, length(u));
+  end;
+
   function getNamespace(const url, prefix: string): INamespace;
   begin
     if namespaces.hasNamespacePrefix(prefix, result) then
@@ -96,8 +104,8 @@ var doc: TTreeDocument;
   procedure importNode(parent: TTreeNode; node: TDOMNode);
     function name(n: TDOMNode): string;
     begin
-      if n.LocalName <>'' then result := UTF8Encode(n.LocalName)
-      else result := UTF8Encode(n.NodeName);
+      if n.LocalName <>'' then result := convert(n.LocalName)
+      else result := convert(n.NodeName);
     end;
 
   var
@@ -111,9 +119,9 @@ var doc: TTreeDocument;
       new.document := parent.document; //if we do not set it now, further children do not know their document
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
-          new.addAttribute(name(node.Attributes[i]), UTF8Encode(node.Attributes[i].NodeValue));
+          new.addAttribute(name(node.Attributes[i]), convert(node.Attributes[i].NodeValue));
           if (node.Attributes[i].NamespaceURI <> '') and (node.Attributes[i].NodeName <> 'xmlns') then
-            new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(UTF8Encode(node.Attributes[i].NamespaceURI), UTF8Encode(node.Attributes[i].Prefix));
+            new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(convert(node.Attributes[i].NamespaceURI), convert(node.Attributes[i].Prefix));
           case TDOMAttr(node.Attributes[i]).DataType of
           dtId:  new.attributes.Items[new.attributes.count - 1].setDataTypeHack(1);
           dtIdRef, dtIdRefs: new.attributes.Items[new.attributes.count - 1].setDataTypeHack(2);
@@ -123,16 +131,16 @@ var doc: TTreeDocument;
       for i := 0 to node.ChildNodes.Count - 1 do
         importNode(new, node.ChildNodes[i]);
     end else begin
-      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeNode.create(tetText, UTF8Encode(node.NodeValue))
-      else if node is TDOMComment then new := TTreeNode.create(tetComment, UTF8Encode(node.NodeValue))
+      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeNode.create(tetText, convert(node.NodeValue))
+      else if node is TDOMComment then new := TTreeNode.create(tetComment, convert(node.NodeValue))
       else if node is TDOMProcessingInstruction then begin
-        new := TTreeNode.create(tetProcessingInstruction, UTF8Encode(node.NodeName));
-        new.addAttribute('', UTF8Encode(node.NodeValue));
+        new := TTreeNode.create(tetProcessingInstruction, convert(node.NodeName));
+        new.addAttribute('', convert(node.NodeValue));
       end else exit;
     end;
 
     if node.NamespaceURI <> '' then
-      new.namespace := getNamespace(UTF8Encode(node.NamespaceURI), UTF8Encode(node.Prefix));
+      new.namespace := getNamespace(convert(node.NamespaceURI), convert(node.Prefix));
 
 
     parent.addChild(new);

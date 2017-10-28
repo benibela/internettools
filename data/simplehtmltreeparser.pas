@@ -377,7 +377,7 @@ protected
   FTemplateCount: Integer;
   FElementStack: TList;
   FAutoCloseTag: boolean;
-  FCurrentFile: string;
+  FCurrentFile: RawByteString;
   FParsingModel: TParsingModel;
   FTrimText, FReadComments: boolean;
   FTrees: TList;
@@ -2636,7 +2636,7 @@ begin
   FCurrentNamespaces := TNamespaceList.Create;
   FCurrentAndPreviousNamespaces := TNamespaceList.Create;
   globalNamespaces := TNamespaceList.Create;
-  FTargetEncoding:=CP_UTF8;
+  FTargetEncoding:=CP_ACP;
 
   FRepairMissingStartTags:=false; //??
   FRepairMissingEndTags:=true;
@@ -2737,8 +2737,8 @@ begin
   case encBOM of
     CP_UTF8, CP_Windows1252, CP_NONE: ;
     else begin //do no want to handle multi-byte chars
-      FCurrentFile := strConvertToUtf8(FCurrentFile, encBOM);
-      encBOM := CP_UTF8;
+      FCurrentFile := strConvert(FCurrentFile, encBOM, FTargetEncoding);
+      encBOM := FTargetEncoding;
     end;
   end;
   FXmlHeaderEncoding := encBOM;
