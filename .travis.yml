@@ -31,13 +31,13 @@ install:
   - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; echo "-Fusynapse" >> ~/.fpc.cfg; fi
 
 script:
-  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
-  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/examples/xqueryExample.pas
-  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS -Furcmdline  data/examples/QT3testsuite.lpr
   - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools.lpk
   - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools_autoupdate.lpk
   - lazbuild $LAZ_OPT --verbose-pkgsearch data/examples/xqueryExampleGUI.lpi
   - lazbuild $LAZ_OPT --verbose-pkgsearch internet/examples/autoupdatetest.lpi
+  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
+  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/examples/xqueryExample.pas
+  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS -Furcmdline  data/examples/QT3testsuite.lpr
   - $LAZ_ENV data/tests/tests
 
 notifications:
