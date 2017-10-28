@@ -14,22 +14,20 @@ env:
 
 matrix:
   include:
-    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=linux INTERNETACCESS=USE_NO_WRAPPER
-    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=linux INTERNETACCESS=USE_SYNAPSE_WRAPPER
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV= INTERNETACCESS=USE_NO_WRAPPER
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV= INTERNETACCESS=USE_SYNAPSE_WRAPPER
 
 before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &
 
 install:
+  - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
+  - travis-lazarus/.travis.install.py
   - SEARCHPATHS="-Fudata -Fidata -Fuinternet"
-  - wget http://mirrors.iwi.me/lazarus/releases/Lazarus%20Linux%20amd64%20DEB/Lazarus%201.8.0RC5/fpc_3.0.4-rc1_amd64.deb
-  - sudo dpkg --force-overwrite -i *.deb
   - git clone https://github.com/benibela/flre.git flre; cd flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ..; echo "-Fuflre/src/" >> ~/.fpc.cfg
   - git clone https://github.com/benibela/rcmdline.git rcmdline
   - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; echo "-Fusynapse" >> ~/.fpc.cfg; fi
-  - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
-  - travis-lazarus/.travis.install.py
 
 script:
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
