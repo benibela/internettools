@@ -423,7 +423,8 @@ function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strEncodingFromBOMRemove(var str:string):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
+function strEncodingFromBOMRemove(var str:RawByteString):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
+{$ifdef HAS_CPSTRING}function strEncodingFromBOMRemove(var str:string):TSystemCodePage; inline;{$endif}
 
 //** This function converts codePoint to the corresponding uppercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
 //** It cannot be used to convert a character to uppercase, as SpecialCasing.txt is not a map from normal characters to their uppercase variants.
@@ -2470,7 +2471,7 @@ begin
   end;
 end;
 {$ENDIF}
-function strEncodingFromBOMRemove(var str: string): TSystemCodePage;
+function strEncodingFromBOMRemove(var str: RawByteString): TSystemCodePage;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
     delete(str,1,3);
@@ -2490,6 +2491,13 @@ begin
   end else result := CP_NONE;
 end;
 
+{$ifdef HAS_CPSTRING}
+function strEncodingFromBOMRemove(var str:string):TSystemCodePage;
+begin
+  result := strEncodingFromBOMRemove(RawByteString(str));
+end;
+
+{$endif}
 function strUpperCaseSpecialUTF8(codePoint: integer): string;
 const block: array[0..465] of byte = ( $53, $53, $46, $46, $46, $49, $46, $4C, $46, $46, $49, $46, $46, $4C, $53, $54, $53, $54, $D4, $B5, $D5, $92, $D5, $84, $D5, $86, $D5, $84, $D4, $B5, $D5, $84, $D4, $BB, $D5, $8E, $D5, $86, $D5, $84, $D4, $BD, $CA, $BC, $4E, $CE, $99, $CC, $88, $CC, $81, $CE, $A5, $CC, $88, $CC, $81, $4A, $CC, $8C, $48, $CC, $B1, $54, $CC, $88,
 $57, $CC, $8A, $59, $CC, $8A, $41, $CA, $BE, $CE, $A5, $CC, $93, $CE, $A5, $CC, $93, $CC, $80, $CE, $A5, $CC, $93, $CC, $81, $CE, $A5, $CC, $93, $CD, $82, $CE, $91, $CD, $82, $CE, $97, $CD, $82, $CE, $99, $CC, $88, $CC, $80, $CE, $99, $CC, $88, $CC, $81, $CE, $99, $CD, $82, $CE, $99, $CC, $88, $CD, $82, $CE, $A5, $CC, $88, $CC, $80, $CE, $A5, $CC, $88, $CC, $81, $CE,
