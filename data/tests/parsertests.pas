@@ -31,11 +31,13 @@ var
   count: Integer;
 
 
-  procedure t(const i, o: string; ct: string = '');
+  procedure t(i, o: RawByteString; ct: string = '');
   var
     tn: TTreeNode;
     parents: TList;
   begin
+    if strActualEncoding(DefaultSystemCodePage) <> CP_UTF8 then
+      o := strConvertFromUtf8(o, CP_ACP);
     count += 1;
     tp.parseTree(i, '', ct);
     tn := tp.getLastTree;
@@ -114,7 +116,7 @@ begin
   end;
 
 
-  writeln('parser tested');
+  writeln('parser tested, cp: ',DefaultSystemCodePage);
 
 end;
 
