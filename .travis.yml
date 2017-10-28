@@ -16,6 +16,8 @@ matrix:
   include:
     - env: LAZ_VER=1.8.0RC5  LAZ_ENV= INTERNETACCESS=USE_NO_WRAPPER
     - env: LAZ_VER=1.8.0RC5  LAZ_ENV= INTERNETACCESS=USE_SYNAPSE_WRAPPER
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=wine INTERNETACCESS=USE_WININET_WRAPPER LAZ_OPT="--os=win32 --cpu=i386"
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=qemu-arm INTERNETACCESS=USE_SYNAPSE_WRAPPER LAZ_OPT="--os=linux --cpu=arm"
 
 before_install:
   # Start virtual display server
@@ -25,19 +27,20 @@ install:
   - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
   - travis-lazarus/.travis.install.py
   - echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg
-  - SEARCHPATHS="-Fudata -Fidata -Fuinternet"
+  - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet"
   - git clone https://github.com/benibela/flre.git flre; cd flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ..; echo "-Fuflre/src/" >> ~/.fpc.cfg
   - git clone https://github.com/benibela/rcmdline.git rcmdline
   - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; echo "-Fusynapse" >> ~/.fpc.cfg; fi
+  - echo "-d$INTERNETACCESS" >> ~/.fpc.cfg
 
 script:
   - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools.lpk
   - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools_autoupdate.lpk
   - lazbuild $LAZ_OPT --verbose-pkgsearch data/examples/xqueryExampleGUI.lpi
   - lazbuild $LAZ_OPT --verbose-pkgsearch internet/examples/autoupdatetest.lpi
-  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
-  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/examples/xqueryExample.pas
-  - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS -Furcmdline  data/examples/QT3testsuite.lpr
+  - fpc -O2 -gl $FPCSEARCHPATHS data/tests/tests.lpr 
+  - fpc -O2 -gl $FPCSEARCHPATHS data/examples/xqueryExample.pas
+  - fpc -O2 -gl $FPCSEARCHPATHS -Furcmdline  data/examples/QT3testsuite.lpr
   - $LAZ_ENV data/tests/tests
 
 notifications:
