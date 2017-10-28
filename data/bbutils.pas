@@ -1847,14 +1847,6 @@ end;
 
 const INVALID_CHAR_1BYTE = '?';
 
-procedure strRemoveNonASCIIFromANSI(var s: RawByteString);
-var
-  i: SizeInt;
-begin
-  for i := 1 to length(s) do
-    if s[i] > #127 then s[i] := INVALID_CHAR_1BYTE;
-  SetCodePage(RawByteString(s), CP_ASCII, false);
-end;
 
 function charCodePointToCP1252Extensions(const cp: integer): char;
 begin
@@ -1937,6 +1929,14 @@ function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawB
                            //beware the const aliasing! we might have pointer(result) = pointer(str), so result must not be changed before being recreated
 
 var toCPActual: TSystemCodePage;
+  procedure strRemoveNonASCIIFromANSI(var s: RawByteString);
+  var
+    i: SizeInt;
+  begin
+    for i := 1 to length(s) do
+      if s[i] > #127 then s[i] := INVALID_CHAR_1BYTE;
+    SetCodePage(RawByteString(s), toCP, false);
+  end;
 
   procedure convertUtf8ToWesternEurope(var result: RawByteString);
   var
