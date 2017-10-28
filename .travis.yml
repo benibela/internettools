@@ -27,7 +27,7 @@ install:
   - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
   - travis-lazarus/.travis.install.py
   - if [[ ! -e ~/.fpc.cfg ]]; then echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg; fi
-  - mkdir import
+  - mkdir -p import
   - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet"
   - git clone https://github.com/benibela/flre.git import/flre; cd import/flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ../..; echo "-Fuimport/flre/src/" >> ~/.fpc.cfg
   - git clone https://github.com/benibela/rcmdline.git rcmdline
