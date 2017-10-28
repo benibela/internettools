@@ -394,7 +394,7 @@ function strFromSIze(size: int64):string;
 //Conversions between UTF-8 and 1-Byte encodings are in strConvert
 //Conversions between UTF-16 and UTF-8/32/1-Byte-encodings in the moveProcs
 //**length of an utf8 string @br
-//**Currently this function also calculates the length of invalid utf8-sequences, in violation of rfc3629
+function strLengthUtf8(const str: RawByteString; out invalid: boolean): SizeInt;
 function strLengthUtf8(const str: RawByteString): SizeInt;
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): UTF8String; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
@@ -1752,30 +1752,39 @@ begin
 end;
 
 //based on wikipedia
-function strLengthUtf8(const str: RawByteString): SizeInt;
+function strLengthUtf8(const str: RawByteString; out invalid: boolean): SizeInt;
 var
   i: SizeInt;
 begin
   result := 0;
+  invalid := false;
   i := 1;
   while i <= length(str) do begin
     inc(result);
     case ord(str[i]) of
       $00..$7F: inc(i);
-      $80..$BF: begin //in multibyte character (should never appear)
-        inc(i);
-        dec(result);
-      end;
-      $C0..$C1: inc(i, 2);  //invalid (two bytes used for single byte)
       $C2..$DF: inc(i, 2);
       $E0..$EF: inc(i, 3);
       $F0..$F4: inc(i, 4);
-      $F5..$F7: inc(i, 4);  //not allowed after rfc3629
-      $F8..$FB: inc(i, 5);  //"
-      $FC..$FD: inc(i, 6);  //"
-      $FE..$FF: inc(i); //invalid
+
+      $80..$BF, //in multibyte character (should never appear)
+      $C0..$C1, //invalid (two bytes used for single byte)
+      $F5..$F7, //not allowed after rfc3629
+      $F8..$FB, //"
+      $FC..$FD, //"
+      $FE..$FF: //invalid
+      begin
+        inc(i);
+        invalid := true;
+      end;
     end;
   end;
+end;
+
+function strLengthUtf8(const str: RawByteString): SizeInt;
+var invalid: boolean;
+begin
+  result := strLengthUtf8(str, invalid);
 end;
 
 //native does not mean it is the encoding used on the platform, but that it is the endianness you get when accessing them as writing pword or pinteger
@@ -1935,10 +1944,11 @@ var toCPActual: TSystemCodePage;
     i, reslen: SizeInt;
     p: pchar;
     len: SizeInt;
+    invalidutf8: boolean;
   begin
     len := length(str);
-    reslen:=strLengthUtf8(str);//character len (this is the exact result length for valid utf-8, but invalid characters confuse it)
-    if reslen = len then begin
+    reslen:=strLengthUtf8(str, invalidutf8);//character len (this is the exact result length for valid utf-8, but invalid characters confuse it)
+    if (reslen = len) and not invalidutf8 then begin
       //no special chars in str => utf-8=latin-8 => no conversion necessary
       result := str;
       SetCodePage(result, toCP, false);
@@ -2216,12 +2226,14 @@ var
   byteptr: PAnsiChar;
   last: Pointer;
   builder: TStrBuilder;
+  cpactual: TSystemCodePage;
 begin
   if len = 0 then begin
     dest := '';
     exit;
   end;
-  case strActualEncoding(cp) of
+  cpactual := strActualEncoding(cp);
+  case cpactual of
     CP_UTF16, CP_UTF16BE: begin
       SetLength(dest, 2*len);
       move(source^, dest[1], 2 * len);
@@ -2244,7 +2256,7 @@ begin
       SetLength(dest, len);
       last := source + len;
       byteptr := @dest[1];
-      case cp of
+      case cpactual of
         CP_LATIN1:
           while source < last do begin
             byteptr^ := charCodePointToLatin1(strDecodeUTF16Character(source));
