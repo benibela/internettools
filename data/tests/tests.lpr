@@ -15,7 +15,7 @@ commontestutils, extendedhtmlparser;
 var
   start: TDateTime;
   testerrors: boolean = false;
-  commonEncodings: array [0..3] of TSystemCodePage = (CP_UTF8, CP_LATIN1, CP_WINDOWS1252, CP_ASCII);
+  commonEncodings: array [0..3] of TSystemCodePage = (CP_UTF8, CP_LATIN1, CP_ASCII, CP_WINDOWS1252);
   e: TSystemCodePage;
 begin
   testerrors := true;
@@ -38,7 +38,6 @@ begin
     parsertests.unittests(testerrors);
   end;
 
-  DefaultSystemCodePage := CP_UTF8;
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
   xpath3_tests.unittests(testerrors, false); //}

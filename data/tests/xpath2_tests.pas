@@ -822,6 +822,9 @@ begin
   t('codepoints-to-string((65,66,67,68))', 'ABCD', '');
   t('string-to-codepoints("ABCD")', '65', '');
   t('join(string-to-codepoints("ABCD"),",")', '65,66,67,68', '');
+
+
+  DefaultSystemCodePage := CP_UTF8;
   t('codepoints-to-string((2309, 2358, 2378, 2325))', 'अशॊक', ''); //if these tests fail, but those above work, fpc probably compiled the file with the wrong encoding (must be utf8);
   t('string-to-codepoints("Thérèse")', '84', '');
   t('join(string-to-codepoints("Thérèse"),",")', '84,104,233,114,232,115,101', '');
@@ -4010,8 +4013,11 @@ begin
   t('translate("Hallö", "aö", "äo")', 'Hällo');
   DefaultSystemCodePage := CP_LATIN1;
   t('translate("Hallö", "aö", "äo")', 'H'#$C3'll'#$A4'o');
+  {$ifndef windows}
   DefaultSystemCodePage := CP_ACP;
   t('translate("Hallö", "aö", "äo")', 'Hällo');
+  {$endif}
+  DefaultSystemCodePage := CP_UTF8;
   t('normalize-unicode("e'#$CC#$81'")', #$C3#$A9);
   t('normalize-unicode("e'#$CC#$81'", "NFC")', #$C3#$A9);
   t('normalize-unicode("e'#$CC#$81'", "")', 'e'#$CC#$81);
