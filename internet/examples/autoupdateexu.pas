@@ -38,8 +38,6 @@ type
     procedure Button6Click(Sender: TObject);
     procedure Button7Click(Sender: TObject);
     procedure ComboBox1Change(Sender: TObject);
-    procedure Edit4Change(Sender: TObject);
-    procedure FormCreate(Sender: TObject);
   private
     { private declarations }
     procedure updateEnabledButtons;
@@ -53,7 +51,7 @@ var
 
 implementation
 
-uses internetAccess, LazFileUtils, {$IFDEF WINDOWS}w32InternetAccess{$ELSE}synapseinternetaccess{$ENDIF};
+uses internetAccess, LazFileUtils, simpleinternet;
 
 { TForm1 }
 
@@ -105,20 +103,6 @@ end;
 procedure TForm1.ComboBox1Change(Sender: TObject);
 begin
   if au <> nil then au.language := ComboBox1.Text;
-end;
-
-procedure TForm1.Edit4Change(Sender: TObject);
-begin
-
-end;
-
-procedure TForm1.FormCreate(Sender: TObject);
-begin
-  {$IFDEF WINDOWS}
-  defaultInternetAccessClass:=TW32InternetAccess;
-  {$ELSE}
-  defaultInternetAccessClass:=TSynapseInternetAccess;
-  {$ENDIF}
 end;
 
 procedure TForm1.updateEnabledButtons;

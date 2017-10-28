@@ -11,35 +11,34 @@ object Form1: TForm1
   Caption = 'Autoupdatechecker'
   ClientHeight = 405
   ClientWidth = 637
-  OnCreate = FormCreate
-  LCLVersion = '1.7'
+  LCLVersion = '1.8.0.5'
   object Label1: TLabel
     Left = 16
-    Height = 15
+    Height = 18
     Top = 16
-    Width = 77
+    Width = 76
     Caption = 'Cur-Version:'
     ParentColor = False
   end
   object Label2: TLabel
     Left = 15
-    Height = 15
+    Height = 18
     Top = 46
-    Width = 83
+    Width = 78
     Caption = 'Version-URL:'
     ParentColor = False
   end
   object Label3: TLabel
     Left = 14
-    Height = 15
+    Height = 18
     Top = 72
-    Width = 84
+    Width = 78
     Caption = 'Change-URL:'
     ParentColor = False
   end
   object Edit1: TEdit
     Left = 96
-    Height = 25
+    Height = 24
     Top = 13
     Width = 533
     Anchors = [akTop, akLeft, akRight]
@@ -48,7 +47,7 @@ object Form1: TForm1
   end
   object Edit2: TEdit
     Left = 96
-    Height = 25
+    Height = 24
     Top = 40
     Width = 533
     Anchors = [akTop, akLeft, akRight]
@@ -57,7 +56,7 @@ object Form1: TForm1
   end
   object Edit3: TEdit
     Left = 96
-    Height = 25
+    Height = 24
     Top = 67
     Width = 533
     Anchors = [akTop, akLeft, akRight]
@@ -143,33 +142,32 @@ object Form1: TForm1
   end
   object Label4: TLabel
     Left = 16
-    Height = 15
+    Height = 18
     Top = 97
-    Width = 76
+    Width = 73
     Caption = 'User-Agent:'
     ParentColor = False
   end
   object Edit4: TEdit
     Left = 96
-    Height = 25
+    Height = 24
     Top = 93
     Width = 533
     Anchors = [akTop, akLeft, akRight]
-    OnChange = Edit4Change
     TabOrder = 11
     Text = 'Mozilla/5.0 (compatible)'
   end
   object Label5: TLabel
     Left = 16
-    Height = 15
+    Height = 18
     Top = 122
-    Width = 67
+    Width = 63
     Caption = 'Language:'
     ParentColor = False
   end
   object ComboBox1: TComboBox
     Left = 96
-    Height = 25
+    Height = 30
     Top = 120
     Width = 533
     Anchors = [akTop, akLeft, akRight]
