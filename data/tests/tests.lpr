@@ -5,7 +5,7 @@ program tests;
 uses
   //bbheaptrc,
   //heaptrc,
-  {$ifdef unix}cwstring,{$endif} //this is required to use strbuilder with non-utf8
+  {$ifdef unix}cwstring,{$endif}
   Classes, bbutils,
   xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
@@ -17,6 +17,7 @@ var
   testerrors: boolean = false;
   commonEncodings: array [0..3] of TSystemCodePage = (CP_UTF8, CP_LATIN1, CP_ASCII, CP_WINDOWS1252);
   e: TSystemCodePage;
+
 begin
   testerrors := true;
   if testerrors then begin

@@ -37,10 +37,10 @@ install:
   - echo "-d$INTERNETACCESS" >> ~/.fpc.cfg
 
 script:
-  - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools.lpk
-  - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools_autoupdate.lpk
-  - lazbuild $LAZ_OPT --verbose-pkgsearch data/examples/xqueryExampleGUI.lpi
-  - lazbuild $LAZ_OPT --verbose-pkgsearch internet/examples/autoupdatetest.lpi
+  - lazbuild $LAZ_OPT --add-package internettools.lpk
+  - lazbuild $LAZ_OPT --add-package internettools_autoupdate.lpk
+  - if [[ "$LAZ_ENV" != qemu-arm]]; then lazbuild $LAZ_OPT data/examples/xqueryExampleGUI.lpi; fi
+  - if [[ "$LAZ_ENV" != qemu-arm]]; then lazbuild $LAZ_OPT internet/examples/autoupdatetest.lpi; fi
   - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/tests/tests.lpr 
   - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/examples/xqueryExample.pas
   - fpc -O2 -gl $FPCSEARCHPATHS -Furcmdline $FPC_OPT data/examples/QT3testsuite.lpr
