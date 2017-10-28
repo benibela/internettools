@@ -17,7 +17,7 @@ matrix:
     - env: LAZ_VER=1.8.0RC5  LAZ_ENV= INTERNETACCESS=USE_NO_WRAPPER
     - env: LAZ_VER=1.8.0RC5  LAZ_ENV= INTERNETACCESS=USE_SYNAPSE_WRAPPER
     - env: LAZ_VER=1.8RC5  LAZ_ENV=wine INTERNETACCESS=USE_WININET_WRAPPER LAZ_OPT="--os=win32 --cpu=i386"
-    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=qemu-arm INTERNETACCESS=USE_SYNAPSE_WRAPPER LAZ_OPT="--os=linux --cpu=arm"
+    - env: LAZ_VER=1.8.0RC5  LAZ_ENV=qemu-arm INTERNETACCESS=USE_SYNAPSE_WRAPPER LAZ_OPT="--os=linux --cpu=arm" FPC_OPT="-Parm -Tlinux"
 
 before_install:
   # Start virtual display server
@@ -26,6 +26,7 @@ before_install:
 install:
   - git clone https://github.com/benibela/travis-lazarus travis-lazarus
   - travis-lazarus/.travis.install.py
+  - if [[ "$LAZ_ENV" = wine ]]; then find $WINEPREFIX -iname '*fpc.cfg' | head -1 | xargs -i{} ln {} ~/.fpc.cfg; ls -l ~; fi
   - if [[ ! -e ~/.fpc.cfg ]]; then echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg; fi
   - mkdir -p import
   - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet"
@@ -39,9 +40,9 @@ script:
   - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools_autoupdate.lpk
   - lazbuild $LAZ_OPT --verbose-pkgsearch data/examples/xqueryExampleGUI.lpi
   - lazbuild $LAZ_OPT --verbose-pkgsearch internet/examples/autoupdatetest.lpi
-  - fpc -O2 -gl $FPCSEARCHPATHS data/tests/tests.lpr 
-  - fpc -O2 -gl $FPCSEARCHPATHS data/examples/xqueryExample.pas
-  - fpc -O2 -gl $FPCSEARCHPATHS -Furcmdline  data/examples/QT3testsuite.lpr
+  - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/tests/tests.lpr 
+  - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/examples/xqueryExample.pas
+  - fpc -O2 -gl $FPCSEARCHPATHS -Furcmdline $FPC_OPT data/examples/QT3testsuite.lpr
   - $LAZ_ENV data/tests/tests
 
 notifications:
