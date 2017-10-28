@@ -26,6 +26,7 @@ before_install:
 install:
   - git clone https://github.com/benibela/travis-lazarus travis-lazarus
   - travis-lazarus/.travis.install.py
+  - if [[ "$LAZ_ENV" = qemu-arm ]]; then sudo apt-get install libgdk-pixbuf2.0-dev:armhf libx11-dev:armhf libgtk2.0-dev:armhf libcairo-gobject2:armhf; fi
   - if [[ "$LAZ_ENV" = wine ]]; then find $WINEPREFIX -iname '*fpc.cfg' | head -1 | xargs -i{} ln {} ~/.fpc.cfg; ls -l ~; fi
   - if [[ ! -e ~/.fpc.cfg ]]; then echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg; fi
   - mkdir -p import
