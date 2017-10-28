@@ -34,8 +34,10 @@ script:
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/examples/xqueryExample.pas
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS -Furcmdline  data/examples/QT3testsuite.lpr
-  - lazbuild $LAZ_OPT internet/examples/autoupdatetest.lpi
-  - lazbuild $LAZ_OPT data/examples/xqueryExampleGUI.lpi
+  - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools.lpk
+  - lazbuild $LAZ_OPT --verbose-pkgsearch --add-package internettools_autoupdate.lpk
+  - lazbuild $LAZ_OPT --verbose-pkgsearch data/examples/xqueryExampleGUI.lpi
+  - lazbuild $LAZ_OPT --verbose-pkgsearch internet/examples/autoupdatetest.lpi
   - $LAZ_ENV data/tests/tests
 
 notifications:
