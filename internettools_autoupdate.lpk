@@ -1,7 +1,8 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <Package Version="4">
     <Name Value="internettools_autoupdate"/>
+    <Type Value="RunAndDesignTime"/>
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
@@ -9,13 +10,8 @@
         <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
-      <Other>
-        <CompilerMessages>
-          <MsgFileName Value=""/>
-        </CompilerMessages>
-        <CompilerPath Value="$(CompPath)"/>
-      </Other>
     </CompilerOptions>
+    <Description Value="This is an auto updater class related to the Internet Tools package. It depends on the LCL for its progress dialog and thus needs an additional package"/>
     <Files Count="4">
       <Item1>
         <Filename Value="internet/autoupdate.pas"/>
@@ -34,7 +30,6 @@
         <UnitName Value="progressdialog"/>
       </Item4>
     </Files>
-    <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="3">
       <Item1>
         <PackageName Value="internettools"/>

@@ -6,24 +6,42 @@ os:
   - linux
 
 env:
+  global:
+    - WINEPREFIX=~/.winelaz
+    - DISPLAY=:99.0
   matrix:
     - INTERNETACCESS=USE_NO_WRAPPER
     - INTERNETACCESS=USE_SYNAPSE_WRAPPER
+    - LAZ_VER=1.8.0RC5
+
+before_install:
+  # Start virtual display server
+  - Xvfb $DISPLAY &
 
 install:
-  - SEARCHPATHS="-Fudata -Fidata -Fuinternet -Fuflre/src/"
-#  - sudo apt-get update -qq
+  - SEARCHPATHS="-Fudata -Fidata -Fuinternet"
   - wget http://mirrors.iwi.me/lazarus/releases/Lazarus%20Linux%20amd64%20DEB/Lazarus%201.8.0RC5/fpc_3.0.4-rc1_amd64.deb
   - sudo dpkg --force-overwrite -i *.deb
-  - git clone https://github.com/benibela/flre.git flre; cd flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ..
+  - git clone https://github.com/benibela/flre.git flre; cd flre; git reset --hard 9910f85305789eafbe7eeb9cbb2c1274e883ae25; cd ..; echo "-Fuflre/src/" >> ~/.fpc.cfg
   - git clone https://github.com/benibela/rcmdline.git rcmdline
-  - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; SEARCHPATHS="$SEARCHPATHS -Fusynapse"; fi
+  - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ synapse; echo "-Fusynapse" >> ~/.fpc.cfg; fi
+  - git clone https://github.com/nielsAD/travis-lazarus.git travis-lazarus
+  - travis-lazarus/.travis.install.py
+
+script:
+  - lazbuild $LAZ_OPT my_lazarus_tests.lpi               # Build my_lazarus_test project
+  - $LAZ_ENV ./bin/my_lazarus_tests --all --format=plain # Run my_lazarus_test testsuite
+
+
+install:
 
 script:
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/tests/tests.lpr 
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS data/examples/xqueryExample.pas
   - fpc -O2 -gl $SEARCHPATHS -d$INTERNETACCESS -Furcmdline  data/examples/QT3testsuite.lpr
-  - data/tests/tests
+  - lazbuild $LAZ_OPT internet/examples/autoupdatetest.lpi
+  - lazbuild $LAZ_OPT data/examples/xqueryExampleGUI.lpi
+  - $LAZ_ENV data/tests/tests
 
 notifications:
   email:

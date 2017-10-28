@@ -1090,7 +1090,8 @@ begin
   try
     temp.NameValueSeparator := ':';
     temp.LoadFromFile(fn);
-    parseHeadersForCookies(tempurl{%H-}, temp, true);
+    tempurl := decodeURL('file:///'); //this is not actually used in parseHeadersForCookies
+    parseHeadersForCookies(tempurl, temp, true);
   finally
     temp.free;
   end;
