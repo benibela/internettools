@@ -6,8 +6,8 @@
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
-        <IncludeFiles Value="data;../lazarus/dialogs"/>
-        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system"/>
+        <IncludeFiles Value="data;../lazarus/dialogs;lazarus/dialogs"/>
+        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;lazarus/dialogs;import/synapse;system"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>

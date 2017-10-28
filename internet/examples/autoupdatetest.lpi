@@ -70,8 +70,8 @@
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <SearchPaths>
-      <OtherUnitFiles Value="U:\components\pascal\data;..\..\import\synapse;U:\components\pascal\internet;U:\components\lazarus\dialogs;U:\components\pascal\system;\home\benito\hg\components\pascal\data\;\home\benito\hg\components\pascal\internet\;\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\system\"/>
-      <SrcPath Value="\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\import\synapse\;..\..\import\synapse"/>
+      <OtherUnitFiles Value="U:\components\pascal\data;..\..\import\synapse;U:\components\pascal\internet;U:\components\lazarus\dialogs;U:\components\pascal\system;\home\benito\hg\components\pascal\data\;\home\benito\hg\components\pascal\internet\;\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\system\;..\..\lazarus\dialogs"/>
+      <SrcPath Value="\home\benito\hg\components\pascal\import\synapse\"/>
     </SearchPaths>
     <Parsing>
       <SyntaxOptions>
