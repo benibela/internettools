@@ -38,7 +38,7 @@ install:
   - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet"
   - if [[ "$REGEX" != "USE_SOROKINS_REGEX"  ]]; then 
       git clone https://github.com/benibela/flre.git import/flre; 
-      echo "-Fuimport/flre/src/" >> ~/.fpc.cfg
+      echo "-Fuimport/flre/src/" >> ~/.fpc.cfg;
     fi
   - git clone https://github.com/benibela/rcmdline.git rcmdline
   - if [[ "$INTERNETACCESS" == USE_SYNAPSE_WRAPPER ]]; then 
