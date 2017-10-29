@@ -29,6 +29,9 @@
 {$error you need to enable one regex library define in internettoolsconfig.inc}
 {$endif}
 
+{$if not defined(USE_BBFLRE_UNICODE) and not defined(USE_BBFULL_UNICODE) and not defined(USE_THEO_UNICODE) }
+{$error you need to enable one unicode database define in internettoolsconfig.inc }
+{$endif}
 
 
 
