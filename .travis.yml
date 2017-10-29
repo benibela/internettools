@@ -45,7 +45,9 @@ install:
       svn checkout http://svn.code.sf.net/p/synalist/code/synapse/40/ import/synapse; 
       echo "-Fuimport/synapse" >> ~/.fpc.cfg; 
     fi
-  - echo "-d$INTERNETACCESS -d$REGEX -d$UNICODETABLE " >> ~/.fpc.cfg
+  - echo "-d$INTERNETACCESS" >> ~/.fpc.cfg
+  - echo "-d$REGEX" >> ~/.fpc.cfg
+  - echo "-d$UNICODETABLE " >> ~/.fpc.cfg
 
 script:
   - lazbuild $LAZ_OPT --add-package internettools.lpk
