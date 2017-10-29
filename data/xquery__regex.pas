@@ -47,6 +47,7 @@ type TWrappedRegExpr = TFLRE;
      EWrappedRegExpr = EFLRE;
      TWrappedMatchArray = TFLREStrings;
 {$DEFINE REGEX_SUPPORTS_UNICODE}
+{$DEFINE REGEX_SUPPORTS_CLASS_SUBTRACTION}
 {$ENDIF}
 
 type TWrappedRegExprFlag  = (wrfSingleLine, wrfMultiLine, wrfIgnoreCase, // standard
@@ -274,6 +275,30 @@ var pos: integer;
     end;
   end;
 
+  {$ifndef REGEX_SUPPORTS_CLASS_SUBTRACTION}
+  procedure charClassSubtractionExpr; //only allow subtraction of single chars from (expanded) single chars
+  var
+    i: Integer;
+  begin
+    if result[reslen] <> '-' then abort;
+    dec(reslen);
+    gotonextchar;
+    while true do begin
+      case curchar of
+        ']': exit;
+        '[', '\', '-': abort;
+        else for i := reslen downto 2 do
+          if result[i] = '[' then break
+          else if (result[i] = curchar) and (result[i-1] <> '\') then begin
+            move(result[i+1], result[i],reslen - i);
+            dec(reslen);
+          end;
+      end;
+      gotonextchar;
+    end;
+  end;
+  {$endif}
+
   procedure charClassExpr;
   begin
     //c = '['
@@ -301,7 +326,11 @@ var pos: integer;
           addc('-');
           case gotonextchar  of
             '[': begin //subtraction
+              {$ifdef REGEX_SUPPORTS_CLASS_SUBTRACTION}
               charClassExpr;
+              {$else}
+              charClassSubtractionExpr;
+              {$endif}
               exit;
             end;
             '-': begin  //2nd -
@@ -318,6 +347,7 @@ var pos: integer;
       gotonextchar;
     end;
   end;
+
 
 var
   c: Char;
