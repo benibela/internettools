@@ -21,7 +21,7 @@
 
 //internal checks
 {$IFDEF USE_FLRE_WITH_CACHE}{$DEFINE USE_FLRE}{$ENDIF}
-{$ifdef USE_SOROKINS_DREGEX){$define USE_SOROKINS_REGEX}{$endif}
+{$ifdef USE_SOROKINS_DREGEX}{$define USE_SOROKINS_REGEX}{$endif}
 
 {$if not defined(USE_SOROKINS_REGEX) and not defined(USE_FLRE) and not defined(USE_FLRE_WITH_CACHE)}
 {$error you need to enable one regex library define in internettoolsconfig.inc}
