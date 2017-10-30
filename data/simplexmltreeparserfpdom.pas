@@ -87,10 +87,12 @@ end;
 function TTreeParserDOMBase.import(dom: TDOMDocument; fragment: boolean): TTreeDocument;
 var doc: TTreeDocument;
   namespaces: TNamespaceList;
+  encoding: TSystemCodePage;
 
   function convert(const u: UnicodeString): string;
   begin
-    widestringmanager.Unicode2AnsiMoveProc(PWideChar(u), result, TargetEncoding, length(u));
+    if encoding = CP_UTF8 then result := UTF8Encode(u)
+    else widestringmanager.Unicode2AnsiMoveProc(PWideChar(u), result, TargetEncoding, length(u));
   end;
 
   function getNamespace(const url, prefix: string): INamespace;
@@ -152,6 +154,8 @@ var i: Integer;
   a: TTreeAttribute;
   root: TDOMNode_WithChildren;
 begin
+  encoding := strActualEncoding(TargetEncoding);
+
   namespaces:= TNamespaceList.Create;
   doc := TTreeDocument.create(self);
   doc.baseURI:=dom.baseURI;
