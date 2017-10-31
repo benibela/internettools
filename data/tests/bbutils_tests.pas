@@ -22,28 +22,28 @@ uses bbutils;
 type PShortInt = ^ShortInt;
      PInteger = ^integer;
 
-function shortintCompareFunction(c:TObject; a,b:pointer):SizeInt;
+function shortintCompareFunction(c:TObject; a,b:pointer):integer;
 begin
   ignore(c);
   if PShortInt(a)^<PShortInt(b)^ then result := -1
   else if PShortInt(a)^>PShortInt(b)^ then result := 1
   else result := 0;
 end;
-function intCompareFunction(c:TObject; a,b:pointer):SizeInt;
+function intCompareFunction(c:TObject; a,b:pointer):integer;
 begin
   ignore(c);
   if pinteger(a)^<pinteger(b)^ then result := -1
   else if pinteger(a)^>pinteger(b)^ then result := 1
   else result := 0
 end;
-function int64CompareFunction(c:TObject; a,b:pointer):SizeInt;
+function int64CompareFunction(c:TObject; a,b:pointer):integer;
 begin
   ignore(c);
   if pint64(a)^<pint64(b)^ then result := -1
   else if pint64(a)^>pint64(b)^ then result := 1
   else result := 0
 end;
-function stringCompareReverseFunction(c:TObject; a,b:pointer):SizeInt;
+function stringCompareReverseFunction(c:TObject; a,b:pointer):integer;
 begin
   ignore(c);
   result := - CompareText(PString(a)^,PString(b)^);

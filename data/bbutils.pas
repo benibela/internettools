@@ -236,10 +236,10 @@ function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**<
 
 //**Case sensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function strCompareClever(const s1, s2: string): SizeInt;
+function strCompareClever(const s1, s2: string): longint;
 //**Case insensitive, clever comparison, that basically splits the string into
 //**lexicographical and numerical parts and compares them accordingly
-function striCompareClever(const s1, s2: string): SizeInt; {$IFDEF HASINLINE} inline; {$ENDIF}
+function striCompareClever(const s1, s2: string): longint; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //search
 //**Searchs the last index of c in s
@@ -721,7 +721,7 @@ procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //**Compare function to compare the two values to which a and b, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same call convention like a method
-type TPointerCompareFunction = function (data: TObject; a, b: pointer): SizeInt;
+type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**General stable sort function @br
 //**a is the first element in the array to sort, and b is the last. size is the size of every element@br
 //**compareFunction is a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers). @br
@@ -3002,7 +3002,7 @@ begin
 end;
 
 //case-sensitive, intelligent string compare (splits in text, number parts)
-function strCompareClever(const s1, s2: string): SizeInt;
+function strCompareClever(const s1, s2: string): longint;
 var t1,t2:string; //lowercase text
     i,j,ib,jb,p: SizeInt;
     iz, jz: SizeInt;
@@ -3045,7 +3045,7 @@ begin
     result:=sign(length(t1) - length(t2));
 end;
 
-function striCompareClever(const s1, s2: string): SizeInt;
+function striCompareClever(const s1, s2: string): longint;
 begin
   result := strCompareClever(lowercase(s1), lowercase(s2)); //todo optimize
 end;
@@ -4631,17 +4631,20 @@ end;
     //PCompareFunctionWrapperData=^TCompareFunctionWrapperData;
     PPointer=^Pointer;
 
-function compareFunctionWrapper(c:TObject; a,b:pointer):SizeInt;
+function compareFunctionWrapper(c:TObject; a,b:pointer):longint;
 var data: ^TCompareFunctionWrapperData absolute c;
 begin
 //  data:=PCompareFunctionWrapperData(c);
   result:=data^.realFunction(data^.data,ppointer(a)^,ppointer(b)^);
 end;
-function compareRawMemory(c:TObject; a, b:pointer):SizeInt;
-var size: SizeInt;
+function compareRawMemory(c:TObject; a, b:pointer):longint;
+var temp: SizeInt;
 begin
-  size := PtrToUInt(c);
-  result := CompareByte(a^, b^, size);
+  temp := CompareByte(a^, b^, PtrToUInt(c));
+  result := temp;
+  {$ifdef CPU64}
+  if result = 0 then result := temp shr 32
+  {$endif}
 end;
 
 procedure stableSort(a,b: pointer; size: SizeInt;
@@ -4711,7 +4714,7 @@ begin
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
 
-function compareString(c:TObject; a, b:pointer):SizeInt;
+function compareString(c:TObject; a, b:pointer):longint;
 begin
   ignore(c);
   result := striCompareClever(PString(a)^, PString(b)^);
