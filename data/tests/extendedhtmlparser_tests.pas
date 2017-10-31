@@ -1202,6 +1202,20 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   t('<b><t:element t:condition="@x=''z''">{.}</t:element></b>', '<b><a>foo</a><a x="z">2</a><a x="y">bar</a></b>', '_result=2');
   t('<t:element><b>{.}</b>{name()}</t:element>', '<x><a>foo</a><c><b>bar</b></c></x>', '_result=bar'#10'_result=x');
   t('<x><t:element><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><c><b>bar</b></c></x>', '_result=bar'#10'_result=c');
+
+  t('<t:switch><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch>', '<x><a>foo</a><b>bar</b></x>', 'a=foo');
+  t('<t:switch><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch>', '<x><b>bar</b><a>foo</a></x>', 'b=bar');
+  t('<x><t:switch><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch></x>', '<x><a>u</a><b>v</b><b>w</b><b>x</b><a>z</a></x>', 'a=u');
+  t('<x><t:switch><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch></x>', '<x><b>u</b><b>v</b><b>w</b><b>x</b><a>z</a></x>', 'b=u');
+  t('<x><t:switch><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch>+</x>', '<x><a>u</a><b>v</b><b>w</b><b>x</b><a>z</a></x>', 'a=u'#10'b=v'#10'b=w'#10'b=x'#10'a=z');
+  t('<x><t:switch><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch>+</x>', '<x><b>u</b><b>v</b><b>w</b><b>x</b><a>z</a></x>', 'b=u'#10'b=v'#10'b=w'#10'b=x'#10'a=z');
+
+  t('<t:switch prioritized="true"><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch>', '<x><a>foo</a><b>bar</b></x>', 'a=foo');
+  t('<t:switch prioritized="true"><a>{a:=.}</a><t:element t:condition="name()=''b''">{b:=.}</t:element></t:switch>', '<x><b>bar</b><a>foo</a></x>', 'a=foo');
+  t('<t:switch prioritized="true"><t:element t:condition="name()=''b''">{b:=.}</t:element><a>{a:=.}</a></t:switch>', '<x><a>foo</a><b>bar</b></x>', 'b=bar');
+  t('<t:switch prioritized="true"><t:element t:condition="name()=''b''">{b:=.}</t:element><a>{a:=.}</a></t:switch>', '<x><b>bar</b><a>foo</a></x>', 'b=bar');
+
+
 //  t('<x><t:element t:ignore-self-test="name = ''c''"><b>{.}</b>{name()}</t:element></x>', '<x><a>foo</a><b>bar</b></x>', '_result=bar'#10'_result=x');
 
   //Sibling tests

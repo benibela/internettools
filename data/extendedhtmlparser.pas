@@ -761,6 +761,8 @@ uses math,strutils;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchElementOpen;
+      firstRealNoHTMLMatchTemplateType = tetMatchText;
+
       COMMAND_CLOSED:array[firstRealTemplateType..high(TTemplateElementType)] of longint=(1, 2, 0,0,0,0,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
       COMMAND_STR:array[firstRealTemplateType..high(TTemplateElementType)] of string=('element', 'element', 'match-text','meta','meta-attribute','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized','siblings','siblings', 'siblings-header','siblings-header');
 
@@ -1693,7 +1695,7 @@ var xpathText: TTreeNode;
 
       while curChild <> nil do begin //enumerate all child tags
         if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
-        if curChild.templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
+        if curChild.templateType >= firstRealNoHTMLMatchTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
         if templateElementFitHTMLOpen(htmlStart, curChild) and
             matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
           //found match
@@ -1718,7 +1720,7 @@ var xpathText: TTreeNode;
       oldHtmlStart := htmlStart;
       while curChild <> nil do begin //enumerate all child tags
         if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch-prioritized construct may not have the attribute template:optional (it is optional anyways)');
-        if curChild.templateType >= firstRealTemplateType then raise ETemplateParseException.Create('A switch-prioritized command must consist entirely of only html tags');
+        if curChild.templateType >= firstRealNoHTMLMatchTemplateType then raise ETemplateParseException.Create('A switch-prioritized command must consist entirely of only html tags');
 
         htmlStart := oldHtmlStart;
         while (htmlStart <> nil) and ((htmlStart <> htmlEnd.next)) do begin
@@ -1749,7 +1751,7 @@ var xpathText: TTreeNode;
     end;
 
     if prioritized then switchPrioritized
-    else if curChild.templateType >= firstRealTemplateType then switchTemplateCommand
+    else if curChild.templateType >= firstRealNoHTMLMatchTemplateType then switchTemplateCommand
     else switchHTML;
   end;
 
