@@ -345,7 +345,7 @@ begin
   fnewversion:=0;
   fnewversionstr:='';
   fupdatebuildversion:=0;
-  parseXML(versionXML,@loadNewVersionEnterTag,nil,nil,eUTF8);
+  parseXML(versionXML,@loadNewVersionEnterTag,nil,nil,CP_UTF8);
 end;
 
 function TAutoUpdater.needBuildInfoEnterTag(tagName: string;
@@ -403,7 +403,7 @@ begin
 
   fupdatebuildversion:=0;
   finmismatchedtranslationblock := false;
-  parseXML(changelogXML,@needBuildInfoEnterTag,@needBuildInfoLeaveTag,@needBuildInfoTextRead,eUTF8);
+  parseXML(changelogXML,@needBuildInfoEnterTag,@needBuildInfoLeaveTag,@needBuildInfoTextRead,CP_UTF8);
   if fupdatebuildversion<>fnewversion then
     raise Exception.Create(Format(rsChangelogFail, [fnewversionstr, IntToStr(fupdatebuildversion)]));
 end;
