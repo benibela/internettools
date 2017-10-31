@@ -936,8 +936,8 @@ begin
     testrawstr( strConvert(strConvert(temp, CP_LATIN1, e), e, CP_LATIN1), CP_LATIN1, temp);
   end;
 
-  testrawstr( strConvert(temp, CP_UTF8, CP_LATIN1), CP_LATIN1, copy(temp, 1, $80) + #$C3 + strDup('?', 21)); //??? no idea what it is doing here, just making sure it does not crash on invalid utf-8
-  testrawstr( strConvert(temp, CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, copy(temp, 1, $80) + #$C3 + strDup('?', 21)); //???
+  testrawstr( strConvert(temp, CP_UTF8, CP_LATIN1), CP_LATIN1, copy(temp, 1, $80) + strDup('?', $80)); //test against invalid utf-8
+  testrawstr( strConvert(temp, CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, copy(temp, 1, $80) + strDup('?', $80));
 
   for i := 0 to 255 do begin
     temp := strGetUnicodeCharacter(i);
@@ -955,9 +955,53 @@ begin
   end;
 
   testrawstr(strConvert(#128#129#130#131#132#133#134#135#136#137#138#139#140#141#142#143#144#145#146#147#148#149#150#151#152#153#154#155#156#157#158#159#160#161, CP_WINDOWS1252, CP_UTF8),CP_UTF8, '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ ¡');
-  testrawstr(strConvert('x'#$81#$82#$C0#$C1#$F5#$F6#$F7#$F8#$F9#$FA#$FB#$FC#$FD#$FE#$FF#$F0, CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, 'x'); //invalid utf-8
-  testrawstr(strConvert('x'#$81#$82#$C0#$C1#$F5#$F6#$F7#$F8#$F9#$FA#$FB#$FC#$FD#$FE#$FF#$F0, CP_UTF8, CP_LATIN1), CP_LATIN1, 'x'); //invalid utf-8
   testrawstr(strConvert('€'#$C2#$81'•‹Ÿ', CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, #$80#$81#$95#$8B#$9F);
+
+  //invalid utf-8 tests
+  testrawstr(strConvert('x'#$81#$82#$C0#$C1#$F5#$F6#$F7#$F8#$F9#$FA#$FB#$FC#$FD#$FE#$FF#$F0, CP_UTF8, CP_WINDOWS1252), CP_WINDOWS1252, 'x????????????????');
+  testrawstr(strConvert('x'#$81#$82#$C0#$C1#$F5#$F6#$F7#$F8#$F9#$FA#$FB#$FC#$FD#$FE#$FF#$F0, CP_UTF8, CP_LATIN1), CP_LATIN1, 'x????????????????');
+
+  testrawstr(strConvert(#$C0, CP_UTF8, CP_LATIN1),        CP_LATIN1,  '?');
+  testrawstr(strConvert(#$C0#$2E, CP_UTF8, CP_LATIN1),    CP_LATIN1,  '?.');
+  testrawstr(strConvert(#$E0#$2E#$80, CP_UTF8, CP_LATIN1),CP_LATIN1,  '?.?');
+  testrawstr(strConvert(#$C0#$AF, CP_UTF8, CP_LATIN1),    CP_LATIN1, '??');
+  testrawstr(strConvert(#$C0#$AE, CP_UTF8, CP_LATIN1),    CP_LATIN1, '??');
+  testrawstr(strConvert(#$C0#$80, CP_UTF8, CP_LATIN1),    CP_LATIN1, '??');
+  testrawstr(strConvert(#$C0#$80, CP_UTF8, CP_LATIN1),    CP_LATIN1, '??');
+  testrawstr(strConvert(#$E0#$80, CP_UTF8, CP_LATIN1),    CP_LATIN1, '??');
+  testrawstr(strConvert(#$C0#$AF#$2E#$C0#$AF, CP_UTF8, CP_LATIN1), CP_LATIN1, '??.??');
+  testrawstr(strConvert(#$E0#$80#$AF, CP_UTF8, CP_LATIN1), CP_LATIN1, '???');
+  testrawstr(strConvert(#$E0, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$E0#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '??');
+  testrawstr(strConvert(#$E0#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '???');
+  testrawstr(strConvert(#$ED, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$ED#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$ED#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?'); //valid char
+  testrawstr(strConvert(#$EF, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$EF#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$EF#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?'); //valid
+
+  testrawstr(strConvert(#$F0, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F0#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '??');
+  testrawstr(strConvert(#$F0#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '???');
+  testrawstr(strConvert(#$F0#$80#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '????');
+  testrawstr(strConvert(#$F0, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F0#$90, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F0#$90#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F0#$90#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?'); //valid
+  testrawstr(strConvert(#$F1, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F1#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F1#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F1#$80#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?'); //valid
+  testrawstr(strConvert(#$F4, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F4#$8F, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F4#$8F#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F4#$8F#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '?'); //valid
+  testrawstr(strConvert(#$F4, CP_UTF8, CP_LATIN1), CP_LATIN1, '?');
+  testrawstr(strConvert(#$F4#$90, CP_UTF8, CP_LATIN1), CP_LATIN1, '??');
+  testrawstr(strConvert(#$F4#$90#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '???');
+  testrawstr(strConvert(#$F4#$90#$80#$80, CP_UTF8, CP_LATIN1), CP_LATIN1, '????');
+
 
   //more utf-16 tests
   for e in unicodePages do test(fromUTF16(e,[]), '');

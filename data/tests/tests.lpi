@@ -176,6 +176,9 @@
         <OverflowChecks Value="True"/>
         <StackChecks Value="True"/>
       </Checks>
+      <Optimizations>
+        <OptimizationLevel Value="4"/>
+      </Optimizations>
     </CodeGeneration>
     <Linking>
       <Debugging>

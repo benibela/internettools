@@ -394,7 +394,7 @@ function strFromSIze(size: int64):string;
 //Conversions between UTF-8 and 1-Byte encodings are in strConvert
 //Conversions between UTF-16 and UTF-8/32/1-Byte-encodings in the moveProcs
 //**length of an utf8 string @br
-function strLengthUtf8(const str: RawByteString; out invalid: boolean): SizeInt;
+function strLengthUtf8(const str: RawByteString; out invalid: SizeInt): SizeInt;
 function strLengthUtf8(const str: RawByteString): SizeInt;
 function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): UTF8String; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
 function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
@@ -421,8 +421,9 @@ procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: 
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
-function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer; overload; deprecated 'Use (pchar,pchar) overload or strIterator.'; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; overload; deprecated 'Use (pchar,pchar) overload.'; //**< Returns the unicode code point of the utf-8 character starting at @code(source) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(var source: pchar; afterlast: PChar): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(source). Returns a negative value if the character is invalid.
 function strEncodingFromBOMRemove(var str:RawByteString):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
 {$ifdef HAS_CPSTRING}function strEncodingFromBOMRemove(var str:string):TSystemCodePage; inline;{$endif}
 
@@ -1753,37 +1754,26 @@ begin
 end;
 
 //based on wikipedia
-function strLengthUtf8(const str: RawByteString; out invalid: boolean): SizeInt;
+function strLengthUtf8(const str: RawByteString; out invalid: SizeInt): SizeInt;
 var
-  i: SizeInt;
+  p, e: pchar;
+  code: Integer;
 begin
   result := 0;
-  invalid := false;
-  i := 1;
-  while i <= length(str) do begin
-    inc(result);
-    case ord(str[i]) of
-      $00..$7F: inc(i);
-      $C2..$DF: inc(i, 2);
-      $E0..$EF: inc(i, 3);
-      $F0..$F4: inc(i, 4);
+  invalid := 0;
+  if length(str) = 0 then exit;
+  p := pchar(pointer(str));
+  e := p + length(str);
 
-      $80..$BF, //in multibyte character (should never appear)
-      $C0..$C1, //invalid (two bytes used for single byte)
-      $F5..$F7, //not allowed after rfc3629
-      $F8..$FB, //"
-      $FC..$FD, //"
-      $FE..$FF: //invalid
-      begin
-        inc(i);
-        invalid := true;
-      end;
-    end;
+  while p < e do begin
+    code := strDecodeUTF8Character(p, e);
+    inc(result);
+    if code < 0 then inc(invalid);
   end;
 end;
 
 function strLengthUtf8(const str: RawByteString): SizeInt;
-var invalid: boolean;
+var invalid: SizeInt;
 begin
   result := strLengthUtf8(str, invalid);
 end;
@@ -1943,13 +1933,11 @@ var toCPActual: TSystemCodePage;
   var
     cp: Integer;
     i, reslen: SizeInt;
-    p: pchar;
-    len: SizeInt;
-    invalidutf8: boolean;
+    p, e: pchar;
+    invalidutf8: SizeInt;
   begin
-    len := length(str);
     reslen:=strLengthUtf8(str, invalidutf8);//character len (this is the exact result length for valid utf-8, but invalid characters confuse it)
-    if (reslen = len) and not invalidutf8 then begin
+    if (reslen = length(str)) and (invalidutf8 = 0) then begin
       //no special chars in str => utf-8=latin-8 => no conversion necessary
       result := str;
       SetCodePage(result, toCP, false);
@@ -1958,21 +1946,20 @@ var toCPActual: TSystemCodePage;
     result := '';
     SetLength(result,reslen);
     p := pchar(pointer(str));
+    e := p + length(str);
     i := 1;
     case toCPActual of
-      CP_WINDOWS1252: while len > 0 do begin
-        cp := strDecodeUTF8Character(p, len);
-        if cp >= 0 then begin
-          result[i] := charCodePointToCP1252(cp);
-          inc(i);
-        end;
+      CP_WINDOWS1252: while p < e do begin
+        cp := strDecodeUTF8Character(p, e);
+        if cp >= 0 then result[i] := charCodePointToCP1252(cp)
+        else result[i] := '?';
+        inc(i);
       end;
-      else{CP_LATIN1:} while len > 0 do begin
-        cp := strDecodeUTF8Character(p, len);
-        if cp >= 0 then begin
-          result[i] := charCodePointToLatin1(cp);
-          inc(i);
-        end;
+      else{CP_LATIN1:} while p < e do begin
+        cp := strDecodeUTF8Character(p, e);
+        if cp >= 0 then result[i] := charCodePointToLatin1(cp)
+        else result[i] := '?';
+        inc(i);
       end;
     end ;
     if i - 1 <> reslen then SetLength(result, i - 1);
@@ -2127,60 +2114,6 @@ begin
   end;
 end;
 
-function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer;
-begin
-  if remainingLength <= 0 then begin result := -2; exit; end;
-  case ord(source^) of
-    $00..$7F: begin
-      result:=ord(source^);
-      inc(source);
-      dec(remainingLength);
-    end;
-    $80..$BF: begin //in multibyte character (should never appear)
-      result:=-1;
-      inc(source);
-      dec(remainingLength);
-    end;
-    $C0..$C1: begin //invalid (two bytes used for single byte)
-      result:=-1;
-      inc(source, 2);
-      dec(remainingLength, 2);
-    end;
-    $C2..$DF: begin
-      if  remainingLength >= 2 then
-        result := ((ord(source^) and not $C0) shl 6) or (ord(source[1]) and not $80)
-      else
-        result := -2;
-      inc(source, 2);
-      dec(remainingLength, 2);
-    end;
-    $E0..$EF: begin
-      if  remainingLength >= 3 then
-        result := ((ord(source^) and not $E0) shl 12) or ((ord(source[1]) and not $80) shl 6) or (ord(source[2]) and not $80)
-      else
-        result := -2;
-       inc(source, 3);
-      dec(remainingLength, 3);
-    end;
-    $F0..$F4: begin
-      if  remainingLength >= 4 then
-        result := ((ord(source^) and not $F0) shl 18) or ((ord(source[1]) and not $80) shl 12) or ((ord(source[2]) and not $80) shl 6) or (ord(source[3]) and not $80)
-       else
-        result := -2;
-      inc(source, 4);
-      dec(remainingLength, 4);
-    end;
-    else begin
-      result:=-1;
-      inc(source);
-      dec(remainingLength);
-    end;
-    (* $F5..$F7: i := i + 4;  //not allowed after rfc3629
-    $F8..$FB: i := i + 5;  //"
-    $FC..$FD: i := i + 6;  //"
-    $FE..$FF: inc(i); //invalid*)
-  end;
-end;
 
 
 
@@ -2409,44 +2342,98 @@ begin
 end;
 
 function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer;
+var
+  temp: PChar;
+  source: Pointer;
 begin
-  if curpos > length(str) then begin result := -2; exit; end;
-  case ord(str[curpos]) of
+  temp := PChar(pointer(str)); //this is nil for '', but that is fine
+  source := temp + curpos - 1;
+  result := strDecodeUTF8Character(source, temp + length(str));
+  curpos := source - temp + 1;
+end;
+
+function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer;
+var
+  temp: PChar;
+begin
+  temp := source;
+  result := strDecodeUTF8Character(source, source + remainingLength);
+  dec(remainingLength, source - temp);
+end;
+
+function strDecodeUTF8Character(var source: pchar; afterlast: PChar): integer;
+begin
+  if source >= afterlast then exit(-2);
+  case ord(source^) of
     $00..$7F: begin
-      result:=ord(str[curpos]);
-      inc(curpos);
-    end;
-    $80..$BF: begin //in multibyte character (should never appear)
-      result:=-1;
-      inc(curpos);
-    end;
-    $C0..$C1: begin //invalid (two bytes used for single byte)
-      result:=-1;
-      inc(curpos, 2);
+      result:=ord(source^);
+
+      inc(source);
     end;
     $C2..$DF: begin
-      if curpos + 1  > length(str) then begin inc(curpos, 2); begin result := -2; exit; end; end;
-      result := ((ord(str[curpos]) and not $C0) shl 6) or (ord(str[curpos+1]) and not $80);
-      inc(curpos, 2);
+      result:= (ord(source^) and not $C0) shl 6;
+
+      inc(source);
+      if source >= afterlast then exit(-2); //all source >= afterlast checks could be removed, if we assume the string is 0-terminated
+      if (ord(source^) and $C0) <> $80 then exit(-3);
+      result := result or (ord(source^) and not $80);
+
+      inc(source);
     end;
     $E0..$EF: begin
-      if curpos + 2  > length(str) then begin inc(curpos, 3); begin result := -2; exit; end; end;
-      result := ((ord(str[curpos]) and not $E0) shl 12) or ((ord(str[curpos+1]) and not $80) shl 6) or (ord(str[curpos+2]) and not $80);
-      inc(curpos, 3);
+      result:=(ord(source^) and not $E0) shl 12;
+
+      inc(source);
+      if source >= afterlast then exit(-2);
+      if (ord(source^) and $C0) <> $80 then exit(-3);
+      case result of
+        {E}$0: if (source^ < #$A0) {or (source^ > #$BF)} then exit(-3);
+        {E}$D shl 12: if {(source^ < #$80) or} (source^ > #$9F) then exit(-3);
+      end;
+      result := result or ((ord(source^) and not $80) shl 6);
+
+      inc(source);
+      if source >= afterlast then exit(-2);
+      if (ord(source^) and $C0) <> $80 then exit(-3);
+      result := result or ((ord(source^) and not $80));
+
+      inc(source);
     end;
     $F0..$F4: begin
-      if curpos + 3  > length(str) then begin inc(curpos, 4); begin result := -2; exit; end; end;
-      result := ((ord(str[curpos]) and not $F0) shl 18) or ((ord(str[curpos+1]) and not $80) shl 12) or ((ord(str[curpos+2]) and not $80) shl 6) or (ord(str[curpos+3]) and not $80);
-      inc(curpos, 4);
+      result:=((ord(source^) and not $F0) shl 18);
+
+      inc(source);
+      if source >= afterlast then exit(-2);
+      if (ord(source^) and $C0) <> $80 then exit(-3);
+      case result of
+        {E}$0: if (source^ < #$90) {or (source^ > #$BF)} then exit(-3);
+        {E}$4 shl 18: if {(source^ < #$80) or} (source^ > #$8F) then exit(-3);
+      end;
+      result := result or ((ord(source^) and not $80) shl 12);
+
+      inc(source);
+      if source >= afterlast then exit(-2);
+      if (ord(source^) and $C0) <> $80 then exit(-3);
+      result := result or ((ord(source^) and not $80) shl 6);
+
+      inc(source);
+      if source >= afterlast then exit(-2);
+      if (ord(source^) and $C0) <> $80 then exit(-3);
+      result := result or ((ord(source^) and not $80));
+
+      inc(source);
     end;
+    (*
+    $80..$BF //in multibyte character (should never appear)
+    $C0..$C1: //invalid (two bytes used for single byte)
+    $F5..$F7 //not allowed after rfc3629
+    $F8..$FB //"
+    $FC..$FD //"
+    $FE..$FF  //invalid*)
     else begin
       result:=-1;
-      inc(curpos);
+      inc(source);
     end;
-    (* $F5..$F7: i := i + 4;  //not allowed after rfc3629
-    $F8..$FB: i := i + 5;  //"
-    $FC..$FD: i := i + 6;  //"
-    $FE..$FF: inc(i); //invalid*)
   end;
 end;
 
@@ -2475,6 +2462,7 @@ begin
   end;
 end;
 {$ENDIF}
+
 function strEncodingFromBOMRemove(var str: RawByteString): TSystemCodePage;
 begin
   if strbeginswith(str,#$ef#$bb#$bf) then begin
