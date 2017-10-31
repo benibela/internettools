@@ -85,6 +85,7 @@ type
 
   function NewStringUTF(s: string): jobject; inline; //directly calls jni's NewStringUTF (which will fail/crash if the string contains #0 or characters > #$FFFF)
   function stringToJString(s: string; conversionMode: TStringConversionMode = scmConvertAndRepairUTF8ToMUTF8): jobject; //converts/repairs the string, so that it works with all (even invalid) UTF8 strings
+  function jStringToString(s: jobject): string;
   function jStringToStringAndDelete(s: jobject): string;
 
   function arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
@@ -699,7 +700,7 @@ begin
   //nothing works to catch it RethrowJavaExceptionIfThereIsOne; if result = nil then raise EAndroidInterfaceException.create('Failed to create string from '+strFromPtr(pointer(s))+':'+inttostr(length(s)));
 end;
 
-function TJavaEnv.jStringToStringAndDelete(s: jobject): string;
+function TJavaEnv.jStringToString(s: jobject): string;
 var chars: pchar;
 begin
   if s = nil then exit('');
@@ -708,6 +709,13 @@ begin
   if chars = nil then result := ''
   else result := chars;
   env^^.ReleaseStringUTFChars(env, s, chars);
+end;
+
+function TJavaEnv.jStringToStringAndDelete(s: jobject): string;
+var chars: pchar;
+begin
+  if s = nil then exit('');
+  result := jStringToString(s);
   env^^.DeleteLocalRef(env, s);
 end;
 
@@ -732,7 +740,7 @@ begin
 
 end;
 
-procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne;
+procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne();
 begin
   RethrowJavaExceptionIfThereIsOne(EAndroidInterfaceException);
 end;
