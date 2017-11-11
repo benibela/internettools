@@ -2,6 +2,7 @@ unit bbjniutils;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
+{$ModeSwitch typehelpers}
 
 interface
 
@@ -122,6 +123,15 @@ type
   function commonMethods_InputStream_Close(inputStream: jclass = nil): jmethodID; //todo cache
 end;
 
+  type TjobjectHelper = type helper for jobject
+    procedure SetObjectField(FieldID:JFieldID;Val:JObject); inline;
+    procedure SetStringField(FieldID:JFieldID;Val:string); inline;
+    procedure SetIntField(FieldID:JFieldID; i: jint); inline;
+    procedure SetLongField(FieldID:JFieldID; i: jlong); inline;
+    procedure SetBooleanField(FieldID:JFieldID; b: Boolean); inline;
+  end;
+
+
 const javaEnvRef: cardinal = $deadbeef; //block access to CustomDrawnInt.javaEnvRef because it is not thread safe
 threadvar j: TJavaEnv; //this is an object to reduce the overhead caused by being a threadvar (i.e. you can write with j ...)
 
@@ -179,6 +189,31 @@ end;
 procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 begin
   if assigned(onUnload) then onUnload();
+end;
+
+procedure TjobjectHelper.SetObjectField(FieldID: JFieldID; Val: JObject);
+begin
+  j.SetObjectField(self, FieldID, val);
+end;
+
+procedure TjobjectHelper.SetStringField(FieldID: JFieldID; Val: string);
+begin
+  j.SetStringField(self, FieldID, val);
+end;
+
+procedure TjobjectHelper.SetIntField(FieldID: JFieldID; i: jint);
+begin
+  j.SetIntField(self, FieldID, i);
+end;
+
+procedure TjobjectHelper.SetLongField(FieldID: JFieldID; i: jlong);
+begin
+  j.SetLongField(self, FieldID, i);
+end;
+
+procedure TjobjectHelper.SetBooleanField(FieldID: JFieldID; b: Boolean);
+begin
+  j.SetBooleanField(self, FieldID, b);
 end;
 
 function TJavaEnv.getclass(n: pchar): jclass;
