@@ -2919,10 +2919,9 @@ procedure freeAnnotations(annotations: TXQAnnotations);
 
 //for internal use
 function charUnicodeZero(const cp: integer): integer;
-procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline;
-procedure ignore(const intentionallyUnusedParameter: IXQValue); inline;
-procedure ignore(const intentionallyUnusedParameter: TObject); inline;
-procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline;
+procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); overload; inline;
+procedure ignore(const intentionallyUnusedParameter: IXQValue); overload;inline;
+procedure ignore(const intentionallyUnusedParameter: TXQVArray); overload;inline;
 const MicroSecsPerSec = int64(1000000);
 function getNaN: xqfloat;
 function getPosInf: xqfloat;
@@ -3492,12 +3491,7 @@ end;
 
 {$HINTS OFF}
 procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: string); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: boolean); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: Int64); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: TObject); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: pointer); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: xqfloat); inline; begin end;
 procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin end;
