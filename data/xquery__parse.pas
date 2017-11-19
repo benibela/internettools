@@ -1,7 +1,7 @@
 unit xquery__parse;
 
 {
-Copyright (C) 2008 - 2016 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2017 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -1224,7 +1224,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 var token: String;
   procedure parseInitialClauseAndNextToken;
     procedure parseWindow;
-      procedure parseWindowVars(out vars: TXQTermFlowerWindowVarsAndCondition);
+      procedure parseWindowVars(var vars: TXQTermFlowerWindowVarsAndCondition);
       begin
         skipWhitespaceAndComment();
         if pos^ = '$' then vars.currentItem := parseFlowerVariable;
@@ -3964,7 +3964,7 @@ var
   pending: TXQTermPendingEQNameToken;
 begin
   t := txqterm(v^);
-  if t is TXQTermPendingEQNameToken then begin
+  if (t <> nil) and (t.InheritsFrom(TXQTermPendingEQNameToken)) then begin
     pending := TXQTermPendingEQNameToken(t);
     if pending.pending <> xqptVariable then raiseParsingError('XPST0003', 'Internal error 20160101181238b');
     v^ := TXQTermVariable(pending.resolveAndFree(staticContext));
