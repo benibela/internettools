@@ -1409,6 +1409,7 @@ end;
 
 function TXQTermFlowerWindow.variableCount: integer;
 begin
+  result := 0;
   visitlocalvariables(@XQTermFlowerWindowVariableCallbackCount, @result);
 end;
 
@@ -2590,6 +2591,7 @@ begin
     end;
   end;
 
+  afunc := nil;
   exit(false);
 end;
 

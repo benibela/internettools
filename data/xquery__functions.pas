@@ -3843,7 +3843,8 @@ begin
   qname := args[0] as TXQValueQName;
   arity := args[1].toInt64;
   namedf := TXQTermNamedFunction.create(qname.url, {qname.prefix, todo}qname.local, arity);
-  if context.staticContext.strictTypeChecking and (namedf.func <> nil) and (namedf.kind <> xqfkTypeConstructor) then namedf.version := namedf.func.getVersion(arity);
+  if context.staticContext.strictTypeChecking and (namedf.func <> nil) and (namedf.kind <> xqfkTypeConstructor) then
+    namedf.version := namedf.func.getVersion(arity);
   temp := TXQTermDefineFunction.createReference(namedf, arity);
   temp.name := TXQEQNameWithPrefix.create;
   temp.name.namespaceURL := qname.url;
@@ -3852,7 +3853,7 @@ begin
   try
     result := temp.evaluate(PXQEvaluationContext(@context)^);
   except
-    on e: EXQEvaluationException do
+    on e: EXQException do
       if e.errorCode = 'XPST0017' then result := xqvalue() //todo: do not use exceptions for control flow
       else raise;
   end;
