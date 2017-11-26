@@ -4611,7 +4611,7 @@ end;
 procedure stableSortSD(a,b: PAnsiChar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
 const psize = sizeof(TSortData);
 var tempArray: array of TSortData;
-    length:longint;
+    length:SizeInt;
 begin
   //calculate length and check if the input (size) is possible
   length:=(b-a) div psize; //will be divided by pointer size automatically
@@ -4650,7 +4650,7 @@ end;
 procedure stableSort(a,b: pointer; size: SizeInt;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
 var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(TSortData)
-    tempBackArray: array of longint; //todo: 64-bit index where needed
+    tempBackArray: array of SizeInt;
     i, length:SizeInt;
     data: TCompareFunctionWrapperData;
     tempData: pansichar;
