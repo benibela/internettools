@@ -24,7 +24,7 @@ begin
     try raise EXQEvaluationException.create('pxp:INTERNAL', 'These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EXQEvaluationException do ; end;
     try raise EXQParsingException.create('pxp:INTERNAL', 'These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EXQParsingException do ; end;
     //try raise EHTMLParseException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EHTMLParseException do ; end;
-    try raise EHTMLParseMatchingException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.', nil); except on EHTMLParseMatchingException do ; end;
+    try raise EHTMLParseMatchingException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on EHTMLParseMatchingException do ; end;
     //try raise ETreeParseException.create('These tests test several error conditions. These exceptions should be disabled in the debugger.'); except on ETreeParseException do ; end;
   end;
 
