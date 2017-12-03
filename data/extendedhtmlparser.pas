@@ -78,11 +78,7 @@ EHTMLParseException = class(Exception);
 
 { EHTMLParseMatchingException }
 
-EHTMLParseMatchingException = class(EHTMLParseException)
-  sender: TObject;
-  constructor create(const mes: string; const asender: TObject);
-  function partialMatches: string;
-end;
+EHTMLParseMatchingException = class(EHTMLParseException);
 
 THtmlTemplateParser=class;
 
@@ -678,8 +674,8 @@ THtmlTemplateParser=class
     function GetTemplateContextDependencies: TXQContextDependencies;
   protected
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
-    //FCurrentStack: TStringList;
-    //FOnVariableRead: TVariableCallbackFunction;
+
+    procedure raiseMatchingException(message: string); virtual;
 
     //function readTemplateElement(status:TParsingStatus):boolean; //gibt false nach dem letzten zurück
     //function evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
@@ -812,18 +808,6 @@ type
     countChildren: array of TTemplateElement;
   end;
 
-
-constructor EHTMLParseMatchingException.create(const mes: string; const asender: TObject);
-begin
-  inherited create(mes);
-  sender := asender;
-end;
-
-function EHTMLParseMatchingException.partialMatches: string;
-begin
-  if sender is THtmlTemplateParser then result := THtmlTemplateParser(sender).debugMatchings(80)
-  else result := '';
-end;
 
 function TTemplateElement.templateReverse: TTemplateElement;
 begin
@@ -1290,6 +1274,11 @@ begin
   end;
 end;
 
+procedure THtmlTemplateParser.raiseMatchingException(message: string);
+begin
+  raise EHTMLParseMatchingException.Create(message);
+end;
+
 {procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
 var
   base: string;
@@ -1409,7 +1398,7 @@ begin
           wregexprFree(regexp);
         end;
       end;
-      else raise EHTMLParseMatchingException.Create('Invalid attribute matching kind', self);
+      else raiseMatchingException('Invalid attribute matching kind');
     end;
   end;
   if template.templateAttributes = nil then exit(true);
@@ -2017,8 +2006,8 @@ begin
 
   temp := FHtmlTree;
   if temp is TTreeDocument then temp := temp.next;
-  if temp = nil then raise EHTMLParseMatchingException.create('No HTML tree', self);
-  if FTemplate.getLastTree = nil then raise EHTMLParseMatchingException.create('No template tree', self);
+  if temp = nil then raiseMatchingException('No HTML tree');
+  if FTemplate.getLastTree = nil then raiseMatchingException('No template tree');
   result:=matchTemplateTree(FHtmlTree, temp, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
 
   //delete functions, so multiple parsing attempts do not intermix
@@ -2040,7 +2029,7 @@ begin
                    'Couldn''t find a match for: '+cur.toString+#13#10;
             if realLast <> nil then err += 'Previous element is:'+reallast.toString+#13#10;
             if last <> nil then err += 'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString;
-            raise EHTMLParseMatchingException.create(err, self);
+            raiseMatchingException(err);
           end;
           last:=cur;
         end;
@@ -2053,7 +2042,7 @@ begin
       realLast := cur;
       cur := cur.templateNext;
     end;
-    raise EHTMLParseMatchingException.create('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason', self);
+    raiseMatchingException('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason');
   end;
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;

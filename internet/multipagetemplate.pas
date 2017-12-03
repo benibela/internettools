@@ -290,7 +290,7 @@ type
     retryOnConnectionFailures: boolean;
 
     //** Creates a reader using a certain template (atemplate is mandatory, ainternet optional)
-    constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
+    constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess; patternMatcher: THtmlTemplateParser = nil);
     destructor destroy();override;
 
     //** Searches the action element with the given id (equivalent to TMultiPageTemplate.findAction)
@@ -1392,11 +1392,11 @@ begin
   result := query.evaluate(parser.HTMLTree);
 end;
 
-constructor TMultipageTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess);
+constructor TMultipageTemplateReader.create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess; patternMatcher: THtmlTemplateParser);
 begin
   internet:=ainternet;
-  parser:=THtmlTemplateParser.create;
-  parser.KeepPreviousVariables:=kpvKeepValues;
+  parser:=patternMatcher;
+  if parser = nil then parser := THtmlTemplateParser.create;
   if atemplate<>nil then setTemplate(atemplate);
   retryOnConnectionFailures := true;
   queryCache := TXQMapStringObject.Create;
