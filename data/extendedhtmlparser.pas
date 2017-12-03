@@ -926,7 +926,7 @@ var
   i: Integer;
 begin
   inherited assign(asource);
-  if asource is TTemplateElement then begin
+  if assigned(asource) and asource.InheritsFrom(TTemplateElement) then begin
     s := TTemplateElement(asource);
     templateType := s.templateType;
     flags := s.flags;
@@ -936,13 +936,13 @@ begin
     end;
 
     if s.data <> nil then begin
-      if s.data is TCommandSiblingData then begin
+      if s.data.InheritsFrom(TCommandSiblingData) then begin
         data := s.data.newinstance;
         TCommandSiblingData(data).id := TCommandSiblingData(s.data).id;
         TCommandSiblingData(data).children := TCommandSiblingData(s.data).children;
         SetLength(TCommandSiblingData(data).children, length(TCommandSiblingData(data).children));
       end;
-      if s.data is TCommandSiblingHeaderData then begin
+      if s.data.InheritsFrom(TCommandSiblingHeaderData) then begin
         TCommandSiblingHeaderData(data).countChildren := TCommandSiblingHeaderData(s.data).countChildren;
         SetLength(TCommandSiblingHeaderData(data).countChildren, length(TCommandSiblingHeaderData(data).countChildren));
       end;
@@ -1107,7 +1107,7 @@ begin
     cacheRegExpr('regex', '', '', false);
     if templateAttributes.IndexOfName('var') >= 0 then begin
       varname := parser.parseQuery('x"'+templateAttributes.Values['var']+'"');
-      if varname.Term is TXQTermConstant then begin
+      if assigned(varname.Term) and varname.Term.InheritsFrom(TXQTermConstant) then begin
         temp := varname.evaluate(xqvalue('')).toString;
         if strContains(temp, '.') then temp := strBefore(temp, '.');
         TXQueryEngineBreaker(parser.QueryEngine).addAWeirdGlobalVariable('', temp);
@@ -1189,17 +1189,18 @@ function TXQTerm_VisitorFindWeirdGlobalVariableDeclarations.visit(t: PXQTerm): T
 var
   parentIsModule: boolean;
 begin
-  if (t^ is TXQTermDefineVariable) then begin
-    parentIsModule := parent is TXQTermModule;
-    if (not parentIsModule and (not (parent is TXQTermDefineFunction) or  (t^ = TXQTermDefineFunction(parent).children[high(TXQTermDefineFunction(parent).children)]) ))
-       or (parentIsModule and (t^ = TXQTermModule(parent).children[high(TXQTermModule(parent).children)])) then begin
-      hasVars := true;
-      if listVars and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t^).getVariable))) then begin
-        SetLength(vars, length(vars) + 1);
-        vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t^).getVariable);
+  if t^ <> nil then
+    if t^.InheritsFrom(TXQTermDefineVariable) then begin
+      parentIsModule := assigned(parent) and parent.InheritsFrom(TXQTermModule);
+      if (not parentIsModule and (not (parent is TXQTermDefineFunction) or  (t^ = TXQTermDefineFunction(parent).children[high(TXQTermDefineFunction(parent).children)]) ))
+         or (parentIsModule and (t^ = TXQTermModule(parent).children[high(TXQTermModule(parent).children)])) then begin
+        hasVars := true;
+        if listVars and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t^).getVariable))) then begin
+          SetLength(vars, length(vars) + 1);
+          vars[high(vars)] := TXQTermVariable(TXQTermDefineVariable(t^).getVariable);
+        end;
       end;
-    end;
-  end else if (t^ is TXQTermPatternMatcher) and not findNestedVariables then exit(xqtvaNoRecursion);
+    end else if t^.InheritsFrom(TXQTermPatternMatcher) and not findNestedVariables then exit(xqtvaNoRecursion);
   Result:=xqtvaContinue;
 end;
 
@@ -1938,7 +1939,7 @@ begin
 
   FQueryContext.RootElement := FHtmlTree;
   if FHtmlTree = nil then exit;
-  if FHtmlTree.document is TTreeDocument then
+  if assigned(FHtmlTree.document) and FHtmlTree.document.InheritsFrom(TTreeDocument) then
     FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI; //todo: what was this for?
 
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
@@ -2005,7 +2006,7 @@ begin
   end;
 
   temp := FHtmlTree;
-  if temp is TTreeDocument then temp := temp.next;
+  if assigned(temp) and temp.InheritsFrom(TTreeDocument) then temp := temp.next;
   if temp = nil then raiseMatchingException('No HTML tree');
   if FTemplate.getLastTree = nil then raiseMatchingException('No template tree');
   result:=matchTemplateTree(FHtmlTree, temp, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
@@ -2513,7 +2514,7 @@ var
   t: TTemplateElement;
 begin
   result := xqtvaContinue;
-  if template.node is TTreeDocument then t := template.node.next as TTemplateElement
+  if assigned(template.node) and template.node.InheritsFrom(TTreeDocument) then t := template.node.next as TTemplateElement
   else t := template.node as TTemplateElement;
   while t <> nil do begin
     with t do begin
