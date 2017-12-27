@@ -36,7 +36,7 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex,
+uses xquery, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
@@ -849,7 +849,7 @@ end;
 function getBaseType(const x: IXQValue): TXSType;
 begin
   result := x.typeAnnotation;
-  if not (result is TXSNumericType) then exit(baseSchema.double);
+  if not objInheritsFrom(result, TXSNumericType) then exit(baseSchema.double);
   case TXSNumericType(result).subType of
     xsstInteger: result := baseSchema.integer;
     xsstDecimal, xsstFloat, xsstDouble: result := TXSNumericType(result).primitive;
@@ -1199,7 +1199,7 @@ end;
 function getFormEncoding(n: TTreeNode): TSystemCodePage;
 begin
   n := n.getRootHighest();
-  if n is TTreeDocument then
+  if objInheritsFrom(n, TTreeDocument) then
     result := TTreeDocument(n).baseEncoding
   else
     result := CP_UTF8;
@@ -2535,7 +2535,7 @@ begin
     node := node.getParent();
   end;
   if last <> nil then begin
-    if last is TTreeDocument then uri := strResolveURI(uri, strTrimAndNormalize(TTreeDocument(last).baseURI, [#9,#10,#13,' ']))
+    if objInheritsFrom(last, TTreeDocument) then uri := strResolveURI(uri, strTrimAndNormalize(TTreeDocument(last).baseURI, [#9,#10,#13,' ']))
     else if last.typ in [tetOpen] then uri := strResolveURI(uri, strTrimAndNormalize(context.staticContext.baseURI, [#9,#10,#13,' ']))
     else if (uri = '') and (last.typ in [tetAttribute, tetText, tetComment, tetProcessingInstruction]) then exit(xqvalue());
   end;
@@ -2549,7 +2549,7 @@ var
 begin
   if args[0].isUndefined then exit(xqvalue);
   node := xqvalueToSingleNode(args[0]);
-  if (node = nil) or not (node is TTreeDocument) then exit(xqvalue);
+  if (node = nil) or not objInheritsFrom(node, TTreeDocument) then exit(xqvalue);
   if TTreeDocument(node).documentURI = '' then exit(xqvalue);
   result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
 end;
@@ -2559,7 +2559,7 @@ var
   node: TTreeNode;
 begin
   node := context.contextNode();
-  if not (node is TTreeDocument) then exit(xqvalue);
+  if not objInheritsFrom(node, TTreeDocument) then exit(xqvalue);
   if TTreeDocument(node).documentURI = '' then exit(xqvalue);
   result := baseSchema.anyURI.createValue(TTreeDocument(node).documentURI);
 end;
@@ -2571,7 +2571,7 @@ begin
   if argc = 1 then temp := args[0].toNode.getRootHighest()
   else temp := context.getRootHighest;
   if temp = nil then exit(xqvalue);
-  if temp.parent is TTreeDocument then result := xqvalue(temp.parent)
+  if objInheritsFrom(temp.parent, TTreeDocument) then result := xqvalue(temp.parent)
   else result := xqvalue(temp);
 end;
 
@@ -2586,7 +2586,7 @@ begin
 
 
   testlang := lowercase(args[0].toString);
-  if node is TTreeDocument then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
+  if objInheritsFrom(node, TTreeDocument) then node := node.findNext(tetOpen,'',[tefoIgnoreText]);
   while node <> nil do begin
     if node.hasAttribute('lang', @context.staticContext.nodeCollation.equal) then begin
       rlang := node.getAttribute('lang', @context.staticContext.nodeCollation.equal);

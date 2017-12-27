@@ -438,7 +438,7 @@ begin
     xsvAtomic: ; //ok
     xsvList: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (nested list)');
     xsvUnion: for i := 0 to high((aitemType as TXSUnionType).members) do
-      if not (TXSUnionType(aitemType).members[i] is TXSSimpleType) or (TXSSimpleType(TXSUnionType(aitemType).members[i]).variety <> xsvAtomic) then
+      if not objInheritsFrom(TXSUnionType(aitemType).members[i], TXSSimpleType) or (TXSSimpleType(TXSUnionType(aitemType).members[i]).variety <> xsvAtomic) then
         raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)')
     else raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
   end;
@@ -894,7 +894,7 @@ var
 begin
   st := v.typeAnnotation;
   if isDuration then begin
-    if not ( (st is TXSDateTimeType) and (st as TXSDateTimeType).isDuration ) then
+    if not ( objInheritsFrom(st, TXSDateTimeType) and (st as TXSDateTimeType).isDuration ) then
       exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv))
   end else begin
     if not (
@@ -1085,7 +1085,7 @@ begin
 
 
 
-  if base is TXSSimpleType then begin
+  if objInheritsFrom(base, TXSSimpleType) then begin
     primitive := TXSSimpleType(base).primitive;
     variety := TXSSimpleType(base).variety;
     if storage = nil then storage := base.storage;
@@ -1139,7 +1139,7 @@ begin
   if pattern = '' then result := TXSSimpleType.Create(name, parent)
   else begin
     tempParent := parent;
-    while (tempParent <> nil) and not (tempParent is TXSStringType) do
+    while (tempParent <> nil) and not objInheritsFrom(tempParent, TXSStringType) do
       tempParent := tempParent.base;
     result := TXSStringType.Create(name, parent, (tempParent as TXSStringType).subType, pattern);
   end;

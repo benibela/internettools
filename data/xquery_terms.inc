@@ -387,14 +387,14 @@ end;
 constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
   function checkAssignable(t: TXQTerm): boolean;
   begin
-    if (t is TXQTermFilterSequence) and (length(TXQTermFilterSequence(t).children) = 1) then t := TXQTermFilterSequence(t).children[0];
-    if t is TXQTermFilterSequence then t := TXQTermFilterSequence(t).children[0];
+    if objInheritsFrom(t, TXQTermFilterSequence) and (length(TXQTermFilterSequence(t).children) = 1) then t := TXQTermFilterSequence(t).children[0];
+    if objInheritsFrom(t, TXQTermFilterSequence) then t := TXQTermFilterSequence(t).children[0];
     while t <> nil do begin
-      if (t is TXQTermSequence) and (length(TXQTermSequence(t).children) = 1) then
+      if (objInheritsFrom(t, TXQTermSequence)) and (length(TXQTermSequence(t).children) = 1) then
          t := TXQTermSequence(t).children[0]
-      else if (t is TXQTermNodeMatcher) or (t is TXQTermVariable) or (t is TXQTermEQNameToken) then
+      else if objInheritsFrom(t, TXQTermNodeMatcher) or objInheritsFrom(t, TXQTermVariable) or objInheritsFrom(t, TXQTermEQNameToken) then
         exit(true)
-      else if (t is TXQTermReadObjectProperty) or (t is TXQTermDynamicFunctionCall) then
+      else if objInheritsFrom(t, TXQTermReadObjectProperty) or objInheritsFrom(t, TXQTermDynamicFunctionCall) then
         t := TXQTermReadObjectProperty(t).children[0]
       else
         exit(false);
@@ -451,26 +451,26 @@ begin
 
   v := variable;
   while true do begin
-    if v is TXQTermSequence then begin
+    if objInheritsFrom(v, TXQTermSequence) then begin
       if length(TXQTermSequence(v).children) > 1 then raiseEvaluationError('pxp:VAR', 'Only one variable can be assigned to');
       if length(TXQTermSequence(v).children) = 0 then raiseEvaluationError('pxp:VAR', 'Cannot assign to empty sequence');
       v := TXQTermSequence(v).children[0];
-    end else if v is TXQTermNodeMatcher then begin
+    end else if objInheritsFrom(v, TXQTermNodeMatcher) then begin
       raiseEvaluationError('pxp:VAR', 'node matcher term as variable name in assignment has been deprecated. (but this error should never occur, since the term type is changed during parsing time)');
       //varname:=TXQTermNodeMatcher(v).select;
       //break;
-    end else if v is TXQTermVariable then begin
+    end else if objInheritsFrom(v, TXQTermVariable) then begin
       varname := TXQTermVariable(v).value;
       varnamespace := TXQTermVariable(v).namespace;
       break;
-    end else if v is TXQTermReadObjectProperty then begin
+    end else if objInheritsFrom(v, TXQTermReadObjectProperty) then begin
       arrayPrepend(properties, TXQTermReadObjectProperty(v).propname);
       v := TXQTermReadObjectProperty(v).children[0];
-    end else if v is TXQTermDynamicFunctionCall then begin
+    end else if objInheritsFrom(v, TXQTermDynamicFunctionCall) then begin
       if length(TXQTermDynamicFunctionCall(v).children) <> 2 then raiseEvaluationError('pxp:VAR', 'invalid argument count for object property assignment');
       arrayPrepend(properties, TXQTermDynamicFunctionCall(v).children[1].evaluate(context).toString);
       v := TXQTermDynamicFunctionCall(v).children[0];
-    end else if v is TXQTermFilterSequence then begin
+    end else if objInheritsFrom(v, TXQTermFilterSequence) then begin
       if not (assignmentMode in [amOverride, amArrayAppend]) or (length(properties) > 0) then raiseEvaluationError('pxp:VAR', 'Array assignment cannot be followed by property assignment');
       if length(TXQTermFilterSequence(v).children) = 2 then begin
         arrayIndex := TXQTermFilterSequence(v).children[1].evaluate(context).toInt64;
@@ -587,21 +587,21 @@ begin
 
   v := @variable;
   while result = xqtvaContinue do begin
-    if v^ is TXQTermSequence then begin
+    if objInheritsFrom(v^, TXQTermSequence) then begin
       if length(TXQTermSequence(v^).children) <> 1 then raiseEvaluationError('pxp:VAR', 'Only one variable can be assigned to');
       v := @TXQTermSequence(v^).children[0];
-    end else if v^ is TXQTermNodeMatcher then begin
+    end else if objInheritsFrom(v^, TXQTermNodeMatcher) then begin
       raiseEvaluationError('pxp:VAR', 'node matcher term as variable name in assignment has been deprecated. (but this error should never occur, since the term type is changed during parsing time)');
-    end else if (v^ is TXQTermVariable) or (v^ is TXQTermPendingEQNameToken {only happens during parsing}) then begin
+    end else if objInheritsFrom(v^, TXQTermVariable) or objInheritsFrom(v^, TXQTermPendingEQNameToken {only happens during parsing}) then begin
       visitor.declare(PXQTermVariable(v), self);
       result := visitor.simpleTermVisit(v, self);
       visitor.undeclare(PXQTermVariable(v), self);
       break;
     end else begin
       visitor.simpleTermVisitNoRecurse(v, self);
-      if v^ is TXQTermReadObjectProperty then begin
+      if objInheritsFrom(v^, TXQTermReadObjectProperty) then begin
         v := @TXQTermReadObjectProperty(v^).children[0];
-      end else if (v^ is TXQTermDynamicFunctionCall) or (v^ is TXQTermFilterSequence) then begin
+      end else if objInheritsFrom(v^, TXQTermDynamicFunctionCall) or objInheritsFrom(v^, TXQTermFilterSequence) then begin
         case length(TXQTermWithChildren(v^).children) of
           0, 1: ;
           2: visitor.simpleTermVisit(@TXQTermWithChildren(v^).children[1], v^);
@@ -627,15 +627,15 @@ function TXQTermDefineVariable.getVariable: TXQTermVariable;
 var
   v: TXQTerm;
 begin
-  if (variable.ClassType = TXQTermVariable) or (variable is TXQTermVariable) then
+  if (variable.ClassType = TXQTermVariable) or objInheritsFrom(variable, TXQTermVariable) then
     exit(TXQTermVariable(variable));
   v := variable;
-  while true do begin
-    if v is TXQTermSequence then v := TXQTermSequence(v).children[0]
-    else if v is TXQTermVariable then exit(TXQTermVariable(v))
-    else if v is TXQTermReadObjectProperty then v := TXQTermReadObjectProperty(v).children[0]
-    else if v is TXQTermDynamicFunctionCall then  v := TXQTermDynamicFunctionCall(v).children[0]
-    else if v is TXQTermFilterSequence then v := TXQTermFilterSequence(v).children[0]
+  while v <> nil do begin
+    if v.InheritsFrom(TXQTermSequence) then v := TXQTermSequence(v).children[0]
+    else if v.InheritsFrom(TXQTermVariable) then exit(TXQTermVariable(v))
+    else if v.InheritsFrom(TXQTermReadObjectProperty) then v := TXQTermReadObjectProperty(v).children[0]
+    else if v.InheritsFrom(TXQTermDynamicFunctionCall) then  v := TXQTermDynamicFunctionCall(v).children[0]
+    else if v.InheritsFrom(TXQTermFilterSequence) then v := TXQTermFilterSequence(v).children[0]
     else raiseInternalError(1651217);
   end;
   raiseInternalError(1651218);
@@ -643,13 +643,13 @@ end;
 
 function TXQTermDefineVariable.getExpression: TXQTerm;
 begin
-  if (length(children) > 0) and not (children[high(children)] is TXQTermSequenceType) then exit(children[high(children)])
+  if (length(children) > 0) and not objInheritsFrom(children[high(children)], TXQTermSequenceType) then exit(children[high(children)])
   else exit(nil);
 end;
 
 function TXQTermDefineVariable.getSequenceType: TXQTermSequenceType;
 begin
-  if (length(children) > 0) and (children[0] is TXQTermSequenceType) then exit(TXQTermSequenceType(children[0]))
+  if (length(children) > 0) and objInheritsFrom(children[0], TXQTermSequenceType) then exit(TXQTermSequenceType(children[0]))
   else exit(nil);
 end;
 
@@ -895,7 +895,7 @@ function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean
   begin
     if xsa.derivedFrom(xsb) then exit(true);
     result := false;
-    if xsa is TXSUnionType then begin
+    if objInheritsFrom(xsa, TXSUnionType) then begin
       //should test for "Ai is a pure union type, and every type t in the transitive membership of Ai satisfies subtype-itemType(t, Bi)."
       //does it work???
       result := true;
@@ -1095,8 +1095,8 @@ function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
       v: PIXQValue;
   begin
     if pos = high(children) then exit(children[pos].evaluate(context).toBooleanEffective);
-    if not (children[pos] is TXQTermVariable) then raiseEvaluationError('err:XPST0003', 'Expected variable, but got '+children[pos].debugTermToString);
-    if children[pos + 1] is TXQTermSequenceType then typeDelta:=1
+    if not objInheritsFrom(children[pos], TXQTermVariable) then raiseEvaluationError('err:XPST0003', 'Expected variable, but got '+children[pos].debugTermToString);
+    if objInheritsFrom(children[pos + 1], TXQTermSequenceType) then typeDelta:=1
     else typeDelta:=0;
 
     result := isEvery;
@@ -1130,7 +1130,7 @@ function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visit
   begin
     if pos = high(children) then
       exit(visitor.simpleTermVisit(@children[pos], self));
-    if children[pos + 1] is TXQTermSequenceType then begin
+    if objInheritsFrom(children[pos + 1], TXQTermSequenceType) then begin
       result := visitor.simpleTermVisit(@children[pos+1], self);
       case result of xqtvaAbort: exit; end;
       typeDelta:=1;
@@ -2982,12 +2982,12 @@ var
   filter: TXQTermFilterSequence;
   other: TXQTermPath;
 begin
-  if term is TXQTermNodeMatcher then begin
+  if objInheritsFrom(term, TXQTermNodeMatcher) then begin
     SetLength(path, length(path) + 1);
     move(TXQTermNodeMatcher(term).queryCommand, path[high(path)], sizeof(path[high(path)]));
     FillChar(TXQTermNodeMatcher(term).queryCommand, sizeof(TXQTermNodeMatcher(term).queryCommand), 0);
     term.free;
-  end else if term is TXQTermBinaryOp then begin
+  end else if objInheritsFrom(term, TXQTermBinaryOp) then begin
     b := TXQTermBinaryOp(term);
     isDoubleSlash := b.op.name = '//';
     addToPath(b.children[0]);
@@ -3009,7 +3009,7 @@ begin
     end;
     b.children := nil;
     b.free;
-  end else if term is TXQTermFilterSequence then begin
+  end else if objInheritsFrom(term, TXQTermFilterSequence) then begin
     filter := TXQTermFilterSequence(term);
     addToPath(filter.children[0]);
     if length(filter.children) > 1 then begin//fail later with a better message than range check error
@@ -3019,7 +3019,7 @@ begin
     end;
     filter.children := nil;
     filter.free;
-  end else if term is TXQTermPath then begin
+  end else if objInheritsFrom(term, TXQTermPath) then begin
     other := TXQTermPath(term);
     len := length(path);
     setlength(path, length(path) + length(other.path));
@@ -3528,7 +3528,7 @@ begin
   if v.getSequenceCount > 1 then raiseXPTY0004TypeError(v, 'singleton');
   v := xqvalueAtomize(v);
   for i:=1 to high(children) - 1 do begin
-    if not (children[i] is TXQTermWithChildren) then raiseEvaluationError('XPST0003', 'Invalid case clause');
+    if not objInheritsFrom(children[i], TXQTermWithChildren) then raiseEvaluationError('XPST0003', 'Invalid case clause');
     seq := TXQTermWithChildren(children[i]);
     for j := 0 to high(seq.children) - 1 do begin
       operand := xqvalueAtomize(seq.children[j].evaluate(context));
@@ -3940,7 +3940,7 @@ begin
 
 
         for i:=0 to high(children) do begin
-          if children[i] is TXQTermConstructor then begin
+          if objInheritsFrom(children[i], TXQTermConstructor) then begin
             //if TXQTermConstructor(children[i]).isNamespaceConstructor then continue;
             kid := TXQTermConstructor(children[i]).evaluate(subcontext^, root, baseOffset).toNode;
             {if (kid.typ = tetAttribute) then begin
@@ -4000,7 +4000,7 @@ end;
 function TXQTermConstructor.isNamespaceConstructor: boolean;
 begin
   result := ((typ = tetAttribute)
-            and (nameValue is TXQTermConstant)
+            and objInheritsFrom(nameValue, TXQTermConstant)
             and ((TXQTermConstant(nameValue).value.toString = 'xmlns') or strBeginsWith(TXQTermConstant(nameValue).value.toString, 'xmlns:')))
             or (typ = tetNamespace);
 end;
@@ -4114,7 +4114,7 @@ var
   v: TXQTermVariable;
   //selfdefined: Boolean;
 begin
-  if term^ is TXQTermVariable then begin
+  if objInheritsFrom(term^, TXQTermVariable) then begin
     if not overridenVariables.hasVariable(TXQTermVariable(term^), temp) then begin
       v := TXQTermVariable(term^);
       if v.index >= 0 then replace(term, TXQTermConstant.create(context^.temporaryVariables.top(v.index-overridenVariables.count)))
@@ -4132,7 +4132,7 @@ begin
       if not uncertainVariables.hasVariable(TXQTermVariable(term^), temp) then
         uncertainVariables.add(TXQTermVariable(term^), tempValue);
     end*);
-  end else if term^ is TXQTermPatternMatcher then begin
+  end else if objInheritsFrom(term^, TXQTermPatternMatcher) then begin
     SetLength(patterns, length(patterns) + 1);
     patterns[high(patterns)] := TXQTermPatternMatcher(term^);
   end;
@@ -4195,7 +4195,7 @@ begin
     xqtdfUserDefined: temp := define(context, true);
     xqtdfNamedReference: begin
       initNamedFunctionReference(context);
-      if (children[high(children)] is TXQTermNamedFunction)
+      if objInheritsFrom(children[high(children)], TXQTermNamedFunction)
          and (TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted])
          and (length(TXQTermNamedFunction(children[high(children)]).interpretedFunction.parameters) = parameterCount)
          then begin
@@ -4206,7 +4206,7 @@ begin
     end;
     xqtdfStaticPartialApplication: temp := defineStaticPartialApplication(context);
     xqtdfDynamicPartialApplication: begin
-      assert(children[0] is TXQTermDynamicFunctionCall);
+      assert(objInheritsFrom(children[0], TXQTermDynamicFunctionCall));
       dfv := TXQTermDynamicFunctionCall(children[0]).children[0].evaluate(context);
       if not (dfv is TXQValueFunction) then raiseEvaluationError('XPTY0004', 'Need function for partial application, got: '+dfv.toXQuery());
       temp := defineDynamicPartialApplication(context, dfv as TXQValueFunction);
@@ -4265,10 +4265,10 @@ begin
       result.parameters[i].seqtype:=nil;
   end;
   if length(children) > parameterCount then begin
-    if (length(children) > 1) and (children[high(children) - 1] is TXQTermSequenceType) then result.resulttype := children[high(children)-1] as TXQTermSequenceType
-    else if children[high(children)] is TXQTermSequenceType then result.resulttype := children[high(children)] as TXQTermSequenceType;
+    if (length(children) > 1) and objInheritsFrom(children[high(children) - 1], TXQTermSequenceType) then result.resulttype := children[high(children)-1] as TXQTermSequenceType
+    else if objInheritsFrom(children[high(children)], TXQTermSequenceType) then result.resulttype := children[high(children)] as TXQTermSequenceType;
 
-    if not (children[high(children)] is TXQTermSequenceType) then
+    if not objInheritsFrom(children[high(children)], TXQTermSequenceType) then
       result.body := children[high(children)];
   end;
   result.context := context;
@@ -4384,7 +4384,7 @@ begin
   if f.kind = xqfkTypeConstructor then begin
     t := TXSType(TObject(f.func));
     result := TXQTermSequenceType.create(t, true);
-    if t is TXSListType then begin
+    if objInheritsFrom(t, TXSListType) then begin
       result.atomicTypeInfo := TXSListType(t).itemType;
       result.allowMultiple := true;
     end;
@@ -4403,7 +4403,7 @@ var
 begin
   if (kind <> xqtdfNamedReference) or initialized then exit;
 
-  if (children[high(children)] is TXQTermNamedFunction) then begin
+  if objInheritsFrom(children[high(children)], TXQTermNamedFunction) then begin
     version := findNamedFunctionVersion(context);
     f := TXQTermNamedFunction(children[high(children)]);
 

@@ -1294,7 +1294,7 @@ end;
 
 function TTreeNode.hasDocument: boolean;
 begin
-  result := document is TTreeDocument;
+  result := assigned(document) and document.InheritsFrom(TTreeDocument);
 end;
 
 function TTreeNode.getChildrenCount(types: TTreeNodeTypes): integer;
@@ -1736,7 +1736,7 @@ begin
   builder.init(@result);
   known := TNamespaceList.Create;
   encoding := CP_NONE;
-  if base.document is TTreeDocument then encoding := TTreeDocument(base.document).FEncoding;
+  if assigned(base.document) and base.document.InheritsFrom(TTreeDocument) then encoding := TTreeDocument(base.document).FEncoding;
   if nodeSelf then outer(base)
   else inner(base);
   known.free;

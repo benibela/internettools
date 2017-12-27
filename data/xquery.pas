@@ -2944,7 +2944,7 @@ var
 const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];
 
 implementation
-uses base64, strutils, xquery__regex, xquery__parse, xquery__functions;
+uses base64, strutils, xquery__regex, xquery__parse, xquery__functions, bbutilsbeta;
 
 var
   XQFormats : TFormatSettings = (
@@ -3808,7 +3808,7 @@ end;
 
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 begin
-  if not (wrapper is TXQValueFunction) or not ((wrapper as TXQValueFunction).body is TXQTermSequenceType) then
+  if not (wrapper is TXQValueFunction) or not objInheritsFrom((wrapper as TXQValueFunction).body, TXQTermSequenceType) then
     raise EXQEvaluationException.Create('XPTY0004', 'Expected type, got: '+wrapper.toString);
   result := TXQTermSequenceType((wrapper as TXQValueFunction).body);
 end;
@@ -3975,7 +3975,7 @@ begin
     m := TXQTermModule(TXQuery(associatedModules[mi]).FTerm);
     if m = nil then continue; //otherwise it crashes with variables accessing other variables in the same imported module
     for i := 0 to high(m.children) - delta do begin
-      if not (m.children[i] is TXQTermDefineVariable) then continue;
+      if not objInheritsFrom(m.children[i], TXQTermDefineVariable) then continue;
       w := TXQTermDefineVariable(m.children[i]).getVariable;
       if (w.namespace = namespace) and (w.value = varname) then
         exit(TXQTermDefineVariable(m.children[i]));
@@ -4883,7 +4883,7 @@ begin
     end else begin
       tempnode := contextNode(false);
       parser := nil;
-      if (tempnode <> nil) and (tempnode.document is TTreeDocument) then parser := tempnode.getDocument().getCreator;
+      if (tempnode <> nil) and objInheritsFrom(tempnode.document, TTreeDocument) then parser := tempnode.getDocument().getCreator;
       if parser = nil then parser := defaultParser;
       if parser = nil then begin
         defaultParser := TTreeParser.Create;
@@ -4942,7 +4942,7 @@ begin
   if fterm = nil then exit(xqvalue());
   stackSize := context.temporaryVariables.Count;
   try
-    if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not (fterm is TXQTermModule) then
+    if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not objInheritsFrom(fterm, TXQTermModule) then
       exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
 
     context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
@@ -7270,8 +7270,9 @@ var pos: pchar;
           ':': filter := pseudoOrNegation(elementName);
           else begin raiseParsingError('impossible'); filter := nil; end;
         end;
-        if not (result is TXQTermFilterSequence) or (filter is TXQTermConstant) or
-           (TXQTermFilterSequence(result).children[1] is TXQTermConstant) then
+        if not objInheritsFrom(result, TXQTermFilterSequence)
+           or objInheritsFrom(filter, TXQTermConstant)
+           or objInheritsFrom(TXQTermFilterSequence(result).children[1], TXQTermConstant) then
           result := TXQTermFilterSequence.Create(result, filter)
          else
           TXQTermFilterSequence(result).children[1] := TXQTermIf.createLogicOperation(false, TXQTermFilterSequence(result).children[1], filter);
@@ -7649,7 +7650,7 @@ begin
   case query.typ of
     qcDocumentRoot: begin
       n := context.getRootHighest;
-      if not (n is TTreeDocument) then raise EXQEvaluationException.create('XPDY0050', '/ can only select the root if it is a document node.');
+      if not objInheritsFrom(n, TTreeDocument) then raise EXQEvaluationException.create('XPDY0050', '/ can only select the root if it is a document node.');
       result := xqvalue(n);
       filterSequence(result, query.filters, context);
     end;

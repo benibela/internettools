@@ -753,7 +753,7 @@ function guessExtractionKind(e: string): TExtractionKind;
 
 implementation
 
-uses math,strutils;
+uses math,strutils,bbutilsbeta;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchElementOpen;
@@ -1192,7 +1192,7 @@ begin
   if t^ <> nil then
     if t^.InheritsFrom(TXQTermDefineVariable) then begin
       parentIsModule := assigned(parent) and parent.InheritsFrom(TXQTermModule);
-      if (not parentIsModule and (not (parent is TXQTermDefineFunction) or  (t^ = TXQTermDefineFunction(parent).children[high(TXQTermDefineFunction(parent).children)]) ))
+      if (not parentIsModule and (not objInheritsFrom(parent, TXQTermDefineFunction) or  (t^ = TXQTermDefineFunction(parent).children[high(TXQTermDefineFunction(parent).children)]) ))
          or (parentIsModule and (t^ = TXQTermModule(parent).children[high(TXQTermModule(parent).children)])) then begin
         hasVars := true;
         if listVars and (not arrayContains(TXQTermVariable(TXQTermDefineVariable(t^).getVariable))) then begin

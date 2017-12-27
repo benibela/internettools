@@ -145,7 +145,7 @@ protected
 end;
 
 implementation
-uses bbutils, simplehtmltreeparser, strutils, math;
+uses bbutils, simplehtmltreeparser, strutils, math, bbutilsbeta;
 
 type
 
@@ -295,8 +295,9 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     replace(pt, patternMatcher);
   end;
 begin
-  if t^ is TXQTermVariable then visitVariable(t)
-  else if t^ is TXQTermPendingPatternMatcher then visitPendingPatternMatcher(t);
+  if t^ <> nil then
+    if t^.InheritsFrom(TXQTermVariable) then visitVariable(t)
+    else if t^.InheritsFrom(TXQTermPendingPatternMatcher) then visitPendingPatternMatcher(t);
   Result:=xqtvaContinue;
 end;
 
@@ -314,10 +315,10 @@ begin
   try
     currentVariable := nil;
     overridenVariables.pushAll();
-    if t^ is TXQTermModule then begin
+    if objInheritsFrom(t^, TXQTermModule) then begin
       m := TXQTermModule(t^);
       for i := 0 to high(m.children) - 1 do begin
-        if m.children[i] is TXQTermDefineVariable then currentVariable := TXQTermDefineVariable(m.children[i]).getVariable
+        if objInheritsFrom(m.children[i], TXQTermDefineVariable) then currentVariable := TXQTermDefineVariable(m.children[i]).getVariable
         else currentVariable := nil;
         simpleTermVisit(@m.children[i], t^);
       end;
@@ -396,14 +397,14 @@ begin
   stackIndex := stack.IndexOf(term^); //todo, only need to put variables and functions there?
   if stackIndex >= 0 then begin
     for i := stackIndex to stack.count - 1 do
-      if tobject(stack[i]) is TXQTermVariableGlobal then
+      if objInheritsFrom(tobject(stack[i]), TXQTermVariableGlobal) then
         raise EXQEvaluationException.create('XQST0054', 'Dependancy cycle detected for '+tobject(stack[i]).ToString);
   end;
   stack.Add(term^);
   visitedIndex := visited.IndexOf(term^);
   if visitedIndex >= 0 then exit(xqtvaNoRecursion);
   visited.Add(term^);
-  if term^ is TXQTermNamedFunction then begin
+  if objInheritsFrom(term^, TXQTermNamedFunction) then begin
     tnf := TXQTermNamedFunction (term^);
     if tnf.kind = xqfkUnknown then tnf.init(curcontext); //todo: still needed ?
     if tnf.kind = xqfkUnknown then begin
@@ -413,7 +414,7 @@ begin
       TXQTermNamedFunction (term^).interpretedFunction.visit(self);
       goToOldContext;
     end;
-  end else if term^ is TXQTermVariableGlobal then begin
+  end else if objInheritsFrom(term^, TXQTermVariableGlobal) then begin
     globalVar := TXQTermVariableGlobal(term^);
     v := globalVar. definition.getVariable;
     if (overridenVariables.hasVariable(v)) or acceptedVariables.hasVariable(v) then exit;
@@ -463,7 +464,7 @@ var
 begin
   cycler := TVariableCycleDetectorXQ1.create(sc);
   try
-    if start is TXQTermModule then begin
+    if objInheritsFrom(start, TXQTermModule) then begin
       cycler.mainmodule := TXQTermModule(start);
       for i := 0 to high(cycler.mainmodule.children) do begin
         cycler.lastVariableIndex := i;
@@ -927,7 +928,7 @@ begin
   if t <> closingChar then raiseParsingError('XPST0003', 'Expected closing parenthesis: '+ closingChar);
   if partialApplications > 0 then begin
     df := TXQTermDefineFunction.create;
-    if result is TXQTermNamedFunction then df.kind := xqtdfStaticPartialApplication
+    if objInheritsFrom(result, TXQTermNamedFunction) then df.kind := xqtdfStaticPartialApplication
     else df.kind := xqtdfDynamicPartialApplication;
     df.parameterCount := partialApplications;
     {for i := 1 to partialApplications do
@@ -1600,7 +1601,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     begin
       if length(s) = 0 then exit;
       if (length(parent.children) > 0)
-         and (parent.children[high(parent.children)] is TXQTermConstant)
+         and objInheritsFrom(parent.children[high(parent.children)], TXQTermConstant)
          and (TXQTermConstant(parent.children[high(parent.children)]).value is TXQValueString) then
         (TXQTermConstant(parent.children[high(parent.children)]).value as TXQValueString).str += s
       else
@@ -1649,7 +1650,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
           if mustBeLiteral then raiseParsingError('XQST0022', 'Enclosed expression not allowed') ;
           pos += 1;
           temp := parsePrimaryLevel;
-          if temp is TXQTermConstructor then parent.push(TXQTermSequence.Create().push([temp]))
+          if objInheritsFrom(temp, TXQTermConstructor) then parent.push(TXQTermSequence.Create().push([temp]))
           else parent.push(temp);
           expect('}');
           atBoundary := (border = '<') and staticContext.stripBoundarySpace;
@@ -1883,10 +1884,10 @@ begin
     if pos^ <> '}' then begin
       if result.typ in [tetDocument, tetOpen, tetProcessingInstruction, tetAttribute, tetNamespace] then begin
         tempSeq := parsePrimaryLevel;
-        if tempSeq is TXQTermSequence then begin
+        if objInheritsFrom(tempSeq, TXQTermSequence) then begin
           onlyConstructors := true;
           for i:= 0 to high(TXQTermSequence(tempseq).children) do
-            if not (TXQTermSequence(tempSeq).children[i] is TXQTermConstructor) then begin
+            if not objInheritsFrom(TXQTermSequence(tempSeq).children[i], TXQTermConstructor) then begin
               onlyConstructors:=false;
               break;
             end;
@@ -1947,8 +1948,8 @@ var
   prop: String;
   pname: PAnsiString;
 begin
-  if t is TXQTermVariable then pname := @TXQTermVariable(t).value
-  else if t is TXQTermPendingEQNameToken then pname := @TXQTermPendingEQNameToken(t).localpart
+  if objInheritsFrom(t, TXQTermVariable) then pname := @TXQTermVariable(t).value
+  else if objInheritsFrom(t, TXQTermPendingEQNameToken) then pname := @TXQTermPendingEQNameToken(t).localpart
   else begin raiseSyntaxError('Internal error 201601102252'); exit(nil); end;
   if not strContains(pname^, '.') then exit(t);
   name := pname^;
@@ -1997,7 +1998,7 @@ begin
           while true do begin
             SetLength(params, length(params) + 1);
             params[high(params)] := parseValue;
-            if not (params[high(params)] is TXQTermConstant) then raiseSyntaxError('Only literals allowed as annotation arguments');
+            if not objInheritsFrom(params[high(params)], TXQTermConstant) then raiseSyntaxError('Only literals allowed as annotation arguments');
             if nextToken(true) <> ',' then break;
             expect(',');
           end;
@@ -2046,7 +2047,7 @@ begin
     end;
     //resolve name. Do it at the end, so we know there was no XPST0003 error in the function
     if not anonymous then begin
-      if result.name is TXQEQNameUnresolved then
+      if objInheritsFrom(result.name, TXQEQNameUnresolved) then
         result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
       if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
       if staticContext.isLibraryModule and (result.name.namespaceURL <> namespaceGetURL(staticContext.moduleNamespace)) then
@@ -2187,18 +2188,19 @@ end;
 function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
   function functionIsConcat(nf: TXQTermNamedFunction): boolean;
   begin
-    result := (nf.func <> nil) and (nf.func is TXQBasicFunctionInfo) and (TXQBasicFunctionInfo(nf.func).func = @xqFunctionConcat);
+    result := (nf.func <> nil) and nf.func.InheritsFrom(TXQBasicFunctionInfo) and (TXQBasicFunctionInfo(nf.func).func = @xqFunctionConcat);
   end;
 
   procedure pushTerm(t: TXQTerm);
   begin
-    if not (t is TXQTermConstant) then
+    if t = nil then exit;
+    if not t.InheritsFrom(TXQTermConstant) then
       t := TXQTermNamedFunction.create(XMLNamespaceURL_MyExtensionsNew, 'join', [t]);
-    if (result = nil) and (t is TXQTermConstant) then
+    if (result = nil) and t.InheritsFrom(TXQTermConstant) then
       result := t
     else if result = nil then
       result := t//TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', [t])
-    else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
+    else if result.InheritsFrom(TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
       TXQTermNamedFunction(result).push(t)
     else
      result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', [result, t]);
@@ -2211,10 +2213,10 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
     if too < from then exit;
     v := replaceEntitiesIfNeeded(normalizeLineEnding(strFromPchar(from, too - from + 1)));
     if result <> nil then begin
-      if (result is TXQTermConstant) and (TXQTermConstant(result).value is TXQValueString) then
+      if result.InheritsFrom(TXQTermConstant) and (TXQTermConstant(result).value is TXQValueString) then
         (TXQTermConstant(result).value as TXQValueString).str += v
-      else if (result is TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result))
-              and (TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)] is TXQTermConstant)
+      else if result.InheritsFrom(TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result))
+              and objInheritsFrom(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)], TXQTermConstant)
               and (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value is TXQValueString )
               then
         (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value as TXQValueString).str += v
@@ -2261,7 +2263,7 @@ begin
     on EXQParsingException do begin result.free; raise; end;
   end;
   if result = nil then result := TXQTermConstant.create('')
-  else if (result is TXQTermConstant) and not (TXQTermConstant(result).value is TXQValueString) then
+  else if result.InheritsFrom(TXQTermConstant) and not (TXQTermConstant(result).value is TXQValueString) then
     result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'string', [result]);
 end;
 
@@ -2338,7 +2340,7 @@ begin
   result := term;
   if typ.storage = TXQValueQName then begin
     if typ = baseSchema.NOTATION then result := castFail('XPST0080')
-    else if (term.children[0] is TXQTermConstant) then begin
+    else if objInheritsFrom(term.children[0], TXQTermConstant) then begin
       case TXQTermConstant(term.children[0]).value.kind of
         pvkQName: exit; {begin
           if castable then result := TXQTermConstant.create(xqvalueTrue)
@@ -2420,7 +2422,7 @@ var
     end;
     if operatorMode then begin
       result := TXQTermDynamicFunctionCall.create(result, parseValue());
-      if TXQTermDynamicFunctionCall(result).children[1] is TXQTermNodeMatcher then begin
+      if objInheritsFrom(TXQTermDynamicFunctionCall(result).children[1], TXQTermNodeMatcher) then begin
         result.free;
         raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
       end;
@@ -2701,7 +2703,7 @@ function TXQParsingContext.parseOrExpr: TXQTerm;
   var
     binOp: TXQTermBinaryOp;
   begin
-    if not (term^ is TXQTermBinaryOp) then exit(term);
+    if not objInheritsFrom(term^, TXQTermBinaryOp) then exit(term);
     binOp := TXQTermBinaryOp(term^);
     if binOp.op.priority > prio then exit(term);
     if (binOp.op.priority = prio) then begin
@@ -2760,8 +2762,11 @@ var astroot: TXQTerm;
     needDynamicCall: Boolean;
   begin
     replace := ripBinOpApart(@astroot, 10000);
-    if (replace^ is TXQTermFilterSequence) or (replace^ is TXQTermSequence) or (replace^ is TXQTermVariable)  or ((replace^ is TXQTermPendingEQNameToken) and (TXQTermPendingEQNameToken(replace^).pending = xqptVariable))
-       or (replace^ is TXQTermNamedFunction) or (replace^ is TXQTermJSONObjectConstructor) or (replace^ is TXQTermDynamicFunctionCall) then begin
+    if Assigned(replace^) and (
+         replace^.InheritsFrom(TXQTermFilterSequence) or replace^.InheritsFrom(TXQTermSequence) or replace^.InheritsFrom(TXQTermVariable)
+         or (replace^.InheritsFrom(TXQTermPendingEQNameToken) and (TXQTermPendingEQNameToken(replace^).pending = xqptVariable))
+         or replace^.InheritsFrom(TXQTermNamedFunction) or replace^.InheritsFrom(TXQTermJSONObjectConstructor) or replace^.InheritsFrom(TXQTermDynamicFunctionCall)
+       ) then begin
          if pos^ in SYMBOLS + WHITE_SPACE then needDynamicCall:=true
          else begin
            word := nextToken();
@@ -2773,7 +2778,7 @@ var astroot: TXQTerm;
          end;
          if needDynamicCall then begin
            replace^ := TXQTermDynamicFunctionCall.Create(replace^, parseValue);
-           if TXQTermDynamicFunctionCall(replace^).children[1] is TXQTermNodeMatcher then
+           if objInheritsFrom(TXQTermDynamicFunctionCall(replace^).children[1], TXQTermNodeMatcher) then
              raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
          end;
      end else begin
@@ -2808,7 +2813,7 @@ begin
           expect(':=');
           if not options.AllowMutableVariables then raiseSyntaxError('Assignment not allowed');
           result := astroot;
-          if result is TXQTermNodeMatcher then begin
+          if objInheritsFrom(result, TXQTermNodeMatcher) then begin
             if qmCheckNamespaceURL in TXQTermNodeMatcher(astroot).queryCommand.matching then
               result := TXQTermVariable.create(TXQTermNodeMatcher(astroot).queryCommand.value, TXQTermNodeMatcher(astroot).queryCommand.namespaceURLOrPrefix)
              else if qmCheckNamespacePrefix in TXQTermNodeMatcher(astroot).queryCommand.matching then
@@ -2907,7 +2912,7 @@ begin
   m := f.parameterCount;
   if m >= length(f.children) then m := length(f.children);
   for i := 0 to m - 1 do
-    if (f.children[i] is TXQTermDefineVariable) and (TXQTermDefineVariable(f.children[i]).variable is TXQTermPendingEQNameToken) then
+    if objInheritsFrom(f.children[i], TXQTermDefineVariable) and objInheritsFrom(TXQTermDefineVariable(f.children[i]).variable, TXQTermPendingEQNameToken) then
       TXQTermDefineVariable(f.children[i]).variable := (TXQTermPendingEQNameToken(TXQTermDefineVariable(f.children[i]).variable)).resolveAndFree(sc) as TXQTermVariable;;
 
 end;
@@ -2925,14 +2930,14 @@ begin
   functionCount := 0;
   staticContext := context.staticContext;
   for i:=0 to high(children) - 1 do
-    if children[i] is TXQTermDefineFunction then
+    if objInheritsFrom(children[i], TXQTermDefineFunction) then
       functionCount += 1;
   oldFunctionCount := length(staticContext.functions);
   setlength(staticContext.functions, oldFunctionCount + functionCount);
   functions := staticContext.functions;
   functionCount := oldFunctionCount;
   for i:=0 to high(children) - 1 do
-    if children[i] is TXQTermDefineFunction then begin
+    if objInheritsFrom(children[i], TXQTermDefineFunction) then begin
       resolveFunctionParams(TXQTermDefineFunction(children[i]),context.staticContext);
       functions[functionCount] := TXQTermDefineFunction(children[i]).define(context, true);
       if functions[functionCount].body = nil then begin
@@ -2984,7 +2989,7 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
         modu := TXQueryBreaker(sc.importedModules.Objects[i]).getTerm as TXQTermModule;
         if modu = module then continue;
         for j :=  0 to high( modu.children ) do
-          if (modu.children[j] is TXQTermDefineVariable)
+          if objInheritsFrom(modu.children[j], TXQTermDefineVariable)
              and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then begin
                if v.value <> '$' then //context item hack
                   raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
@@ -2994,7 +2999,7 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
     end;
     modu := module;
     for j := 0 to high(modu.children) - 1 do
-      if (modu.children[j] is TXQTermDefineVariable)
+      if objInheritsFrom(modu.children[j], TXQTermDefineVariable)
          and (modu.children[j] <> d)
          and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then
       raise EXQParsingException.create('XQST0049', 'Duplicate variable declarations:  ' + v.ToString);
@@ -3018,7 +3023,7 @@ begin
 
   functionCount := 0;
   for i:=high(children) -  1 downto 0 do
-    if children[i] is TXQTermDefineFunction then begin
+    if objInheritsFrom(children[i], TXQTermDefineFunction) then begin
       functionCount += 1;
     end else checkVariableOverride(((children[i] as TXQTermDefineVariable)));
 
@@ -3040,7 +3045,7 @@ begin
         otherModule := TXQueryBreaker(sc.importedModules.Objects[j]).getTerm as TXQTermModule;
         if otherModule = module then continue;
         for k := 0 to high(otherModule.children)  do
-          if otherModule.children[k] is TXQTermDefineFunction then begin
+          if objInheritsFrom(otherModule.children[k], TXQTermDefineFunction) then begin
             otherFunction := TXQTermDefineFunction(otherModule.children[k]);
             if equalNamespaces(sc.functions[i].namespaceURL, otherFunction.name.namespaceURL)
                and (sc.functions[i].name = otherFunction.name.localname)
@@ -3083,7 +3088,7 @@ begin
     result.free;
     raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
-  if result is TXQTermModule then begin
+  if objInheritsFrom(result, TXQTermModule) then begin
     if staticContext.isLibraryModule then TXQTermModule(result).push(TXQTermSequence.Create);
     tempContext := staticContext.sender.getEvaluationContext(staticContext);
     initializeFunctions(TXQTermModule(result), tempContext);
@@ -3101,7 +3106,7 @@ begin
   end;
   finalResolving(TXQueryBreaker(thequery).fterm, staticContext, options);
   result := TXQueryBreaker(thequery).fterm;
-  if result is TXQTermModule then
+  if objInheritsFrom(result, TXQTermModule) then
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, TXQueryBreaker(thequery).staticContextShared);
 
 
@@ -3186,7 +3191,7 @@ begin
   try
     if not onlySpecialString then begin
       TXQueryBreaker(thequery).fterm := parseModule;
-      if TXQueryBreaker(thequery).fterm is TXQTermModule then
+      if objInheritsFrom(TXQueryBreaker(thequery).fterm, TXQTermModule) then
         collectVariables(TXQTermModule(TXQueryBreaker(thequery).fterm));
     end else begin
       TXQueryBreaker(thequery).fterm := parseXString(true);
@@ -3233,9 +3238,9 @@ var
     children := module.children;
     p := high(sc.functions);
     for i:=high(TXQTermModule(result).children) - 1 downto 0 do
-      if children[i] is TXQTermDefineFunction then begin
+      if objInheritsFrom(children[i], TXQTermDefineFunction) then begin
         f := TXQTermDefineFunction(children[i]);
-        if (length(f.children) > f.parameterCount) and not (f.children[high(f.children)] is TXQTermSequenceType) then
+        if (length(f.children) > f.parameterCount) and not objInheritsFrom(f.children[high(f.children)], TXQTermSequenceType) then
           sc.functions[p].body := f.children[high(f.children)]; //we need to update body or it blows up, when the resolving visitor has changed the first term of it
         p-=1;
       end;
@@ -3244,7 +3249,7 @@ begin
   try
     try
       visitor := TFinalNamespaceResolving.Create();
-      if result is TXQTermModule then visitor.mainModule := TXQTermModule(result);
+      if objInheritsFrom(result, TXQTermModule) then visitor.mainModule := TXQTermModule(result);
       visitor.staticContext := sc;
       visitor.simpleTermVisit(@result, nil);
 
@@ -3264,7 +3269,7 @@ begin
   if opts.AllowJSONLiterals then
     TJSONLiteralReplaceVisitor.startVisiting(@result);
 
-  if (result is TXQTermModule) then
+  if objInheritsFrom(result, TXQTermModule) then
     initializeFunctionsAfterResolving();
   if sc.model = xqpmXQuery1 then
     TVariableCycleDetectorXQ1.detectCycle(result, sc);
@@ -3412,7 +3417,7 @@ var declarationDuplicateChecker: TStringList;
       end;
     end;
     TXQTermModule(result).push(vari);
-    if vari.variable is TXQTermPendingEQNameToken then vari.variable := TXQTermPendingEQNameToken(vari.variable).resolveAndFree(staticContext); //global variable namespaces are known
+    if objInheritsFrom(vari.variable, TXQTermPendingEQNameToken) then vari.variable := TXQTermPendingEQNameToken(vari.variable).resolveAndFree(staticContext); //global variable namespaces are known
     if not contextItem and staticContext.isLibraryModule and (namespaceGetURL(staticContext.moduleNamespace) <> (vari.variable as TXQTermVariable).namespace) then
       raiseParsingError( 'XQST0048', 'Wrong namespace: ' + vari.debugTermToString);
     case nextToken() of
@@ -3462,7 +3467,7 @@ var declarationDuplicateChecker: TStringList;
       j: Integer;
   begin
     if name <> nil then begin
-      if name is TXQEQNameUnresolved then name := TXQEQNameUnresolved(name).resolveAndFreeToEQName(staticContext);
+      if objInheritsFrom(name, TXQEQNameUnresolved) then name := TXQEQNameUnresolved(name).resolveAndFreeToEQName(staticContext);
       namespaceURL := name.namespaceURL;
       localname := name.localname;
     end else begin
@@ -3942,11 +3947,11 @@ end;
 function TJSONLiteralReplaceVisitor.visit(t: PXQTerm): TXQTerm_VisitAction;
 begin
   result := xqtvaContinue;
-  if (t^ is TXQTermNodeMatcher) //and (length(TXQTermNodeMatcher(t^).children) = 0)
+  if objInheritsFrom(t^, TXQTermNodeMatcher) //and (length(TXQTermNodeMatcher(t^).children) = 0)
      and ((TXQTermNodeMatcher(t^).queryCommand.typ = qcDirectChildImplicit))
      and ((TXQTermNodeMatcher(t^).queryCommand.namespaceChecked) //todo, this only should check for prefixes
      and (TXQTermNodeMatcher(t^).queryCommand.namespaceURLOrPrefix = ''))
-     and not (parent is TXQTermPath)
+     and not objInheritsFrom(parent, TXQTermPath)
      then begin
     case TXQTermNodeMatcher(t^).queryCommand.value of
       'true': begin t^.free; t^ := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'true', 0); end;
@@ -3983,7 +3988,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     begin
       hasPrivatePublic := false;
       for i := 0 to high(ans) do begin
-        if ans[i].name is TXQEQNameUnresolved then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext);
+        if objInheritsFrom(ans[i].name, TXQEQNameUnresolved) then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext);
 
         case ans[i].name.namespaceURL of
           XMLNamespaceUrl_XQuery: begin
@@ -4008,7 +4013,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     pending: TXQTermPendingEQNameToken;
     flags: TXQSequenceTypeFlags;
   begin
-    if (length(st.children) > 0) and (st.children[0] is TXQTermPendingEQNameToken) then begin
+    if (length(st.children) > 0) and objInheritsFrom(st.children[0], TXQTermPendingEQNameToken) then begin
       pending := TXQTermPendingEQNameToken(st.children[0]);
       flags := TXQSequenceTypeFlags(pending.data);
       schema := staticContext.findSchema(pending.resolveURI(staticContext, xqdnkType));
@@ -4194,7 +4199,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     name: String;
   begin
     if f.name = nil then exit; //already parsed
-    unresolved := f.name is TXQEQNameUnresolved;
+    unresolved := objInheritsFrom(f.name, TXQEQNameUnresolved);
     if unresolved then TXQEQNameUnresolved(f.name).resolveURI(staticContext, xqdnkFunction);
 
     if findFunction(f.name.namespaceURL, f.name.localname, length(f.children)) then
@@ -4232,14 +4237,14 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   var
     i, j: Integer;
   begin
-    if f.name is TXQEQNameUnresolved then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
+    if objInheritsFrom(f.name, TXQEQNameUnresolved) then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
     visitAnnotations(f.annotations, true, f.name = nil);
     if f.kind = xqtdfUserDefined then begin
       resolveFunctionParams(f,staticContext);
       for i := 0 to f.parameterCount - 1 do begin
-        if not (f.children[i] is TXQTermDefineVariable) then continue;
+        if not objInheritsFrom(f.children[i], TXQTermDefineVariable) then continue;
         for j := i + 1 to f.parameterCount - 1 do begin
-          if not (f.children[j] is TXQTermDefineVariable) then continue;
+          if not objInheritsFrom(f.children[j], TXQTermDefineVariable) then continue;
           if TXQTermVariable(TXQTermDefineVariable(f.children[i]).variable).equalsVariable(TXQTermVariable(TXQTermDefineVariable(f.children[j]).variable)) then
             raiseParsingError('XQST0039', 'Duplicate variable name: '+TXQTermDefineVariable(f.children[i]).variable.ToString);
         end;
@@ -4287,13 +4292,13 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         raiseSyntaxError('Need single typ for cast')
       else if baseSchema.isAbstractType(st.atomicTypeInfo) then
         raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast')
-      else if (st.atomicTypeInfo is TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
+      else if objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
         raiseParsingError('XQST0052', 'Expected simple type');
       result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs);
     end else if b.op.func = @xqvalueInstanceOf then begin
       st := b.children[1] as TXQTermSequenceType;
       visitSequenceType(st);
-      if (st.kind = tikAtomic) and (st.atomicTypeInfo is TXSListType) then
+      if (st.kind = tikAtomic) and objInheritsFrom(st.atomicTypeInfo, TXSListType) then
         raiseParsingError('XPST0051', 'No value is a list type');
       result := b;
     end else if (b.op.func = @xqvalueOrPlaceholder) or (b.op.func = @xqvalueAndPlaceholder) then begin
@@ -4347,22 +4352,32 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     for i := 0 to high(t.catches) do
       for j := 0 to high(t.catches[i].tests) do
-        if t.catches[i].tests[j].name is TXQEQNameUnresolved then
+        if objInheritsFrom(t.catches[i].tests[j].name, TXQEQNameUnresolved) then
           t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext);
   end;
 
+var
+  tempClass, nextClass: TClass;
 begin
-  if t^ is TXQTermPendingEQNameToken then begin
-    t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext);
-  end else if t^ is TXQTermSequenceType then visitSequenceType(TXQTermSequenceType(t^))
-  else if t^ is TXQTermNamedFunction then t^ := visitNamedFunction(TXQTermNamedFunction(t^))
-  else if t^ is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(t^))
-  else if t^ is TXQTermBinaryOp then t^ := visitBinaryOp(TXQTermBinaryOp(t^))
-  else if t^ is TXQTermFlower then visitFlower(TXQTermFlower(t^))
-  else if t^ is TXQTermNodeMatcher then visitNodeMatcher(TXQTermNodeMatcher(t^))
-  else if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
-  else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
-  else if t^ is TXQTermTryCatch then visitTryCatch(TXQTermTryCatch(t^))
+  if assigned(t^) then begin
+    tempClass := t^.ClassType;
+    while tempClass <> nil do begin
+      nextClass := nil;
+      if tempClass = TXQTermPendingEQNameToken then begin
+        t^ := TXQTermPendingEQNameToken(t^).resolveAndFree(staticContext);
+      end else if tempClass = TXQTermSequenceType then visitSequenceType(TXQTermSequenceType(t^))
+      else if tempClass = TXQTermNamedFunction then t^ := visitNamedFunction(TXQTermNamedFunction(t^))
+      else if tempClass = TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(t^))
+      else if tempClass = TXQTermBinaryOp then t^ := visitBinaryOp(TXQTermBinaryOp(t^))
+      else if tempClass = TXQTermFlower then visitFlower(TXQTermFlower(t^))
+      else if tempClass = TXQTermNodeMatcher then visitNodeMatcher(TXQTermNodeMatcher(t^))
+      else if tempClass = TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
+      else if tempClass = TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
+      else if tempClass = TXQTermTryCatch then visitTryCatch(TXQTermTryCatch(t^))
+      else nextClass := tempClass.ClassParent;
+      tempClass := nextClass;
+    end;
+  end;
 
   ;result := xqtvaContinue;
 end;
@@ -4394,8 +4409,8 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if (c.typ = tetOpen) and (c.ClassType = TXQTermConstructor) then
       checkForDuplicatedAttributes;
-    if c.nameValue is TXQTermEQNameToken then c.nameHash := nodeNameHash(TXQTermEQNameToken(c.nameValue).localpart)
-    else if c.nameValue is TXQTermConstant then begin
+    if objInheritsFrom(c.nameValue, TXQTermEQNameToken) then c.nameHash := nodeNameHash(TXQTermEQNameToken(c.nameValue).localpart)
+    else if objInheritsFrom(c.nameValue, TXQTermConstant) then begin
       case TXQTermConstant(c.nameValue).value.kind of
         pvkString, pvkQName: begin
           temp := TXQTermConstant(c.nameValue).value.toString;
@@ -4444,7 +4459,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
     v: TXQTermVariable;
   begin
     if ((parent <> mainModule) or (mainModule = nil) or (mainModule.children[high(mainModule.children)] = f))
-       and not (parent is TXQTermDefineFunction) and (staticContext.sender <> nil) then begin
+       and not objInheritsFrom(parent, TXQTermDefineFunction) and (staticContext.sender <> nil) then begin
       v := f.getVariable;
       TXQueryEngineBreaker(staticContext.sender).addAWeirdGlobalVariable(v.namespace, v.value);
     end;
@@ -4460,18 +4475,29 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
 
   function visitFilterSequence(t: TXQTermFilterSequence): TXQTerm;
   begin
-    if (length(t.children) < 2) and (not (parent is TXQTermDefineVariable) or (TXQTermDefineVariable(parent).variable <> t)) then
+    if (length(t.children) < 2) and (not objInheritsFrom(parent, TXQTermDefineVariable) or (TXQTermDefineVariable(parent).variable <> t)) then
       raiseSyntaxError('[] not allowed');
-    if t.children[0] is TXQTermNodeMatcher then result := TXQTermPath.create(t) //this ensures the indices in filters are correct. i.e. in ancestors::*[$i] indices in reverse document order (opposite order of (ancestors::*)[$i])
+    if objInheritsFrom(t.children[0], TXQTermNodeMatcher) then result := TXQTermPath.create(t) //this ensures the indices in filters are correct. i.e. in ancestors::*[$i] indices in reverse document order (opposite order of (ancestors::*)[$i])
     else result := t;
   end;
+
+var
+  tempClass, nextClass: TClass;
 begin
-  if t^ is TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
-  else if t^ is TXQTermFlower then visitFlower(TXQTermFlower(t^))
-  else if t^ is TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
-  else if t^ is TXQTermBinaryOp then t^ := visitBinaryOp(TXQTermBinaryOp(t^))
-  else if t^ is TXQTermFilterSequence then t^ := visitFilterSequence(TXQTermFilterSequence(t^))
-  ;result := xqtvaContinue;
+  if assigned(t^) then begin
+    tempClass := t^.ClassType;
+    while tempClass <> nil do begin
+      nextClass := nil;
+      if      tempclass = TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
+      else if tempclass = TXQTermFlower then visitFlower(TXQTermFlower(t^))
+      else if tempclass = TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
+      else if tempclass = TXQTermBinaryOp then t^ := visitBinaryOp(TXQTermBinaryOp(t^))
+      else if tempclass = TXQTermFilterSequence then t^ := visitFilterSequence(TXQTermFilterSequence(t^))
+      else nextClass := tempClass.ClassParent;
+      tempClass := nextClass;
+    end;
+  end;
+  result := xqtvaContinue;
 end;
 
 procedure TFinalNamespaceResolving.raiseParsingError(a, b: string);

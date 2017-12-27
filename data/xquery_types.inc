@@ -1961,8 +1961,8 @@ begin
 
   if not hasProperty(properties[startIndex], @oldValue) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+properties[startIndex]+' not found, when assigning to '+strJoin(properties, '.'));
-  if (oldValue is TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1)
-  else if (oldValue is TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(properties, v, startIndex+1)
+  if objInheritsFrom(oldValue, TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1)
+  else if objInheritsFrom(oldValue, TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(properties, v, startIndex+1)
   else raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+properties[startIndex]+' to assign to '+strJoin(properties, '.'));
 
   result := cloneLinked;

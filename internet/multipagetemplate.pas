@@ -306,6 +306,7 @@ type
 
 implementation
 
+uses bbutilsbeta;
 
 type
 
@@ -444,7 +445,7 @@ begin
   addChildrenFromTree(t);
   hadCatch := false;
   for i := 0 to high(children) do
-    if children[i] is TTemplateActionCatch then hadCatch := true
+    if objInheritsFrom(children[i], TTemplateActionCatch) then hadCatch := true
     else if hadCatch then raise ETemplateReader.create('Cannot have non-catch element after catch element');
 end;
 
@@ -454,7 +455,7 @@ procedure TTemplateActionTry.perform(reader: TMultipageTemplateReader);
      i: Integer;
    begin
     for i := 0 to high(children) do
-      if children[i] is TTemplateActionCatch then
+      if objInheritsFrom(children[i], TTemplateActionCatch) then
         if TTemplateActionCatch(children[i]).checkError(reader, namespace, prefix, errCode) then
           exit(true);
     exit(false);
@@ -750,13 +751,13 @@ var
   j: Integer;
 begin
   for i := 0 to high(children) do
-    if (children[i] is TTemplateActionChooseWhen) then begin
+    if objInheritsFrom(children[i], TTemplateActionChooseWhen) then begin
        if (TTemplateActionChooseWhen(children[i]).evaluateQuery(reader, TTemplateActionChooseWhen(children[i]).test).toBoolean) then begin
          for j := 0 to high(children[i].children) do
            children[i].children[j].perform(reader);
          exit;
        end;
-    end else if children[i] is TTemplateActionChooseOtherwise then begin
+    end else if objInheritsFrom(children[i], TTemplateActionChooseOtherwise) then begin
       for j := 0 to high(children[i].children) do
         children[i].children[j].perform(reader);
       exit;
@@ -1103,7 +1104,7 @@ begin
     'meta': addChild(TTemplateActionMeta);
     'if': addChild(TTemplateActionIf);
     'else':
-      if (length(children) = 0 ) or not (children[high(children)] is TTemplateActionIf) then raise ETemplateReader.create('<else> must follow <if>')
+      if (length(children) = 0 ) or not objInheritsFrom(children[high(children)], TTemplateActionIf) then raise ETemplateReader.create('<else> must follow <if>')
       else begin
         TTemplateActionIf(children[high(children)]).&else := TTemplateAction.Create;
         TTemplateActionIf(children[high(children)]).&else.addChildrenFromTree(t);
@@ -1198,11 +1199,11 @@ procedure setPatternNames(a: TTemplateAction; baseName: string='');
 var
   i: Integer;
 begin
-  if a is TTemplateActionPage then begin
+  if objInheritsFrom(a, TTemplateActionPage) then begin
     baseName+=' page:'+TTemplateActionPage(a).url;
-  end else if a is TTemplateActionPattern then begin
+  end else if objInheritsFrom(a, TTemplateActionPattern) then begin
     if TTemplateActionPattern(a).name = '' then TTemplateActionPattern(a).name:='(pattern of'+baseName+')';
-  end else if a is TTemplateActionMain then
+  end else if objInheritsFrom(a, TTemplateActionMain) then
       baseName+=' action:'+TTemplateActionMain(a).name;
   for i := 0 to high(a.children) do
     setPatternNames(a.children[i], baseName);
@@ -1223,7 +1224,7 @@ var i:longint;
 begin
  for i:=0 to high(a.children) do
    loadPatterns(a.children[i],loadSomething, dataPath);
- if a is TTemplateActionPattern then begin
+ if objInheritsFrom(a, TTemplateActionPattern) then begin
    b := TTemplateActionPattern(a);
    if b.href = '' then exit;
    b.pattern:=loadSomething(dataPath+b.href);
@@ -1285,7 +1286,7 @@ function TMultiPageTemplate.findAction(_name: string): TTemplateAction;
     i: Integer;
   begin
     for i:=0 to high(a.children) do begin
-      if a.children[i] is TTemplateActionMain then
+      if objInheritsFrom(a.children[i], TTemplateActionMain) then
         if TTemplateActionMain(a.children[i]).name = _name then exit(a.children[i]);
       result := find(a.children[i]);
       if result <> nil then exit;
@@ -1303,7 +1304,7 @@ var
   i: Integer;
 begin
   for i:=0 to high(a.children) do begin
-    if a.children[i] is TTemplateActionVariable then
+    if objInheritsFrom(a.children[i], TTemplateActionVariable) then
       if TTemplateActionVariable(a.children[i]).name = aname then exit(TTemplateActionVariable(a.children[i]).value);
     result := find(a.children[i]);
     if result <> '' then exit;
@@ -1343,7 +1344,7 @@ var
 begin
   template:=atemplate;
   for i:=0 to high(atemplate.baseActions.children) do
-    if atemplate.baseActions.children[i] is TTemplateActionVariable then
+    if objInheritsFrom(atemplate.baseActions.children[i], TTemplateActionVariable) then
       atemplate.baseActions.children[i].perform(self);
 end;
 
