@@ -1224,13 +1224,15 @@ var i:longint;
 begin
  for i:=0 to high(a.children) do
    loadPatterns(a.children[i],loadSomething, dataPath);
- if objInheritsFrom(a, TTemplateActionPattern) then begin
+ if a.InheritsFrom(TTemplateActionPattern) then begin
    b := TTemplateActionPattern(a);
    if b.href = '' then exit;
    b.pattern:=loadSomething(dataPath+b.href);
    if b.pattern='' then
      raise ETemplateReader.create('Template-Datei "'+dataPath+b.href+'" konnte nicht geladen werden');
- end
+ end else if a.InheritsFrom(TTemplateActionIf) and assigned(TTemplateActionIf(a).&else) then begin
+   loadPatterns(TTemplateActionIf(a).&else, loadSomething, dataPath);
+ end;
 end;
 
 procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string);
