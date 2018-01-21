@@ -424,7 +424,7 @@ begin
               dec(connectionResetRepeat);
               Sleep(2000);
               connectionReset := true;
-            end else raise e;
+            end else raise;
           end;
         end;
       end;
