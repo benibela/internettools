@@ -3311,6 +3311,22 @@ begin
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "method": "POST", "post": "a=b", "charset": "utf-8"}, {"ä": "ü"}))', '{"post": "a=b&%C3%A4=%C3%BC", "url": "http://foo/?x=y", "method": "POST", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "method": "POST", "post": "a=b", "charset": "latin1"}, {"ä": "ü"}))', '{"post": "a=b&%E4=%FC", "url": "http://foo/?x=y", "method": "POST", "charset": "latin1"}');
 
+  //(request-combine supersedes form-combine)
+  t('serialize-json(request-combine({"url": "http://foo/?x=y"}, {"a[]": "b"}))', '{"url": "http://foo/?x=y&a%5B%5D=b"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b"},"c=d")))', '{"url": "http://foo/?x=y&a%5B%5D=b&c=d"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b"},{"a2[]": "b2"})))', '{"url": "http://foo/?x=y&a%5B%5D=b&a2%5B%5D=b2"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b"},"c=d",{"a2[]": "b2"})))', '{"url": "http://foo/?x=y&a%5B%5D=b&c=d&a2%5B%5D=b2"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b","a3[]": "b3"},"c=d",{"a2[]": "b2"})))', '{"url": "http://foo/?x=y&a%5B%5D=b&a3%5B%5D=b3&c=d&a2%5B%5D=b2"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b"},"c=d",{"a2[]": "b2"},"e=f","g=h")))', '{"url": "http://foo/?x=y&a%5B%5D=b&c=d&a2%5B%5D=b2&e=f&g=h"}');
+
+  t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, {"a[]": "b"}))', '{"post": "a%5B%5D=b", "url": "http://foo/?x=y", "method": "POST"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b"},"c=d")))', '{"post": "a%5B%5D=b&c=d", "url": "http://foo/?x=y", "method": "POST"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b"},{"a2[]": "b2"})))', '{"post": "a%5B%5D=b&a2%5B%5D=b2", "url": "http://foo/?x=y", "method": "POST"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b"},"c=d",{"a2[]": "b2"})))', '{"post": "a%5B%5D=b&c=d&a2%5B%5D=b2", "url": "http://foo/?x=y", "method": "POST"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b","a3[]": "b3"},"c=d",{"a2[]": "b2"})))', '{"post": "a%5B%5D=b&a3%5B%5D=b3&c=d&a2%5B%5D=b2", "url": "http://foo/?x=y", "method": "POST"}');
+  t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b"},"c=d",{"a2[]": "b2"},"e=f","g=h")))', '{"post": "a%5B%5D=b&c=d&a2%5B%5D=b2&e=f&g=h", "url": "http://foo/?x=y", "method": "POST"}');
+
+
   t('join(for $r in (random(), random(), random()) return if ($r >= 0 and $r < 1) then "O" else "F")', 'O O O');
   t('join(for $r in (random(10), random(10), random(10.5)) return if ($r >= 0 and $r < 10) then "O" else "F")', 'O O O');
   t('(random(), random-seed(123), random())[last()]  = (random-seed(123), random())[last()]', 'true');
