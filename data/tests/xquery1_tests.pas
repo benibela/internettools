@@ -811,6 +811,7 @@ begin
   t('form(<form><select name="s"><option value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
   t('form(<form><select name="s"><option selected="selected" value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
   t('form(<form><select name="s"><option value="1">a</option><option selected="selected" value="2">b</option></select></form>).url', 'pseudo://test?s=2');
+  t('form(<form><select name="s"></select></form>).url', 'pseudo://test');
 
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');

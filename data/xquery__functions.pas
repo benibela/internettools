@@ -1190,7 +1190,7 @@ begin
     end;
     while temp <> tempend do
       temp := temp.next;
-    exit(true);
+    exit(not first);
   end;
   exit(false);
 end;
