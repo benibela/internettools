@@ -230,7 +230,7 @@ type
     //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
     procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
     //**Loads the template directly from a string. @br Loading pattern-matching templates with the templateFile attribute is not supported
-    procedure loadTemplateFromString(template: string; aname: string = 'unknown');
+    procedure loadTemplateFromString(template: string; aname: string = 'unknown'; apath: string = '');
     //**Loads this template from a directory. @br The multipage template is read from the file template, and
     //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
     procedure loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string = 'unknown');
@@ -1235,19 +1235,20 @@ begin
  end;
 end;
 
-procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string);
+procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string; apath: string = '');
 
 var
   tree: TTreeParser;
 begin
-  self.path:='';
+  self.path:=apath;
+  if path <> '' then path := IncludeTrailingPathDelimiter(path);
   self.name:=aname;
   tree := TTreeParser.Create;
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
   tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
   tree.TargetEncoding:=CP_UTF8;
   readTree(tree.parseTree(template));
-  loadPatterns(baseActions, @strLoadFromFileUTF8);
+  loadPatterns(baseActions, @strLoadFromFileUTF8, path);
   setPatternNames(baseActions);
   tree.Free;
 end;
