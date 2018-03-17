@@ -822,6 +822,7 @@ var
 begin
   url.prepareSelfForRequest(lastURLDecoded);
 
+  method := UpperCase(method);
   reaction := iarReject;
   while reaction <> iarAccept do begin
     url.path := urlEncodeData(url.path, ueURLPath); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
