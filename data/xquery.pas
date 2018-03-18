@@ -151,7 +151,7 @@ type
     moduleContextItemDeclarations: array of TXQTermDefineVariable;
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     associatedModules: TFPList;
-    importedModules: TStringList; //**< All imported modules as (prefix, module: TXQuery) tuples
+    importedModules: TXQMapStringObject; //**< All imported modules as (prefix, module: TXQuery) tuples
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
     defaultFunctionNamespace: INamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
     defaultElementTypeNamespace: INamespace; //**< Default element type namespace (default is empty)
@@ -2131,6 +2131,8 @@ type
     function visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
     function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
+    function getStaticContext: TXQStaticContext;
+
     destructor Destroy; override;
   protected
     staticContext: TXQStaticContext;
@@ -4025,7 +4027,7 @@ begin
     end;
     result.importedmodules := importedmodules;
     if result.importedModules <> nil then begin
-      result.importedModules := TStringList.Create;
+      result.importedModules := TXQMapStringObject.Create;
       for i:=0 to importedModules.count - 1 do result.importedModules.AddObject(importedModules[i], importedModules.Objects[i]);
     end;
     result.importedSchemas := importedSchemas;
@@ -4995,6 +4997,11 @@ end;
 function TXQuery.visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@fterm, parent);
+end;
+
+function TXQuery.getStaticContext: TXQStaticContext;
+begin
+  result := staticContext;
 end;
 
 destructor TXQuery.Destroy;

@@ -3369,7 +3369,7 @@ var declarationDuplicateChecker: TStringList;
     end;
 
     if staticContext.importedModules = nil then
-      staticContext.importedModules := TStringList.Create;
+      staticContext.importedModules := TXQMapStringObject.Create;
     for i := 0 to staticContext.importedModules.Count -  1 do
       if namespaceGetURL(TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace) = moduleURL then
         raiseParsingError('XQST0047', 'Duplicated module import of ' + moduleURL);
@@ -3602,7 +3602,7 @@ begin
           staticContext.moduleNamespace := TNamespace.make(parseNamespaceURI('', 'XQST0088'), token);
           expect(';');
           token := nextToken(true);
-          if staticContext.importedModules = nil then staticContext.importedModules := TStringList.Create;
+          if staticContext.importedModules = nil then staticContext.importedModules := TXQMapStringObject.Create;
           Assert(thequery <> nil);
           staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
           if staticContext.sender.AutomaticallyRegisterParsedModules then
