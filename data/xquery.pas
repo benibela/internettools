@@ -86,6 +86,7 @@ type
   TXQNativeModule = class;
   TXQValuePropertyEnumerator = class;
   TXQTermDefineVariable = class;
+  TXQMapStringObject = class;
 
   float = record end;
   xqfloat = double;
@@ -1207,9 +1208,12 @@ type
     constructor Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation = xqdttNone );
   end;
 
-  TXQMapStringObject = class(TStringList)
+  TXQMapStringOwningObject = class(TStringList)
     constructor Create;
     function DoCompareText(const s1, s2: string): PtrInt; override;
+  end;
+  TXQMapStringObject = class(TXQMapStringOwningObject)
+    constructor Create;
   end;
 
 
@@ -1255,7 +1259,7 @@ type
     procedure show(const s: string); //do not use
     procedure hide(const s: string); //do not use
   private
-    typeList, hiddenTypeList: TXQMapStringObject;
+    typeList, hiddenTypeList: TXQMapStringOwningObject;
     procedure cacheDescendants;
     {$ifdef dumpFunctions}procedure logConstructorFunctions;{$endif}
   end;
@@ -2802,9 +2806,9 @@ type
   function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQInterpretedFunctionInfo;
   function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQOperatorInfo;
 protected
-  basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringObject;
-  binaryOpLists: TXQMapStringObject;
-  binaryOpFunctions: TXQMapStringObject;
+  basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
+  binaryOpLists: TXQMapStringOwningObject;
+  binaryOpFunctions: TXQMapStringOwningObject;
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
   procedure parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
   {$ifdef dumpFunctions}
@@ -2982,6 +2986,12 @@ var
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
+constructor TXQMapStringObject.Create;
+begin
+  inherited;
+  OwnsObjects := false;
+end;
+
 
 function TXQFunctionParameterTypes.serialize: string;
 var
@@ -3064,7 +3074,7 @@ end;
 
 
 
-constructor TXQMapStringObject.Create;
+constructor TXQMapStringOwningObject.Create;
 begin
   Sorted := true;
   OwnsObjects:=true;
@@ -3072,7 +3082,7 @@ begin
   CaseSensitive := true;
 end;
 
-function TXQMapStringObject.DoCompareText(const s1, s2: string): PtrInt;
+function TXQMapStringOwningObject.DoCompareText(const s1, s2: string): PtrInt;
 begin
   Result:=CompareStr(s1, s2);
 end;
@@ -7987,11 +7997,11 @@ var
   i: Integer;
 begin
   namespace := anamespace;
-  basicFunctions:=TXQMapStringObject.Create;
-  complexFunctions:=TXQMapStringObject.Create;
-  interpretedFunctions:=TXQMapStringObject.Create;
-  binaryOpLists:=TXQMapStringObject.Create;
-  binaryOpFunctions:=TXQMapStringObject.Create;
+  basicFunctions:=TXQMapStringOwningObject.Create;
+  complexFunctions:=TXQMapStringOwningObject.Create;
+  interpretedFunctions:=TXQMapStringOwningObject.Create;
+  binaryOpLists:=TXQMapStringOwningObject.Create;
+  binaryOpFunctions:=TXQMapStringOwningObject.Create;
   binaryOpFunctions.OwnsObjects := false;
   if length(aparentModule) > 0 then begin
     SetLength(parents, length(aparentModule));

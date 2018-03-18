@@ -1028,7 +1028,7 @@ var
   objIdx: Integer;
 begin
   if hiddenTypeList = nil then
-    hiddenTypeList := TXQMapStringObject.Create;
+    hiddenTypeList := TXQMapStringOwningObject.Create;
   objIdx := typeList.IndexOf(s);
   hiddenTypeList.AddObject(typeList[objIdx], typeList.Objects[objIdx]);
   typeList.OwnsObjects := false;
@@ -1150,7 +1150,7 @@ constructor TXSSchema.Create;
 
 begin
   version := xsd11;
-  typeList := TXQMapStringObject.Create;
+  typeList := TXQMapStringOwningObject.Create;
   if baseSchema <> nil then begin
     anyType := baseSchema.anyType;
     anySimpleType := baseSchema.anySimpleType;
