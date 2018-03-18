@@ -2631,6 +2631,7 @@ type
     function indexOf(const name: string; const namespaceURL: string = ''): integer; //**< Returns the last index of the variable @code(name) in the internal list. (Warning: doesn't support objects, yet??) It is recommended to use hasVariable instead, the index is an implementation detail
 
     function getName(i: integer): string; //**< Name of the variable at index @code(i)
+    function getNamespace(i: integer): string; //**< Namespace of the variable at index @code(i)
     function getAll(const name: string; const namespaceURL: string = ''): IXQValue; //**< Returns all values of the variable with name @name(name) as sequence
     function getString(const name:string): string; //**< Returns a value as string. This is the same as get(name).toString.
     function isPropertyChange(i: integer): boolean;
@@ -2652,6 +2653,7 @@ type
     destructor destroy();override;
 
     procedure clear; //**< Clear everything
+    procedure remove(const name: string; const namespace: string = '');
     function pushAll: integer; //**< Marks the current state of the variables (in O(1))
     procedure popAll(level: integer = -1); //**< Reverts all variables to the latest marked state
 
@@ -5932,7 +5934,6 @@ end;
 
 { TXQVariableStorage }
 
-
 procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespaceURL: string);
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
@@ -6061,6 +6062,12 @@ begin
   result := varstorage[i].name;
 end;
 
+function TXQVariableChangeLog.getNamespace(i: integer): string;
+begin
+  assert(i>=0); assert(i< count);
+  result := varstorage[i].namespaceURL;
+end;
+
 function TXQVariableChangeLog.get(i: integer): IXQValue; inline;
 begin
   result := varstorage[i].value;
@@ -6090,6 +6097,24 @@ begin
   if historyCount > 256 then setlength(histories, 0);
   varCount := 0;
   historyCount := 0;
+end;
+
+procedure TXQVariableChangeLog.remove(const name: string; const namespace: string);
+var
+  i: Integer;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
+  for i := count - 1 downto 0 do begin
+    if not strEqual(varstorage[i].name, name) or not strEqual(varstorage[i].namespaceURL, namespace) then continue;
+    varstorage[i].name := '';
+    varstorage[i].namespaceURL := '';
+    varstorage[i].value := nil;
+    dec(varcount);
+    if i < varcount then begin
+      move(varstorage[i + 1], varstorage[i], sizeof(varstorage[i]) * (varcount - i));
+      FillChar(varstorage[varcount], sizeof(varstorage[count]), 0);
+    end;
+  end;
 end;
 
 function TXQVariableChangeLog.pushAll: integer;
