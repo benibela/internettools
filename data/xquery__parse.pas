@@ -3278,6 +3278,8 @@ end;
 function TXQParsingContext.parseModuleInternal(): TXQTerm;
 
 var declarationDuplicateChecker: TStringList;
+    oldImportedModulesCount: integer;
+    oldNamespaceCount: Integer;
 
   procedure checkForDuplicate(declaration, err: string);
   begin
@@ -3343,6 +3345,17 @@ var declarationDuplicateChecker: TStringList;
     if (url <> XMLNamespaceURL_XMLSchema) then raiseParsingError('XQST0059', 'Unknown schema: ' + url);
     staticContext.importedSchemas.add(TNamespace.make(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
   end;
+  procedure declareNamespace(const nameSpaceName, nameSpaceURL: string);
+  begin
+    if (nameSpaceName = 'xml') or (nameSpaceName = 'xmlns')
+       or (nameSpaceURL = XMLNamespaceUrl_XML) or (nameSpaceURL = XMLNamespaceUrl_XMLNS) then
+         raiseParsingError('XQST0070', 'Undeclarable namespace');
+    if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create
+    else if staticContext.namespaces.lastIndexOfNamespacePrefix(nameSpaceName) >= oldNamespaceCount then
+      raiseParsingError('XQST0033', 'Duplicated namespace declaration');
+    staticContext.namespaces.Add(TNamespace.make(nameSpaceURL, nameSpaceName));
+  end;
+
   procedure importModule; //has read import module
   var
     moduleName: String;
@@ -3370,9 +3383,16 @@ var declarationDuplicateChecker: TStringList;
 
     if staticContext.importedModules = nil then
       staticContext.importedModules := TXQMapStringObject.Create;
-    for i := 0 to staticContext.importedModules.Count -  1 do
-      if namespaceGetURL(TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace) = moduleURL then
+    for i := 0 to staticContext.importedModules.Count -  1 do begin
+      if namespaceGetURL(TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace) = moduleURL then begin
+        if i < oldImportedModulesCount then begin
+          if moduleName = '' then moduleName := TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace.getPrefix;
+          if moduleName <> staticContext.importedModules[i] then declareNamespace(moduleName, moduleURL);
+          exit; //allow external imports in shared contexts
+        end;
         raiseParsingError('XQST0047', 'Duplicated module import of ' + moduleURL);
+      end;
+    end;
 
     module := engine.findModule(moduleURL);
     if module = nil then begin
@@ -3550,7 +3570,6 @@ var
 
 
 
-  oldNamespaceCount: Integer;
   namespaceMode: TXQNamespaceMode;
 
   oldDecimalFormatCount: integer;
@@ -3561,6 +3580,8 @@ begin
   if staticContext.namespaces <> nil then oldNamespaceCount := staticContext.namespaces.Count;
   oldDecimalFormatCount := 0;
   if staticContext.decimalNumberFormats <> nil then oldDecimalFormatCount := staticContext.decimalNumberFormats.Count;
+  oldImportedModulesCount := 0;
+  if staticContext.importedModules <> nil then oldImportedModulesCount := staticContext.importedModules.Count;
   try
     token := nextToken(true);
     marker := pos;
@@ -3696,14 +3717,7 @@ begin
         'namespace': begin
            nameSpaceName := nextTokenNCName();
            expect('=');
-           nameSpaceURL := xmlStrWhitespaceCollapse(parseString);
-           if (nameSpaceName = 'xml') or (nameSpaceName = 'xmlns')
-              or (nameSpaceURL = XMLNamespaceUrl_XML) or (nameSpaceURL = XMLNamespaceUrl_XMLNS) then
-                raiseParsingError('XQST0070', 'Undeclarable namespace');
-           if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create
-           else if staticContext.namespaces.lastIndexOfNamespacePrefix(nameSpaceName) >= oldNamespaceCount then
-             raiseParsingError('XQST0033', 'Duplicated namespace declaration');
-           staticContext.namespaces.Add(TNamespace.make(nameSpaceURL, nameSpaceName));
+           declareNamespace(nameSpaceName, xmlStrWhitespaceCollapse(parseString));
         end;
         else begin
           pos := marker;
