@@ -2196,7 +2196,7 @@ type
   *)
   TXQDeclareExternalFunctionEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespaceURL, functionName: string; var result: TXQValueFunction) of object;
 
-  TXQImportModuleEvent = procedure (sender: TObject; const namespace: string; const at: array of string) of object;
+  TXQImportModuleEvent = procedure (sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string) of object;
 
   //** Event called by the fn:trace(value,info) function.
   TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;

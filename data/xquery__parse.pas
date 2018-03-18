@@ -3376,7 +3376,7 @@ var declarationDuplicateChecker: TStringList;
 
     module := engine.findModule(moduleURL);
     if module = nil then begin
-      if assigned(engine.OnImportModule) then engine.onImportModule(engine, moduleURL, at);
+      if assigned(engine.OnImportModule) then engine.onImportModule(engine, staticContext, moduleURL, at);
       module := engine.findModule(moduleURL);
       if module = nil then begin
         nativeModule := engine.findNativeModule(moduleURL);

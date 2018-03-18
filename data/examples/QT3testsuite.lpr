@@ -104,7 +104,7 @@ TTestCase = class
   function expectedPrettier: string;
   constructor create(e: TTreeNode);
   function run: TTestCaseResultValue;
-  procedure importModule(sender: TObject; const namespace: string; const at: array of string);
+  procedure importModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
 end;
 
 { TModule }
@@ -1093,7 +1093,7 @@ begin
     result.result := TResult(results[0]).check;    ;
 end;
 
-procedure TTestCase.importModule(sender: TObject; const namespace: string; const at: array of string);
+procedure TTestCase.importModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
 var
   i: Integer;
 begin

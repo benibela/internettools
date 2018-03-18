@@ -24,7 +24,7 @@ type
   destructor Destroy; override;
   procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;  const variable: string; var value: IXQValue);
   procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;  const functionName: string; var value: TXQValueFunction);
-  procedure ImportModule(sender: TObject; const namespace: string; const at: array of string);
+  procedure ImportModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
 end;
 
 
@@ -1978,7 +1978,7 @@ begin
   end;
 end;
 
-procedure THelper.ImportModule(sender: TObject; const namespace: string; const at: array of string);
+procedure THelper.ImportModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
 begin
   case namespace of
     'pseudo://circle2':
