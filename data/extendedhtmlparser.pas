@@ -1210,10 +1210,13 @@ var
   cur: TTemplateElement;
   visitor: TXQTerm_VisitorFindWeirdGlobalVariableDeclarations;
   temp: TXQTerm;
+  lastTree: TTreeDocument;
 begin
   result := false;
   visitor := TXQTerm_VisitorFindWeirdGlobalVariableDeclarations.Create;
   try
+    lastTree := FTemplate.getLastTree;
+    if lastTree = nil then exit(false);
     cur := TTemplateElement(FTemplate.getLastTree.next);
     while cur <> nil do begin
       if cur.source <> nil then begin
