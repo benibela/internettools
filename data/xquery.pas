@@ -4638,8 +4638,8 @@ var
   i: Integer;
   staticContext: TXQStaticContext;
 begin
-  if (context.temporaryVariables <> nil) then
-    context.temporaryVariables.clear;
+//  if (context.temporaryVariables <> nil) then  we cannot free them here, because it fails when a query calls another module
+//    context.temporaryVariables.clear;
   if context.globallyDeclaredVariables <> nil then
     context.globallyDeclaredVariables.clear; //declared global variables
 
