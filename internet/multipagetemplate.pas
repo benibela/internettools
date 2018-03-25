@@ -1428,7 +1428,15 @@ procedure TMultipageTemplateReader.callAction(action: string);
 var act: TTemplateAction;
 begin
   act:=findAction(action);
-  if act=nil then raise ETemplateReader.Create(Format(rsActionNotFound, [action]));
+  if act=nil then begin
+    if strEndsWith(action, '?') then begin
+      delete(action,length(action),1);
+      act := findAction(action);
+      if act = nil then exit;
+    end;
+    if act = nil then
+      raise ETemplateReader.Create(Format(rsActionNotFound, [action]));
+  end;
   callAction(act);
 end;
 
