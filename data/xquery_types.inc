@@ -2067,6 +2067,7 @@ function TXQValueObject.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenc
 var
   first: Boolean;
   prop: TXQProperty;
+  tempName: String;
 begin
   first := true;
   for prop in getPropertyEnumerator do begin
@@ -2074,7 +2075,13 @@ begin
       result :=  '<'+objectTag+'>';
       first := false;
     end;
-    result +=  '<'+prop.name+'>'+prop.Value.xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+prop.Name+'>';
+    tempName := prop.name;
+    if TXSSchema.isValidNCName(tempName) then result += '<'+ tempName + '>'
+    else begin
+      result += '<_ key="'+xmlStrEscape(tempName, true) + '">';
+      tempName := '_';
+    end;
+    result += prop.Value.xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+tempName+'>';
   end;
   if first then exit('<'+objectTag+'/>'); //no properties
   result +=  '</'+objectTag+'>';

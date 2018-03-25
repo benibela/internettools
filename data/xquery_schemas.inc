@@ -976,7 +976,7 @@ begin
   else result := nil;
 end;
 
-function TXSSchema.isValidNCName(const s: string): boolean;
+class function TXSSchema.isValidNCName(const s: string): boolean;
 //this should do the same as RegExpr_XMLNCName
 //except being faster (and working)
 const AsciiNameStartChar = ['A'..'Z', '_', 'a'..'z'];
@@ -1015,7 +1015,7 @@ begin
   result := true;
 end;
 
-function TXSSchema.isValidQName(s: string): boolean;
+class function TXSSchema.isValidQName(s: string): boolean;
 var i: integer;
 begin
   i := pos(':', s);

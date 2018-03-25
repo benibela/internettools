@@ -1250,8 +1250,8 @@ type
     function findType(const typeName: string): TXSType;
 
     //for internal use
-    function isValidNCName(const s: string): boolean;
-    function isValidQName(s: string): boolean;
+    class function isValidNCName(const s: string): boolean; static;
+    class function isValidQName(s: string): boolean;  static;
     function isValidationOnlyType(t: TXSType): boolean;
     function isAbstractType(t: TXSType): boolean;
 
