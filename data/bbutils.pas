@@ -61,6 +61,7 @@ unit bbutils;
 {$IFDEF FPC}
 {$mode objfpc}{$H+}
 {$ModeSwitch advancedrecords}
+{$ModeSwitch typehelpers}
 {$COPERATORS OFF}
 {$DEFINE HASINLINE}
 {$DEFINE HASDefaultFormatSettings}
@@ -154,7 +155,11 @@ type
   TFloatArray = array of float;
 
   TCharSet = set of ansichar;
-
+{$ifdef FPC_HAS_CPSTRING}
+  TBByStringHelper = Type Helper(TStringHelper) for AnsiString
+    function RemoveFromLeft(chopoff: SizeInt): String;
+  end;
+{$endif}
 
 //-----------------------Pointer functions------------------------
 type TProcedureOfObject=procedure () of object;
@@ -1065,6 +1070,14 @@ begin
   result := (l = length(s)) and ( (l = 0) or strlsiequal(p, pansichar(pointer(s)), l, l));
 end;
 
+
+{$ifdef FPC_HAS_CPSTRING}
+function TBByStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
+begin
+  result := self;
+  delete(result, 1, chopoff);
+end;
+{$endif}
 
 
 function strEqual(const s1, s2: RawByteString): boolean;
