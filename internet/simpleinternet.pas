@@ -178,7 +178,7 @@ end;
 
 function process(data: string; query: string): xquery.IXQValue;
 var dataFileName: string;
-  datain: String;
+  datain, contentType: String;
   tempVars: TXQVariableChangeLog;
   context: TXQEvaluationContext;
   format: TInternetToolsFormat;
@@ -192,8 +192,12 @@ begin
 
   data := retrieve(data);
 
-  if lastRetrievedType in [rtFile, rtRemoteURL] then dataFileName:=fileNameExpandToURI(datain);
-  format := guessFormat(data, dataFileName, lastContentType);
+  case lastRetrievedType of
+    rtRemoteURL: dataFileName := defaultInternet.lastUrl;
+    rtFile: dataFileName := fileNameExpandToURI(datain);
+  end;
+  contentType := lastContentType;
+  format := guessFormat(data, dataFileName, contentType);
 
   query := trim(query);
   querykind := guessExtractionKind(query);
@@ -209,7 +213,7 @@ begin
         templateParser.HTMLParser.repairMissingStartTags := format = itfHTML;
       end;
       templateParser.parseTemplate(query);
-      templateParser.parseHTML(data, dataFileName);
+      templateParser.parseHTML(data, dataFileName, contentType);
       if templateParser.variableChangeLog.count > 0 then begin
         tempVars := templateParser.VariableChangeLogCondensed.collected;
         if (tempVars.count = 1) and (tempVars.getName(0) = templateParser.UnnamedVariableName) then begin
