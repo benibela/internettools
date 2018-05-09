@@ -751,6 +751,14 @@ const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 type TExtractionKind = (ekAuto, ekXPath2, ekXPath3, ekPatternHTML, ekPatternXML, ekCSS, ekXQuery1, ekXQuery3, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
 function guessExtractionKind(e: string): TExtractionKind;
 
+const
+  rsPatternMatchingFailedS: string = 'Matching of pattern %s failed.';
+  rsPatternMatchingFailedDebugAtS: string = 'Couldn''t find a match for: %s';
+  rsPatternMatchingFailedDebugPreviousElementS: string = 'Previous element is: %s';
+  rsPatternMatchingFailedDebugLastMatchSS: string = 'Last match was: %s with %s';
+  rsPatternMatchingFailedDebugAllMatched: string = 'However, all elements have found their match.';
+
+
 implementation
 
 uses math,strutils,bbutilsbeta;
@@ -1976,6 +1984,16 @@ begin
 end;
 
 function THtmlTemplateParser.matchLastTrees: Boolean;
+  function nodeInfo(node: TTreeNode): string;
+  begin
+    result := node.toString();
+    if node = nil then exit;
+    case node.typ of
+      tetOpen: if (node.next <> nil) and (node.next.typ = tetText) then result += trim(node.next.value);
+      tetClose: if (node.previous <> nil) and (node.previous.typ = tetText) then result += trim(node.previous.value);
+    end;
+  end;
+
 var cur,last,realLast:TTemplateElement;
     temp: TTreeNode;
     err: String;
@@ -2029,10 +2047,10 @@ begin
       case cur.templateType of
         tetHTMLOpen, tetHTMLText, tetMatchElementOpen: begin
           if (cur.match = nil) then begin
-            err := 'Matching of template '+ftemplate.getLastTree.baseURI+' failed.'#13#10+
-                   'Couldn''t find a match for: '+cur.toString+#13#10;
-            if realLast <> nil then err += 'Previous element is:'+reallast.toString+#13#10;
-            if last <> nil then err += 'Last match was:'+last.toString+' with '+TTemplateElement(last).match.toString;
+            err := format(rsPatternMatchingFailedS, [ftemplate.getLastTree.baseURI]) + LineEnding +
+                   format(rsPatternMatchingFailedDebugAtS, [nodeInfo(cur)]) + LineEnding;
+            if realLast <> nil then err += format(rsPatternMatchingFailedDebugPreviousElementS, [nodeInfo(reallast)]) + LineEnding;
+            if last <> nil then err += format(rsPatternMatchingFailedDebugLastMatchSS, [nodeInfo(last), nodeInfo(TTemplateElement(last).match)]);
             raiseMatchingException(err);
           end;
           last:=cur;
@@ -2046,7 +2064,9 @@ begin
       realLast := cur;
       cur := cur.templateNext;
     end;
-    raiseMatchingException('Matching of template '+FTemplate.getLastTree.baseURI+' failed. for an unknown reason');
+    err := format(rsPatternMatchingFailedS, [ftemplate.getLastTree.baseURI]) + LineEnding + rsPatternMatchingFailedDebugAllMatched;
+    if last <> nil then err += format(rsPatternMatchingFailedDebugLastMatchSS, [nodeInfo(last), nodeInfo(TTemplateElement(last).match)]);
+    raiseMatchingException(err);
   end;
 //TODODO  for i:=1 to variableLogStart do FVariableLog.Delete(0); //remove the old variables from the changelog
 end;
