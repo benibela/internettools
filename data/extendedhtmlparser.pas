@@ -1985,12 +1985,22 @@ end;
 
 function THtmlTemplateParser.matchLastTrees: Boolean;
   function nodeInfo(node: TTreeNode): string;
+    function textNodeInfo(node: TTreeNode): string;
+    begin
+      result := '';
+      if node = nil then exit;
+      if node.typ <> tetText then exit;
+      result := trim(node.value);
+      if length(result) > 50 then result := copy(result, 1, 50) + '..';
+    end;
+
   begin
     result := node.toString();
     if node = nil then exit;
+
     case node.typ of
-      tetOpen: if (node.next <> nil) and (node.next.typ = tetText) then result += trim(node.next.value);
-      tetClose: if (node.previous <> nil) and (node.previous.typ = tetText) then result += trim(node.previous.value);
+      tetOpen: result += textNodeInfo(node.next);
+      tetClose: result := textNodeInfo(node.previous) + result;
     end;
   end;
 
