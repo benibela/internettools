@@ -223,6 +223,7 @@ begin
 
   t('type-of(x"{1}")', 'string');
   t('x"{(1,2,3)}"', '1 2 3');
+  t('x"{("1","2"," 3")}"', '1 2  3');
   t('x">{(1,2,3)}<"', '>1 2 3<');
 
   //change base xml used for tests
@@ -2485,7 +2486,7 @@ begin
   t('for $f in "foo" return join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).$f)', 'bar'); //test based on jsoniq standard
   t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).foo)', 'bar'); //test from jsoniq standard
 
-  t('(17).abc', '');
+  //t('(17).abc', '');
 
   //  t('$x. bar', 'bar');
 //  t('$x.$indirect', 'bar');

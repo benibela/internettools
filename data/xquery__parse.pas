@@ -1,7 +1,7 @@
 unit xquery__parse;
 
 {
-Copyright (C) 2008 - 2017 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2018 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -2002,7 +2002,8 @@ begin
           while true do begin
             SetLength(params, length(params) + 1);
             params[high(params)] := parseValue;
-            if not objInheritsFrom(params[high(params)], TXQTermConstant) then raiseSyntaxError('Only literals allowed as annotation arguments');
+            if not objInheritsFrom(params[high(params)], TXQTermConstant) or (TXQTermConstant(params[high(params)]).value.Count <> 1) then
+              raiseSyntaxError('Only literals allowed as annotation arguments');
             if nextToken(true) <> ',' then break;
             expect(',');
           end;
@@ -2198,12 +2199,12 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
   procedure pushTerm(t: TXQTerm);
   begin
     if t = nil then exit;
-    if not t.InheritsFrom(TXQTermConstant) then
-      t := TXQTermNamedFunction.create(XMLNamespaceURL_MyExtensionsNew, 'join', [t]);
-    if (result = nil) and t.InheritsFrom(TXQTermConstant) then
+    if not (t is TXQTermConstant) then
+      t := TXQTermNamedFunction.create(XMLNamespaceURL_MyExtensionsNew, 'join', [t])
+     else if TXQTermConstant(t).value.Count > 1 then
+       TXQTermConstant(t).value := xqvalue(TXQTermConstant(t).value.toJoinedString());
+    if (result = nil) then
       result := t
-    else if result = nil then
-      result := t//TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', [t])
     else if result.InheritsFrom(TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result)) then
       TXQTermNamedFunction(result).push(t)
     else
@@ -2331,7 +2332,7 @@ begin
                 TXQTermConstant.create(msg)]);
 end;
 
-function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false): txqterm;
+function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType; staticContext: TXQStaticContext; castable: boolean = false; allowNone: boolean = false): txqterm;
   function castFail(code: string): txqterm;
   begin
     if castable then result := TXQTermConstant.create(xqvalueFalse)
@@ -2367,6 +2368,11 @@ begin
               else result := TXQTermConstant.Create(TXQValueQName.create(typ, namespace, name));
             end else result := TXQTermConstant.Create(TXQValueQName.create(typ, staticContext.findNamespace('', xqdnkElementType), name));
           end;
+        end;
+        pvkUndefined: begin
+          if allowNone and castable then result := TXQTermConstant.create(xqvalueTrue)
+          else if allowNone then result := TXQTermConstant.create(xqvalue)
+          else result := castFail('XPTY0004');
         end
         else result := castFail('XPTY0004')
       end;
@@ -4323,7 +4329,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast')
       else if objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
         raiseParsingError('XQST0052', 'Expected simple type');
-      result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs);
+      result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs, st.allowNone);
     end else if b.op.func = @xqvalueInstanceOf then begin
       st := b.children[1] as TXQTermSequenceType;
       visitSequenceType(st);

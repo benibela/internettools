@@ -4001,6 +4001,7 @@ function TXQTermConstructor.isNamespaceConstructor: boolean;
 begin
   result := ((typ = tetAttribute)
             and objInheritsFrom(nameValue, TXQTermConstant)
+            and (TXQTermConstant(nameValue).value.Count = 1)
             and ((TXQTermConstant(nameValue).value.toString = 'xmlns') or strBeginsWith(TXQTermConstant(nameValue).value.toString, 'xmlns:')))
             or (typ = tetNamespace);
 end;
