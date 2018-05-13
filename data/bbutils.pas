@@ -1183,18 +1183,21 @@ begin
 end;
 
 function strlsiIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
-var last: pansichar;
+var last, startstr: pansichar;
+    searchedLow, searchedUp: char;
 begin
   if l2<=0 then begin result := 0; exit; end;
   if l1<l2 then begin result := -1; exit; end;
+  startstr := str;
   last:=str+(l1-l2);
   result:=0;
+  searchedLow := lowercase(searched^);
+  searchedUp := upcase(searched^);
   while str <= last do begin
-    if upcase(str^) = upcase(searched^) then
+    if (str^ = searchedLow) or (str^ = searchedUp) then
       if strlsiequal(str+1, searched+1, l2-1, l2-1) then
-        exit;
+        exit(str - startstr);
     inc(str);
-    inc(result);
   end;
   result:=-1;
 end;
