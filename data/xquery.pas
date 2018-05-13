@@ -1561,7 +1561,7 @@ type
 
   { TXQTermConstant }
 
-  TXQTermConstant = class(TXQTerm)
+  TXQTermConstant = class sealed(TXQTerm)
     value: IXQValue;
     constructor createNumber(const avalue: string);
     constructor create(const avalue: string);

@@ -60,6 +60,7 @@ type
 TXQParsingContext = class(TXQAbstractParsingContext)
 protected
   thequery: TXQuery;
+  tempcontext: TXQEvaluationContext;
   procedure raiseParsingError(errcode, s: string);
   procedure raiseSyntaxError(s: string);
   procedure raiseInvalidModel(s: string);
@@ -92,7 +93,7 @@ protected
   function normalizeLineEnding(const s: string): string;
 
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
-  function parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
+  function parseFunctionCall(target: TXQTermWithChildren): TXQTerm;
   function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
   procedure parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
@@ -104,8 +105,8 @@ protected
   function parseString(const w: string): string;
   function parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
-  function parseJSONLikeObjectConstructor(): TXQTermWithChildren; //**< parses an json object constructor { "name": value, .. } or {| ... |}
-  function parseJSONLikeArray(): TXQTermJSONArray;
+  function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
+  function parseJSONLikeArray(): TXQTerm;
 
 
   function parseFlower(akind: string): TXQTermFlower;
@@ -142,6 +143,9 @@ protected
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); override;
 
   function setXQueryVersion(code: string): boolean;
+
+
+  function optimizeConstantChildren(seq: TXQTermWithChildren): TXQTerm;
 end;
 
 implementation
@@ -677,12 +681,12 @@ begin
   end;
 end;
 
-procedure TXQParsingContext.skipWhitespace;
+procedure TXQParsingContext.skipWhitespace();
 begin
   while pos^ in WHITE_SPACE do pos += 1;
 end;
 
-procedure TXQParsingContext.skipComment;
+procedure TXQParsingContext.skipComment();
 var nestene: integer;
 begin
   nestene:=0;
@@ -699,7 +703,7 @@ begin
   raiseSyntaxError('Never ending comment')
 end;
 
-procedure TXQParsingContext.skipWhitespaceAndComment;
+procedure TXQParsingContext.skipWhitespaceAndComment();
 begin
   while (pos^ in WHITE_SPACE) or ((pos^ = '(') and ((pos+1)^ = ':')) do begin
     while pos^ in WHITE_SPACE do pos+=1;
@@ -895,7 +899,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char; allowPartialApplication: boolean  ): TXQTermWithChildren;
+function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char; allowPartialApplication: boolean): TXQTermWithChildren;
 var partialApplications: integer;
   procedure nextValue;
   begin
@@ -904,11 +908,11 @@ var partialApplications: integer;
       if pos^ = '?' then begin
         inc(pos);
         inc(partialApplications);
-        result.push(TXQTermPlaceholderVariable.Create);
+        target.push(TXQTermPlaceholderVariable.Create);
         exit;
       end;
     end;
-    result.push(parse());
+    target.push(parse());
   end;
 
 var
@@ -938,7 +942,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseFunctionCall(target: TXQTermWithChildren): TXQTermWithChildren;
+function TXQParsingContext.parseFunctionCall(target: TXQTermWithChildren): TXQTerm;
 begin
   result := parseSequenceLike(target, ')', parsingModel in [xqpmXPath3, xqpmXQuery3]);
 end;
@@ -1193,7 +1197,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parsePatternMatcher: TXQTermPatternMatcher;
+function TXQParsingContext.parsePatternMatcher(): TXQTermPatternMatcher;
 var
   curpos: PChar;
   temp: TXQTermConstructor;
@@ -2267,22 +2271,23 @@ begin
     result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'string', [result]);
 end;
 
-function TXQParsingContext.parseJSONLikeObjectConstructor: TXQTermWithChildren;
+function TXQParsingContext.parseJSONLikeObjectConstructor(): TXQTerm;
 var
   token: String;
   jn: TXQNativeModule;
   optional: Boolean;
   resobj: TXQTermJSONObjectConstructor;
+  resultfunc: TXQTermNamedFunction;
 begin
   //expect('{'); parsed by caller
   if pos^ = '|' then begin
     expect('|');
     jn := TXQueryEngine.findNativeModule('http://jsoniq.org/functions');
     if jn = nil then raiseParsingError('pxp:JSONIQ', 'The {| .. |} syntax can only be used, if the json unit is loaded.');
-    result := TXQTermNamedFunction.create();
-    TXQTermNamedFunction(result).kind := xqfkBasic;
-    TXQTermNamedFunction(result).func := jn.findBasicFunction('object', 1, xqpmXPath2);
-    result := parseSequenceLike(result, '|');
+    resultfunc := TXQTermNamedFunction.create();
+    resultfunc.kind := xqfkBasic;
+    resultfunc.func := jn.findBasicFunction('object', 1, xqpmXPath2);
+    result := parseSequenceLike(resultfunc, '|');
     expect('}');
     exit;
   end;
@@ -2292,14 +2297,14 @@ begin
     skipWhitespaceAndComment();
     if pos^ = '}' then begin expect('}'); exit;end;
     repeat
-      result.push(parse);
+      resobj.push(parse);
       skipWhitespaceAndComment();
       optional := pos^ = '?';
       if optional then expect('?:')
       else expect(':');
       //if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString); //removed as json-iq allows variables there
       skipWhitespaceAndComment();
-      result.push(parse);
+      resobj.push(parse);
       if optional then begin
         SetLength(resobj.optionals, length(resobj.children) div 2);
         resobj.optionals[high(resobj.optionals)] := true;
@@ -2313,10 +2318,10 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseJSONLikeArray: TXQTermJSONArray;
+function TXQParsingContext.parseJSONLikeArray(): TXQTerm;
 begin
   //expect('['); parsed by caller
-  result := parseSequenceLike(TXQTermJSONArray.Create, ']') as TXQTermJSONArray;
+  result := optimizeConstantChildren(parseSequenceLike(TXQTermJSONArray.Create, ']', false));
 end;
 
 function createDynamicErrorTerm(const code, msg: string): TXQTermNamedFunction;
@@ -2445,7 +2450,7 @@ begin
       if pos^ = '#' then exit(parseExtension);
       result := TXQTermSequence.Create;
       try
-        exit(parseSequenceLike(TXQTermWithChildren(result))); //only sequence or priority brackets
+        exit(optimizeConstantChildren(parseSequenceLike(TXQTermWithChildren(result), ')', false))); //only sequence or priority brackets
       except
         result.free;
         raise;
@@ -3068,14 +3073,13 @@ begin
   finalizeContextItemTypes(sc);
 end;
 
-function TXQParsingContext.parseModule: TXQTerm;
+function TXQParsingContext.parseModule(): TXQTerm;
 var
   pendings: TInterfaceList;
   otherQuery: TXQueryBreaker;
   i: Integer;
   hadPending: Boolean;
   tempTerm: TXQTerm;
-  tempContext: TXQEvaluationContext;
 begin
   pendings := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
   hadPending := pendings.Count > 0;
@@ -3090,7 +3094,6 @@ begin
   end;
   if objInheritsFrom(result, TXQTermModule) then begin
     if staticContext.isLibraryModule then TXQTermModule(result).push(TXQTermSequence.Create);
-    tempContext := staticContext.sender.getEvaluationContext(staticContext);
     initializeFunctions(TXQTermModule(result), tempContext);
   end;
   TXQueryBreaker(thequery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
@@ -3188,6 +3191,7 @@ begin
   pendingModules := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
   oldPendingCount := pendingModules.Count;
   oldFunctionCount := length(staticContext.functions);
+  tempContext := staticContext.sender.getEvaluationContext(staticContext);
   try
     if not onlySpecialString then begin
       TXQueryBreaker(thequery).fterm := parseModule;
@@ -3953,6 +3957,17 @@ begin
      else exit(false);
   end;
   result := true;
+end;
+
+function TXQParsingContext.optimizeConstantChildren(seq: TXQTermWithChildren): TXQTerm;
+var
+  t: TXQTerm;
+begin
+  for t in seq.children do
+    if not(t is TXQTermConstant) then
+      exit(seq);
+  result := TXQTermConstant.create(seq.evaluate( tempcontext ));
+  seq.free;
 end;
 
 
