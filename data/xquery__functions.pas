@@ -1977,15 +1977,14 @@ end;
 
 
 function xqFunctionContains(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var s, t: string;
+var t: string;
   collation: TXQCollation;
 begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
-  s :=args[0].toString;
   t :=args[1].toString;
   if t = '' then result := xqvalueTrue
-  else result := xqvalue(collation.contains(s,t));
+  else result := xqvalue(collation.contains(args[0].toString,t));
 end;
 
 function xqFunctionStarts_with(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
