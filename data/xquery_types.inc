@@ -1619,6 +1619,7 @@ begin
     result.fcurrent:=@seq.fbuffer[0];
     dec(result.fcurrent);
     result.flast := @seq.fbuffer[seq.Count-1];
+    //we do not need to set result.fsingleelement, since we set flast to non-nil
   end else TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 

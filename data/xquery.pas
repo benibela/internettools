@@ -4705,12 +4705,13 @@ end;
 
 function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
 begin
-  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs it occurs many times
+  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs many times
   if result then begin
     inc(fcurrent);
     exit;
   end;
-  if (fsingleelement <> nil) and (fcurrent = nil) then begin
+  //if we get here fcurrent = flast. So fsingleelement is only used if fcurrent = flast = nil.
+  if (fcurrent = nil) and (fsingleelement <> nil) then begin
     fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
     flast := @fsingleelement;
     exit(true);
