@@ -219,7 +219,7 @@ begin
                     value:=pos;
                     while (pos<=htmlEnd) and (pos^<>valueStart) do inc(pos);
                     valueLen:=pos-value;
-                    inc(pos);
+                    if pos <= htmlEnd then inc(pos);
                   end;
                 end;
               end;
