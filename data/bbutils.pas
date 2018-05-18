@@ -2713,6 +2713,7 @@ begin
       result[p+1] := charEncodeHexDigitUp(ord(s[i]) and $F);
       inc(p, 2);
     end;
+  Assert(p = length(result) + 1);
   //setlength(result, p-1);
 end;
 

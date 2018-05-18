@@ -747,7 +747,6 @@ begin
 end;
 
 function TJavaEnv.jStringToStringAndDelete(s: jobject): string;
-var chars: pchar;
 begin
   if s = nil then exit('');
   result := jStringToString(s);
