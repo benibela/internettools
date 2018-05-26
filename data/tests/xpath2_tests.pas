@@ -1268,7 +1268,7 @@ begin
   t('string-join(a/descendant-or-self::c/text(),",")', 'c1,c2,c3,c4,cx1,cx2,CC1', '');
   t('string-join(a/child::c/descendant::c/text(),",")', '', '');
   t('string-join(a/child::c/descendant-or-self::c/text(),",")', '', '');
-  t('string-join(a/b/child::c/descendant::c/text(),",")', 'CC1', '');
+  t('string-join(a/b/child::c/descendant::c/text(),",")', 'CC1', ''); //failing here might come from an an end node not being found
   t('string-join(a/b/child::c/descendant-or-self::c/text(),",")', 'c1,c2,c3,c4,cx1,cx2,CC1', '');
   t('string-join(a/b/following::d/text(),",")', 'd1,d2,d3', '');
   t('string-join(a/b/following-sibling::d/text(),",")', 'd1,d2,d3', '');

@@ -1433,12 +1433,6 @@ type
   end;
 
 
-  TXQPathMatchingAxis = (qcSameNode, qcDirectParent, qcDirectChildImplicit,  qcDirectChild, qcSameOrDescendant, qcDescendant, qcFollowing, qcFollowingSibling,
-                          qcAncestor, qcPrecedingSibling, qcPreceding, qcSameOrAncestor,
-                          qcDocumentRoot,
-                          qcFunctionSpecialCase,
-                          qcAttribute
-                          );
   TXQPathMatchingKind = (qmValue, qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument,
                          qmSchemaFail {schema matching is not supported},
                          qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild);
@@ -1460,23 +1454,20 @@ type
     function clone: TXQPathMatchingStep;
     function namespaceChecked: boolean;
     procedure destroy;
-    case typ: TXQPathMatchingAxis of  //**< Axis, where it searchs for a matching tree node
-    qcSameNode: (matching: TXQPathMatchingKinds;); //**< Which nodes match the query command. If this is [], _nothing_ is found! The elements of the set [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute] match nodes of a certain type, qmValue activates the value field.
-    qcFunctionSpecialCase: (specialCase: TXQTerm; );   //**< Term used for qcFunctionSpecialCase
+    case typ: TTreeNodeEnumeratorAxis of  //**< Axis, where it searchs for a matching tree node
+    tneaSameNode: (matching: TXQPathMatchingKinds;); //**< Which nodes match the query command. If this is [], _nothing_ is found! The elements of the set [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute] match nodes of a certain type, qmValue activates the value field.
+    tneaFunctionSpecialCase: (specialCase: TXQTerm; );   //**< Term used for qcFunctionSpecialCase
   end;
   TXQPathMatching = array of TXQPathMatchingStep;
 
   TTreeElementTypes = set of TTreeNodeType;
   TXQPathNodeConditionIteration = (qcnciNext, qcnciPreceding, qcnciParent);
 
-  TXQPathNodeConditionOption = (xqpncMatchStartNode, xqpncCheckValue, xqpncCheckNamespace, xqpncCheckOnSingleChild);
+  TXQPathNodeConditionOption = (xqpncCheckValue, xqpncCheckNamespace, xqpncCheckOnSingleChild);
   TXQPathNodeConditionOptions = set of TXQPathNodeConditionOption;
   //** Record mapping
-  TXQPathNodeCondition = record
+  TXQPathNodeCondition = object(TTreeNodeEnumeratorConditions)
     options: TXQPathNodeConditionOptions;
-    findOptions, initialFindOptions: TTreeNodeFindOptions; //**< find options for findNext
-    iteration: TXQPathNodeConditionIteration; //**< The axis to search
-    start,endnode: TTreeNode; //**< Start end node for the search
     searchedTypes: TTreeElementTypes; //**< Treeelement types matched by the query
     requiredValue: string; //**< Required node name (if checkValue)
     requiredValueHash: cardinal;
@@ -1484,6 +1475,10 @@ type
     requiredType: TXQTermSequenceType;
     equalFunction: TStringComparisonFunc; //**< Function used to compare node values with the required values
     documentElementSubCondition: ^TXQPathNodeCondition;
+
+    function nodeMatchesExtendedConditions(node: TTreeNode): boolean;
+    function getNextNode(prev: TTreeNode): TTreeNode; reintroduce;
+    procedure init(const contextNode: TTreeNode; const command: TXQPathMatchingStep); reintroduce;
   end;
 
 
@@ -2496,12 +2491,6 @@ public
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: TXQPathMatchingStepFilters; var context: TXQEvaluationContext);
 
-    class function nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean; static;
-    //** Gets the next node matching a query step (ignoring [] filter)
-    class function getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode; static;
-    //** Gets the next node matching a query step (ignoring [] filter)
-    class procedure unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition); static;
-
     //** Performs a query step, given a (sequence) of parent nodes
     class function expandSequence(const previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue; static;
     //** Initialize a query by performing the first step
@@ -3097,23 +3086,23 @@ var
   i: Integer;
 begin
   result := '';
-  if typ <> qcFunctionSpecialCase then begin
+  if typ <> tneaFunctionSpecialCase then begin
    if not (qmAttribute in matching) then
      case typ of
-       qcSameNode: result := 'self::';
-       qcDirectParent: result := 'parent::';
-       qcDirectChild: result := 'child::';
-       qcDirectChildImplicit: result := '';
-       qcSameOrDescendant: result := 'same-or-descendant::';
-       qcDescendant: result := 'descendant::';
-       qcFollowing: result := 'following::';
-       qcFollowingSibling: result := 'following-sibling::';
-       qcAncestor: result := 'ancestor::';
-       qcPrecedingSibling: result := 'preceding-sibling::';
-       qcPreceding: result := 'preceding::';
-       qcSameOrAncestor: result := 'same-or-ancestor::';
-       qcDocumentRoot: result := 'root::';
-       qcFunctionSpecialCase: result := '(:special-case::)';
+       tneaSameNode: result := 'self::';
+       tneaDirectParent: result := 'parent::';
+       tneaDirectChild: result := 'child::';
+       tneaDirectChildImplicit: result := '';
+       tneaSameOrDescendant: result := 'same-or-descendant::';
+       tneaDescendant: result := 'descendant::';
+       tneaFollowing: result := 'following::';
+       tneaFollowingSibling: result := 'following-sibling::';
+       tneaAncestor: result := 'ancestor::';
+       tneaPrecedingSibling: result := 'preceding-sibling::';
+       tneaPreceding: result := 'preceding::';
+       tneaSameOrAncestor: result := 'same-or-ancestor::';
+       tneaDocumentRoot: result := 'root::';
+       tneaFunctionSpecialCase: result := '(:special-case::)';
        else result := '???';
      end;
    if qmElement in matching then result += 'element';
@@ -3148,7 +3137,7 @@ begin
   for i := 0 to high(result.filters) do result.filters[i].filter:= result.filters[i].filter.clone;
   if requiredType = nil then result.requiredType:=nil
   else result.requiredType:=TXQTermSequenceType(requiredType.clone);
-  if typ = qcFunctionSpecialCase then result.specialCase :=specialCase.clone
+  if typ = tneaFunctionSpecialCase then result.specialCase :=specialCase.clone
   else result.matching:=matching;
 end;
 
@@ -3164,7 +3153,7 @@ begin
   for i := 0 to high(filters) do filters[i].filter.free;
   requiredType.Free;
   requiredType := nil;
-  if typ = qcFunctionSpecialCase then specialCase.free;
+  if typ = tneaFunctionSpecialCase then specialCase.free;
 end;
 
 constructor TXQDecimalFormat.Create;
@@ -7268,7 +7257,7 @@ var pos: pchar;
       else if striEqual(t, 'only-of-type') then  result := newBinOp(newFunction('count', [allOfSameType('')]), '=', newOne)
       else if striEqual(t, 'empty') then         begin
         result := TXQTermNodeMatcher.Create();
-        TXQTermNodeMatcher(Result).queryCommand.typ:=qcDirectChild;
+        TXQTermNodeMatcher(Result).queryCommand.typ:=tneaDirectChild;
         TXQTermNodeMatcher(Result).queryCommand.matching:=MATCH_ALL_NODES - [qmAttribute];
         result := newFunction('not', [result]);
       end else if striEqual(t, 'link') then          result := TXQTermIf.createLogicOperation(false, TXQTermNodeMatcher.Create('self', 'a'), newFunction('exists', newReadAttrib('href')))
@@ -7537,7 +7526,7 @@ begin
 
   resultSeq:=TXQValueSequence.create(previous.getSequenceCount);
   try
-    if command.typ = qcFunctionSpecialCase then begin
+    if command.typ = tneaFunctionSpecialCase then begin
       tempContext := context;
       tempContext.SeqLength:=previous.getSequenceCount;
       tempContext.SeqIndex:=0;
@@ -7569,7 +7558,7 @@ begin
     onlyNodes := false;
     for n in previous.GetEnumeratorPtrUnsafe do begin
       case command.typ of
-        qcFunctionSpecialCase: begin
+        tneaFunctionSpecialCase: begin
           if not (n^.kind in [pvkNode, pvkObject, pvkArray]) then
             raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery()); //continue;
           newList.clear;
@@ -7578,7 +7567,7 @@ begin
           if n^.kind = pvkNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
           newList.add(command.specialCase.evaluate(tempContext));
         end;
-        qcAttribute: begin
+        tneaAttribute: begin
           oldnode := n^.toNode;
           if oldnode = nil then raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery());
           if (oldnode.attributes = nil) or (oldnode.typ = tetProcessingInstruction) { a pi node has attributes internally but they are accessible} then continue;
@@ -7601,12 +7590,12 @@ begin
             pvkNode: begin
               assert(n^.toNode <> nil);
               oldnode := n^.toNode;
-              unifyQuery(oldnode, command, nodeCondition);
+              nodeCondition.init(oldnode, command);
               if namespaceMatching = xqnmURL then begin
                 nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
                 Include(nodeCondition.options, xqpncCheckNamespace);
               end else exclude(nodeCondition.options, xqpncCheckNamespace);
-              newnode := getNextQueriedNode(nil, nodeCondition);
+              newnode := nodeCondition.getNextNode(nil);
               if newnode = nil then continue;
               newList.count := 0;
               while newnode <> nil do begin
@@ -7614,22 +7603,20 @@ begin
                    or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
                    or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
                 newList.add(newnode);
-                newnode := getNextQueriedNode(newnode, nodeCondition);
+                newnode := nodeCondition.getNextNode(newnode);
               end;
-              if command.typ = qcPrecedingSibling then
-                newList.revert;
             end;
             pvkObject, pvkArray: begin
               if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
               if (command.namespaceURLOrPrefix <> '') or (command.requiredType <> nil)
-                 or not (command.typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant, qcSameNode])
-                 or ((command.typ <> qcSameNode) and (command.matching - [qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
-                 or ((command.typ = qcSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
+                 or not (command.typ in [tneaDirectChild, tneaDirectChildImplicit, tneaDescendant, tneaSameNode])
+                 or ((command.typ <> tneaSameNode) and (command.matching - [qmCheckNamespaceURL, qmCheckNamespacePrefix, qmCheckOnSingleChild, qmValue, qmAttribute] <> [qmElement]))
+                 or ((command.typ = tneaSameNode) and ((command.matching <> [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument]) or (command.value <> '') ))
                  then
                    raise EXQEvaluationException.create('pxp:JSON', 'too complex query for JSON object');
               newList.Count:=0;
               case command.typ of
-                qcDirectChild, qcDirectChildImplicit: begin
+                tneaDirectChild, tneaDirectChildImplicit: begin
                   if qmValue in command.matching then begin //read named property
                     //if tempKind <> pvkObject then raise EXQEvaluationException.create('err:XPTY0020', 'Only nodes (or objects if resp. json extension is active) can be used in path expressions');
                     if tempKind = pvkObject then newList.add(n^.getProperty(command.value))
@@ -7646,9 +7633,9 @@ begin
                     end;
                   end;
                 end;
-                qcDescendant:
+                tneaDescendant:
                   jsoniqDescendants(n^ as TXQValue, command.value);
-                qcSameNode:
+                tneaSameNode:
                   newList.add(n^);
               end;
 
@@ -7668,7 +7655,7 @@ begin
       end;
 
       if tempList.Count = 0 then continue;
-      if command.typ in [qcAncestor,qcSameOrAncestor,qcPreceding,qcPrecedingSibling] then
+      if command.typ in [tneaAncestor,tneaSameOrAncestor,tneaPreceding,tneaPrecedingSibling] then
         tempList.revert; //revert the list, because it is now in ancestor order (needed for indices in filtering), but need to be returned in document order
 
       if resultSeq.seq.Count = 0 then onlyNodes := tempList[0].kind = pvkNode;
@@ -7692,13 +7679,13 @@ var
   n: TTreeNode;
 begin
   case query.typ of
-    qcDocumentRoot: begin
+    tneaDocumentRoot: begin
       n := context.getRootHighest;
       if not objInheritsFrom(n, TTreeDocument) then raise EXQEvaluationException.create('XPDY0050', '/ can only select the root if it is a document node.');
       result := xqvalue(n);
       filterSequence(result, query.filters, context);
     end;
-    qcFunctionSpecialCase: begin
+    tneaFunctionSpecialCase: begin
       result := query.specialCase.evaluate(context);
       filterSequence(result, query.filters, context);
     end
@@ -7819,30 +7806,30 @@ begin
 end;
 
 {$ImplicitExceptions off}
-class function TXQueryEngine.nodeMatchesQueryLocally(const nodeCondition: TXQPathNodeCondition; node: TTreeNode): boolean;
+function TXQPathNodeCondition.nodeMatchesExtendedConditions(node: TTreeNode): boolean;
 begin
   result := false;
-  if not (node.typ in nodeCondition.searchedTypes) then exit(); //I tried to move this to findNextNode, but then it fails //text() because it needs to continue through non-text nodes to find one. and sequencetype needs it, too
-  if not (xqpncCheckOnSingleChild in nodeCondition.options) then begin
+  if not (node.typ in searchedTypes) then exit(); //I tried to move this to findNextNode, but then it fails //text() because it needs to continue through non-text nodes to find one. and sequencetype needs it, too
+  if not (xqpncCheckOnSingleChild in options) then begin
   end else begin
     if node.next = node.reverse then exit(); //no child
     if node.next.getNextSibling() <> nil then exit(); //too many children
     if (node.next.typ <> tetOpen) then exit;
     node := node.next //todo: does this affect requiredtype??
   end;
-  if ((xqpncCheckValue in nodeCondition.options )
-      and ((node.hash <> nodeCondition.requiredValueHash) or not nodeCondition.equalFunction(nodeCondition.requiredValue, node.value))) then
+  if ((xqpncCheckValue in options )
+      and ((node.hash <> requiredValueHash) or not equalFunction(requiredValue, node.value))) then
     exit();
-  if xqpncCheckNamespace in nodeCondition.options  then
+  if xqpncCheckNamespace in options  then
     if node.namespace = nil then begin
-      if nodeCondition.requiredNamespaceURL <> '' then exit(); //do not call getNamespaceURL, because returning strings is slow
+      if requiredNamespaceURL <> '' then exit(); //do not call getNamespaceURL, because returning strings is slow
     end else
-      if not node.namespace.equal(nodeCondition.requiredNamespaceURL) then exit();
-  if (nodeCondition.requiredType <> nil) and not (nodeCondition.requiredType.instanceOf(node)) then begin
-    if nodeCondition.requiredType.isSingleType() then
+      if not node.namespace.equal(requiredNamespaceURL) then exit();
+  if (requiredType <> nil) and not (requiredType.instanceOf(node)) then begin
+    if requiredType.isSingleType() then
       case node.typ of
-        tetOpen: exit(baseSchema.untyped.derivedFrom(nodeCondition.requiredType.atomicTypeInfo));
-        else exit(baseSchema.untypedAtomic.derivedFrom(nodeCondition.requiredType.atomicTypeInfo));
+        tetOpen: exit(baseSchema.untyped.derivedFrom(requiredType.atomicTypeInfo));
+        else exit(baseSchema.untypedAtomic.derivedFrom(requiredType.atomicTypeInfo));
       end;
     exit();
   end;
@@ -7852,76 +7839,17 @@ end;
 
 {$ImplicitExceptions on}
 
-function findNextNode(node: TTreeNode; const nodeCondition: TXQPathNodeCondition; findOptions: TTreeNodeFindOptions): TTreeNode; inline;
-//simplification of TTreeNode.findNext with only the relevant parts
-begin
-  if (tefoNoChildren in findOptions) and (node.typ in TreeNodesWithChildren) then result := node.reverse
-  else result := node.next;
-  if result <> nodeCondition.endnode then exit();
-  {this used to be in TTreeNode.findNext, but is not used here.
-   Does this mean tefoNoGrandChildren is not even used here?
 
-  if tefoNoGrandChildren in findOptions then begin
-    while (result <> nil) and (result <> nodeCondition.endnode) do begin
-      exit;
-      if result.typ in TreeNodesWithChildren then result := result.reverse
-      else result := result.next;
-    end;
-  end else begin
-    while (result <> nil) and (result <> nodeCondition.endnode) do begin
-      exit;
-      result := result.next;
-    end;
-  end;}
-  result := nil;
+function TXQPathNodeCondition.getNextNode(prev: TTreeNode): TTreeNode;
+begin
+  result := inherited getNextNode(prev);
+  while (result <> nil) do begin
+    if nodeMatchesExtendedConditions(result) then exit;
+    result := inherited getNextNode(result);
+  end;
 end;
 
-class function TXQueryEngine.getNextQueriedNode(prev: TTreeNode; var nodeCondition: TXQPathNodeCondition): TTreeNode;
-begin
-  //TODO: allow more combinations than single type, or ignore types
-  if (prev = nil) and (xqpncMatchStartNode in nodeCondition.options) then begin
-    if not assigned(nodeCondition.start) then exit(nil);
-    if nodeMatchesQueryLocally(nodeCondition, nodeCondition.start) then
-      exit(nodeCondition.start);
-  end;
-  case nodeCondition.iteration of
-    qcnciNext: begin
-      if (prev = nil) or (prev = nodeCondition.start) then begin
-        if not assigned(nodeCondition.start) then exit(nil);
-        prev := findNextNode(nodeCondition.start, nodeCondition, nodeCondition.initialFindOptions)
-       end else
-        prev := findNextNode(prev, nodeCondition, nodeCondition.findOptions);
-
-      while (prev <> nil) do begin
-        if nodeMatchesQueryLocally(nodeCondition, prev) then exit(prev);
-        prev := findNextNode(prev, nodeCondition, nodeCondition.findOptions);
-      end;
-    end;
-    qcnciParent: begin
-      if (prev = nil) then prev := nodeCondition.start;
-      while prev <> nil do begin
-        prev := prev.getParent();
-        if (prev <> nil)
-           and (nodeMatchesQueryLocally(nodeCondition, prev)) then exit(prev);
-      end;
-    end;
-    qcnciPreceding: begin
-      if (prev = nil) then prev := nodeCondition.start;
-      while prev <> nil do begin
-        prev := prev.previous;
-        while (prev <> nil) and (prev = nodeCondition.endnode) do begin
-          prev := prev.previous;
-          nodeCondition.endnode := nodeCondition.endnode.getParent();
-        end;
-        if (prev <> nil)
-           and (nodeMatchesQueryLocally(nodeCondition, prev)) then exit(prev);
-      end;
-    end;
-  end;
-  exit(nil);
-end;
-
-class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeNode; const command: TXQPathMatchingStep; out nodeCondition: TXQPathNodeCondition);
+procedure TXQPathNodeCondition.init(const contextNode: TTreeNode; const command: TXQPathMatchingStep);
   function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
   begin
     result := [];
@@ -7933,94 +7861,20 @@ class procedure TXQueryEngine.unifyQuery(const contextNode: TTreeNode; const com
     if qmDocument in qmt then include(result, tetDocument);
   end;
 begin
-  nodeCondition.findOptions:=[];
-  nodeCondition.initialFindOptions:=[];
-  nodeCondition.options:=[];
-  nodeCondition.iteration := qcnciNext;
+  options:=[];
   if (qmValue in command.matching) then begin
-    Include(nodeCondition.options, xqpncCheckValue);
-    nodeCondition.requiredValueHash := command.valueHash;
+    Include(options, xqpncCheckValue);
+    requiredValueHash := command.valueHash;
   end;
-  nodeCondition.requiredValue:=command.value;
-  if (qmCheckNamespaceURL in command.matching) or (qmCheckNamespacePrefix in command.matching) then Include(nodeCondition.options, xqpncCheckNamespace);
-  nodeCondition.requiredNamespaceURL:=command.namespaceURLOrPrefix; //is resolved later
-  nodeCondition.searchedTypes:=convertMatchingOptionsToMatchedTypes(command.matching);
-  nodeCondition.requiredType := command.requiredType;
-  if qmCheckOnSingleChild in command.matching then Include(nodeCondition.options, xqpncCheckOnSingleChild);
+  requiredValue:=command.value;
+  if (qmCheckNamespaceURL in command.matching) or (qmCheckNamespacePrefix in command.matching) then
+    Include(options, xqpncCheckNamespace);
+  requiredNamespaceURL:=command.namespaceURLOrPrefix; //is resolved later
+  searchedTypes:=convertMatchingOptionsToMatchedTypes(command.matching);
+  requiredType := command.requiredType;
+  if qmCheckOnSingleChild in command.matching then Include(options, xqpncCheckOnSingleChild);
 
-  if contextNode = nil then exit;
-
-  nodeCondition.start := contextnode;
-  nodeCondition.endnode := contextnode.reverse;
-
-  case command.typ of
-    qcSameNode: begin
-      Include(nodeCondition.options, xqpncMatchStartNode);
-      nodeCondition.endnode:=contextNode.next;
-    end;
-    qcDirectChild, qcDirectChildImplicit: begin
-      nodeCondition.findOptions:=[tefoNoGrandChildren, tefoNoChildren];
-      nodeCondition.initialFindOptions := [tefoNoGrandChildren];
-    end;
-    qcDescendant: begin
-      nodeCondition.findOptions:=[];
-      nodeCondition.initialFindOptions := [tefoNoGrandChildren];
-    end;
-    qcSameOrDescendant: begin
-      Include(nodeCondition.options, xqpncMatchStartNode);
-      nodeCondition.findOptions:=[];
-      nodeCondition.initialFindOptions := [tefoNoGrandChildren];
-    end;
-    qcFollowingSibling: begin
-      nodeCondition.findOptions:=[tefoNoChildren, tefoNoGrandChildren];
-      nodeCondition.initialFindOptions := [tefoNoGrandChildren,tefoNoChildren];
-      nodeCondition.endnode:=contextNode.getParent();
-      if nodeCondition.endnode <> nil then nodeCondition.endnode := nodeCondition.endnode.reverse;
-    end;
-    qcFollowing: begin
-      nodeCondition.findOptions:=[];
-      nodeCondition.initialFindOptions := [tefoNoChildren, tefoNoGrandChildren];
-      nodeCondition.endnode:=nil;
-    end;
-
-    qcDirectParent: begin
-      Include(nodeCondition.options, xqpncMatchStartNode);
-      nodeCondition.start := contextNode.getParent();
-      if nodeCondition.start <> nil then nodeCondition.endnode := nodeCondition.start.next;
-    end;
-    qcAncestor, qcSameOrAncestor: begin
-      nodeCondition.iteration := qcnciParent;
-      if command.typ = qcSameOrAncestor then Include(nodeCondition.options, xqpncMatchStartNode);
-      nodeCondition.endnode := nil;
-    end;
-    qcPrecedingSibling: begin
-      nodeCondition.start:=contextnode.getParent();
-      nodeCondition.findOptions:=[tefoNoGrandChildren, tefoNoChildren];
-      nodeCondition.initialFindOptions := [tefoNoGrandChildren];
-      nodeCondition.endnode:=contextnode;
-    end;
-    qcPreceding: begin
-      nodeCondition.iteration:=qcnciPreceding;
-      if contextNode.typ in [tetAttribute] then begin
-        nodeCondition.start := nil;  //preceding shall not match attributes
-        nodeCondition.endnode := nil;
-      end else begin
-        nodeCondition.start := contextNode;
-        nodeCondition.endnode := contextNode.getParent();
-      end;
-    end;
-  end;
-
-  //prevent search in certain cases, to prevent it from reading following elements as children from nodes that cannot have children
-  if (nodeCondition.iteration = qcnciNext)                                           //only qcnciNext is concerned with children
-     and (nodeCondition.start <> nil)
-     and (not (contextnode.typ in TreeNodesWithChildren) or (contextnode.reverse = nil))         //open elements (which btw. should always have a reverse element) have actual children, so this prevention is not needed / harmful
-     and (not (command.typ in [qcFollowing, qcFollowingSibling, qcPrecedingSibling]) //following/sibling should match following/sibling so there is also no problem
-           or (contextNode.typ in [tetAttribute]))  then            //except the node is an attribute, then should following/sibling shouldn't match anything
-    nodeCondition.endnode := nodeCondition.start.next; //prevent search
-
-  include(nodeCondition.findOptions,tefoIgnoreText); //text matching is done on our level
-  include(nodeCondition.initialFindOptions,tefoIgnoreText);
+  inherited init(contextNode, command.typ);
 end;
 
 

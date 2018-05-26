@@ -816,7 +816,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     node: TTreeNode;
   begin
     //this is a sub function, so the f/initialization of nodeCondition is only done for tests that actually are element tests
-    TXQueryEngine.unifyQuery(nil, self.nodeMatching, nodeCondition);
+    nodeCondition.init(nil, self.nodeMatching);
     if qmCheckNamespacePrefix in self.nodeMatching.matching then begin
       include(nodeCondition.options, xqpncCheckNamespace);
       if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)
@@ -827,7 +827,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     result := true;
     for v in ta.GetEnumeratorPtrUnsafe do begin
       node := v^.toNode;
-      result := result and assigned(node) and TXQueryEngine.nodeMatchesQueryLocally(nodeCondition, v^.toNode);
+      result := result and assigned(node) and nodeCondition.nodeMatchesExtendedConditions(v^.toNode);
       if not result then exit;
     end;
   end;
@@ -2940,7 +2940,7 @@ var
 begin
   result := xqtvaContinue;
   for i := 0 to high(path) do begin
-    if path[i].typ = qcFunctionSpecialCase then visitor.simpleTermVisit(@path[i].specialCase, self);
+    if path[i].typ = tneaFunctionSpecialCase then visitor.simpleTermVisit(@path[i].specialCase, self);
     if path[i].requiredType <> nil then visitor.simpleTermVisit(@path[i].requiredType, self);
     for j := 0 to high(path[i].filters) do begin
       result := visitor.simpleTermVisit(@path[i].filters[j], self);
@@ -2965,10 +2965,10 @@ var
   i, j: Integer;
 begin
   if length(path) = 0 then exit([]);
-  if path[0].typ = qcFunctionSpecialCase then result := path[0].specialCase.getContextDependencies
+  if path[0].typ = tneaFunctionSpecialCase then result := path[0].specialCase.getContextDependencies
   else result := ALL_CONTEXT_DEPENDENCIES - [xqcdFocusPosition, xqcdFocusLast, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
   for i := 0 to high(path) do begin
-    if path[i].typ = qcFunctionSpecialCase then result += path[i].specialCase.getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast];
+    if path[i].typ = tneaFunctionSpecialCase then result += path[i].specialCase.getContextDependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast];
     for j := 0 to high(path[i].filters) do
       result += path[i].filters[j].dependencies - [xqcdFocusItem,  xqcdFocusPosition, xqcdFocusLast];
   end;
@@ -2993,7 +2993,7 @@ begin
     addToPath(b.children[0]);
     if isDoubleSlash then begin
       setlength(path, length(path) + 1);
-      path[high(path)].typ:=qcSameOrDescendant;
+      path[high(path)].typ:=tneaSameOrDescendant;
       path[high(path)].matching:=[qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction];
     end;
     addToPath(b.children[1]);
@@ -3001,10 +3001,10 @@ begin
     //optimization
     //two descendants following each other can be condensed to a single descendant (but this changes the indices of the sequence, so it only work if there are no numeric filters)
     last := high(path);
-    if (path[last - 1].typ = qcSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
-        and (path[last].typ in [qcDirectChild, qcDirectChildImplicit, qcDescendant]) and (length(path[last].filters) = 0) then begin
+    if (path[last - 1].typ = tneaSameOrDescendant) and (path[last - 1].matching = [qmDocument, qmElement, qmText, qmComment, qmProcessingInstruction]) and (length(path[last - 1].filters) = 0)
+        and (path[last].typ in [tneaDirectChild, tneaDirectChildImplicit, tneaDescendant]) and (length(path[last].filters) = 0) then begin
       path[last - 1] := path[last];
-      path[last - 1].typ := qcDescendant;
+      path[last - 1].typ := tneaDescendant;
       SetLength(path, last);
     end;
     b.children := nil;
@@ -3029,7 +3029,7 @@ begin
     other.free;
   end else begin
     SetLength(path, length(path) + 1);
-    path[high(path)].typ := qcFunctionSpecialCase;
+    path[high(path)].typ := tneaFunctionSpecialCase;
     path[high(path)].specialCase:=term;
   end;
 end;
@@ -3052,9 +3052,9 @@ end;
 constructor TXQTermNodeMatcher.Create(direct: TXQTermNodeMatcherDirect);
 begin
   case direct of
-    xqnmdRoot: queryCommand.typ:=qcDocumentRoot;
+    xqnmdRoot: queryCommand.typ:=tneaDocumentRoot;
     xqnmdParent: begin
-      queryCommand.typ:=qcDirectParent; //parent /../
+      queryCommand.typ:=tneaDirectParent; //parent /../
       queryCommand.matching:=[qmDocument, qmElement];
     end;
   end;
@@ -3098,7 +3098,7 @@ end;
 
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if (queryCommand.matching = [qmText]) and (queryCommand.typ = qcDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then
+  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then
     result := xqvalue(context.TextNode)
   else begin
     result := TXQueryEngine.evaluateSingleStepQuery(queryCommand,context, true);
@@ -3139,27 +3139,27 @@ begin
 end;
 
 procedure TXQTermNodeMatcher.setAxis(const axis: string);
-  function getAxis(const axis: string): TXQPathMatchingAxis;
+  function getAxis(const axis: string): TTreeNodeEnumeratorAxis;
   begin
      //forward
      case axis of
-     '': result := qcDirectChildImplicit;
-     'child': result :=  qcDirectChild;
-     'descendant': result := qcDescendant;
-     'self': result := qcSameNode;
-     'parent': result := qcDirectParent;
+     '': result := tneaDirectChildImplicit;
+     'child': result :=  tneaDirectChild;
+     'descendant': result := tneaDescendant;
+     'self': result := tneaSameNode;
+     'parent': result := tneaDirectParent;
 
-     'descendant-or-self': result := qcSameOrDescendant;
-     'following-sibling': result := qcFollowingSibling;
-     'following': result := qcFollowing;
+     'descendant-or-self': result := tneaSameOrDescendant;
+     'following-sibling': result := tneaFollowingSibling;
+     'following': result := tneaFollowing;
 
      //reverse
-     'ancestor': result := qcAncestor;
-     'preceding-sibling': result := qcPrecedingSibling;
-     'preceding': result := qcPreceding;
-     'ancestor-or-self': result := qcSameOrAncestor;
+     'ancestor': result := tneaAncestor;
+     'preceding-sibling': result := tneaPrecedingSibling;
+     'preceding': result := tneaPreceding;
+     'ancestor-or-self': result := tneaSameOrAncestor;
 
-     'attribute': result := qcAttribute;
+     'attribute': result := tneaAttribute;
      else raise EXQEvaluationException.Create('XPST0003', 'Unknown axis: '+axis);
      end;
   end;

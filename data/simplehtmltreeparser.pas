@@ -144,10 +144,33 @@ end;
 
 TTreeNode = class;
 TTreeAttribute = class;
-
 TAttributeList = class;
 
-{ TAttributeEnumerator }
+TTreeNodeEnumeratorNextCallback = function (current: TTreeNode): TTreeNode;
+TTreeNodeEnumeratorAxis = (tneaSameNode, tneaDirectParent, tneaDirectChildImplicit,  tneaDirectChild, tneaSameOrDescendant, tneaDescendant, tneaFollowing, tneaFollowingSibling,
+                        tneaAncestor, tneaPrecedingSibling, tneaPreceding, tneaSameOrAncestor,
+                        //the following are not used here, but in xquery
+                        tneaDocumentRoot,
+                        tneaFunctionSpecialCase,
+                        tneaAttribute
+                        );
+
+TTreeNodeEnumeratorConditions = object
+type TTreeNodeEnumeratorBasicAxis = (tneabNoAxis, tneabFollowing, tneabFollowingSibling, tneabPreceding, tneabPrecedingSibling, tneabParent);
+protected
+  nextCallback: TTreeNodeEnumeratorNextCallback;
+  start, endnode: TTreeNode;
+  procedure setBasicAxis(axis: TTreeNodeEnumeratorBasicAxis);
+public
+  procedure init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
+  function getNextNode(current: TTreeNode): TTreeNode;
+end;
+TTreeNodeEnumerator = object(TTreeNodeEnumeratorConditions)
+public
+  Current: TTreeNode;
+  function MoveNext: Boolean;
+end;
+
 
 TAttributeEnumerator = record
   list: TAttributeList;
@@ -158,7 +181,6 @@ public
   property Current: TTreeAttribute read GetCurrent;
 end;
 
-{ TAttributeList }
 
 //**@abstract A list of attributes.
 //**Currently this is a simple string list, and you can get the values with the values property. (with c++ I would have used map<string, string> but this doesn't exist in Pascal)
@@ -252,9 +274,10 @@ TTreeNode = class
 
   function getPreviousSibling(): TTreeNode; //**< Get the previous element on the same level or nil if there is none
   function getNextSibling(): TTreeNode; //**< Get the next element on the same level or nil if there is none
+  function hasChildren(): boolean; inline;
   function getFirstChild(): TTreeNode; //**< Get the first child, or nil if there is none
-  function getParent(): TTreeNode; //**< Searchs the parent, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
-  function getPrevious(): TTreeNode; //**< Searchs the previous, notice that this is a slow function (neither the parent nor previous elements are stored in the tree, so it has to search the last sibling)
+  function getParent(): TTreeNode; //**< Searchs the parent
+  function getPrevious(): TTreeNode; //**< Searchs the previous
   function getRootHighest(): TTreeNode;    //**< Returns the highest node ancestor
   function getRootElement(): TTreeNode;    //**< Returns the highest element node ancestor
   function getDocument(): TTreeDocument; //**< Returns the document node containing this node. Raises an exception if there is no associated document
@@ -533,6 +556,117 @@ var
 begin
   for i := 1 to length(s) do if s[i] >= #128 then exit(0);
   result := nodeNameHash(s);
+end;
+
+function TTreeNodeEnumerator.MoveNext: Boolean;
+begin
+  current := nextCallback(current);
+  result := current <> nil;
+end;
+
+function axisAlwaysNil(current: TTreeNode): TTreeNode; begin ignore(current); result := nil; end;
+function axisNext(current: TTreeNode): TTreeNode; begin result := current.next; end;
+function axisNextSibling(current: TTreeNode): TTreeNode; begin result := current.getNextSibling(); end;
+function axisPrevious(current: TTreeNode): TTreeNode; begin result := current.previous; end;
+function axisPreviousSibling(current: TTreeNode): TTreeNode; begin result := current.getPreviousSibling(); end;
+function axisParent(current: TTreeNode): TTreeNode; begin result := current.getParent(); end;
+
+procedure TTreeNodeEnumeratorConditions.setBasicAxis(axis: TTreeNodeEnumeratorBasicAxis);
+const axisCallbacks: array[TTreeNodeEnumeratorBasicAxis] of TTreeNodeEnumeratorNextCallback = (
+  @axisAlwaysNil,
+  @axisNext,        @axisNextSibling,
+  @axisPrevious,    @axisPreviousSibling,
+  @axisParent
+  );
+
+begin
+  nextCallback := axisCallbacks[axis];
+end;
+
+procedure TTreeNodeEnumeratorConditions.init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
+var
+  basicAxis: TTreeNodeEnumeratorBasicAxis;
+begin
+  start := contextnode;
+  basicAxis := tneabNoAxis;
+
+  if contextNode <> nil then
+    case axis of
+      tneaSameNode: begin
+      end;
+      tneaDirectChild, tneaDirectChildImplicit:
+        if contextNode.typ <> tetAttribute then begin
+          start := contextNode.getFirstChild();
+          endnode := contextNode.reverse;
+          basicAxis := tneabFollowingSibling;
+        end else start := nil;
+      tneaDescendant:
+        if contextNode.typ <> tetAttribute then begin
+          start := contextNode.getFirstChild();
+          endnode := contextNode.reverse;
+          basicAxis := tneabFollowing;
+        end else start := nil;
+      tneaSameOrDescendant: begin
+        if contextNode.typ in TreeNodesWithChildren then begin
+          basicAxis := tneabFollowing;
+          endnode := contextNode.reverse
+        end;
+      end;
+      tneaFollowingSibling:
+        if contextNode.typ <> tetAttribute then begin
+          start := contextNode.getNextSibling();
+          basicAxis := tneabFollowingSibling;
+          endnode:=contextNode.getParent();
+          if endnode <> nil then endnode := endnode.reverse;
+        end else start := nil;
+      tneaFollowing:
+        if contextNode.typ <> tetAttribute then begin
+          if contextNode.hasChildren then start := contextNode.reverse
+          else start := start.next;
+          while (start <> nil) and (start.typ = tetClose) do start := start.next;
+          basicAxis := tneabFollowing;
+          endnode:=nil;
+        end else start := nil;
+
+      tneaDirectParent: begin
+        start := contextNode.getParent();
+      end;
+      tneaAncestor, tneaSameOrAncestor: begin
+        basicAxis := tneabParent;
+        if axis = tneaAncestor then start := start.getParent();
+        endnode := nil;
+      end;
+
+      tneaPrecedingSibling:
+        if contextNode.typ <> tetAttribute then begin
+          basicAxis := tneabPrecedingSibling;
+          start := contextNode.getPreviousSibling();
+          endnode:=contextnode.getParent();
+        end else start := nil;
+      tneaPreceding:
+        if contextNode.typ <> tetAttribute then begin
+          basicAxis := tneabPreceding;
+          start := contextNode.previous;
+          endnode := contextNode.getParent();
+        end else start := nil;
+    end;
+
+  if start = nil then basicAxis := tneabNoAxis;
+  setBasicAxis(basicAxis);
+end;
+
+function TTreeNodeEnumeratorConditions.getNextNode(current: TTreeNode): TTreeNode;
+begin
+  if current = nil then result := start
+  else result := nextCallback(current);
+  if result = endnode then begin
+    if nextCallback <> @axisPrevious then exit(nil);
+    //preceding axis does not include ancestors, so skip them here
+    while (result <> nil) and (result = endnode) do begin
+      result := axisPrevious(result);
+      endnode := endnode.getParent();
+    end;
+  end;
 end;
 
 {$ifndef USE_FLRE}
@@ -1228,13 +1362,13 @@ begin
   result := valueout <> nil;
 end;
 
-function TTreeNode.getAttributeCount: integer;
+function TTreeNode.getAttributeCount(): integer;
 begin
   if (self = nil) or (attributes = nil) then exit(0);
   result := attributes.Count;
 end;
 
-function TTreeNode.getPreviousSibling: TTreeNode;
+function TTreeNode.getPreviousSibling(): TTreeNode;
 begin
   result := previous;
   if result = nil then exit;
@@ -1255,6 +1389,11 @@ begin
   if result.typ = tetClose then exit(nil);
 end;
 
+function TTreeNode.hasChildren: boolean;
+begin
+  result := getFirstChild <> nil;
+end;
+
 function TTreeNode.getFirstChild(): TTreeNode;
 begin
   if not (typ in TreeNodesWithChildren) then exit(nil);
@@ -1268,31 +1407,31 @@ begin
   exit(parent);
 end;
 
-function TTreeNode.getPrevious: TTreeNode;
+function TTreeNode.getPrevious(): TTreeNode;
 begin
   if self = nil then exit(nil);
   result := previous
 end;
 
-function TTreeNode.getRootHighest: TTreeNode;
+function TTreeNode.getRootHighest(): TTreeNode;
 begin
   if self = nil then exit(nil);
   result := document;
 end;
 
-function TTreeNode.getRootElement: TTreeNode;
+function TTreeNode.getRootElement(): TTreeNode;
 begin
   result := document;
   if (result = nil) or (result.typ = tetOpen) then exit;
   exit(result.findChild(tetOpen,'',[tefoIgnoreText]));
 end;
 
-function TTreeNode.getDocument: TTreeDocument;
+function TTreeNode.getDocument(): TTreeDocument;
 begin
   result := document as TTreeDocument;
 end;
 
-function TTreeNode.hasDocument: boolean;
+function TTreeNode.hasDocument(): boolean;
 begin
   result := assigned(document) and document.InheritsFrom(TTreeDocument);
 end;
@@ -1313,7 +1452,7 @@ end;
 
 {$ImplicitExceptions off}
 
-function TTreeNode.getNodeName: string;
+function TTreeNode.getNodeName(): string;
 begin
   case typ of
     tetOpen, tetAttribute, tetClose, tetProcessingInstruction: begin
@@ -1326,7 +1465,7 @@ end;
 
 
 
-function TTreeNode.getNamespacePrefix: string;
+function TTreeNode.getNamespacePrefix(): string;
 begin
   if namespace = nil then exit('');
   result := namespace.getPrefix;

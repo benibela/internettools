@@ -996,7 +996,7 @@ procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQP
 var
   newword: String;
 begin
-  kindTest.typ:=qcDirectChild;
+  kindTest.typ:=tneaDirectChild;
   kindTest.matching:=convertElementTestToMatchingOptions(word);
   if (kindTest.matching = [qmAttribute]) and (word = 'namespace-node') then begin
     kindTest.matching := [qmAttribute, qmCheckNamespaceURL];
@@ -3983,7 +3983,7 @@ function TJSONLiteralReplaceVisitor.visit(t: PXQTerm): TXQTerm_VisitAction;
 begin
   result := xqtvaContinue;
   if objInheritsFrom(t^, TXQTermNodeMatcher) //and (length(TXQTermNodeMatcher(t^).children) = 0)
-     and ((TXQTermNodeMatcher(t^).queryCommand.typ = qcDirectChildImplicit))
+     and ((TXQTermNodeMatcher(t^).queryCommand.typ = tneaDirectChildImplicit))
      and ((TXQTermNodeMatcher(t^).queryCommand.namespaceChecked) //todo, this only should check for prefixes
      and (TXQTermNodeMatcher(t^).queryCommand.namespaceURLOrPrefix = ''))
      and not objInheritsFrom(parent, TXQTermPath)
@@ -4299,7 +4299,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in step.matching) then begin
       step.matching := step.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
-      if step.typ = qcAttribute then
+      if step.typ = tneaAttribute then
         step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkUnknown)
        else
         step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkElementType);
