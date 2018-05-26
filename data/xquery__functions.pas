@@ -1374,11 +1374,9 @@ var replaceNames, replaceValues: TStringArray;
 
       used := TStringList.Create;
       used.CaseSensitive:=false;
-      temp := form.getFirstChild();
-      while (temp <> nil) and (temp <> form.reverse) do begin
+      for temp in form.getEnumeratorDescendants do begin
         if nodeToFormData(temp, cmp, false, name, value) then begin
           addToRequest(name, value);
-          temp := temp.reverse;
         end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
           name := temp.getAttribute('name');
           if (name <> '') then begin
@@ -1387,7 +1385,6 @@ var replaceNames, replaceValues: TStringArray;
               addToRequest(name, '');
           end;
         end;
-        temp := temp.next;
       end;
 
       for i:=0 to high(replaceNames) do
