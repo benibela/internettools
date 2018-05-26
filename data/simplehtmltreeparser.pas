@@ -577,8 +577,7 @@ end;
 
 function TTreeNodeEnumerator.MoveNext: Boolean;
 begin
-  if fcurrent = nil then fcurrent := start
-  else fcurrent := nextCallback(fcurrent);
+  FCurrent := getNextNode(FCurrent);
   result := fcurrent <> nil;
 end;
 
