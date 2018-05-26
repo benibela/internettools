@@ -1144,7 +1144,6 @@ end;
 
 function nodeToFormData(temp: TTreeNode; cmp: TStringComparisonFunc; includeAllInputs: boolean; out name, value: string): boolean;
 var
-  tempend: TTreeNode;
   typ: String;
   first: Boolean;
 begin
@@ -1176,20 +1175,16 @@ begin
 
   if cmp(temp.value, 'select') then begin
     name := temp.getAttribute('name', cmp);
-    tempend := temp.reverse;
     value := '';
     first := true;
-    while temp <> tempend do begin
+    for temp in temp.getEnumeratorDescendants do begin
       if cmp(temp.value, 'option') and (first or temp.hasAttribute('selected', cmp)) then begin
         value := temp.getAttribute('value', cmp);
         first := false;
         if temp.hasAttribute('selected', cmp) then
           break;
       end;
-      temp := temp.next;
     end;
-    while temp <> tempend do
-      temp := temp.next;
     exit(not first);
   end;
   exit(false);

@@ -166,9 +166,12 @@ public
   function getNextNode(current: TTreeNode): TTreeNode;
 end;
 TTreeNodeEnumerator = object(TTreeNodeEnumeratorConditions)
+  FCurrent: TTreeNode;
 public
-  Current: TTreeNode;
+  procedure init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
   function MoveNext: Boolean;
+  property Current: TTreeNode read FCurrent;
+  function GetEnumerator: TTreeNodeEnumerator;
 end;
 
 
@@ -255,6 +258,14 @@ TTreeNode = class
   //**A direct child of X is a node Y with Y.parent = X. @br
   //**The options tefoNoChildren, tefoNoGrandChildren have of course no effect. (former is set to false, latter to true)
   function findChild(withTyp: TTreeNodeType; const withText:string; findOptions: TTreeNodeFindOptions=[]): TTreeNode;
+
+  function getEnumeratorChildren: TTreeNodeEnumerator;
+  function getEnumeratorDescendants: TTreeNodeEnumerator;
+  function getEnumeratorAncestors: TTreeNodeEnumerator;
+  function getEnumeratorPreceding: TTreeNodeEnumerator;
+  function getEnumeratorFollowing: TTreeNodeEnumerator;
+  function getEnumeratorPrecedingSiblings: TTreeNodeEnumerator;
+  function getEnumeratorFollowingSiblings: TTreeNodeEnumerator;
 
   function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
   function outerXML(insertLineBreaks: boolean = false):string;
@@ -558,10 +569,22 @@ begin
   result := nodeNameHash(s);
 end;
 
+procedure TTreeNodeEnumerator.init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
+begin
+  inherited;
+  fCurrent := nil;
+end;
+
 function TTreeNodeEnumerator.MoveNext: Boolean;
 begin
-  current := nextCallback(current);
-  result := current <> nil;
+  if fcurrent = nil then fcurrent := start
+  else fcurrent := nextCallback(fcurrent);
+  result := fcurrent <> nil;
+end;
+
+function TTreeNodeEnumerator.GetEnumerator: TTreeNodeEnumerator;
+begin
+  result := self;
 end;
 
 function axisAlwaysNil(current: TTreeNode): TTreeNode; begin ignore(current); result := nil; end;
@@ -1261,6 +1284,41 @@ begin
   result:=findNext(withTyp, withText, findOptions + [tefoNoGrandChildren] - [tefoNoChildren], reverse);
 end;
 
+function TTreeNode.getEnumeratorChildren: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaDirectChild);
+end;
+
+function TTreeNode.getEnumeratorDescendants: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaDescendant);
+end;
+
+function TTreeNode.getEnumeratorAncestors: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaAncestor);
+end;
+
+function TTreeNode.getEnumeratorPreceding: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaPreceding);
+end;
+
+function TTreeNode.getEnumeratorFollowing: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaFollowing);
+end;
+
+function TTreeNode.getEnumeratorPrecedingSiblings: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaPrecedingSibling);
+end;
+
+function TTreeNode.getEnumeratorFollowingSiblings: TTreeNodeEnumerator;
+begin
+  result.init(self, tneaFollowingSibling);
+end;
+
 {$ImplicitExceptions on}
 
 function TTreeNode.deepNodeText(separator: string): string;
@@ -1389,7 +1447,7 @@ begin
   if result.typ = tetClose then exit(nil);
 end;
 
-function TTreeNode.hasChildren: boolean;
+function TTreeNode.hasChildren(): boolean;
 begin
   result := getFirstChild <> nil;
 end;
