@@ -1142,64 +1142,115 @@ end;
 
 
 
-function nodeToFormData(temp: TTreeNode; cmp: TStringComparisonFunc; includeAllInputs: boolean; out name, value: string): boolean;
+function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllInputs: boolean; out name, value: string): boolean;
+//submittable elements:   button input object select textarea
+type TSubmittableElement = (seButton, seInput, seObject, seSelect, seTextarea);
+type TInputElementType = (ietOther, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
 var
   typ: String;
   first: Boolean;
+  kind: TSubmittableElement;
+  inputKind: TInputElementType;
+  ancestor, legend, descendant: TTreeNode;
 begin
-  if temp.typ <> tetOpen then exit(false);
+  result := false;
+  if node.typ <> tetOpen then exit;
 
-  if cmp(temp.value, 'textarea') then begin
-    name := temp.getAttribute('name', cmp);
-    value := temp.deepNodeText();
-    exit(true);
+  if cmp(node.value, 'input') then begin
+    kind := seInput;
+    typ := node.getAttribute('type', cmp);
+
+    if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
+    else if cmp(typ, 'image') then inputKind := ietImageButton
+    else if cmp(typ, 'submit') or cmp(typ, 'reset') or cmp(typ, 'button')  then inputKind := ietButton
+    else if cmp(typ, 'file') then inputKind := ietFile
+    else inputKind := ietOther
+    ;
+  end else begin
+    inputKind := ietOther;  //not used, fixes a pointless warning
+    if cmp(node.value, 'select') then kind := seSelect
+    else if cmp(node.value, 'textarea') then kind := seTextarea
+    else if cmp(node.value, 'button') then kind := seButton
+    else if cmp(node.value, 'object') then kind := seObject
+    else exit;
   end;
 
-  if cmp(temp.value, 'input') and (temp['name'] <> '') then begin
-    typ := temp.getAttribute('type', cmp);
-    if includeAllInputs or ( (typ = '') or cmp(typ, 'hidden') or cmp(typ, 'password') or cmp(typ, 'text') ) then begin
-      name := temp.getAttribute('name', cmp);
-      value := temp.getAttribute('value', cmp);
-    end else if (cmp(typ, 'checkbox') or cmp(typ, 'radio')) and (temp.hasAttribute('checked', cmp))  then begin
-      name := temp.getAttribute('name', cmp);
-      value := temp.getAttribute('value', 'on', cmp);
-    end else exit(false);
-    exit(true);
+  if not includeAllInputs then begin
+    if (kind = seButton) or ((kind = seInput) and (inputKind in [ietImageButton,ietButton])) then exit; //todo: only exit if not submitter
+    if kind = seObject then exit; //we have no plugins?
+
+    if (kind <> seObject) and node.hasAttribute('disabled', cmp) then exit;
+    legend := nil;
+    for ancestor in node.getEnumeratorAncestors do begin
+      if cmp(ancestor.value, 'fieldset') and ancestor.hasAttribute('disabled', cmp) then begin
+        if ancestor.findChild(tetOpen, 'legend') <> legend then //descendants of the first legend *child* are always enabled
+          exit;
+      end else if cmp(ancestor.value, 'legend') then legend := ancestor
+      //else if cmp(ancestor.value, 'datalist') then exit; html5 says, ignore fields with a datalist ancestor, but FF/Chromium do not do that
+    end;
+
+    if (inputKind = ietCheckboxOrRadiobutton) and (kind = seInput) and not node.hasAttribute('checked', cmp) then exit;
   end;
 
-  if includeAllInputs and cmp(temp.value, 'button') and (temp['name'] <> '') then begin
-    name := temp.getAttribute('name', cmp);
-    value := temp.getAttribute('value', cmp);
-    exit(true);
-  end;
 
-  if cmp(temp.value, 'select') then begin
-    name := temp.getAttribute('name', cmp);
-    value := '';
-    first := true;
-    for temp in temp.getEnumeratorDescendants do begin
-      if cmp(temp.value, 'option') and (first or temp.hasAttribute('selected', cmp)) then begin
-        value := temp.getAttribute('value', cmp);
-        first := false;
-        if temp.hasAttribute('selected', cmp) then
-          break;
+  name := node.getAttribute('name', cmp);
+
+  if name = '' then exit; //todo: do not exit on image buttons here
+
+  //todo: image button x,y
+
+  case kind of
+    seSelect: begin
+      value := '';
+      first := true;
+      for descendant in node.getEnumeratorDescendants do begin
+        if cmp(descendant.value, 'option') and (first or descendant.hasAttribute('selected', cmp)) then begin
+          value := descendant.getAttribute('value', cmp);
+          first := false;
+          //todo: multiple options can be selected
+          if descendant.hasAttribute('selected', cmp) then
+            break;
+        end;
+      end;
+      exit(not first);
+    end;
+    seInput: begin
+      case inputKind of
+        ietCheckboxOrRadiobutton: value := node.getAttribute('value', 'on', cmp);
+        ietFile: exit; //todo: file upload
+        //todo: ietHidden: if name = '_charset_' then value := getFormCharset(form)
+        else value := node.getAttribute('value', cmp);
       end;
     end;
-    exit(not first);
+    //seObject: ; aborted above
+    seTextarea: value := node.deepNodeText()
+    else value := node.getAttribute('value', cmp);
   end;
-  exit(false);
+  //todo: dirname attribute
+  //todo: line normalization
+  result := true;
 end;
 
 
 function getFormEncoding(n: TTreeNode): TSystemCodePage;
+var
+  encodingLabels, l: string;
 begin
-  n := n.getRootHighest();
-  if objInheritsFrom(n, TTreeDocument) then
-    result := TTreeDocument(n).baseEncoding
-  else
-    result := CP_UTF8;
+  result := CP_NONE;
+  if n.getAttributeTry('accept-charset', encodingLabels) then
+    for l in strSplitOnAsciiWS(encodingLabels) do begin
+      result := strEncodingFromName(l);
+      if result <> CP_NONE then break;
+    end;
+
+  if result = CP_NONE then begin
+    n := n.getRootHighest(); //html5 says this encoding should not be used when @accept-charset exists, even if it is empty, but FF/Chromium use it anyways :/
+    if objInheritsFrom(n, TTreeDocument) then
+      result := TTreeDocument(n).baseEncoding;
+  end;
+
   case result of
-    CP_ACP, CP_OEMCP, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII, CP_NONE:
+    CP_NONE, CP_ACP, CP_OEMCP, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII:
       result := CP_UTF8;
   end;
 end;
@@ -1311,6 +1362,13 @@ begin
 end;
 
 
+//see https://html.spec.whatwg.org/multipage/forms.html and https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-2
+{todo:
+form owner attribute can add submittable elements to the form that are not descendants of the form (e.g. form=xyz adds it to <form id=xyz)
+need to handle submitter element (e.g. button)
+check for <form method=dialog>
+enctype=text/plain
+}
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var replaceNames, replaceValues: TStringArray;
     specialReplaceValues: TXQVArray;

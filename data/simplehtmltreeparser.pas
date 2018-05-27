@@ -489,6 +489,7 @@ end;
 function xmlStrEscape(s: string; attrib: boolean = false):string;
 function xmlStrWhitespaceCollapse(const s: string):string;
 function htmlStrEscape(s: string; attrib: boolean = false; encoding: TSystemCodePage = CP_NONE):string;
+function strSplitOnAsciiWS(s: string): TStringArray; //splits on ascii whitespace as defined in HTML5 (note: #$C is WS in HTML but not in XML)
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -3113,6 +3114,12 @@ begin
   end;
   builder.final;
 end;
+
+function strSplitOnAsciiWS(s: string): TStringArray;
+begin
+  result := strSplit(strTrimAndNormalize(s, [#9,#$A,#$C,#$D,' ']), ' ');
+end;
+
 
 function equalNamespaces(const ans, bns: INamespace): boolean;
 begin

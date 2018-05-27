@@ -808,10 +808,10 @@ begin
   t('form(<form><input name="a" value="foo" type="radio"/></form>).url', 'pseudo://test');
   t('form(<form><input name="a" value="foo" type="radio" checked="checked"/></form>).url', 'pseudo://test?a=foo');
 
-  t('form(<form><select name="s"><option value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
-  t('form(<form><select name="s"><option selected="selected" value="1">a</option><option value="2">b</option></select></form>).url', 'pseudo://test?s=1');
-  t('form(<form><select name="s"><option value="1">a</option><option selected="selected" value="2">b</option></select></form>).url', 'pseudo://test?s=2');
-  t('form(<form><select name="s"></select></form>).url', 'pseudo://test');
+  t('form(<form><select name="s"><option value="1">a</option><option value="2">b</option></select><option name="wr" value="ong"/></form>).url', 'pseudo://test?s=1');
+  t('form(<form><select name="s"><option selected="selected" value="1">a</option><option value="2">b</option></select><option value="ong"/></form>).url', 'pseudo://test?s=1');
+  t('form(<form><select name="s"><option value="1">a</option><option selected="selected" value="2">b</option></select><option name="wr" value="ong"/></form>).url', 'pseudo://test?s=2');
+  t('form(<form><select name="s"></select><option name="wr" value="ong"/></form>).url', 'pseudo://test');
 
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
@@ -827,6 +827,11 @@ begin
   t('uri-combine((), <input name="c" value="foo" type="submit"/>)', 'c=foo');
   t('form(<form><input name="c" value="foo" type="submit"/></form>).url', 'pseudo://test');
   t('form(<form><input name="c" value="foo" type="submit"/></form>, <input name="c" value="foo" type="submit"/>).url', 'pseudo://test?c=foo');
+
+  t('form(<form accept-charset="xyyx'#9'rte'#$C'r latin1"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%E4%F6%FC');
+  t('form(<form accept-charset="asd'#$9'ter utf8"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%C3%A4%C3%B6%C3%BC');
+  t('form(<form><input name="a" value="b" disabled="false"/><datalist><input name="a2" value="b" /></datalist><fieldset disabled="x"><div><legend><input name="a3indiv" value="b"/></legend></div><legend><input name="a3" value="b"/></legend><input name="a4" value="b"/></fieldset></form>).url', 'pseudo://test?a2=b&a3=b');
+
 
   //Tests based on failed XQTS tests
   t('empty(text {"some text"}/..)', 'true');

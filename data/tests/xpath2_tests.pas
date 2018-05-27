@@ -3263,30 +3263,30 @@ begin
   t('', '', '!<html><form action="abc" method="POST"><input name="foo" value="bar"/><input name="X" value="123" type="unknown"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/><button name="btn" value="fu"/></form>'
                 + '<form action="abc22"><input name="foo2" value="bar2"/><input name="X" value="123" type="unknown"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/></form>'
                 + '<form action="next/haus/bimbam?k=y"><input name="T" value="Z"/><textarea name="fy">ihl</textarea></form>'
-                + '<form action="multi" enctype="multipart/form-data" method="POST"><input name="foo" value="bar"/><input name="X" value="123" type="unknown"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/></form>'
+                + '<form action="multi" enctype="multipart/form-data" method="POST"><input name="foo" value="bar"/><input name="X" value="123" type="file"/><input name="Y" value="456" type="checkbox" checked/><input name="Z" value="789" type="checkbox"/></form>'
                 + '</html>');
   t('form(//form[1]).url', 'pseudo://test/abc', '');
   t('form(//form[1]).headers', '', '');
   t('form(//form[1]).method', 'POST', '');
-  t('form(//form[1]).post', 'foo=bar&Y=456', '');
-  t('($f := form(//form[1], "foo=override")).post', 'foo=override&Y=456', '');
-  t('form-combine($f, "foo=cat").post', 'foo=cat&Y=456', '');
-  t('form(//form[1], "Y=override2&Z=override3&Z=override4").post', 'foo=bar&Y=override2&Z=override3&Z=override4', '');
-  t('form(//form[1], "foo=override&Y=override2&Z=override3&Z=override4").post', 'foo=override&Y=override2&Z=override3&Z=override4', '');
-  t('form(//form[1], {"foo": "override", "Y": "override2", "Z": "override3", "Z": "override4"}).post', 'foo=override&Y=override2&Z=override3&Z=override4', '');
-  t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&Y=override2&ride=&Z=override3&Z=override4', '');
-  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": "override3", "Z": "override4"}).post', 'foo=over%25%26ride&Y=override+2&Z=override3&Z=override4', '');
-  t('form(//form[1], //form[1]//button).post', 'foo=bar&Y=456&btn=fu', '');
+  t('form(//form[1]).post', 'foo=bar&X=123&Y=456', '');
+  t('($f := form(//form[1], "foo=override")).post', 'foo=override&X=123&Y=456', '');
+  t('form-combine($f, "foo=cat").post', 'foo=cat&X=123&Y=456', '');
+  t('form(//form[1], "Y=override2&Z=override3&Z=override4").post', 'foo=bar&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], "foo=override&Y=override2&Z=override3&Z=override4").post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], {"foo": "override", "Y": "override2", "Z": "override3", "Z": "override4"}).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&X=123&Y=override2&ride=&Z=override3&Z=override4', '');
+  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": "override3", "Z": "override4"}).post', 'foo=over%25%26ride&X=123&Y=override+2&Z=override3&Z=override4', '');
+  t('form(//form[1], //form[1]//button).post', 'foo=bar&X=123&Y=456&btn=fu', '');
 
-  t('form(//form[2]).url', 'pseudo://test/abc22?foo2=bar2&Y=456', '');
+  t('form(//form[2]).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('form(//form[2]).method', 'GET', '');
   t('form(//form[2]).post', '', '');
-  t('form(//form[2], "tt=tttt").url', 'pseudo://test/abc22?foo2=bar2&Y=456&tt=tttt', '');
-  t('form(//form[2], ("tt=tttt", "foo2=maus")).url', 'pseudo://test/abc22?foo2=maus&Y=456&tt=tttt', '');
+  t('form(//form[2], "tt=tttt").url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456&tt=tttt', '');
+  t('form(//form[2], ("tt=tttt", "foo2=maus")).url', 'pseudo://test/abc22?foo2=maus&X=123&Y=456&tt=tttt', '');
 
   t('count(form(//form))', '4', '');
   t('form(//form)[1].url', 'pseudo://test/abc', '');
-  t('form(//form)[2].url', 'pseudo://test/abc22?foo2=bar2&Y=456', '');
+  t('form(//form)[2].url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('form(//form)[3].url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
 
   baseboundary := '---------------------------1212jhjg2ypsdofx0235p2z5as09';
