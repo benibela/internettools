@@ -1431,7 +1431,7 @@ var replaceNames, replaceValues: TStringArray;
       encoding := getFormEncoding(form);
 
       used := TStringList.Create;
-      used.CaseSensitive:=false;
+      used.CaseSensitive:=true;
       for temp in form.getEnumeratorDescendants do begin
         if nodeToFormData(temp, cmp, false, name, value) then begin
           addToRequest(name, value);
