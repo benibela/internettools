@@ -523,7 +523,7 @@ begin
   if length(properties) = 0 then //test is unnessesary, as it should work with only the last branch. But being explicit looks better
     context.staticContext.sender.VariableChangelog.add(varname, value{%H-}, varnamespace)
    else
-    context.staticContext.sender.VariableChangelog.addObjectModification(varname, value, varnamespace, properties)
+    context.staticContext.sender.VariableChangelog.addObjectModification(varname, value, varnamespace, @properties[0], length(properties))
 
 
   (*exit;

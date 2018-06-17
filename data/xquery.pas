@@ -842,7 +842,7 @@ type
     procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
     function setImmutable(const name: string; const s: string): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
 
-    function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
 
     procedure enumerateKeys(sl: TStringList);
     function enumerateValues: IXQValue;
@@ -876,7 +876,7 @@ type
 
     function clone: IXQValue; override;
 
-    function setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueJSONArray;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
@@ -2664,7 +2664,7 @@ type
     //function evaluateVariable(sender: TObject; const variable: string; var value: IXQValue): boolean; //**< Sets @code(value) to the value of the variable @code(variable). @br This is used as callback by the XQuery-Engine
     //procedure defineVariable(sender: TObject; const variable: string; const value: IXQValue); //**< Sets @code(variable) to the @code(value)@br This is used as callback by the XQuery-Engine
 
-    procedure addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; properties: TStringArray);
+    procedure addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
 
   private
     shared: boolean;
@@ -5939,24 +5939,24 @@ begin
   inc(varcount);
 end;
 
-procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; properties: TStringArray);
+procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
 var
   oldObj, newValue: IXQValue;
 begin
   if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
-  if length(properties) = 0 then begin
+  if len <= 0 then begin
    add(variable, value, namespaceURL);
    exit;
   end;
 
   if not hasVariable(variable, oldObj, namespaceURL) then
-    raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(properties, '.')+')');
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(props, len, '.')+')');
 
 
   if not (oldObj is TXQValueObject) then begin
-    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(properties, '.')+')');
-    newValue := (oldObj as TXQValueJSONArray).setImmutable(properties, value);
-  end else newValue := (oldObj as TXQValueObject).setImmutable(properties, value);
+    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
+    newValue := (oldObj as TXQValueJSONArray).setImmutable(props, len, value);
+  end else newValue := (oldObj as TXQValueObject).setImmutable(props, len, value);
 
   reserve(count + 1);
 

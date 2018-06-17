@@ -1952,22 +1952,22 @@ begin
   result := setImmutable(name,xqvalue(s));
 end;
 
-function TXQValueObject.setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer = 0): TXQValueObject;
+function TXQValueObject.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
 var
   oldValue: TXQValue;
   newValue: IXQValue;
 begin
-  if startIndex = high(properties) then
-    exit(setImmutable(properties[high(properties)], v));
+  if len = 1 then
+    exit(setImmutable(props^, v));
 
-  if not hasProperty(properties[startIndex], @oldValue) then
-    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+properties[startIndex]+' not found, when assigning to '+strJoin(properties, '.'));
-  if objInheritsFrom(oldValue, TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(properties, v, startIndex+1)
-  else if objInheritsFrom(oldValue, TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(properties, v, startIndex+1)
-  else raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+properties[startIndex]+' to assign to '+strJoin(properties, '.'));
+  if not hasProperty(props^, @oldValue) then
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
+  if objInheritsFrom(oldValue, TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(props + 1, len - 1, v)
+  else if objInheritsFrom(oldValue, TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(props + 1, len - 1, v)
+  else raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
 
   result := cloneLinked;
-  result.values.add(properties[startIndex],  newValue);
+  result.values.add(props^, newValue);
 end;
 
 procedure TXQValueObject.enumerateKeys(sl: TStringList);
@@ -2168,24 +2168,24 @@ begin
   result := seqr;
 end;
 
-function TXQValueJSONArray.setImmutable(const properties: TStringArray; const v: IXQValue; startIndex: integer): TXQValueJSONArray;
+function TXQValueJSONArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
 var
   newValue: IXQValue;
   i: Integer;
   idx: Integer;
 begin
-  idx := StrToInt(properties[startIndex]);
+  idx := StrToInt(props^);
   if idx < 0 then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
 
-  if (startIndex = high(properties)) then
+  if (len = 1) then
     newValue := v
   else if (idx > seq.Count) then
-    raise EXQEvaluationException.Create('pxp:Array', 'Element index'+properties[startIndex]+' not found, when assigning to '+strJoin(properties, '.'))
+    raise EXQEvaluationException.Create('pxp:Array', 'Element index'+props^+' not found, when assigning to '+strJoin(props, len, '.'))
   else if seq[idx-1] is TXQValueObject then
-    newValue := (seq[idx-1] as TXQValueObject).setImmutable(properties, v, startIndex+1)
+    newValue := (seq[idx-1] as TXQValueObject).setImmutable(props + 1, len - 1, v)
   else if seq[idx-1] is TXQValueJSONArray then
-    newValue := (seq[idx-1] as TXQValueJSONArray).setImmutable(properties, v, startIndex+1)
-  else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+properties[startIndex]+' to assign to '+strJoin(properties, '.'));
+    newValue := (seq[idx-1] as TXQValueJSONArray).setImmutable(props + 1, len - 1, v)
+  else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+props^+' to assign to '+strJoin(props, len, '.'));
 
 
   result := TXQValueJSONArray.create(seq.Count);

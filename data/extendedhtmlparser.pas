@@ -1568,7 +1568,9 @@ var xpathText: TTreeNode;
       name := Trim(performPXPEvaluation(templateStart.varname).toString);
       props := strSplit(name, '.');
       if length(props) > 0 then name := arrayDelete(props, 0);
-      FVariableLog.addObjectModification(name, value, '', props);
+      if length(props) > 0 then FVariableLog.addObjectModification(name, value, '', @props[0], length(props))
+      else FVariableLog.addObjectModification(name, value, '', nil, 0);
+
     end else if (FUnnamedVariableName <> '') and (oldvarcount = FVariableLog.count) then
       FVariableLog.add(FUnnamedVariableName, value);
 
