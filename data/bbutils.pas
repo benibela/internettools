@@ -369,9 +369,8 @@ function strAfterLast(const s: string; const sep: TCharSet): string; overload;
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
 function strJoin(const sl: TStrings; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
 //**Joins all string list items to a single string separated by @code(sep).@br
-//**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
-//**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
-function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt=0; const limitStr: string='...'): string;overload;
+function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt=0; const limitStr: string='...'): string;overload;//{$ifdef HASINLINE} inline; {$endif}
+function strJoin(strings: PString; stringsLength: SizeInt; const sep: string = ', '): string;overload;
 
 //**Converts a str to a bool (for fpc versions previous 2.2)
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
@@ -2854,8 +2853,14 @@ begin
 end;
 
 
-function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt = 0;
+{function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt = 0;
  const limitStr: string = '...'): string; overload;
+begin
+  if length(sl) = 0 then exit('');
+  result := strJoin(@sl[0], length(sl), sep, limit, limitStr);
+end;}
+
+function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt=0; const limitStr: string='...'): string;overload;//{$ifdef HASINLINE} inline; {$endif}
 var i:SizeInt;
 begin
   Result:='';
@@ -2877,6 +2882,26 @@ begin
   end;
 end;
 
+function strJoin(strings: PString; stringsLength: SizeInt; const sep: string = ', '): string; overload;
+var sb: TStrBuilder;
+  reslen: SizeInt;
+  i: SizeInt;
+begin
+  case stringsLength of
+    0: exit('');
+    1: exit(strings^);
+  end;
+  reslen := length(sep) * (stringsLength - 1);
+  for i := 0 to stringsLength - 1 do reslen := reslen + length(strings[i]);
+  sb.init(@result, reslen);
+  sb.append(strings^);
+  for i := 1 to stringsLength - 1 do begin
+    sb.append(sep);
+    inc(strings);
+    sb.append(strings^);
+  end;
+  sb.final;
+end;
 
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
 
