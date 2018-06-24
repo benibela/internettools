@@ -3,6 +3,7 @@ unit bbjniutils;
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
 {$ModeSwitch typehelpers}
+{$Macro on}
 
 interface
 
@@ -60,8 +61,13 @@ type
 
   procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID); inline;
   procedure callStaticVoidMethod(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
-  function callStaticObjMethod(obj: jobject;  methodID: jmethodID): jobject; inline;
-  function callStaticObjMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callStaticObjectMethod(obj: jobject;  methodID: jmethodID): jobject; inline;
+  function callStaticObjectMethod(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
+
+  procedure callStaticVoidMethodChecked(obj: jobject; methodID: jmethodID); inline;
+  procedure callStaticVoidMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue); inline;
+  function callStaticObjectMethodChecked(obj: jobject;  methodID: jmethodID): jobject; inline;
+  function callStaticObjectMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
 
   procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject); inline;
   procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string); inline;
@@ -123,13 +129,53 @@ type
   function commonMethods_InputStream_Close(inputStream: jclass = nil): jmethodID; //todo cache
 end;
 
-  type TjobjectHelper = type helper for jobject
-    procedure SetObjectField(FieldID:JFieldID;Val:JObject); inline;
-    procedure SetStringField(FieldID:JFieldID;Val:string); inline;
-    procedure SetIntField(FieldID:JFieldID; i: jint); inline;
-    procedure SetLongField(FieldID:JFieldID; i: jlong); inline;
-    procedure SetBooleanField(FieldID:JFieldID; b: Boolean); inline;
-  end;
+
+
+TjobjectHelper = type helper for jobject
+  procedure SetObjectField(FieldID:JFieldID;Val:JObject); inline;
+  procedure SetStringField(FieldID:JFieldID;Val:string); inline;
+  procedure SetIntField(FieldID:JFieldID; i: jint); inline;
+  procedure SetLongField(FieldID:JFieldID; i: jlong); inline;
+  procedure SetBooleanField(FieldID:JFieldID; b: Boolean); inline;
+
+  procedure callVoidMethod(methodID: jmethodID); inline;
+  procedure callVoidMethod(methodID: jmethodID; args: Pjvalue); inline;
+  function callObjectMethod(methodID: jmethodID): jobject; inline;
+  function callObjectMethod(methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callBooleanMethod(methodID: jmethodID): boolean; inline;
+  function callBooleanMethod(methodID: jmethodID; args: Pjvalue): boolean; inline;
+  function callIntMethod(methodID: jmethodID): jint; inline;
+  function callIntMethod(methodID: jmethodID; args: Pjvalue): jint; inline;
+  function callStringMethod(methodID: jmethodID): string; inline;
+  function callStringMethod(methodID: jmethodID; args: Pjvalue): string; inline;
+
+  procedure callVoidMethodChecked(methodID: jmethodID); inline;
+  procedure callVoidMethodChecked(methodID: jmethodID; args: Pjvalue); inline;
+  function callObjectMethodChecked(methodID: jmethodID): jobject; inline;
+  function callObjectMethodChecked(methodID: jmethodID; args: Pjvalue): jobject; inline;
+  function callBooleanMethodChecked(methodID: jmethodID): boolean; inline;
+  function callBooleanMethodChecked(methodID: jmethodID; args: Pjvalue): boolean; inline;
+  function callIntMethodChecked(methodID: jmethodID): jint; inline;
+  function callIntMethodChecked(methodID: jmethodID; args: Pjvalue): jint; inline;
+  function callStringMethodChecked(methodID: jmethodID): string; inline;
+  function callStringMethodChecked(methodID: jmethodID; args: Pjvalue): string; inline;
+
+  procedure callStaticVoidMethodChecked(methodID: jmethodID); inline;
+  procedure callStaticVoidMethodChecked(methodID: jmethodID; args: Pjvalue); inline;
+  function callStaticObjectMethodChecked(methodID: jmethodID): jobject; inline;
+  function callStaticObjectMethodChecked(methodID: jmethodID; args: Pjvalue): jobject; inline;
+
+  procedure deleteLocalRef(); inline;
+  procedure deleteGlobalRef(); inline;
+  function newGlobalRefAndDelete(): jobject; inline;
+{end;
+
+TjclassHelper = type helper for jclass}
+  function NewObject: jobject;
+  function NewObject(m: jmethodID): jobject;
+  function NewObject(m: jmethodID; args: Pjvalue): jobject;
+  function getmethod(n, sig: pchar): jmethodID;
+end;
 
 
 const javaEnvRef: cardinal = $deadbeef; //block access to CustomDrawnInt.javaEnvRef because it is not thread safe
@@ -137,6 +183,8 @@ threadvar j: TJavaEnv; //this is an object to reduce the overhead caused by bein
 
 var jvmref: PJavaVM; //**< Java VM reference as passed to JNI_OnLoad.
     jContextObject: jobject;
+    jCustomClassLoader: jobject; //**< alternative class loader to use rather than env.findclass
+    jCustomClassLoaderFindClassMethod: jmethodID;
 
 var onLoad: function: integer;
 var onUnload: procedure;
@@ -151,6 +199,8 @@ procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); {$ifdef mswindows}stdcall;{
 //do not use (they are here just for testing)
 function isValidModifiedUTF8(const s: string; conversionMode: TStringConversionMode): integer;
 function repairModifiedUTF8(const s: string): string; //valid utf is converted, invalid characters are removed
+
+procedure setCustomClassLoaderFromLoadedClass(c: jclass);
 
 implementation
 
@@ -191,6 +241,28 @@ begin
   if assigned(onUnload) then onUnload();
 end;
 
+{$define TjclassHelper := TjobjectHelper}
+function TjclassHelper.NewObject: jobject;
+begin
+  result := NewObject(j.getmethod(self, '<init>', '()V'));
+end;
+
+function TjclassHelper.NewObject(m: jmethodID): jobject;
+begin
+  result := j.newObject(self, m);
+end;
+
+function TjclassHelper.NewObject(m: jmethodID; args: Pjvalue): jobject;
+begin
+  result := j.newObject(self, m, args);
+end;
+
+function TjclassHelper.getmethod(n, sig: pchar): jmethodID;
+begin
+  result := j.getmethod(self, n, sig);
+end;
+
+
 procedure TjobjectHelper.SetObjectField(FieldID: JFieldID; Val: JObject);
 begin
   j.SetObjectField(self, FieldID, val);
@@ -216,8 +288,160 @@ begin
   j.SetBooleanField(self, FieldID, b);
 end;
 
-function TJavaEnv.getclass(n: pchar): jclass;
+
+procedure TjobjectHelper.callVoidMethod(methodID: jmethodID);
 begin
+  j.callVoidMethod(self, methodID);
+end;
+
+procedure TjobjectHelper.callVoidMethod(methodID: jmethodID; args: Pjvalue);
+begin
+  j.callVoidMethod(self, methodID, args);
+end;
+
+function TjobjectHelper.callObjectMethod(methodID: jmethodID): jobject;
+begin
+  result := j.callObjectMethod(self, methodID);
+end;
+
+function TjobjectHelper.callObjectMethod(methodID: jmethodID; args: Pjvalue): jobject;
+begin
+  result := j.callObjectMethod(self, methodID, args);
+end;
+
+function TjobjectHelper.callBooleanMethod(methodID: jmethodID): boolean;
+begin
+  result := j.callBooleanMethod(self, methodID);
+end;
+
+function TjobjectHelper.callBooleanMethod(methodID: jmethodID; args: Pjvalue): boolean;
+begin
+  result := j.callBooleanMethod(self, methodID, args);
+end;
+
+function TjobjectHelper.callIntMethod(methodID: jmethodID): jint;
+begin
+  result := j.callIntMethod(self, methodID);
+end;
+
+function TjobjectHelper.callIntMethod(methodID: jmethodID; args: Pjvalue): jint;
+begin
+  result := j.callIntMethod(self, methodID, args);
+end;
+
+function TjobjectHelper.callStringMethod(methodID: jmethodID): string;
+begin
+  result := j.callStringMethod(self, methodID);
+end;
+
+function TjobjectHelper.callStringMethod(methodID: jmethodID; args: Pjvalue): string;
+begin
+  result := j.callStringMethod(self, methodID, args);
+end;
+
+
+
+procedure TjobjectHelper.callVoidMethodChecked(methodID: jmethodID);
+begin
+  j.callVoidMethodChecked(self, methodID);
+end;
+
+procedure TjobjectHelper.callVoidMethodChecked(methodID: jmethodID; args: Pjvalue);
+begin
+  j.callVoidMethodChecked(self, methodID, args);
+end;
+
+function TjobjectHelper.callObjectMethodChecked(methodID: jmethodID): jobject;
+begin
+  result := j.callObjectMethodChecked(self, methodID);
+end;
+
+function TjobjectHelper.callObjectMethodChecked(methodID: jmethodID; args: Pjvalue): jobject;
+begin
+  result := j.callObjectMethodChecked(self, methodID, args);
+end;
+
+function TjobjectHelper.callBooleanMethodChecked(methodID: jmethodID): boolean;
+begin
+  result := j.callBooleanMethodChecked(self, methodID);
+end;
+
+function TjobjectHelper.callBooleanMethodChecked(methodID: jmethodID; args: Pjvalue): boolean;
+begin
+  result := j.callBooleanMethodChecked(self, methodID, args);
+end;
+
+function TjobjectHelper.callIntMethodChecked(methodID: jmethodID): jint;
+begin
+  result := j.callIntMethodChecked(self, methodID);
+end;
+
+function TjobjectHelper.callIntMethodChecked(methodID: jmethodID; args: Pjvalue): jint;
+begin
+  result := j.callIntMethodChecked(self, methodID, args);
+end;
+
+function TjobjectHelper.callStringMethodChecked(methodID: jmethodID): string;
+begin
+  result := j.callStringMethodChecked(self, methodID);
+end;
+
+function TjobjectHelper.callStringMethodChecked(methodID: jmethodID; args: Pjvalue): string;
+begin
+  result := j.callStringMethodChecked(self, methodID, args);
+end;
+
+procedure TjobjectHelper.callStaticVoidMethodChecked(methodID: jmethodID);
+begin
+  j.callStaticVoidMethodChecked(self, methodID);
+end;
+
+procedure TjobjectHelper.callStaticVoidMethodChecked(methodID: jmethodID; args: Pjvalue);
+begin
+  j.callStaticVoidMethodChecked(self, methodID, args);
+end;
+
+function TjobjectHelper.callStaticObjectMethodChecked(methodID: jmethodID): jobject;
+begin
+  result := j.callStaticObjectMethodChecked(self, methodID);
+end;
+
+function TjobjectHelper.callStaticObjectMethodChecked(methodID: jmethodID; args: Pjvalue): jobject;
+begin
+  result := j.callStaticObjectMethodChecked(self, methodID, args);
+end;
+
+procedure TjobjectHelper.deleteLocalRef();
+begin
+  j.deleteLocalRef(self);
+end;
+
+procedure TjobjectHelper.deleteGlobalRef();
+begin
+  j.deleteGlobalRef(self);
+end;
+
+function TjobjectHelper.newGlobalRefAndDelete(): jobject;
+begin
+  result := j.newGlobalRefAndDelete(self);
+end;
+
+
+
+function TJavaEnv.getclass(n: pchar): jclass;
+var
+  jn: jobject;
+begin
+  if jCustomClassLoader <> nil then begin
+    jn := stringToJString(n);
+    result := callObjectMethod(jCustomClassLoader, jCustomClassLoaderFindClassMethod, @jn);
+    if ExceptionCheck then begin
+      env^^.ExceptionClear(env);
+      result := nil;
+    end;
+    deleteLocalRef(jn);
+    if result <> nil then exit;
+  end;
   result := env^^.FindClass(env, n);
   RethrowJavaExceptionIfThereIsOne();
 end;
@@ -409,14 +633,38 @@ begin
   env^^.CallStaticVoidMethodA(env, obj, methodID, args);
 end;
 
-function TJavaEnv.callStaticObjMethod(obj: jobject; methodID: jmethodID): jobject;
+function TJavaEnv.callStaticObjectMethod(obj: jobject; methodID: jmethodID): jobject;
 begin
   result := env^^.CallStaticObjectMethod(env, obj, methodID);
 end;
 
-function TJavaEnv.callStaticObjMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
+function TJavaEnv.callStaticObjectMethod(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
 begin
   result := env^^.CallStaticObjectMethodA(env, obj, methodID, args);
+end;
+
+procedure TJavaEnv.callStaticVoidMethodChecked(obj: jobject; methodID: jmethodID);
+begin
+  callStaticVoidMethod(obj, methodID);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+procedure TJavaEnv.callStaticVoidMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue);
+begin
+  callStaticVoidMethod(obj, methodID, args);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callStaticObjectMethodChecked(obj: jobject; methodID: jmethodID): jobject;
+begin
+  result := callStaticObjectMethod(obj, methodID);
+  RethrowJavaExceptionIfThereIsOne();
+end;
+
+function TJavaEnv.callStaticObjectMethodChecked(obj: jobject; methodID: jmethodID; args: Pjvalue): jobject;
+begin
+  result := callStaticObjectMethod(obj, methodID, args);
+  RethrowJavaExceptionIfThereIsOne();
 end;
 
 procedure TJavaEnv.SetObjectField(Obj: JObject; FieldID: JFieldID; Val: JObject);
@@ -962,6 +1210,20 @@ begin
 end;
 
 
+procedure setCustomClassLoaderFromLoadedClass(c: jclass);
+var classClass, classLoaderClass: jclass;
+  getClassLoaderMethod: jmethodID;
+begin
+  //see https://stackoverflow.com/questions/13263340/findclass-from-any-thread-in-android-jni
+  with needJ do begin
+    classClass := env^^.GetObjectClass(env, c);
+    getClassLoaderMethod := getmethod(classClass, 'getClassLoader', '()Ljava/lang/ClassLoader;');
+    jCustomClassLoader := newGlobalRefAndDelete(callObjectMethodChecked(c, getClassLoaderMethod));
+
+    classLoaderClass := env^^.FindClass(env, 'java/lang/ClassLoader');
+    jCustomClassLoaderFindClassMethod := getmethod(classLoaderClass, 'findClass', '(Ljava/lang/String;)Ljava/lang/Class;');
+  end;
+end;
 
 
 end.
