@@ -73,8 +73,6 @@ protected
 public
   constructor create();override;
   destructor destroy;override;
-  function needConnection():boolean;override;
-  procedure closeOpenedConnections();override;
 
   function internalHandle: TObject; override;
 end;
@@ -258,16 +256,6 @@ destructor TSynapseInternetAccess.destroy;
 begin
   FreeAndNil(connection);
   inherited destroy;
-end;
-
-function TSynapseInternetAccess.needConnection(): boolean;
-begin
-  result:=existsConnection();
-end;
-
-procedure TSynapseInternetAccess.closeOpenedConnections();
-begin
-  //TODO
 end;
 
 function TSynapseInternetAccess.internalHandle: TObject;

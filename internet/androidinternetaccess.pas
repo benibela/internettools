@@ -14,7 +14,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
-{**This unit contains the wrapper for Android.}
+{**This unit contains the wrapper TAndroidInternetAccess for Android.}
 unit androidinternetaccess;
 
 
@@ -54,8 +54,6 @@ protected
 public
   constructor create;override;
   destructor destroy;override;
-  function needConnection():boolean;override;
-  procedure closeOpenedConnections();override;
 
   function internalHandle: TObject; override;
 
@@ -506,15 +504,6 @@ begin
   inherited destroy;
 end;
 
-function TAndroidInternetAccess.needConnection(): boolean;
-begin
-  result:=existsConnection();
-end;
-
-procedure TAndroidInternetAccess.closeOpenedConnections();
-begin
-  //TODO
-end;
 
 function TAndroidInternetAccess.internalHandle: TObject;
 begin

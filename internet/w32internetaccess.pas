@@ -56,7 +56,6 @@ type
     constructor create();override;
     destructor destroy;override;
     function needConnection():boolean;override;
-    procedure closeOpenedConnections();override;
 
     function internalHandle: TObject; override;
   end;
@@ -430,13 +429,6 @@ begin
   if result then begin
     result:=existsConnection();
     newConnectionOpened:=true;
-  end;
-end;
-
-procedure TW32InternetAccess.closeOpenedConnections();
-begin
-  if newConnectionOpened then begin
-    //todo: close inet con
   end;
 end;
 

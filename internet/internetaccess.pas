@@ -233,11 +233,11 @@ type
 
 
     //**checks if an internet connection exists
-    function existsConnection():boolean;virtual;
+    function existsConnection():boolean; virtual; deprecated;
     //**call this to open a connection (very unreliable). It will return true on success
-    function needConnection():boolean;virtual;abstract;
+    function needConnection():boolean; virtual; deprecated;
     //**Should close all connections (doesn't work)
-    procedure closeOpenedConnections();virtual;abstract;
+    procedure closeOpenedConnections(); virtual; deprecated;
 
     //**Encodes the passed string in the url encoded format
     class function urlEncodeData(const data: string; encodingModel: TUrlEncodingModel = ueHTMLForm): string; static;
@@ -873,7 +873,7 @@ begin
   lastUrl := lastURLDecoded.combined;
 end;
 
-function TInternetAccess.getLastErrorDetails: string;
+function TInternetAccess.getLastErrorDetails(): string;
 begin
   result := lastErrorDetails;
 end;
@@ -1302,6 +1302,16 @@ begin
       result:=get('http',internetConfig^.connectionCheckPage,'/')<>'';
   except
   end;
+end;
+
+function TInternetAccess.needConnection(): boolean;
+begin
+  result:=existsConnection();
+end;
+
+procedure TInternetAccess.closeOpenedConnections();
+begin
+
 end;
 
 class function TInternetAccess.urlEncodeData(const data: string; encodingModel: TUrlEncodingModel): string;
