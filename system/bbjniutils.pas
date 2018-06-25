@@ -175,6 +175,7 @@ TjclassHelper = type helper for jclass}
   function NewObject(m: jmethodID): jobject;
   function NewObject(m: jmethodID; args: Pjvalue): jobject;
   function getmethod(n, sig: pchar): jmethodID;
+  function getstaticmethod(n, sig: pchar): jmethodID;
 end;
 
 
@@ -260,6 +261,11 @@ end;
 function TjclassHelper.getmethod(n, sig: pchar): jmethodID;
 begin
   result := j.getmethod(self, n, sig);
+end;
+
+function TjobjectHelper.getstaticmethod(n, sig: pchar): jmethodID;
+begin
+  result := j.getstaticmethod(self, n, sig);
 end;
 
 
