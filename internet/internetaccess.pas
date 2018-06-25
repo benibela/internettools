@@ -170,7 +170,7 @@ type
     function getLastErrorDetails(): string; virtual;
     //utility functions to minimize platform dependent code
   public
-    type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie);
+    type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie, iahUserAgent);
          //if headerKind is iahUnknown header contains the entire header line name: value, otherwise only the value
        THeaderEnumCallback = procedure (data: pointer; headerKindHint: THeaderKind; const name, value: string);
       class function parseHeaderLineKind(const line: string): THeaderKind; static;
@@ -1129,6 +1129,7 @@ begin
     'l', 'L': if check('location') then exit(iahLocation);
     'r', 'R': if check('referer') then exit(iahReferer);
     's', 'S': if check('set-cookie') then exit(iahSetCookie);
+    'u', 'U': if check('user-agent') then exit(iahUserAgent);
   end;
 end;
 
@@ -1161,6 +1162,7 @@ begin
     iahLocation: result := 'Location';
     iahSetCookie: result := 'Set-Cookie';
     iahCookie: result := 'Cookie';
+    iahUserAgent: result := 'User-Agent';
     else raise EInternetException.create('Internal error: Unknown header line kind');
   end;
 end;
@@ -1185,13 +1187,14 @@ begin
      callback(data, kind, parseHeaderLineName(additionalHeaders[i]), parseHeaderLineValue(additionalHeaders[i]));
    end;
 
-   if (not hadHeader[iahReferer]) and (lastUrl <> '') then callKnownKind( iahReferer, lastUrl );
+  if (not hadHeader[iahReferer]) and (lastUrl <> '') then callKnownKind( iahReferer, lastUrl );
    if (not hadHeader[iahAccept]) then callKnownKind( iahAccept, 'text/html,application/xhtml+xml,application/xml,text/*,*/*' );
    if (not hadHeader[iahCookie]) and (length(cookies.cookies) > 0) then begin
      temp := cookies.makeCookieHeaderValueOnly(target);
      if temp <> '' then callKnownKind( iahCookie, temp);
    end;
    if (not hadHeader[iahContentType]) and hasPostData then callKnownKind(iahContentType, ContentTypeForData);
+   //if (not hadHeader[iahUserAgent]) then callKnownKind( iahUserAgent, internetConfig^.userAgent ); no central handling of agent, it is too different between the APIs
 end;
 
 procedure TInternetAccess.init;
