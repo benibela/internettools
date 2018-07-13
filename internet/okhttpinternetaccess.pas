@@ -275,20 +275,20 @@ begin
         MediaTypeClass := getclass('okhttp3/MediaType').newGlobalRefAndDelete();
         MediaTypeMethods.parse := j.getstaticmethod(MediaTypeClass, 'parse', '(Ljava/lang/String;)Lokhttp3/MediaType;');
 
-        CallClass := getclass('okhttp3/Call');
+        CallClass := getclass('okhttp3/Call').newGlobalRefAndDelete();
         CallMethods.execute := CallClass.getmethod('execute', '()Lokhttp3/Response;');
 
-        ResponseClass := getclass('okhttp3/Response');
+        ResponseClass := getclass('okhttp3/Response').newGlobalRefAndDelete();
         ResponseMethods.body := ResponseClass.getmethod('body', '()Lokhttp3/ResponseBody;');
         ResponseMethods.code := ResponseClass.getmethod('code', '()I');
         ResponseMethods.headers := ResponseClass.getmethod('headers', '()Lokhttp3/Headers;');
         ResponseMethods.message := ResponseClass.getmethod('message', '()Ljava/lang/String;');
         ResponseMethods.close := ResponseClass.getmethod('close', '()V');
 
-        ResponseBodyClass := getclass('okhttp3/ResponseBody');
+        ResponseBodyClass := getclass('okhttp3/ResponseBody').newGlobalRefAndDelete();
         ResponseBodyMethods.bytestream := ResponseBodyClass.getmethod('byteStream', '()Ljava/io/InputStream;');
 
-        HeadersClass := getclass('okhttp3/Headers');
+        HeadersClass := getclass('okhttp3/Headers').newGlobalRefAndDelete();
         HeadersMethods.name := HeadersClass.getmethod('name', '(I)Ljava/lang/String;');
         HeadersMethods.value := HeadersClass.getmethod('value', '(I)Ljava/lang/String;');
         HeadersMethods.size := HeadersClass.getmethod('size', '()I');
