@@ -119,6 +119,19 @@ var okHttp: record
       end;
   end;
 
+function isRepeatableConnectionFailure(const msg: string; dataIsEmpty: boolean): boolean;
+begin
+  result :=
+            ((strContains(msg, 'javax.net.ssl.SSLHandshakeException') and strContains(msg, 'I/O error during system call')))
+            or (dataIsEmpty and
+                (
+                (strContains(msg, 'javax.net.ssl.SSLException') and strContains(msg, 'I/O error during system call'))
+                or (strContains(msg, 'java.net.SocketException') and strContains(msg, 'recvfrom failed: ETIMEDOUT'))
+                )
+               )
+            ;
+end;
+
 procedure addHeader(jrequestbuilder: jobject; {%H-}headerKind: TOKHTTPInternetAccess.THeaderKind; const name, value: string);
 var args: array[0..1] of jvalue;
 begin
@@ -139,87 +152,104 @@ var jUrl, jrequestbody, jrequest, jmediatype, jcall, jresponse, jbody, jheaders:
   wrappedData: jbyteArray;
   args: array[0..1] of jvalue;
   headerCount: jint;
-  i: Integer;
+  i, connectionResetRepeat: Integer;
+  connectionReset: Boolean;
 begin
   with needJ, okHttp do begin
-    ExceptionCheckAndClear;
+    connectionResetRepeat := 5;
+    connectionReset := true;
+    while connectionReset do begin
+      connectionReset := false;
+      try
+        ExceptionCheckAndClear;
 
-    jRequestBuilder := RequestBuilderClass.NewObject(RequestBuilderMethods.init);
-    if ExceptionCheckAndClear then exit;
+        jRequestBuilder := RequestBuilderClass.NewObject(RequestBuilderMethods.init);
+        if ExceptionCheckAndClear then exit;
 
-    jUrl := stringToJString(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
-    if ExceptionCheckAndClear then exit;
-    jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.url, @jurl).deleteLocalRef();
-    jurl.deleteLocalRef();
+        jUrl := stringToJString(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+        if ExceptionCheckAndClear then exit;
+        jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.url, @jurl).deleteLocalRef();
+        jurl.deleteLocalRef();
 
-    //todo: user/password
+        //todo: user/password
 
-    if not data.isEmpty then begin
-      wrappedData := env^^.NewByteArray(env, data.count);
-      if wrappedData = nil then begin
-        lastErrorDetails := 'Failed to allocate JNI array';
-        exit;
+        if not data.isEmpty then begin
+          wrappedData := env^^.NewByteArray(env, data.count);
+          if wrappedData = nil then begin
+            lastErrorDetails := 'Failed to allocate JNI array';
+            exit;
+          end;
+          env^^.SetByteArrayRegion(env, wrappedData, 0, data.count, data.data); //todo: is there a faster way than copying?
+
+          //mediatype = MediaType.parse(contenttype)
+          contenttype := trim(additionalHeaders.Values['Content-Type']);
+          if contenttype = '' then contenttype := ContentTypeForData;
+          args[0].l := stringToJString(contenttype);
+          jmediatype :=  MediaTypeClass.callStaticObjectMethodChecked(MediaTypeMethods.parse, @args[0]);
+          DeleteLocalRef(args[0].l);
+
+          //body = RequestBody.create(mediatype, data)
+          args[0].l := jmediatype;
+          args[1].l := wrappedData;
+          jrequestbody := RequestBodyClass.callStaticObjectMethodChecked(RequestBodyMethods.create, @args);
+          j.DeleteLocalRef(wrappedData);
+          j.DeleteLocalRef(jmediatype);
+        end else jrequestbody := nil;
+
+        //builder.method(method, body)
+        args[0].l := stringToJString(method);
+        args[1].l := jrequestbody;
+        jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.method, @args).deleteLocalRef();
+        deleteLocalRef(args[0].l);
+        if args[1].l <> nil then deleteLocalRef(args[1].l);
+
+        enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, jRequestBuilder);
+        if additionalHeaders.IndexOfName('User-Agent') < 0 then
+           addHeader(jRequestBuilder, iahUserAgent, 'User-Agent', internetConfig^.userAgent);
+
+        //request = builder.build()
+        jrequest := jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.build);
+        jRequestBuilder.deleteLocalRef();
+
+        //call = client.newCall(request)
+        jcall := Client.callObjectMethodChecked(ClientMethods.newCall, @jrequest);
+        jrequest.deleteLocalRef();
+
+        //response = call.execute()
+        jresponse := jcall.callObjectMethod(CallMethods.execute);
+        if ExceptionCheckAndClear then
+           exit; //here we do not want to raise an exception if the HTTP request fails. The caller will raise it if lastHTTPResultCode is not set
+        jcall.deleteLocalRef();
+
+        lastHTTPResultCode := jresponse.callIntMethodChecked(ResponseMethods.code);
+        lastErrorDetails := jresponse.callStringMethodChecked(ResponseMethods.message);
+
+        jbody := jresponse.callObjectMethodChecked(ResponseMethods.body);
+        inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @writeBlock);
+        deleteLocalRef(jbody);
+
+        lastHTTPHeaders.Clear;
+        jheaders := jresponse.callObjectMethodChecked(ResponseMethods.headers);
+        headerCount := callIntMethodChecked(jheaders, HeadersMethods.size);
+        for i := 0 to headerCount - 1 do begin
+          args[0].i := i;;
+          lastHTTPHeaders.add( callStringMethodChecked(jheaders, HeadersMethods.name, @args[0]) + ':' + callStringMethodChecked(jheaders, HeadersMethods.value, @args[0]));
+        end;
+        deleteLocalRef(jheaders);
+
+        jresponse.callVoidMethodChecked(ResponseMethods.close);
+        deleteLocalRef(jresponse);
+      except
+        on e: EAndroidInterfaceException do begin
+          if (connectionResetRepeat > 0) and isRepeatableConnectionFailure(e.Message, data.isEmpty)
+          then begin
+            dec(connectionResetRepeat);
+            Sleep(1000);
+            connectionReset := true;
+          end else raise;
+        end;
       end;
-      env^^.SetByteArrayRegion(env, wrappedData, 0, data.count, data.data); //todo: is there a faster way than copying?
-
-      //mediatype = MediaType.parse(contenttype)
-      contenttype := trim(additionalHeaders.Values['Content-Type']);
-      if contenttype = '' then contenttype := ContentTypeForData;
-      args[0].l := stringToJString(contenttype);
-      jmediatype :=  MediaTypeClass.callStaticObjectMethodChecked(MediaTypeMethods.parse, @args[0]);
-      DeleteLocalRef(args[0].l);
-
-      //body = RequestBody.create(mediatype, data)
-      args[0].l := jmediatype;
-      args[1].l := wrappedData;
-      jrequestbody := RequestBodyClass.callStaticObjectMethodChecked(RequestBodyMethods.create, @args);
-      j.DeleteLocalRef(wrappedData);
-      j.DeleteLocalRef(jmediatype);
-    end else jrequestbody := nil;
-
-    //builder.method(method, body)
-    args[0].l := stringToJString(method);
-    args[1].l := jrequestbody;
-    jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.method, @args).deleteLocalRef();
-    deleteLocalRef(args[0].l);
-    if args[1].l <> nil then deleteLocalRef(args[1].l);
-
-    enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, jRequestBuilder);
-    if additionalHeaders.IndexOfName('User-Agent') < 0 then
-       addHeader(jRequestBuilder, iahUserAgent, 'User-Agent', internetConfig^.userAgent);
-
-    //request = builder.build()
-    jrequest := jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.build);
-    jRequestBuilder.deleteLocalRef();
-
-    //call = client.newCall(request)
-    jcall := Client.callObjectMethodChecked(ClientMethods.newCall, @jrequest);
-    jrequest.deleteLocalRef();
-
-    //response = call.execute()
-    jresponse := jcall.callObjectMethod(CallMethods.execute);
-    if ExceptionCheckAndClear then
-       exit; //here we do not want to raise an exception if the HTTP request fails. The caller will raise it if lastHTTPResultCode is not set
-    jcall.deleteLocalRef();
-
-    lastHTTPResultCode := jresponse.callIntMethodChecked(ResponseMethods.code);
-    lastErrorDetails := jresponse.callStringMethodChecked(ResponseMethods.message);
-
-    jbody := jresponse.callObjectMethodChecked(ResponseMethods.body);
-    inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @writeBlock);
-    deleteLocalRef(jbody);
-
-    lastHTTPHeaders.Clear;
-    jheaders := jresponse.callObjectMethodChecked(ResponseMethods.headers);
-    headerCount := callIntMethodChecked(jheaders, HeadersMethods.size);
-    for i := 0 to headerCount - 1 do begin
-      args[0].i := i;;
-      lastHTTPHeaders.add( callStringMethodChecked(jheaders, HeadersMethods.name, @args[0]) + ':' + callStringMethodChecked(jheaders, HeadersMethods.value, @args[0]));
     end;
-    deleteLocalRef(jheaders);
-
-    jresponse.callVoidMethodChecked(ResponseMethods.close);
-    deleteLocalRef(jresponse);
   end;
 end;
 
