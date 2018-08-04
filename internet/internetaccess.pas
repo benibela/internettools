@@ -236,7 +236,7 @@ type
     function existsConnection():boolean; virtual; deprecated;
     //**call this to open a connection (very unreliable). It will return true on success
     function needConnection():boolean; virtual; deprecated;
-    //**Should close all connections (doesn't work)
+    //**Should close all connections (doesn''t work)
     procedure closeOpenedConnections(); virtual; deprecated;
 
     //**Encodes the passed string in the url encoded format
