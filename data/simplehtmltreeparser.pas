@@ -55,7 +55,8 @@ public
   procedure Add(const Key:TXQHashKeyString; const Value:TValue); inline;
   property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
 end;
-TXQHashmapStrOwningObject = specialize TXQHashmapStrOwning<TObject, TObjectList>;
+generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TObjectList>);
+TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
 TXQHashmapStrOwningInterface = specialize TXQHashmapStrOwning<IUnknown, TInterfaceList>;
 
 
