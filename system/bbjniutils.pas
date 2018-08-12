@@ -70,12 +70,14 @@ type
   function callStaticObjectMethodChecked(obj: jobject;  methodID: jmethodID; args: Pjvalue): jobject; inline;
 
   procedure SetObjectField(Obj:JObject;FieldID:JFieldID;Val:JObject); inline;
+  procedure SetObjectFieldAndDelete(Obj:JObject;FieldID:JFieldID;Val:JObject); inline;
   procedure SetStringField(Obj:JObject;FieldID:JFieldID;Val:string); inline;
   procedure SetIntField(Obj:JObject;FieldID:JFieldID; i: jint); inline;
   procedure SetLongField(Obj:JObject;FieldID:JFieldID; i: jlong); inline;
   procedure SetBooleanField(Obj:JObject;FieldID:JFieldID; b: Boolean); inline;
 
   procedure setObjectArrayElement(a: jobject; index: integer; v: jobject); inline;
+  procedure setObjectArrayElementAndDelete(a: jobject; index: integer; v: jobject); inline;
   function getObjectArrayElement(a: jobject; index: integer): jobject; inline;
   procedure setStringArrayElement(a: jobject; index: integer; v: string); inline;
   function getStringArrayElement(a: jobject; index: integer): string; inline;
@@ -84,7 +86,8 @@ type
 
   function newObject(c: jclass; m: jmethodID): jobject;
   function newObject(c: jclass; m: jmethodID; args: Pjvalue): jobject;
-  function newObjectArray(len: integer; c: jclass; def: jobject): jobject;
+  function newObjectArray(len: integer; c: jclass; def: jobject = nil): jobject;
+  function newStringArray(len: integer; def: jobject = nil): jobject;
 
   function newGlobalRefAndDelete(obj: jobject): jobject;
   procedure deleteLocalRef(obj: jobject); inline;
@@ -695,6 +698,12 @@ begin
   env^^.SetObjectField(env, Obj, FieldID, val);
 end;
 
+procedure TJavaEnv.SetObjectFieldAndDelete(Obj: JObject; FieldID: JFieldID; Val: JObject);
+begin
+  SetObjectField(obj, FieldID, val);
+  deleteLocalRef(val);
+end;
+
 procedure TJavaEnv.SetStringField(Obj: JObject; FieldID: JFieldID; Val: string);
 var
   temp: jobject;
@@ -722,6 +731,12 @@ end;
 procedure TJavaEnv.setObjectArrayElement(a: jobject; index: integer; v: jobject);
 begin
   env^^.SetObjectArrayElement(env, a, index, v);
+end;
+
+procedure TJavaEnv.setObjectArrayElementAndDelete(a: jobject; index: integer; v: jobject);
+begin
+  setObjectArrayElement(a, index, v);
+  deleteLocalRef(v);
 end;
 
 function TJavaEnv.getObjectArrayElement(a: jobject; index: integer): jobject;
@@ -768,6 +783,11 @@ end;
 function TJavaEnv.newObjectArray(len: integer; c: jclass; def: jobject): jobject;
 begin
   result := env^^.NewObjectArray(env,   len, c, def);
+end;
+
+function TJavaEnv.newStringArray(len: integer; def: jobject): jobject;
+begin
+  result := env^^.NewObjectArray(env, len, commonClasses_String, def);
 end;
 
 function TJavaEnv.newGlobalRefAndDelete(obj: jobject): jobject;
