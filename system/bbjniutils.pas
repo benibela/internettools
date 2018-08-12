@@ -458,8 +458,12 @@ begin
 end;
 
 function TJavaEnv.getmethod(classname: pchar; n, sig: pchar): jmethodID;
+var
+  c: jclass;
 begin
-  result := getmethod(getclass(classname), n, sig);
+  c := getclass(classname);
+  result := getmethod(c, n, sig);
+  deleteLocalRef(c);
 end;
 
 function TJavaEnv.getfield(c: jclass; n, sig: pchar): jfieldID;
@@ -468,8 +472,12 @@ begin
 end;
 
 function TJavaEnv.getfield(classname: pchar; n, sig: pchar): jfieldID;
+var
+  c: jclass;
 begin
-  result := j.env^^.GetFieldID(env, getclass(classname), n, sig);
+  c := getclass(classname);
+  result := j.env^^.GetFieldID(env, c, n, sig);
+  deleteLocalRef(c);
 end;
 
 function TJavaEnv.getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
@@ -480,8 +488,12 @@ begin
 end;
 
 function TJavaEnv.getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
+var
+  c: jclass;
 begin
-  result := getstaticmethod(getclass(classname), n, sig);
+  c := getclass(classname);
+  result := getstaticmethod(c, n, sig);
+  deleteLocalRef(c);
 end;
 
 function TJavaEnv.getstaticfield(c: jclass; n, sig: pchar): jfieldID;
@@ -490,8 +502,12 @@ begin
 end;
 
 function TJavaEnv.getstaticfield(classname: pchar; n, sig: pchar): jfieldID;
+var
+  c: jclass;
 begin
-  result := getstaticfield(getclass(classname), n, sig);
+  c := getclass(classname);
+  result := getstaticfield(c, n, sig);
+  deleteLocalRef(c);
 end;
 
 function TJavaEnv.getObjectField(obj: jobject; id: jfieldID): jobject;
