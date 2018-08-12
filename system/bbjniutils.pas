@@ -99,7 +99,7 @@ type
   function jStringToStringAndDelete(s: jobject): string;
   function booleanToJboolean(b: boolean): jboolean; inline;
 
-  function arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
+  function arrayToJArray(a: array of string): jobject;
 
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
   procedure RethrowJavaExceptionIfThereIsOne();
@@ -109,28 +109,19 @@ type
   procedure ThrowNew(c: jclass; error: string);
   procedure ThrowNew(c: pchar; error: string);
 
-  function inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead, jmInputStreamClose: jmethodID): string;
   function inputStreamToStringAndDelete(stream: jobject): string;
+  private
   procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite; jmInputStreamRead, jmInputStreamClose: jmethodID);
+  public
   procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite);
 
-  function getMapProperty(map: jobject; value: jobject): jobject;
+  function getMapProperty(map: jobject; value: jobject): jobject; deprecated 'I do not use this anymore? So I remove it?';
 
   {$ifdef android}
   function getAssets: jobject;
   function getAssetAsString(name: string): string;
-  function getAssetAsString(name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID): string;
   function getAssetAsString(assets: jobject; name: string): string;
-  function getAssetAsString(assets: jobject; name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID): string;
-
-  function commonMethods_AssetManager_Open_StringInputStream: jmethodID; //todo cache
   {$endif}
-
-
-  function commonClasses_String: jclass; //todo cache
-  function commonClasses_InputStream: jclass; //todo cache
-  function commonMethods_InputStream_Read_B(inputStream: jclass = nil): jmethodID; //todo cache
-  function commonMethods_InputStream_Close(inputStream: jclass = nil): jmethodID; //todo cache
 end;
 
 
@@ -191,6 +182,28 @@ var jvmref: PJavaVM; //**< Java VM reference as passed to JNI_OnLoad.
     jCustomClassLoader: jobject; //**< alternative class loader to use rather than env.findclass
     jCustomClassLoaderFindClassMethod: jmethodID;
 
+    jCommonClasses: record
+      &String: record
+        classRef: jclass;
+      end;
+      InputStream: record
+        classRef: jclass;
+        read_B, close: jmethodID;
+      end;
+      {$ifdef android}
+      android: record
+        Context: record
+          classRef: jclass;
+          getAssets: jmethodID;
+        end;
+        AssetManager: record
+          classRef: jclass;
+          open: jmethodID;
+        end;
+      end;
+      {$endif}
+    end;
+
 var onLoad: function: integer;
 var onUnload: procedure;
 
@@ -211,6 +224,32 @@ implementation
 
 uses math {$IFDEF CD_Android}, customdrawnint{$endif};
 
+var commonClassesInitialized: boolean;
+procedure initializeCommonClasses;
+begin
+  if commonClassesInitialized then exit;
+  with jCommonClasses, j do begin
+    &String.classRef := newGlobalRefAndDelete(getclass('java/lang/String'));
+    with InputStream do begin
+      classRef := newGlobalRefAndDelete(getclass('java/io/InputStream'));
+      read_B := getmethod(classRef, 'read', '([B)I');
+      close := getmethod(classRef, 'close', '()V');
+    end;
+    {$ifdef android}
+    with android.Context do begin
+      classRef := newGlobalRefAndDelete(getclass('android/content/Context'));
+      getAssets := getmethod(classRef, 'getAssets', '()Landroid/content/res/AssetManager;');
+    end;
+    with android.AssetManager do begin
+      classRef := newGlobalRefAndDelete(getclass('android/content/res/AssetManager'));
+      open := getmethod(classRef, 'open', '(Ljava/lang/String;)Ljava/io/InputStream;');
+    end;
+    {$endif}
+  end;
+  commonClassesInitialized := true;
+end;
+
+
 function needJ: TJavaEnv;
 var attachArgs: JavaVMAttachArgs;
 begin
@@ -230,6 +269,7 @@ begin
     if j.env = nil then
       raise EAndroidInterfaceException.create('Failed to get VM environment');
 
+    initializeCommonClasses; //this actually should not be here, since it should be globally called once, while needJ is called for every thread
   end;
   result := j;
 end;
@@ -245,6 +285,7 @@ procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); {$ifdef mswindows}stdcal
 begin
   if assigned(onUnload) then onUnload();
 end;
+
 
 {$define TjclassHelper := TjobjectHelper}
 function TjclassHelper.NewObject: jobject;
@@ -787,7 +828,7 @@ end;
 
 function TJavaEnv.newStringArray(len: integer; def: jobject): jobject;
 begin
-  result := env^^.NewObjectArray(env, len, commonClasses_String, def);
+  result := env^^.NewObjectArray(env, len, jCommonClasses.&String.classRef, def);
 end;
 
 function TJavaEnv.newGlobalRefAndDelete(obj: jobject): jobject;
@@ -1049,17 +1090,13 @@ begin
   else result := JNI_FALSE;
 end;
 
-function TJavaEnv.arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
+function TJavaEnv.arrayToJArray(a: array of string): jobject;
 var
   i: Integer;
-  sc: jclass;
 begin
-  sc := stringClass;
-  if sc = nil then sc := commonClasses_String;
-  result := newObjectArray(length(a), sc, nil);
+  result := newObjectArray(length(a), jCommonClasses.&String.classRef, nil);
   for i := 0 to high(a) do
     setStringArrayElement(result, i, a[i]);
-  if stringClass = nil then deleteLocalRef(sc);
 end;
 
 
@@ -1105,22 +1142,12 @@ begin
   ThrowNew(getclass(c), error);
 end;
 
-
-function TJavaEnv.inputStreamToStringAndDelete(stream: jobject; jmInputStreamRead, jmInputStreamClose: jmethodID): string;
+function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
 var builder: TStrBuilder;
 begin
   builder.init(@result);
-  inputStreamReadAllAndDelete(stream, @builder.appendBuffer, jmInputStreamRead, jmInputStreamClose);
+  self.inputStreamReadAllAndDelete(stream, @builder.appendBuffer, jCommonClasses.InputStream.read_B, jCommonClasses.InputStream.close);
   builder.final;
-end;
-
-function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
-var
-  streamClass: jclass;
-begin
-  streamClass := commonClasses_InputStream;
-  result := inputStreamToStringAndDelete(stream, commonMethods_InputStream_Read_B(streamClass), commonMethods_InputStream_Close(streamClass));
-  deleteLocalRef(streamClass);
 end;
 
 procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite; jmInputStreamRead,
@@ -1153,12 +1180,8 @@ begin
 end;
 
 procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite);
-var
-  streamClass: jclass;
 begin
-  streamClass := commonClasses_InputStream;
-  inputStreamReadAllAndDelete(stream, readCallback, commonMethods_InputStream_Read_B(streamClass), commonMethods_InputStream_Close(streamClass));
-  deleteLocalRef(streamClass);
+  inputStreamReadAllAndDelete(stream, readCallback, jCommonClasses.InputStream.read_B, jCommonClasses.InputStream.close);
 end;
 
 function TJavaEnv.getMapProperty(map: jobject; value: jobject): jobject;
@@ -1169,33 +1192,18 @@ end;
 {$ifdef android}
 function TJavaEnv.getAssets: jobject;
 begin
-  result := callObjectMethodChecked(jContextObject, getmethod('android/content/Context', 'getAssets', '()Landroid/content/res/AssetManager;'));
+  result := callObjectMethodChecked(jContextObject, jCommonClasses.android.Context.getAssets);
 end;
 
 function TJavaEnv.getAssetAsString(name: string): string;
+var assets: jobject;
 begin
-  result := getAssetAsString(getAssets, name);
-end;
-
-function TJavaEnv.getAssetAsString(name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID): string;
-begin
-  result := getAssetAsString(getAssets, name, jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose);
+  assets := getAssets;
+  result := getAssetAsString(assets, name);
+  deleteLocalRef(assets);
 end;
 
 function TJavaEnv.getAssetAsString(assets: jobject; name: string): string;
-var
-  stream: jclass;
-begin
-  stream := commonClasses_InputStream;
-  result := getAssetAsString(name,
-                             commonMethods_AssetManager_Open_StringInputStream,
-                             commonMethods_InputStream_Read_B(stream),
-                             commonMethods_InputStream_Close(stream));
-  deleteLocalRef(stream);
-end;
-
-function TJavaEnv.getAssetAsString(assets: jobject; name: string; jmAssetManagerOpen, jmInputStreamRead, jmInputStreamClose: jmethodID
-  ): string;
 var
   temp: jobject;
   stream: jobject;
@@ -1213,49 +1221,14 @@ begin
   end;
 
   temp := stringToJString(name);
-  stream := callObjectMethodChecked(assets, jmAssetManagerOpen, @temp);
+  stream := callObjectMethodChecked(assets, jCommonClasses.android.AssetManager.open, @temp);
   deleteLocalRef(temp);
 
-  result := inputStreamToStringAndDelete(stream, jmInputStreamRead, jmInputStreamClose);
+  result := inputStreamToStringAndDelete(stream);
 end;
 
-function TJavaEnv.commonMethods_AssetManager_Open_StringInputStream: jmethodID;
-begin
-  result := getmethod('android/content/res/AssetManager', 'open', '(Ljava/lang/String;)Ljava/io/InputStream;');
-end;
 
 {$endif}
-
-function TJavaEnv.commonClasses_String: jclass;
-begin
-  result := getclass('java/lang/String');
-end;
-
-
-function TJavaEnv.commonClasses_InputStream: jclass;
-begin
-  result := getclass('java/io/InputStream');
-end;
-
-function TJavaEnv.commonMethods_InputStream_Read_B(inputStream: jclass): jmethodID;
-var
-  localinputstream: jclass;
-begin
-  if inputStream = nil then localinputStream := commonClasses_InputStream
-  else localinputstream := inputStream;
-  result := getmethod(commonClasses_InputStream, 'read', '([B)I');
-  if inputStream = nil then deleteLocalRef(localinputstream);
-end;
-
-function TJavaEnv.commonMethods_InputStream_Close(inputStream: jclass): jmethodID;
-var
-  localinputstream: jclass;
-begin
-  if inputStream = nil then localinputStream := commonClasses_InputStream
-  else localinputstream := inputStream;
-  result := getmethod(localinputstream, 'close', '()V');
-  if inputStream = nil then deleteLocalRef(localinputstream);
-end;
 
 
 procedure setCustomClassLoaderFromLoadedClass(c: jclass);
