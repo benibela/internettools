@@ -468,7 +468,7 @@ end;
 
 function TJavaEnv.getfield(c: jclass; n, sig: pchar): jfieldID;
 begin
-  result := j.env^^.GetFieldID(env, c, n, sig);
+  result := env^^.GetFieldID(env, c, n, sig);
 end;
 
 function TJavaEnv.getfield(classname: pchar; n, sig: pchar): jfieldID;
@@ -476,7 +476,7 @@ var
   c: jclass;
 begin
   c := getclass(classname);
-  result := j.env^^.GetFieldID(env, c, n, sig);
+  result := env^^.GetFieldID(env, c, n, sig);
   deleteLocalRef(c);
 end;
 
@@ -498,7 +498,7 @@ end;
 
 function TJavaEnv.getstaticfield(c: jclass; n, sig: pchar): jfieldID;
 begin
-  result := j.env^^.GetStaticFieldID(env, c, n, sig);
+  result := env^^.GetStaticFieldID(env, c, n, sig);
 end;
 
 function TJavaEnv.getstaticfield(classname: pchar; n, sig: pchar): jfieldID;
@@ -691,7 +691,7 @@ end;
 
 procedure TJavaEnv.SetObjectField(Obj: JObject; FieldID: JFieldID; Val: JObject);
 begin
-  j.env^^.SetObjectField(env, Obj, FieldID, val);
+  env^^.SetObjectField(env, Obj, FieldID, val);
 end;
 
 procedure TJavaEnv.SetStringField(Obj: JObject; FieldID: JFieldID; Val: string);
@@ -705,23 +705,23 @@ end;
 
 procedure TJavaEnv.SetIntField(Obj: JObject; FieldID: JFieldID; i: jint);
 begin
-  j.env^^.SetIntField(env, Obj, FieldID, i);
+  env^^.SetIntField(env, Obj, FieldID, i);
 end;
 
 procedure TJavaEnv.SetLongField(Obj: JObject; FieldID: JFieldID; i: jlong);
 begin
-  j.env^^.SetLongField(env, Obj, FieldID, i);
+  env^^.SetLongField(env, Obj, FieldID, i);
 end;
 
 procedure TJavaEnv.SetBooleanField(Obj: JObject; FieldID: JFieldID; b: Boolean);
 begin
-  if b then j.env^^.SetBooleanField(env, Obj, FieldID, JNI_TRUE)
-  else j.env^^.SetBooleanField(env, Obj, FieldID, JNI_FALSE)
+  if b then env^^.SetBooleanField(env, Obj, FieldID, JNI_TRUE)
+  else env^^.SetBooleanField(env, Obj, FieldID, JNI_FALSE)
 end;
 
 procedure TJavaEnv.setObjectArrayElement(a: jobject; index: integer; v: jobject);
 begin
-  j.env^^.SetObjectArrayElement(env, a, index, v);
+  env^^.SetObjectArrayElement(env, a, index, v);
 end;
 
 function TJavaEnv.getObjectArrayElement(a: jobject; index: integer): jobject;
@@ -734,7 +734,7 @@ var
   temp: jobject;
 begin
   temp := stringToJString(v);
-  j.env^^.SetObjectArrayElement(env, a, index, temp);
+  env^^.SetObjectArrayElement(env, a, index, temp);
   deleteLocalRef(temp);
 end;
 
