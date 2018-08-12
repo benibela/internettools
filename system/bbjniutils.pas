@@ -94,6 +94,7 @@ type
   function stringToJString(s: string; conversionMode: TStringConversionMode = scmConvertAndRepairUTF8ToMUTF8): jobject; //converts/repairs the string, so that it works with all (even invalid) UTF8 strings
   function jStringToString(s: jobject): string;
   function jStringToStringAndDelete(s: jobject): string;
+  function booleanToJboolean(b: boolean): jboolean; inline;
 
   function arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
 
@@ -715,8 +716,7 @@ end;
 
 procedure TJavaEnv.SetBooleanField(Obj: JObject; FieldID: JFieldID; b: Boolean);
 begin
-  if b then env^^.SetBooleanField(env, Obj, FieldID, JNI_TRUE)
-  else env^^.SetBooleanField(env, Obj, FieldID, JNI_FALSE)
+  env^^.SetBooleanField(env, Obj, FieldID, booleanToJboolean(b))
 end;
 
 procedure TJavaEnv.setObjectArrayElement(a: jobject; index: integer; v: jobject);
@@ -1021,6 +1021,12 @@ begin
   if s = nil then exit('');
   result := jStringToString(s);
   env^^.DeleteLocalRef(env, s);
+end;
+
+function TJavaEnv.booleanToJboolean(b: boolean): jboolean;
+begin
+  if b then result := JNI_TRUE
+  else result := JNI_FALSE;
 end;
 
 function TJavaEnv.arrayToJArray(a: array of string; stringClass: jclass = nil): jobject;
