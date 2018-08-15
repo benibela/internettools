@@ -37,8 +37,8 @@ begin
   test( not CSSHasHiddenStyle('display: nonex') );
   test( CSSHasHiddenStyle('visibility: hidden') );
   test( CSSHasHiddenStyle('a; b; c; display: none') );
-  test( CSSHasHiddenStyle('ddsdas:::Aas; c; display:') );
-  test( CSSHasHiddenStyle(';; c; display') );
+  test( not CSSHasHiddenStyle('ddsdas:::Aas; c; display:') );
+  test( not CSSHasHiddenStyle(';; c; display') );
   test( CSSHasHiddenStyle('display: none; position: absolute; border: 1px solid rgb(17, 17, 17); background-color: rgb(224, 234, 204); padding: 5px; opacity: 0.85; margin-top: 0.5em; margin-left: -2em;'));
 end;
 
