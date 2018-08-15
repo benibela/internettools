@@ -268,11 +268,12 @@ TTreeNode = class
   function getEnumeratorPrecedingSiblings: TTreeNodeEnumerator;
   function getEnumeratorFollowingSiblings: TTreeNodeEnumerator;
 
-  function deepNodeText(separator: string=''):string; //**< concatenates the text of all (including indirect) text children
+  function deepNodeText(separator: string=''):string;
   function outerXML(insertLineBreaks: boolean = false):string;
   function innerXML(insertLineBreaks: boolean = false):string;
   function outerHTML(insertLineBreaks: boolean = false):string;
   function innerHTML(insertLineBreaks: boolean = false):string;
+  function innerText():string; //**< Returns a human readable text for an HTML node. The exact output might change in future version (e.g. more/less line breaks)
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
@@ -1359,6 +1360,35 @@ end;
 function TTreeNode.innerHTML(insertLineBreaks: boolean): string;
 begin
   result := serializeHTML(false, insertLineBreaks);
+end;
+
+function TTreeNode.innerText(): string;
+var cur:TTreeNode;
+    builder: TStrBuilder;
+begin
+  //https://www.w3.org/TR/html52/dom.html#dom-htmlelement-innertext
+  result:='';
+  if self = nil then exit;
+  case typ of
+    tetText, tetProcessingInstruction, tetComment: exit(strTrim(value));
+  end;
+  cur := self;
+  builder.init(@result);
+  while (cur<>nil) and (cur <> reverse) do begin
+    if cur.typ = tetText then begin
+      builder.append(strTrimAndNormalize(cur.value));
+    end else if cur.typ = tetOpen then
+      if striEqual(cur.value, 'br') then builder.append(#10)
+      else if striEqual(cur.value, 'td') or striEqual(cur.value, 'th') then builder.append(#9)
+      else if striEqual(cur.value, 'tr') then builder.append(#10) //todo: do this on all block elements
+      else if striEqual(cur.value, 'p') then builder.append(#10#10) //todo: collapse, <p><p/><p> are only 2 as well
+      else if striEqual(cur.value, 'script') or striEqual(cur.value, 'style')
+            or striEqual(cur.value, 'link') or striEqual(cur.value, 'meta') then  //todo: skip all invisible elements, display:none
+        cur := cur.reverse;
+    cur := cur.next;
+  end;
+  builder.final;
+  result := strTrim(result);
 end;
 
 function TTreeNode.getValue(): string;

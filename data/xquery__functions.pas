@@ -1141,6 +1141,26 @@ begin
   result := xqvalue(node.innerHTML())
 end;
 
+function xqFunctionInner_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var node: TTreeNode;
+begin
+  requiredArgCount(argc, 0, 1);
+  if argc = 1 then node := args[0].toNode
+  else node := context.contextNode();
+  result := xqvalue(node.innerText())
+end;
+
+function xqFunctionMatched_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var node: TTreeNode;
+begin
+  requiredArgCount(argc, 0, 0);
+  if context.TextNode <> nil then node := context.TextNode
+  else if context.ParentElement <> nil then node := context.ParentElement
+  else node := context.contextNode();
+  exit(xqvalue(node.innerText));
+end;
+
+
 
 
 
@@ -5636,6 +5656,8 @@ begin
   pxpold.registerFunction('inner-xml',0,1,@xqFunctionInner_XML, []);
   pxpold.registerFunction('outer-html',0,1,@xqFunctionOuter_HTML, []);
   pxpold.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
+  pxpold.registerFunction('inner-text',0,1,@xqFunctionInner_Text, []);
+  pxpold.registerFunction('matched-text',0,0,@xqFunctionMatched_Text, []);
   pxpold.registerFunction('form',1,2,@xqFunctionForm, []);
   pxpold.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
   resolveHTMLCallback := @xqFunctionResolve_Html;

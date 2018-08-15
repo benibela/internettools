@@ -499,6 +499,9 @@ t('<a><template:read source="text()" var="A"/><x/><template:read source="text()"
 t('<table id="right"><template:loop><tr><td><template:read source="../text()" var="col"/></td></tr></template:loop></table>',
       '<table id="right"><tr>pre<td>123</td><td>other</td></tr><tr>ff<td>foo</td><td>columns</td></tr><tr>gg<td>bar</td><td>are</td></tr><tr>hh<td>xyz</td><td>ignored</td></tr></table>',
       'col=pre'#10'col=ff'#10'col=gg'#10'col=hh');
+t('<a><template:read source="matched-text()" var="A"/><x/><template:read source="matched-text()" var="B"/></a>',
+      '<a>hello<x></x>a</a>',
+      'A=hello'#13'B=a');
 
       //case insensitiveness
 t('<A><template:read source="text()" var="A"/><x/><template:read source="text()" var="B"/></A>',

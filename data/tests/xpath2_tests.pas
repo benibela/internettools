@@ -239,6 +239,8 @@ begin
   t('html/@attrib3',             'THIRD ATTRIBUTE',                  '');
   t('html/adv/text()',           '',                                 '');
   t('html/adv/table/deep-text('' '')','first col 2nd col',           ''); //additional spaces!
+  t('html/adv/table/inner-text()','first col'#9'2nd col',           '');
+  t('html/adv/table/inner-text(tr/td[2])','2nd col',           '');
   t('html/adv/table/@id',        't1',                               '');
   t('html/adv/table/tr/td/text()', 'first col',                      '');
   t('html/adv/table/tr/td/comment()', 'cya',                         '');
