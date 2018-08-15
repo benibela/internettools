@@ -492,6 +492,7 @@ function xmlStrEscape(s: string; attrib: boolean = false):string;
 function xmlStrWhitespaceCollapse(const s: string):string;
 function htmlStrEscape(s: string; attrib: boolean = false; encoding: TSystemCodePage = CP_NONE):string;
 function strSplitOnAsciiWS(s: string): TStringArray; //splits on ascii whitespace as defined in HTML5 (note: #$C is WS in HTML but not in XML)
+function CSSHasHiddenStyle(const style: string): boolean;
 
 const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
       XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
@@ -1362,9 +1363,74 @@ begin
   result := serializeHTML(false, insertLineBreaks);
 end;
 
+function CSSHasHiddenStyle(const style: string): boolean;
+//https://www.w3.org/TR/css-syntax-3/#parse-a-list-of-declarations0 but simplified
+var
+  p, e: PChar;
+  procedure skipWS;
+  begin
+    while (p <= e) and (p^ in [' ',#9,#10,#13]) do inc(p);
+  end;
+  function expect(c: char): boolean;
+  begin
+    skipWS;
+    result := (p <= e) and (p^ = c);
+    if result then inc(p);
+    skipWS;
+  end;
+  function matches(const s: string): boolean;
+  begin
+    skipWS;
+    result := false;
+    if not striBeginsWith(p, s) then exit;
+    inc(p, length(s));
+    if (p <= e) and (p^ in ['-','a'..'z','A'..'Z','_','0'..'9',#$7F..#$FF]) then exit;
+    result := true;
+  end;
+
+begin
+  result := false;
+  if style = '' then exit;
+  p := @style[1];
+  e := @style[length(style)];
+  while p <= e do begin
+    //whitespace and crap
+    skipWS;
+    if p > e then break;
+    case p^ of
+      '{': while (p <= e) and (p^ <> '}') do inc(p);
+      '(': while (p <= e) and (p^ <> ')') do inc(p);
+      '[': while (p <= e) and (p^ <> ']') do inc(p);
+    end;
+    skipWS;
+    if p > e then break;
+    if p^ = ';' then begin
+      inc(p);
+      continue;
+    end;
+
+    //check relevant styles
+    case p^ of
+      'v','V': if matches('visibility') then begin
+        if not expect(':') then continue;
+        if matches('hidden') then result := true
+        else if matches('visible') then result := false;
+      end;
+      'd','D': if matches('display') then begin
+        if not expect(':') then continue;
+        if matches('none') then result := true;
+      end;
+    end;
+    while (p <= e) and (p^ <> ';') do inc(p);
+  end;
+end;
+
+
 function TTreeNode.innerText(): string;
+
 var cur:TTreeNode;
     builder: TStrBuilder;
+    skipElement: Boolean;
 begin
   //https://www.w3.org/TR/html52/dom.html#dom-htmlelement-innertext
   result:='';
@@ -1378,13 +1444,31 @@ begin
     if cur.typ = tetText then begin
       builder.append(strTrimAndNormalize(cur.value));
     end else if cur.typ = tetOpen then
-      if striEqual(cur.value, 'br') then builder.append(#10)
-      else if striEqual(cur.value, 'td') or striEqual(cur.value, 'th') then builder.append(#9)
-      else if striEqual(cur.value, 'tr') then builder.append(#10) //todo: do this on all block elements
-      else if striEqual(cur.value, 'p') then builder.append(#10#10) //todo: collapse, <p><p/><p> are only 2 as well
-      else if striEqual(cur.value, 'script') or striEqual(cur.value, 'style')
-            or striEqual(cur.value, 'link') or striEqual(cur.value, 'meta') then  //todo: skip all invisible elements, display:none
-        cur := cur.reverse;
+      if cur.value <> '' then begin
+        case LowerCase(cur.value[1]) of
+          'a': skipElement := striEqual(cur.value, 'area');
+          'b': skipElement := striEqual(cur.value, 'base') or  striEqual(cur.value, 'basefont');
+          'd': skipElement := striEqual(cur.value, 'datalist');
+          'h': skipElement := striEqual(cur.value, 'head');
+          'l': skipElement := striEqual(cur.value, 'link');
+          'm': skipElement := striEqual(cur.value, 'meta');
+          //'n': skipElement := striEqual(cur.value, 'noembed') or striEqual(cur.value, 'noframes');
+          'p': skipElement := striEqual(cur.value, 'param');
+          'r': skipElement := striEqual(cur.value, 'rp');
+          's': skipElement := striEqual(cur.value, 'script')  or striEqual(cur.value, 'source') or striEqual(cur.value, 'style');
+          't': skipElement := striEqual(cur.value, 'template') or striEqual(cur.value, 'track') or striEqual(cur.value, 'title');
+          else skipElement := false;
+        end;
+        if not skipElement then skipElement := CSSHasHiddenStyle(cur['style']);
+        if skipElement then cur := cur.reverse
+        else begin
+          if striEqual(cur.value, 'br') then builder.append(#10)
+          else if striEqual(cur.value, 'td') or striEqual(cur.value, 'th') then builder.append(#9)
+          else if striEqual(cur.value, 'tr') then builder.append(#10) //todo: do this on all block elements
+          else if striEqual(cur.value, 'p') then builder.append(#10#10) //todo: collapse, <p><p/><p> are only 2 as well
+        end;
+      end;
+
     cur := cur.next;
   end;
   builder.final;

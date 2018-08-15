@@ -11,6 +11,8 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
+uses commontestutils;
+
 function debugDump(t: TTreeNode): string;
 begin
   result := '';
@@ -24,6 +26,22 @@ begin
     t := t.next;
   end;
 end;
+
+procedure testCSS;
+begin
+  test( CSSHasHiddenStyle('display: none') );
+  test( CSSHasHiddenStyle(';;display  : none') );
+  test( not CSSHasHiddenStyle('xdisplay: none'));
+  test( not CSSHasHiddenStyle('displayx: none') );
+  test( not CSSHasHiddenStyle('display: xnone') );
+  test( not CSSHasHiddenStyle('display: nonex') );
+  test( CSSHasHiddenStyle('visibility: hidden') );
+  test( CSSHasHiddenStyle('a; b; c; display: none') );
+  test( CSSHasHiddenStyle('ddsdas:::Aas; c; display:') );
+  test( CSSHasHiddenStyle(';; c; display') );
+  test( CSSHasHiddenStyle('display: none; position: absolute; border: 1px solid rgb(17, 17, 17); background-color: rgb(224, 234, 204); padding: 5px; opacity: 0.85; margin-top: 0.5em; margin-left: -2em;'));
+end;
+
 
 procedure unittests(TestErrors:boolean);
 var
@@ -117,9 +135,11 @@ begin
       tp.free;
   end;
 
+  testCSS;
 
   writeln('parser tested, cp: ',DefaultSystemCodePage);
 
 end;
+
 
 end.
