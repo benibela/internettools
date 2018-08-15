@@ -1150,7 +1150,7 @@ begin
   result := xqvalue(node.innerText())
 end;
 
-function xqFunctionMatched_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionMatched_Text(const context: TXQEvaluationContext; argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var node: TTreeNode;
 begin
   requiredArgCount(argc, 0, 0);
@@ -1727,14 +1727,15 @@ var
   n: TTreeNode;
   tempv: IXQValue;
 begin
-  requiredArgCount(argc, 1, 2);
+  requiredArgCount(argc, 0, 2);
 
   baseUri := '';
-  for tempv in args[0] do
-    if (tempv.kind = pvkNode) and (tempv.toNode <> nil) and (tempv.toNode.hasDocument()) then begin
-      baseUri := tempv.toNode.getDocument().baseURI;
-      break;
-    end;
+  if argc > 0 then
+    for tempv in args[0] do
+      if (tempv.kind = pvkNode) and (tempv.toNode <> nil) and (tempv.toNode.hasDocument()) then begin
+        baseUri := tempv.toNode.getDocument().baseURI;
+        break;
+      end;
 
   if (argc > 1) and (baseUri = '') then begin //use 2nd parameter only as fallback uri, if 1st parameter does not have one. (it would be nicer to have a way to override the url, but checking if there is a url, is too much caller overhead)
     tempv := args[1].get(1);
@@ -1747,9 +1748,17 @@ begin
     end;
   end;
 
+  if (baseUri = '') and (argc < 2) then begin
+     n := context.contextNode(false);
+     if (n <> nil) and assigned(n.getDocument()) then baseUri := n.getDocument().baseURI;
+  end;
+
   resseq := TXQValueSequence.create();
   result := resseq;
-  resolve(args[0]);
+  if argc > 0 then resolve(args[0])
+  else if context.SeqValue <> nil then resolve(context.SeqValue)
+  else resolve(xqvalue(context.contextNode(true)));
+
   xqvalueSeqSqueeze(result);
 end;
 
@@ -5659,7 +5668,7 @@ begin
   pxpold.registerFunction('inner-text',0,1,@xqFunctionInner_Text, []);
   pxpold.registerFunction('matched-text',0,0,@xqFunctionMatched_Text, []);
   pxpold.registerFunction('form',1,2,@xqFunctionForm, []);
-  pxpold.registerFunction('resolve-html',1,2,@xqFunctionResolve_Html, []);
+  pxpold.registerFunction('resolve-html',0,2,@xqFunctionResolve_Html, []);
   resolveHTMLCallback := @xqFunctionResolve_Html;
   pxpold.registerFunction('random',0,1,@xqFunctionRandom, []);
   pxpold.registerFunction('random-seed',0,1,@xqFunctionRandom_Seed, []);

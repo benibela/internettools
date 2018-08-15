@@ -4198,6 +4198,7 @@ begin
 
   t('resolve-html(//a)', 'abc', '<html><head></head><body><a href="abc"/></body></html>');
   t('resolve-html(//a)', 'http://example.org/abc', '<html><head><base href="http://example.org"/></head><body><a href="abc"/></body></html>');
+  t('//a/resolve-html()', 'http://example.org/abc');
   t('resolve-html(//a, "http://foobar.org")', 'http://example.org/def', '<html><head><base target="xx"/><base href="http://example.org"/><base href="http://www.google.de"/></head><body><a href="def"/></body></html>');
   t('resolve-html(//form, "http://foobar.org").url', 'http://example.org/def?b=a', '<html><head><base target="xx"/><base href="http://example.org"/><base href="http://www.google.de"/></head><body><form action="def"><input value="a" name="b"></body></html>');
   t('form(//form).url', 'http://example.org/def?b=a');
