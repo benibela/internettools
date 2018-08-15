@@ -2197,6 +2197,7 @@ type
   TXQTraceEvent = procedure (sender: TXQueryEngine; value, info: IXQValue) of object;
   //** Event called by the fn:doc to parse a downloaded document.
   TXQParseDocEvent = procedure (sender: TXQueryEngine; data, url, contenttype: string; var node: TTreeNode) of object;
+  TXQWarningEvent = procedure (sender: TXQueryEngine; warning: string) of object;
 
   //** Modifier for integer formatting, as described in fn:format-integer.
   //** The absence of xqfimOrdinal means cardinal    , the absence of traditional means alphabetic. (traditional is a traditional way of writing integers with letters, e.g. roman numbers)
@@ -2396,6 +2397,8 @@ type
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection, OnUriCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
     OnParseDoc: TXQParseDocEvent; //**< Event called by fn:doc (if nil, a default xml parser is used)
+
+    OnWarningDeprecated: TXQWarningEvent; //**< Event called when a deprecated feature is used.
 
     ParsingOptions: TXQParsingOptions;
 

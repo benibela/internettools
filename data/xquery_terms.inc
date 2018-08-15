@@ -3098,9 +3098,11 @@ end;
 
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then
-    result := xqvalue(context.TextNode)
-  else begin
+  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then begin
+    if assigned(context.staticContext.sender.OnWarningDeprecated) then
+      context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'DO NOT USE text() in pattern matching. Use either matched-text() or ./text() . So far text() has behaved like matched-text(), but the behavior will be changed to ./text(). (the behavior of matched-text() will later change to return the same value as matched-text() and ./matched-text() )');
+    result := xqvalue(context.TextNode);
+  end else begin
     result := TXQueryEngine.evaluateSingleStepQuery(queryCommand,context, true);
     xqvalueSeqSqueeze(result);
   end

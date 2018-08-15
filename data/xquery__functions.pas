@@ -1095,6 +1095,8 @@ end;
 function xqFunctionDeep_Node_Text(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var sep: string;
 begin
+  if assigned(context.staticContext.sender.OnWarningDeprecated) then
+    context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'deep-text() has been DEPRECATED. Use either (.) or string() to get all text, inner-text() to get the visible text or matched-text() to get the visible text during pattern matching.');
   if argc = 1 then sep := args[0].toString else sep := '';
   if (context.SeqValue <> nil) and (context.SeqValue.kind = pvkNode) then begin
 //    raise EXQEvaluationException.Create('deep-text() needs a node, but context item is atomic value');
@@ -2303,13 +2305,15 @@ begin
   result := args[0].getProperty(args[1].toString);
 end;
 
-function xqFunctionObject({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionObject(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   seq: TXQVList;
   i: Integer;
   obj: TXQValueObject;
   v: IXQValue;
 begin
+  if assigned(context.staticContext.sender.OnWarningDeprecated) then
+    context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'object() function is DEPRECATED.');
   requiredArgCount(argc, 0, 1);
   obj := TXQValueObject.create();
   if argc = 1 then begin
