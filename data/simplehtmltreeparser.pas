@@ -274,6 +274,7 @@ TTreeNode = class
   function outerHTML(insertLineBreaks: boolean = false):string;
   function innerHTML(insertLineBreaks: boolean = false):string;
   function innerText():string; //**< Returns a human readable text for an HTML node. The exact output might change in future version (e.g. more/less line breaks)
+  class function innerTextRangeInternal(from, till_excluding: TTreeNode): string; static;
 
   function getValue(): string; //**< get the value of this element
   function getValueTry(out valueout:string): boolean; //**< get the value of this element if the element exists
@@ -1427,20 +1428,24 @@ end;
 
 
 function TTreeNode.innerText(): string;
+begin
+  result:='';
+  if self = nil then exit;
+  case typ of
+    tetText, tetProcessingInstruction, tetComment: result := strTrim(value);
+    else result := innerTextRangeInternal(self, self.reverse);
+  end;
+end;
 
+class function TTreeNode.innerTextRangeInternal(from, till_excluding: TTreeNode): string;
 var cur:TTreeNode;
     builder: TStrBuilder;
     skipElement: Boolean;
 begin
   //https://www.w3.org/TR/html52/dom.html#dom-htmlelement-innertext
-  result:='';
-  if self = nil then exit;
-  case typ of
-    tetText, tetProcessingInstruction, tetComment: exit(strTrim(value));
-  end;
-  cur := self;
+  cur := from;
   builder.init(@result);
-  while (cur<>nil) and (cur <> reverse) do begin
+  while (cur<>nil) and (cur <> till_excluding) do begin
     if cur.typ = tetText then begin
       builder.append(strTrimAndNormalize(cur.value));
     end else if cur.typ = tetOpen then

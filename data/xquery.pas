@@ -2428,6 +2428,7 @@ type
     destructor Destroy; override;
 
 protected
+    PatternMatcherTextStart, PatternMatcherTextEnd: TTreeNode;
     function evaluate(expression: string; model: TXQParsingModel; tree:TTreeNode = nil): IXQValue;
     function evaluate(expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue;
 public

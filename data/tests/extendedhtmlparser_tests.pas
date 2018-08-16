@@ -502,8 +502,13 @@ t('<table id="right"><template:loop><tr><td><template:read source="../text()" va
 t('<a><template:read source="matched-text()" var="A"/><x/><template:read source="matched-text()" var="B"/></a>',
       '<a>hello<x></x>a</a>',
       'A=hello'#13'B=a');
+t('<a>{A:=matched-text()}<x/>{B:=matched-text()}</a>', '<a>hallo<x></x>a</a>', 'A=hallo'#13'B=a');
+t('<a>{A:=matched-text()}<x/>{B:=text()}</a>', '<a>bold<b>o</b>123<x></x>a<x/>456</a>', 'A=boldo123'#13'B=a');
+t('<a>{A:=matched-text()}<x/>{B:=matched-text()}</a>', '<a>bold<b>o</b>123<x></x>a<x/>456</a>', 'A=boldo123'#13'B=a456');
 
-      //case insensitiveness
+
+
+//case insensitiveness
 t('<A><template:read source="text()" var="A"/><x/><template:read source="text()" var="B"/></A>',
        '<a>hallo<x></x>a</a>',
        'A=hallo'#13'B=a');

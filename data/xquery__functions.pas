@@ -1152,10 +1152,16 @@ end;
 
 function xqFunctionMatched_Text(const context: TXQEvaluationContext; argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var node: TTreeNode;
+  engine: TXQueryEngine;
 begin
   requiredArgCount(argc, 0, 0);
-  if context.TextNode <> nil then node := context.TextNode
-  else if context.ParentElement <> nil then node := context.ParentElement
+  if context.TextNode <> nil then begin
+    engine := context.staticContext.sender;
+    if TXQueryEngineBreaker(engine).PatternMatcherTextStart = context.TextNode then begin //safety check, so it does not crash when there is an invalid pointer in textstart
+      exit(xqvalue(TTreeNode.innerTextRangeInternal(TXQueryEngineBreaker(engine).PatternMatcherTextStart, TXQueryEngineBreaker(engine).PatternMatcherTextEnd)));
+    end;
+    node := context.TextNode;
+  end else if context.ParentElement <> nil then node := context.ParentElement
   else node := context.contextNode();
   exit(xqvalue(node.innerText));
 end;

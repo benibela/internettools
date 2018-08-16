@@ -1476,6 +1476,10 @@ function THtmlTemplateParser.matchTemplateTree(htmlParent, htmlStart, htmlEnd: T
   ): boolean;
 
 var xpathText: TTreeNode;
+    pendingShortRead: record
+      xpathText: TTreeNode;
+      read: TTemplateElement;
+    end;
 
   function performPXPEvaluation(const pxp: IXQuery): IXQValue;
   var
@@ -1524,6 +1528,59 @@ var xpathText: TTreeNode;
     else templateStart := templateStart.templateReverse.templateNext;
   end;
 
+    procedure HandleCommandShortRead(usePending: boolean = false);
+      procedure doActualRead(templateElement: TTemplateElement);
+      var varcount: integer;
+        read: IXQValue;
+      begin
+        varcount:=FVariableLog.count;
+        read := performPXPEvaluation(templateElement.source);
+        if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then
+          FVariableLog.add(FUnnamedVariableName, read);
+      end;
+    var next: TTemplateElement;
+  begin
+    if usePending then begin
+      xpathText := pendingShortRead.xpathText;
+      TXQueryEngineBreaker(QueryEngine).PatternMatcherTextStart := pendingShortRead.xpathText;
+      if htmlStart = pendingShortRead.xpathText then TXQueryEngineBreaker(QueryEngine).PatternMatcherTextEnd := pendingShortRead.xpathText
+      else TXQueryEngineBreaker(QueryEngine).PatternMatcherTextEnd := htmlStart;
+
+      doActualRead(pendingShortRead.read);
+      pendingShortRead.read := nil;
+
+      TXQueryEngineBreaker(QueryEngine).PatternMatcherTextStart := nil;
+      TXQueryEngineBreaker(QueryEngine).PatternMatcherTextEnd := nil;
+    end else begin
+      if pendingShortRead.read <> nil then HandleCommandShortRead(true);
+      next := templateStart.templateReverse.templateNext;
+      if assigned(next)
+         //exclude template commands I do not understand how to handle
+         and (next.templateType in [tetHTMLOpen, tetMatchElementOpen])
+         and (next.condition = nil) and (next.test = nil) and (next.ignoreSelfTest = nil) and not (tefOptional in next.flags)
+         then begin
+        (*  This handles the common case {matched-text()}<br> to read everything till the next line break.
+        It does not handle {$x:=matched-text()}<br t:condition="contains($x, 'foo')"> to read a<br>b<br>foo<br> to read everything till a line break following a certain text.
+        Nor if backreferences:
+           {$x:=matched-text}<if test="contains($x, 'foo')"><b/></if><else><c/></else>
+
+           abc<b/>foo<x/>bar<y/>  fail      b needs foo before b, no c
+           abc<c/>foo<x/>bar<y/>  abc       no b, everything before c
+           abc<b/>foo<c/>bar<y/>  abcfoo    b needs foo before b => everything c
+           abc<c/>foo<b/>bar<y/>  abc       c comes first         (but could also be abcfoo, if it would try to find the longest match)
+
+        The only reliable, reasonable way seems to be to perform the read on *every* text node, till an HTML element matches.  But that is very slow.
+
+        But unrelated conditions, {$x:=true()}<a t:condition="$x"/> are fine, and work as before.
+
+        *)
+        pendingShortRead.xpathText := xpathText;
+        pendingShortRead.read := templateStart;
+      end else doActualRead(templateStart);
+      templateStart := templateStart.templateReverse;
+    end;
+  end;
+
   function HandleMatchOpen: boolean;
   begin
     //To check if a node matches a template node we have to check all children, if they don't match
@@ -1533,6 +1590,7 @@ var xpathText: TTreeNode;
     result := false;
     if (not templateElementFitHTMLOpen(htmlStart, templateStart)) then htmlStart:=htmlStart.next
     else begin
+      if pendingShortRead.read <> nil then HandleCommandShortRead(true);
       templateStart.match := htmlStart;
       if (not matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, templateStart.templateNext, templateStart.templateReverse)) then htmlStart:=htmlStart.next
       else begin
@@ -1579,16 +1637,7 @@ var xpathText: TTreeNode;
     templateStart := templateStart.templateReverse;
   end;
 
-  procedure HandleCommandShortRead;
-  var varcount: integer;
-    read: IXQValue;
-  begin
-    varcount:=FVariableLog.count;
-    read := performPXPEvaluation(templateStart.source);
-    if (FUnnamedVariableName <> '') and (varcount = FVariableLog.count) then
-      FVariableLog.add(FUnnamedVariableName, read);
-    templateStart := templateStart.templateReverse;
-  end;
+
 
   function HandleCommandPseudoIf: boolean;
   var
@@ -1887,6 +1936,7 @@ begin
  // assert(templateStart <> templateEnd);
   level := FVariableLog.pushAll;
   xpathText := nil;
+  pendingShortRead.read := nil;
   switchCommandAccepted:=false;
   while (htmlStart <> nil) and
         (templateStart <> nil) and (templateStart <> templateEnd) and
