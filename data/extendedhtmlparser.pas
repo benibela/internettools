@@ -1,5 +1,5 @@
 {**
-  @abstract This units contains a template based html parser named THtmlTemplateParser
+  @abstract This units contains a pattern matching HTML parser named THtmlTemplateParser
 
   @author Benito van der Zander (http://www.benibela.de)
 }
@@ -119,7 +119,7 @@ end;
 //** Specifies when the text of text nodes is trimmed. Each value removes strictly more whitespace than the previous ones.
 //** @value ttnNever never, all whitespace is kept
 //** @value ttnForMatching When comparing two text nodes, whitespace is ignored; but all whitespace will be returned when reading text
-//** @value ttnAfterReading The XQ-functions like ., text(), deep-text() return the text trimmed, but the whitespace is still stored in the tree (so deep-text returns whitespace between child nodes)
+//** @value ttnAfterReading The XQ-functions like ., text(), inner-text() return the text trimmed, but the whitespace is still stored in the tree (so deep-text returns whitespace between child nodes)
 //** @value ttnWhenLoading All starting/ending whitespace is unconditionally removed from all text nodes
 TTrimTextNodes = (ttnNever, ttnForMatching, ttnWhenLoadingEmptyOnly, ttnWhenLoading);
 
@@ -135,31 +135,31 @@ TXQTermVariableArray = array of TXQTermVariable;
 { THtmlTemplateParser }
 
 (***
-  @abstract This is the template processor class which can apply a template to one or more html documents.
+  @abstract This is the pattern matching processor class which can apply a pattern to one or more HTML documents.
 
-  You can use it by calling the methods @code(parseTemplate) and @code(parseHTML). @code(parseTemplate) loads a certain template
-  and @code(parseHTML) matches the template to a html/xml file.@br
-  A template file is just like a html file with special commands. The parser than matches every text and tag
-  of the template to text/tag in the html file, while ignoring every additional data in latter file.
+  You can use it by calling the methods @code(parseTemplate) and @code(parseHTML). @code(parseTemplate) loads a certain pattern
+  and @code(parseHTML) matches the pattern to an HTML/XML file.@br
+  A pattern file is just like a HTML file with special commands (it used to be called template file). The parser than matches every text and tag
+  of the pattern to text/tag in the HTML file, while ignoring every additional data in latter file.
   If no match is possible an exception is raised.@br
-  The template can extract certain values from the html file into variables, and you can access these variables with the property @link(variables) and variableChangeLog.
-  Former only contains the final value of the variables, latter records every assignment during the matching of the template.@br@br
+  The pattern can extract certain values from the HTML file into variables, and you can access these variables with the property @link(variables) and variableChangeLog.
+  Former only contains the final value of the variables, latter records every assignment during the matching of the pattern.@br@br
 
 
   @bold(Getting started)
 
 
-  Creating a template to analyze a xml-file/webpage:
+  Creating a template to analyze a XML-file/webpage:
 
   @orderedList(
 
-  @item(First, you should remove all things from the webpage that are uninteresting, dynamically generated or invalid xml (or alternatively start with an empty file as template).)
+  @item(First, you should remove all things from the webpage that are uninteresting, dynamically generated or invalid XML (or alternatively start with an empty file as template).)
 
-  @item(Then, you should replace all parts that you want to extract with @code(<t:s>yourVariableName:=text()</t:s>).@br
-        This will write the value of the text node that contains the t:s tag in the variable yourVariableName.@br@br
-        Instead of the @code(t:s) tag, you can also use the short notation @code({yourVariableName:=text()}); and instead of
-        @code(text()) to read the text node, you can also use @code(@attrib) to read an attribute; or an arbitrary complex
-        @link(xquery.TXQueryEngine xpath/xquery-expression))
+  @item(Then, you should replace all parts that you want to extract with @code({$yourVariableName}).@br
+        This will copy the element containing the code to the variable $yourVariableName.@br@br
+        If you do not want the entire element in the variable, you can read something else like an attribute @code({$yourVariableName := @someattribute}), the text @code({$yourVariableName := matched-text()}) or an arbitrary complex @link(xquery.TXQueryEngine XPath/XQuery-expression).
+        Rather than the @code({}) notation, you can also use a t:s tag @code(<t:s>$yourVariableName:=matched-text()</t:s>).
+
 
   @item(Then the template is finished, at least the trivial things)
   )
@@ -213,7 +213,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   @itemLabel(@italic(Example, how to read the first field of every row of a table):)
   @item(
-    Html-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
+    HTML-File: @code(<table> <tr> <td> row-cell 1 </td> </tr> <tr> <td> row-cell 2 </td> </tr> ... <tr> <td> row-cell n </td> </tr> </table>)@br
     Template: @code(<table> <template:loop> <tr> <td> {$field} </td> </tr> </template:loop> </table>)@br
 
     This will read row after row, and will write each first field to the change log of the variable @code(field).
@@ -221,7 +221,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   @itemLabel(@italic(Example, how to read several fields of every row of a table):)
   @item(
-    Html-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
+    HTML-File: @code(<table> <tr> <td> a </td> <td> b </td> <td> c </td> </tr> ... </tr> </table>)@br
     Template: @code(<table> <template:loop> <tr> <td> {$field1} </td> <td> {$field2} </td> <td> {$field3} </td> ... </tr> </template:loop> </table>)@br
 
     This will read @code($field1=a, $field2=b, $field3=c)...@br
@@ -232,7 +232,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   @itemLabel(@italic(Example, how to read all elements between two elements):)
   @item(
-    Html-File:
+    HTML-File:
 @preformatted(
   <h1>Start</h1>
     <b>Text 1</b>
@@ -250,7 +250,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   @itemLabel(@italic(Example, how to read the first list item starting with an unary prime number):)
   @item(
-  Html-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
+  HTML-File: @code(... <li>1111: this is 4</li><li>1:1 is no prime</li><li>1111111: here is 7</li><li>11111111: 8</li> ...)@br
   Template: @code(<li template:condition="filter(text(), '1*:') != filter(text(), '^1?:|^(11+?)\1+:')">{$prime}</li>)@br
 
   This will return "1111111: here is 7", because 1111111 is the first prime in that list.)
@@ -364,7 +364,7 @@ TXQTermVariableArray = array of TXQTermVariable;
        The template change is trivial, you just add both headers to the template:
 
           @code(<h1>Header 1</h1>                                                                                                                             @br
-                <t:loop><b>{$name}</b>: <t:s>value1 := extract(text(), ":(.+),", 1), value2 := extract(text(), ":(.+),(.+)", 2)</t:s><br></t:loop>            @br
+                <t:loop><b>{$name}</b>: <t:s>value1 := extract(matched-text(), ":(.+),", 1), value2 := extract(matched-text(), ":(.+),(.+)", 2)</t:s><br></t:loop>            @br
                 <h1>Header 2</h1>)
 
        How to do it in XPath? (in XPath 2, it is of course still impossible with XPath 1)
@@ -477,7 +477,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
        But you would never do that nowadays, if you can use a regular expression like @code('foo(.{1})').
 
-       Such a regular expression now implicitely selects the characters after foo, just like a template @code(<foo/>{text()})
+       Such a regular expression now implicitely selects the characters after foo, just like a template @code(<foo/>{matched-text()})
        selects the text after a foo-element.
 
        )
@@ -501,10 +501,6 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   The following template commands can be used:
    @unorderedList(
-      @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
-        @br The @link(xquery.TXQueryEngine XPath-expression) in source is evaluated and stored in variable of var.
-        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the xq-function extract instead of the regex/submatch attributes, because former is more elegant)
-        )
       @item(@code(<template:s>var:=source</template:s>)
         @br Short form of @code(template:read). The expression in @code(source) is evaluated and assigned to the variable @code(s). @br You can also set several variables like @code(a:=1,b:=2,c:=3) (Remark: The := is actually part of the expression syntax, so you can use much more complex expressions.)
         )
@@ -575,6 +571,11 @@ TXQTermVariableArray = array of TXQTermVariable;
       @item(@code(<template:meta-attribute [name="??"] [text-matching="??"]  [case-sensitive="??"]) @br
         Like meta for all attributes with a certain name.
       )
+      @item(@code(<template:read var="??" source="??" [regex="??" [submatch="??"]]/>)
+        @br This is deprecated.
+        @br The @link(xquery.TXQueryEngine XPath-expression) in source is evaluated and stored in variable of var.
+        @br If a regex is given, only the matching part is saved. If submatch is given, only the submatch-th match of the regex is returned. (e.g. b will be the 2nd match of "(a)(b)(c)") (However, you should use the xq-function extract instead of the regex/submatch attributes, because former is more elegant)
+        )
     )@br
     These template attributes can be used on any template element:
     @unorderedList(
@@ -582,11 +583,11 @@ TXQTermVariableArray = array of TXQTermVariable;
         The element (and its children) is ignored if the condition does not evaluate to true (so @code(<template:tag test="{condition}">..</template:tag>) is a short hand for @code(<template:if test="{condition}">@code(<template:tag>..</template:tag></template:if>))).
       )
       @item(@code(template:ignore-self-test="xpath condition") @br
-        The element (and NOT its children) is ignored if the condition does not evaluate to true.
+        The element (but NOT its children) is ignored if the condition does not evaluate to true.
       )
     )
     @br
-    On html/matching tags also these matching modifying attributes can be used:
+    On HTML/matching tags also these matching modifying attributes can be used:
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
@@ -628,6 +629,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
     @bold(Planned breaking changes: )@br
     @unorderedList(
+    @item(@code(text()) will be replaced by @code(matched-text()). Then @code(text()) will always return the same as @code(./text()). )
     @item(Avoid unmatched parenthesis and pipes within text nodes:@br
           Currently is no short notation to read alternatives with the template:switch command, like @code(<template:switch><a>..</a><b>..</b><c>..</c></template:switch>).@br
           In future this might be the same as @code((<a>..</a>|<b>..</b>|<c>..</c>)).@br
