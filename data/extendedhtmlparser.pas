@@ -1556,7 +1556,7 @@ var xpathText: TTreeNode;
       next := templateStart.templateReverse.templateNext;
       if assigned(next)
          //exclude template commands I do not understand how to handle
-         and (next.templateType in [tetHTMLOpen, tetMatchElementOpen])
+         and (next.templateType in [tetHTMLOpen, tetMatchElementOpen, tetHTMLClose, tetMatchElementClose])
          and (next.condition = nil) and (next.test = nil) and (next.ignoreSelfTest = nil) and not (tefOptional in next.flags)
          then begin
         (*  This handles the common case {matched-text()}<br> to read everything till the next line break.
@@ -1992,8 +1992,17 @@ begin
         end;
 
   result := templateStart = templateEnd;
-  if not result then
+  if result then begin
+    if pendingShortRead.read <> nil then begin
+      //find the end of the current element, so we read the entire text from the remembered text node till the end of the element
+      while assigned(htmlStart) and (htmlStart.typ <> tetClose) do
+        if htmlStart.typ = tetOpen then htmlStart := htmlStart.reverse.next
+        else htmlStart := htmlStart.next;
+      HandleCommandShortRead(true);
+    end;
+  end else
     FVariableLog.popAll(level);
+
 end;
 
 procedure THtmlTemplateParser.parseHTMLSimple(html, uri, contenttype: string);

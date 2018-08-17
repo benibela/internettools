@@ -515,6 +515,38 @@ function isInvalidUTF8(const s: string): boolean;
 function nodeNameHash(const s: RawByteString): cardinal;
 
 
+type HTMLNodeNameHashs = object
+  const a = $820103F0;
+  const img = $4FACAFC2;
+  const br = $2CF50F7A;
+  const td = $A664EDFC;
+  const tr = $B93B93AD;
+  const th = $1483CA3C;
+  const table = $57CFB523;
+  const thead = $2D298F5C;
+  const tbody = $BB316BB0;
+  const p = $B7656EB4;
+
+  //invisible
+  const area = $B61A9737;
+  const base = $36BAA821;
+  const basefont = $C997A27A;
+  const datalist = $41BB801A;
+  const head = $FB1A74A6;
+  const link = $21E329D3;
+  const meta = $53F6A414;
+  const noembed = $35DC71D8;
+  const noframes = $8EF9275D;
+  const param = $EA036F5E;
+  const rp = $065D2F8B;
+  const script = $75469FD3;
+  const source = $B04BAA1E;
+  const style = $244E4D3D;
+  const template = $08F14C20;
+  const track = $AB8D6A26;
+  const title = $FE8D4719;
+end;
+
 implementation
 uses xquery;
 
@@ -565,6 +597,7 @@ begin
   result := result + (result shl 3);
   result := result xor (result shr 11);
   result := result + (result shl 15);
+  //remember to update HTMLNodeNameHashs when changing anything here;
 end;
 function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
 var
@@ -1448,31 +1481,39 @@ begin
   while (cur<>nil) and (cur <> till_excluding) do begin
     if cur.typ = tetText then begin
       builder.append(strTrimAndNormalize(cur.value));
-    end else if cur.typ = tetOpen then
-      if cur.value <> '' then begin
-        case LowerCase(cur.value[1]) of
-          'a': skipElement := striEqual(cur.value, 'area');
-          'b': skipElement := striEqual(cur.value, 'base') or  striEqual(cur.value, 'basefont');
-          'd': skipElement := striEqual(cur.value, 'datalist');
-          'h': skipElement := striEqual(cur.value, 'head');
-          'l': skipElement := striEqual(cur.value, 'link');
-          'm': skipElement := striEqual(cur.value, 'meta');
-          //'n': skipElement := striEqual(cur.value, 'noembed') or striEqual(cur.value, 'noframes');
-          'p': skipElement := striEqual(cur.value, 'param');
-          'r': skipElement := striEqual(cur.value, 'rp');
-          's': skipElement := striEqual(cur.value, 'script')  or striEqual(cur.value, 'source') or striEqual(cur.value, 'style');
-          't': skipElement := striEqual(cur.value, 'template') or striEqual(cur.value, 'track') or striEqual(cur.value, 'title');
-          else skipElement := false;
-        end;
-        if not skipElement then skipElement := CSSHasHiddenStyle(cur['style']);
-        if skipElement then cur := cur.reverse
-        else begin
-          if striEqual(cur.value, 'br') then builder.append(#10)
-          else if striEqual(cur.value, 'td') or striEqual(cur.value, 'th') then builder.append(#9)
-          else if striEqual(cur.value, 'tr') then builder.append(#10) //todo: do this on all block elements
-          else if striEqual(cur.value, 'p') then builder.append(#10#10) //todo: collapse, <p><p/><p> are only 2 as well
+    end else if cur.typ = tetOpen then begin
+      case cur.hash of
+        HTMLNodeNameHashs.area: skipElement := striEqual(cur.value, 'area');
+        HTMLNodeNameHashs.base: skipElement := striEqual(cur.value, 'base');
+        HTMLNodeNameHashs.basefont: skipElement := striEqual(cur.value, 'basefont');
+        HTMLNodeNameHashs.datalist: skipElement := striEqual(cur.value, 'datalist');
+        HTMLNodeNameHashs.head: skipElement := striEqual(cur.value, 'head');
+        HTMLNodeNameHashs.link: skipElement := striEqual(cur.value, 'link');
+        HTMLNodeNameHashs.meta: skipElement := striEqual(cur.value, 'meta');
+        //HTMLNodeNameHashs.noembed: skipElement := striEqual(cur.value, 'noembed');
+        //HTMLNodeNameHashs.noframes: skipElement := striEqual(cur.value, 'noframes');
+        HTMLNodeNameHashs.param: skipElement := striEqual(cur.value, 'param');
+        HTMLNodeNameHashs.rp: skipElement := striEqual(cur.value, 'rp');
+        HTMLNodeNameHashs.script: skipElement := striEqual(cur.value, 'script');
+        HTMLNodeNameHashs.source: skipElement := striEqual(cur.value, 'source');
+        HTMLNodeNameHashs.style: skipElement := striEqual(cur.value, 'style');
+        HTMLNodeNameHashs.template: skipElement := striEqual(cur.value, 'template');
+        HTMLNodeNameHashs.track: skipElement := striEqual(cur.value, 'track');
+        HTMLNodeNameHashs.title: skipElement := striEqual(cur.value, 'title');
+        else skipElement := false;
+      end;
+      if not skipElement then skipElement := CSSHasHiddenStyle(cur['style']);
+      if skipElement then cur := cur.reverse
+      else begin
+        case cur.hash of
+          HTMLNodeNameHashs.br: if striEqual(cur.value, 'br') then builder.append(#10);
+          HTMLNodeNameHashs.td: if striEqual(cur.value, 'td') then builder.append(#9);
+          HTMLNodeNameHashs.th: if striEqual(cur.value, 'th') then builder.append(#9);
+          HTMLNodeNameHashs.tr: if striEqual(cur.value, 'tr') then builder.append(#10); //todo: do this on all block elements
+          HTMLNodeNameHashs.p: if striEqual(cur.value, 'p') then builder.append(#10#10); //todo: collapse, <p><p/><p> are only 2 as well
         end;
       end;
+    end;
 
     cur := cur.next;
   end;
@@ -3316,6 +3357,8 @@ end;
 initialization
   XMLNamespace_XML := TNamespace.Make(XMLNamespaceUrl_XML, 'xml');
   XMLNamespace_XMLNS := TNamespace.Make(XMLNamespaceUrl_XMLNS, 'xmlns');
+
+  assert(HTMLNodeNameHashs.noframes = nodeNameHash('noframes'));
 
   omittedEndTags:=THTMLOmittedEndTags.Create;
   omittedEndTags.add(THTMLOmittedEndTagInfo.Create(['li'], ['ol', 'ul', 'menu' {only if @type in toolbar state}]));
