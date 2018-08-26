@@ -838,6 +838,7 @@ function TTemplateActionCallAction.clone: TTemplateAction;
 begin
   Result:=cloneChildren(TTemplateActionCallAction.Create);
   TTemplateActionCallAction(result).action:=action;
+  TTemplateActionCallAction(result).test:=test;
 end;
 
 { TTemplateActionLoadPage }
