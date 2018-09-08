@@ -371,6 +371,8 @@ type
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated 'use toXQuery'; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
+    function stringifyNodes: IXQValue; //preliminary
+    function hasNodes: boolean;
 
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
     function GetEnumerator: TXQValueEnumerator; //**< Implements the enumerator for for..in.@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
@@ -448,6 +450,8 @@ type
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated;
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; virtual;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
+    function stringifyNodes: IXQValue; virtual;
+    function hasNodes: boolean; virtual;
 
     function clone: IXQValue; virtual;
 
@@ -735,6 +739,8 @@ type
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function stringifyNodes: IXQValue; override;
+    function hasNodes: boolean; override;
 
     procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence cannot contain another sequence, so they will be merged)
     procedure addOrdered(const node: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence cannot contain another sequence, so they will be merged)
@@ -768,6 +774,9 @@ type
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function stringifyNodes: IXQValue; override;
+    function hasNodes: boolean; override;
+
 
     //for internal use
     class function nodeTypeAnnotation(tn: TTreeNode): TXSType; static;
@@ -854,6 +863,8 @@ type
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function stringifyNodes: IXQValue; override;
+    function hasNodes: boolean; override;
 
     class procedure prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess); static;
   end;
@@ -863,6 +874,7 @@ type
   TXQValueJSONArray = class (TXQValueJSONIQItem)
     seq: TXQVList;
 
+    constructor create(takeList: TXQVList); reintroduce; virtual;
     constructor create(capacity: integer = 0); reintroduce; virtual;
 
     class function classKind: TXQValueKind; override;
@@ -880,6 +892,8 @@ type
 
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    function stringifyNodes: IXQValue; override;
+    function hasNodes: boolean; override;
 
     procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence
 
@@ -1326,6 +1340,8 @@ type
     procedure add(node: TTreeNode);
     procedure add(list: TXQVList);
     procedure addOrdered(list: TXQVList);
+    function stringifyNodes: TXQVList;
+    function hasNodes: boolean;
   end;
 
   {$define TRACK_STACK_VARIABLE_NAMES}
@@ -2653,6 +2669,7 @@ type
 
 
     procedure stringifyNodes;
+    function hasNodes: boolean;
     //class function splitName(const variable: string; out base, varname: string): boolean; static;
 
     function debugTextRepresentation: string; //**< Dump of the log as list of name=value pairs
@@ -5770,6 +5787,24 @@ begin
   for i := 0 to list.Count - 1 do addOrdered(list.fbuffer[i]);
 end;
 
+function TXQVList.stringifyNodes: TXQVList;
+var
+  i: Integer;
+begin
+  result := TXQVList.create(Count);
+  for i := 0 to Count - 1 do
+    result.add(fbuffer[i].stringifyNodes);
+end;
+
+function TXQVList.hasNodes: boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to Count - 1 do
+    if fbuffer[i].hasNodes then exit(true);
+  result := false;
+end;
+
 procedure TXQVCustomList.put(i: integer; const AValue: IXQValue); inline;
 begin
   checkIndex(i);
@@ -6147,20 +6182,20 @@ procedure TXQVariableChangeLog.stringifyNodes;
 var
   i: Integer;
   pv: PIXQValue;
-  hasNodes: Boolean;
+  xhasNodes: Boolean;
   list: TXQVList;
 begin
   for i:=0 to count-1 do
     case varstorage[i].value.kind of
       pvkNode: varstorage[i].value := xqvalue(varstorage[i].value.toString);
       pvkSequence: begin
-        hasNodes := false;
+        xhasNodes := false;
         for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
           if pv^.kind = pvkNode then begin
-            hasNodes := true;
+            xhasNodes := true;
             break;
           end;
-        if hasNodes then begin
+        if xhasNodes then begin
           list := txqvlist.create(varstorage[i].value.getSequenceCount);
           for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
             if pv^.kind = pvkNode then list.add(xqvalue(pv^.toString))
@@ -6169,6 +6204,14 @@ begin
         end;
       end;
     end
+end;
+
+function TXQVariableChangeLog.hasNodes: boolean;
+var i: integer;
+begin
+  for i:=varCount - 1 downto 0 do
+    if varstorage[i].value.hasNodes then exit(true);
+  result := false;
 end;
 
 procedure TXQVariableChangeLog.removeLast;

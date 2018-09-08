@@ -4268,6 +4268,8 @@ begin
 
   end;
 
+  test(xqvalue('abc').stringifyNodes.toString, 'abc');
+  test(ps.evaluateXPath2('(1, 2, [1,{"abc": [2, "def"]},3])').stringifyNodes.jsonSerialize(tnsText, false), '[1, 2, [1, {"abc": [2, "def"]}, 3]]');
 
   writeln('XPath 2: ', testid, ' completed');
 

@@ -397,6 +397,16 @@ begin
   result := xmlStrEscape(toString);
 end;
 
+function TXQValue.stringifyNodes: IXQValue;
+begin
+  result := self;
+end;
+
+function TXQValue.hasNodes: boolean;
+begin
+  result := false;
+end;
+
 function TXQValue.clone: IXQValue;
 begin
   raise EXQEvaluationException.Create('pxp:INTERNAL', 'Clone on "abstract" base class called.');
@@ -488,7 +498,7 @@ begin
   result := self; //singleton is always ordered
 end;
 
-function TXQValue.retrieve: IXQValue;
+function TXQValue.retrieve(): IXQValue;
 var tempContext: TXQEvaluationContext;
   resseq: TXQValueSequence;
   function dataToXQV(const data, uri, contenttype: string): ixqvalue;
@@ -1695,6 +1705,16 @@ begin
   result += '</'+sequenceTag+'>';
 end;
 
+function TXQValueSequence.stringifyNodes: IXQValue;
+begin
+  result := TXQValueSequence.create(seq.stringifyNodes);
+end;
+
+function TXQValueSequence.hasNodes: boolean;
+begin
+  result := seq.hasNodes;
+end;
+
 procedure TXQValueSequence.add(const value: IXQValue);
 begin
   seq.add(value);
@@ -1799,6 +1819,16 @@ begin
     tnsXML: result := xmlStrEscape(node.outerXML());
     tnsHTML: result := xmlStrEscape(node.outerHTML());
   end;
+end;
+
+function TXQValueNode.stringifyNodes: IXQValue;
+begin
+  Result:=xqvalue(toString);
+end;
+
+function TXQValueNode.hasNodes: boolean;
+begin
+  result := true;
 end;
 
 class function TXQValueNode.nodeTypeAnnotation(tn: TTreeNode): TXSType;
@@ -2088,6 +2118,24 @@ begin
   result +=  '</'+objectTag+'>';
 end;
 
+function TXQValueObject.stringifyNodes: IXQValue;
+var obj: TXQValueObject;
+  i: Integer;
+begin
+  if prototype <> nil then obj := prototype.stringifyNodes as TXQValueObject
+  else obj := TXQValueObject.create();
+  for i:=0 to values.count-1 do
+    obj.values.add(values.getName(i), values.get(i).stringifyNodes);
+  result := obj;
+end;
+
+function TXQValueObject.hasNodes: boolean;
+begin
+  if values.hasNodes then result := true
+  else if prototype <> nil then result := prototype.hasNodes
+  else result := false;
+end;
+
 class procedure TXQValueObject.prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess);
 var h: IXQValue;
   value: String;
@@ -2120,6 +2168,12 @@ end;
 
 
 { TXQValueJSONArray }
+
+constructor TXQValueJSONArray.create(takeList: TXQVList);
+begin
+  inherited create(baseJSONiqSchema.array_);
+  seq := takeList
+end;
 
 constructor TXQValueJSONArray.create(capacity: integer);
 begin
@@ -2233,6 +2287,16 @@ begin
   for i := 1 to seq.Count-1 do
     result += '<'+elementTag+'>' + seq[i].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
   result += '</'+sequenceTag+'>';
+end;
+
+function TXQValueJSONArray.stringifyNodes: IXQValue;
+begin
+  Result:= TXQValueJSONArray.create(seq.stringifyNodes);
+end;
+
+function TXQValueJSONArray.hasNodes: boolean;
+begin
+  Result:= seq.hasNodes;
 end;
 
 procedure TXQValueJSONArray.add(const value: IXQValue);
