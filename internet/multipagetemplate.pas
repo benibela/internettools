@@ -114,6 +114,7 @@ type
 
     @unorderedList(
       @item(@code(<page>)        Downloads a page )
+      @item(@code(<json>)        Same as <page> but to download JSON data )
       @item(@code(<pattern>)     Processes the last page with pattern matching )
       @item(@code(<variable>)    Sets an variable, either to a string value or to an evaluated XPath expression )
       @item(@code(<loop>)        Repeats the children of the loop element )
@@ -306,7 +307,7 @@ type
 
 implementation
 
-uses bbutilsbeta;
+uses bbutilsbeta, xquery_json;
 
 type
 
@@ -329,8 +330,6 @@ type
     function clone: TTemplateAction; override;
   end;
 
-  { TTemplateActionLoadPage }
-
   TTemplateActionPage = class(TTemplateAction)
     url:string;
     headers, postparams:array of TProperty;
@@ -344,7 +343,10 @@ type
     procedure onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction);
   end;
 
-  { TTemplateActionLoadPage }
+  TTemplateActionJSON = class(TTemplateActionPage)
+    procedure perform(reader: TMultipageTemplateReader); override;
+    function clone: TTemplateAction; override;
+  end;
 
   TTemplateActionPattern = class(TTemplateAction)
     pattern:string;
@@ -435,6 +437,7 @@ type
 
 resourcestring
   rsActionNotFound = 'Action %s not found.';
+
 
 
 procedure TTemplateActionTry.initFromTree(t: TTreeNode);
@@ -1023,7 +1026,29 @@ begin
   result := result;
 end;
 
-{ TTemplateActionVariable }
+
+
+procedure TTemplateActionJSON.perform(reader: TMultipageTemplateReader);
+begin
+  inherited perform(reader);
+  if reader.lastData <> '' then
+    reader.setVariable('json', parseJSON(reader.lastData));
+end;
+
+function TTemplateActionJSON.clone: TTemplateAction;
+begin
+  Result:=cloneChildren(TTemplateActionJSON.Create);
+  TTemplateActionPage(result).url := url;
+  TTemplateActionPage(result).headers := headers;
+  SetLength(TTemplateActionPage(result).headers, length(headers));
+  TTemplateActionPage(result).postparams := postparams;
+  SetLength(TTemplateActionPage(result).postparams, length(postparams));
+  TTemplateActionPage(result).condition:=condition;
+  TTemplateActionPage(result).method:=method;
+  result := result;
+end;
+
+
 
 procedure TTemplateActionVariable.initFromTree(t: TTreeNode);
 begin
@@ -1096,6 +1121,7 @@ begin
     'action': addChild(TTemplateActionMain);
     'actions': addChildrenFromTree(t);
     'page': addChild(TTemplateActionPage);
+    'json': addChild(TTemplateActionJSON);
     'pattern': addChild(TTemplateActionPattern);
     'call': addChild(TTemplateActionCallAction);
     'choose': addChild(TTemplateActionChoose);
