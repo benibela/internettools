@@ -40,6 +40,7 @@ type
     proxyHTTPName, proxyHTTPPort: string; //**< proxy used for HTTP
     proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for HTTPS (not always supported, currently only with wininet)
     proxySOCKSName, proxySOCKSPort: string; //**< socks proxy
+    proxyUsername, proxyPassword: string;
 
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
@@ -714,24 +715,21 @@ end;
 { TInternetConfig }
 
 procedure TInternetConfig.setProxy(proxy: string);
-var
-  portPos: SizeInt;
-  port: String;
 begin
   proxy:=trim(proxy);;
   if proxy='' then begin
     useProxy:=false;
     exit;
   end;
-  portPos := pos(':', proxy);
-  port := copy(proxy,portPos+1, length(proxy));
-  if portPos > 0 then proxy := copy(proxy,1,portPos-1)
-  else port := '8080';
-
-  proxyHTTPName:=proxy;
-  proxyHTTPSName:=proxy;
-  proxyHTTPPort:=port;
-  proxyHTTPSPort:=port;
+  with decodeURL(proxy) do begin
+    proxyHTTPName := host;
+    proxyHTTPSName := host;
+    if port = '' then port := '8080';
+    proxyHTTPPort := port;
+    proxyHTTPSPort := port;
+    proxyUsername:=strUnescapeHex(username, '%');
+    proxyPassword:=strUnescapeHex(password, '%');
+  end;
   useProxy:=true;
 end;
 

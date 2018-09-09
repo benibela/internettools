@@ -183,6 +183,10 @@ begin
       lastErrorDetails:=rsConnectingTo0SFailed;
       exit;
     end;
+    if internetConfig^.proxyUsername <> '' then
+      InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_USERNAME, pchar(internetConfig^.proxyUsername), length(internetConfig^.proxyUsername));
+    if internetConfig^.ProxyPassword <> '' then
+      InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_PASSWORD, pchar(internetConfig^.ProxyPassword), length(internetConfig^.ProxyPassword));
     lastServer := decoded; //remember to which server the connection points. We cannot use lastURLDecoded, since the connection has already changed, but lastURLDecoded is only set after redirects
   end;
 

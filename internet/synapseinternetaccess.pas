@@ -236,6 +236,8 @@ begin
       connection.ProxyHost:=defaultInternetConfiguration.proxyHTTPName;
       connection.ProxyPort:=defaultInternetConfiguration.proxyHTTPPort;
     end;
+    connection.ProxyUser:=defaultInternetConfiguration.proxyUsername;
+    connection.ProxyPass:=defaultInternetConfiguration.proxyPassword;
     if defaultInternetConfiguration.proxySOCKSName <>'' then begin
       temp := defaultInternetConfiguration.proxySOCKSName;
       if strContains(temp, '@') then begin
