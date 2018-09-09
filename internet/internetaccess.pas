@@ -28,23 +28,35 @@ uses
   Classes, SysUtils, bbutils;
 type
   PInternetConfig=^TInternetConfig;
-  //**@abstract(Internet configuration)
-  //**You don't have to set it, but the user would prefer to have those options
+  {** @abstract(Internet configuration)
 
-  { TInternetConfig }
+  Not all options are supported by all backends. Compatibility matrix:
 
+      @table(
+        @rowHead( @cell(option)           @cell(wininet (w32)) @cell(synapse) @cell(OkHttp for Android) @cell((Android) Apache HttpComponents) )
+        @row(     @cell(useragent)        @cell(yes)           @cell(yes)     @cell(yes)            @cell(yes) )
+        @row(     @cell(tryDefaultConfig) @cell(yes)           @cell(no)      @cell(no)             @cell(no) )
+        @row(     @cell(http proxy)       @cell(yes)           @cell(yes)     @cell(no)             @cell(yes) )
+        @row(     @cell(https proxy)      @cell(yes)      @cell(should use http proxy) @cell(no)    @cell(should use http proxy) )
+        @row(     @cell(socks proxy)      @cell(yes)           @cell(yes)     @cell(no)             @cell(no) )
+        @row(     @cell(proxy user/pass)  @cell(same auth for all proxies)@cell(separate for http and socks)@cell(no)@cell(no) )
+        @row(     @cell(checkSSLCertificates) @cell(yes)       @cell(no, always @false)     @cell(no, depends on Android)   @cell(no, depends on Android) )
+      )
+
+  You can always set more options on the internalHandle returned by TInternetAccess.
+  }
   TInternetConfig=record
     userAgent: string; //**< the user agent used when connecting
-    tryDefaultConfig: boolean; //**< should the system default configuration be used (not always supported, currently it only works with wininet)
+    tryDefaultConfig: boolean; //**< should the system default configuration be used
     useProxy: Boolean; //**< should a proxy be used
     proxyHTTPName, proxyHTTPPort: string; //**< proxy used for HTTP
-    proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for HTTPS (not always supported, currently only with wininet)
+    proxyHTTPSName, proxyHTTPSPort: string; //**< proxy used for HTTPS
     proxySOCKSName, proxySOCKSPort: string; //**< socks proxy
     proxyUsername, proxyPassword: string;
 
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
-    checkSSLCertificates: boolean; //**< If ssl certificates should be checked in HTTPS connections (currently only for w32internetaccess)
+    checkSSLCertificates: boolean; //**< If ssl certificates should be checked in HTTPS connections
 
     logToPath: string;
 
@@ -140,14 +152,14 @@ type
     ueXPathFromIRI);//**< Encode for the XPath/XQuery function fn:iri-to-uri as defined in the XPath standard
 
   //**@abstract(Abstract base class for connections)
-  //**This class defines the interface methods for HTTP requests, like get, post or request.@br
+  //**This class defines the interface methods for HTTP requests, like @link(get), post or request.@br
   //**If a method fails, it will raise a EInternetException@br@br
   //**Since this is an abstract class, you cannot use it directly, but need to use one of the implementing child classes
   //**TW32InternetAccess, TSynapseInternetAccess, TAndroidInternetAccess or TMockInternetAccess. @br
   //**The recommended usage is to assign one of the child classes to defaultInternetAccessClass and
   //**then create an actual internet access class with @code(defaultInternetAccessClass.create()). @br
   //**Then it is trivial to swap between different implementations on different platforms, and the depending units
-  //**(e.g. simpleinternet or xquery ) will use the implementation you have choosen.
+  //**(e.g. simpleinternet or xquery ) will use the implementation you have choosen. Default options will be taken from the global defaultInternetConfig record.
   TInternetAccess=class
   private
     FOnTransferEnd: TTransferEndEvent;
