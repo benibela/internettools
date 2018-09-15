@@ -268,6 +268,7 @@ type
   protected
     template:TMultiPageTemplate;
     lastData, lastContentType: string;
+    lastDataFormat: TInternetToolsFormat;
     dataLoaded: boolean;
     queryCache: TXQMapStringObject;
     procedure needLoadedData;
@@ -334,6 +335,7 @@ type
     url:string;
     headers, postparams:array of TProperty;
     condition, method: string;
+    inputFormat: TInternetToolsFormat;
 
     errorHandling: string;
     procedure initFromTree(t: TTreeNode); override;
@@ -341,11 +343,6 @@ type
     function clone: TTemplateAction; override;
   private
     procedure onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction);
-  end;
-
-  TTemplateActionJSON = class(TTemplateActionPage)
-    procedure perform(reader: TMultipageTemplateReader); override;
-    function clone: TTemplateAction; override;
   end;
 
   TTemplateActionPattern = class(TTemplateAction)
@@ -859,6 +856,11 @@ begin
     TTemplateActionPattern(children[high(children)]).href := t.getAttribute('templateFile');
     TTemplateActionPattern(children[high(children)]).name := TTemplateActionPattern(children[high(children)]).href;
   end;
+  case LowerCase(t.value) of
+    'json': inputFormat := itfJSON;
+    else inputFormat := itfHTML;
+  end;
+
 
   t := t.getFirstChild();
   while t <> nil do begin
@@ -1007,6 +1009,7 @@ begin
   if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
 
   reader.lastData := page;
+  reader.lastDataFormat := inputFormat;
 
   performChildren(reader);
 
@@ -1023,28 +1026,7 @@ begin
   SetLength(TTemplateActionPage(result).postparams, length(postparams));
   TTemplateActionPage(result).condition:=condition;
   TTemplateActionPage(result).method:=method;
-  result := result;
-end;
-
-
-
-procedure TTemplateActionJSON.perform(reader: TMultipageTemplateReader);
-begin
-  inherited perform(reader);
-  if reader.lastData <> '' then
-    reader.setVariable('json', parseJSON(reader.lastData));
-end;
-
-function TTemplateActionJSON.clone: TTemplateAction;
-begin
-  Result:=cloneChildren(TTemplateActionJSON.Create);
-  TTemplateActionPage(result).url := url;
-  TTemplateActionPage(result).headers := headers;
-  SetLength(TTemplateActionPage(result).headers, length(headers));
-  TTemplateActionPage(result).postparams := postparams;
-  SetLength(TTemplateActionPage(result).postparams, length(postparams));
-  TTemplateActionPage(result).condition:=condition;
-  TTemplateActionPage(result).method:=method;
+  TTemplateActionPage(result).inputFormat:=inputFormat;
   result := result;
 end;
 
@@ -1120,8 +1102,7 @@ begin
     'variable': addChild(TTemplateActionVariable);
     'action': addChild(TTemplateActionMain);
     'actions': addChildrenFromTree(t);
-    'page': addChild(TTemplateActionPage);
-    'json': addChild(TTemplateActionJSON);
+    'page', 'json': addChild(TTemplateActionPage);
     'pattern': addChild(TTemplateActionPattern);
     'call': addChild(TTemplateActionCallAction);
     'choose': addChild(TTemplateActionChoose);
@@ -1364,7 +1345,10 @@ begin
   setVariable('url', cururl);
   setVariable('raw', lastData);
 
-  parser.parseHTMLSimple(lastData, curUrl, lastContentType);
+  case lastDataFormat of
+    itfJSON: setVariable('json', parseJSON(lastData));
+    else parser.parseHTMLSimple(lastData, curUrl, lastContentType);
+  end;
   dataLoaded := true;
 end;
 
