@@ -678,49 +678,6 @@ procedure dateDecode(date: TDateTime; year, month, day: PInteger);
 
 const WHITE_SPACE=[#9,#10,#13,' '];
 
-(*
-//----------------------------Templates-------------------------------
-
-
-type
-
-{ TMap }
-
-generic TMap<T_Key,T_Value> = class
-protected
-  data: array of record
-    key: T_Key;
-    value: T_Value;
-  end;
-  function getKeyID(key: T_Key):longint;
-public
-  procedure insert(key: T_Key; value: T_Value);
-  procedure remove(key: T_Key);
-  function get(key: T_Key): T_Value;
-  function existsKey(key: T_Key): boolean;
-
-end;
-
-{ TSet }
-
-generic TSet<T_Value> = class(TObject)
-protected
-  reallength: longint;
-  data: array of T_Value;
-public
-  procedure clear();
-  procedure insert(v: T_Value);
-  //procedure insertAll(other: TObject);
-  procedure remove(v: T_Value);
-  //procedure removeAll(other:TObject);
-  function contains(v: T_Value):boolean;
-  function count:longint;
-end;
-
-TIntSet = specialize TSet <integer>;
-
-procedure setInsertAll(oldSet:TIntSet; insertedSet: TIntSet);
-procedure setRemoveAll(oldSet:TIntSet; removedSet: TIntSet);            *)
 //----------------------------Others-----------------------------------
 //**Compare function to compare the two values to which a and b, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
@@ -4514,67 +4471,6 @@ begin
   end;                   }
 end;
 
-
-
-(*
-{ TMap }
-
-function TMap.getKeyID(key: T_Key): longint;
-var i:longint;
-begin
-  result:=0-1; //WTF!!
-  for i:=0 to high(data) do
-    if data[i].key=key then
-      begin result := i; exit; end;
-end;
-
-procedure TMap.insert(key: T_Key; value: T_Value);
-begin
-  if getKeyID(key)<>0-1 then exit;
-  SetLength(data,length(data)+1);
-  data[high(data)].key:=key;
-  data[high(data)].value:=value;
-end;
-
-procedure TMap.remove(key: T_Key);
-var id:longint;
-begin
-  id:=getKeyID(key);
-  if id=0-1 then exit;
-  data[id]:=data[high(data)];
-  setlength(data,length(data)-1);
-end;
-
-function TMap.get(key: T_Key): T_Value;
-var id:longint;
-begin
-  id:=getKeyID(key);
-  if id= 0-1 then raise exception.create('key does not exists');
-  result:=data[id].value;
-end;
-
-function TMap.existsKey(key: T_Key): boolean;
-begin
-  result:=getKeyID(key)<>(0-1); //WTF!
-end;
-  *)
-  (*
-  procedure setInsertAll(oldSet: TIntSet; insertedSet: TIntSet);
-  var
-    i: Integer;
-  begin
-    for i:=0 to high(insertedSet.data) do
-      oldSet.insert(insertedSet.data[i]);
-  end;
-
-  procedure setRemoveAll(oldSet: TIntSet; removedSet: TIntSet);
-  var
-    i: Integer;
-  begin
-    for i:=high(removedSet.data) downto 0 do
-      oldSet.remove(removedSet.data[i]);
-  end;
-    *)
 
 //================================Others===================================
 type TSortData = Pointer;
