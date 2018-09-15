@@ -1746,7 +1746,7 @@ begin
   ps.StaticContext.strictTypeChecking:=false;
 
   ps.AutomaticallyRegisterParsedModules := true;
-  ps.parseXQuery1('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17; ');
+  ps.parseQuery('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17; ', xqpmXQuery1);
   m('import module "pseudo://test-module3"; test3:double(10)', '20');
   m('import module "pseudo://test-module3" at "whatever"; test3:double(10)', '20');
   m('import module namespace test4 = "pseudo://test-module3"; test4:double(10) + $test4:var', '37');
@@ -1987,7 +1987,7 @@ procedure THelper.ImportModule(sender: TObject; context: TXQStaticContext; const
 begin
   case namespace of
     'pseudo://circle2':
-      ps.parseXQuery1('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ;');
+      ps.parseQuery('module namespace circle2 = "pseudo://circle2"; import module "pseudo://circle1"; declare function circle2:cf2 ($x) { if ($x <= 0) then 1 else $x * circle1:cf1($x - 1)} ;', xqpmXQuery1);
     'http://www.w3.org/2005/xpath-functions', 'http://jsoniq.org/function-library': ;
     else raise Exception.Create('TestInternalException: Invalid namespace: '+namespace)
   end;

@@ -31,7 +31,7 @@ var
   begin
     inc(globalTestCount);
     if s3 <> '' then xml.parseTree(s3);
-    ps.parseXQuery3(s1);
+    ps.parseQuery(s1, xqpmXQuery3_0);
     ps.LastQuery.getTerm.getContextDependencies;
     result := ps.evaluate(xml.getLastTree).toString;
   end;
@@ -89,7 +89,7 @@ var
   procedure mr(s1: string); //module register
   begin
     try
-      ps.registerModule(ps.parseXQuery3(s1));
+      ps.registerModule(ps.parseQuery(s1, xqpmXQuery3_0));
     except on e:exception do begin
       writeln('Error @ "',s1, '"');
       raise;

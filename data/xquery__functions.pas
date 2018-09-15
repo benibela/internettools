@@ -2263,9 +2263,11 @@ begin
   if argc = 2 then begin
     if args[1].kind <> pvkObject then raiseXPTY0004TypeError(args[1], 'object');
     case args[1].getProperty('language').toString of
-      'xquery', 'xquery3', 'xquery3.0': model := xqpmXQuery3;
+      'xquery', 'xquery3', 'xquery3.1': model := xqpmXQuery3_1;
+      'xquery3.0': model := xqpmXQuery3_0;
       'xquery1', 'xquery1.0': model := xqpmXQuery1;
-      'xpath', 'xpath3', 'xpath3.0': model := xqpmXPath3;
+      'xpath', 'xpath3', 'xpath3.1': model := xqpmXPath3_1;
+      'xpath3.0': model := xqpmXPath3_0;
       'xpath2': model := xqpmXPath2;
       '':;
       else raise EXQEvaluationException.create('PXP:EVAL','Invalid language');
@@ -5624,7 +5626,7 @@ end;
 
 
 
-var fn3, fn, pxp, pxpold, op, x: TXQNativeModule;
+var fn3, fn3_1, fn, pxp, pxpold, op, x: TXQNativeModule;
 
 
 
@@ -5632,6 +5634,9 @@ procedure initializeFunctions;
 begin
   { Modules can be submodules of other. We have the following relations
 
+                fn3_1: standard xpath/xquery 3.1 functions
+             -/|
+             /
            fn3: standard xpath/xquery 3.0 functions
           -/|
           /
@@ -5647,8 +5652,10 @@ begin
    x: my (new and old) extensions
 
   }
+  fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
+  fn3_1.acceptedModels := [xqpmXPath3_1, xqpmXQuery3_1];
   fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
-  fn3.acceptedModels := [xqpmXPath3, xqpmXQuery3];
+  fn3.acceptedModels := [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
   fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3]);
   TXQueryEngine.registerNativeModule(fn);
   pxpold := TXQNativeModule.Create(TNamespace.create(#0'.benibela.de','hidden'));
@@ -5968,6 +5975,7 @@ begin
   pxpold.free;
   fn.free;
   fn3.free;
+  fn3_1.free;
   op.free;
 end;
 

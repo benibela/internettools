@@ -2547,7 +2547,7 @@ begin
   module := TXQueryEngine.findNativeModule(anamespace);
 
   if staticContext <> nil then model := staticContext.model
-  else model := xqpmXQuery3;
+  else model := xqpmXQuery3_1;
 
   if (module <> nil) then begin
     afunc := module.findBasicFunction(alocalname, argcount, model);

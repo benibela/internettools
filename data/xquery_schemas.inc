@@ -811,7 +811,7 @@ end;
 function TXSQNameType.castable(const v: IXQValue; const context: TXQStaticContext): boolean;
 begin
   result := (v.typeAnnotation.storage = TXQValueQName)
-            or ((context.model in [xqpmXPath3, xqpmXQuery3])
+            or ((context.model in PARSING_MODEL3)
                 and (v.kind = pvkString)
                 and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic))
                 and (self <> baseSchema.NOTATION)
@@ -820,7 +820,7 @@ end;
 
 procedure TXSQNameType.castAllowed(const v: ixqvalue; const s: string; const context: TXQStaticContext);
 begin
-  if not (context.model in [xqpmXPath3, xqpmXQuery3]) then
+  if not (context.model in PARSING_MODEL3) then
     raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.toXQuery());
   if (v.kind <> pvkString) or ((not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic))) then
     raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.toXQuery());

@@ -334,8 +334,9 @@ begin
   end;
 end;
 
-const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3];
-      PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
+const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1];
+  PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
+  PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
 
 
 constructor TVariableCycleDetectorXQ1.create(startcontext: TXQStaticContext);
@@ -624,17 +625,19 @@ end;
 
 procedure TXQParsingContext.requireXQuery(s: string);
 begin
-  if (parsingModel <> xqpmXQuery1) and (parsingModel <> xqpmXQuery3) then raiseInvalidModel('XQuery is required '+s);
+  if not (parsingModel in PARSING_MODEL_XQUERY) then
+    raiseInvalidModel('XQuery is required '+s);
 end;
 
 procedure TXQParsingContext.require3(s: string);
 begin
-  if (parsingModel <> xqpmXPath3) and (parsingModel <> xqpmXQuery3) then raiseInvalidModel('At least XQuery/XPath version 3.0 is required '+s);
+  if not (parsingModel in PARSING_MODEL3) then
+    raiseInvalidModel('At least XQuery/XPath version 3.0 is required '+s);
 end;
 
 procedure TXQParsingContext.requireXQuery3(s: string);
 begin
-  if (parsingModel <> xqpmXQuery3) then raiseInvalidModel('XQuery version 3.0 is required '+s);
+  if (parsingModel <> xqpmXQuery3_0) and (parsingModel <> xqpmXQuery3_1) then raiseInvalidModel('XQuery version 3.0 is required '+s);
 end;
 
 function TXQParsingContext.isModel3: boolean;
@@ -944,7 +947,7 @@ end;
 
 function TXQParsingContext.parseFunctionCall(target: TXQTermWithChildren): TXQTerm;
 begin
-  result := parseSequenceLike(target, ')', parsingModel in [xqpmXPath3, xqpmXQuery3]);
+  result := parseSequenceLike(target, ')', parsingModel in PARSING_MODEL3);
 end;
 
 function TXQParsingContext.isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
@@ -2062,7 +2065,7 @@ begin
         XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
           raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
         XMLNamespaceURL_XPathFunctionsMath, XMLNamespaceURL_XQuery:
-          if parsingModel = xqpmXQuery3 then
+          if parsingModel in PARSING_MODEL3 then
             raiseParsingError('XQST0045', 'Invalid namespace for function declaration: '+result.name.ToString);
       end;
 
@@ -2166,7 +2169,7 @@ end;
 function TXQParsingContext.replaceEntitiesIfNeeded(const s: string): string;
 begin
   result := s;
-  if ((parsingModel in [xqpmXQuery1,xqpmXQuery3]) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
+  if ((parsingModel in PARSING_MODEL_XQUERY) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
     Result := replaceEntitiesAlways(Result);
 end;
 
@@ -2359,7 +2362,7 @@ begin
           name := trim(TXQTermConstant(term.children[0]).value.toString);
           if not (baseSchema.isValidQName(name)) then result := castFail('FORG0001')
           else if castable then result := TXQTermConstant.create(xqvalueTrue)
-          else if (staticContext.model in [xqpmXPath3, xqpmXQuery3]) then exit
+          else if (staticContext.model in PARSING_MODEL3) then exit
           else begin
             //see  TXQTermSequenceType.staticQNameCast
             if pos(':', name) > 0 then begin
@@ -2468,7 +2471,7 @@ begin
       word := nextToken();
       if (pos^ = '/') and (word = '//') then raiseSyntaxError('Invalid ///');
       skipWhitespaceAndComment();
-      if (pos^ in [#0,',',')',']','}','=','!','>','[','|','+',';']) or ((pos^ = '<') and (parsingModel in [xqpmXPath2, xqpmXPath3])) then begin
+      if (pos^ in [#0,',',')',']','}','=','!','>','[','|','+',';']) or ((pos^ = '<') and (parsingModel in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1])) then begin
         if word = '//' then raiseSyntaxError('Invalid //');
         exit(TXQTermNodeMatcher.Create(xqnmdRoot)) //leading lone slash (see standard#parse-note-leading-lone-slash)
       end;
@@ -2534,7 +2537,7 @@ begin
         expect('(');
         if namespacePrefix = '' then begin
           case word of
-            'function': if parsingModel in [xqpmXQuery3, xqpmXPath3] then exit(parseFunctionDeclaration(nil, true));
+            'function': if parsingModel in PARSING_MODEL3 then exit(parseFunctionDeclaration(nil, true));
           end;
 
           if isKindTestFunction(word) then begin
@@ -2669,14 +2672,14 @@ begin
       '$','tumbling', 'sliding': exit(parseFlower(token));
       '<': if checkForPatternMatching then exit(parseFlower(token));
     end;
-    'let': if (parsingModel in [xqpmXPath3, xqpmXQuery1, xqpmXQuery3] ) then
+    'let': if (parsingModel <> xqpmXPath2 ) then
       case nextToken(true) of
         '$': exit(parseFlower(token));
         '<': if checkForPatternMatching then exit(parseFlower(token));
       end;
     'some', 'every': if nextToken(true) = '$' then
       exit(parseSomeEvery(token));
-    'switch': if (parsingModel = xqpmXQuery3) and (nextToken(true) = '(') then
+    'switch': if (parsingModel in [xqpmXQuery3_0, xqpmXQuery3_1]) and (nextToken(true) = '(') then
       exit(parseSwitch);
     'typeswitch': if parsingModel in PARSING_MODEL_XQUERY then
       exit(parseTypeSwitch);
@@ -2692,7 +2695,7 @@ begin
       end;
       exit;
     end;
-    'try': if (parsingModel = xqpmXQuery3) and (nextToken(true) = '{') then
+    'try': if (parsingModel in [xqpmXQuery3_0, xqpmXQuery3_1]) and (nextToken(true) = '{') then
       exit(parseTryCatch);
   end;
   pos := marker;
@@ -3602,7 +3605,8 @@ begin
           requireXQuery();
           temp := parseString();
           if strBeginsWith(temp, '1.0') then parsingModel := xqpmXQuery1
-          else if strBeginsWith(temp, '3.0') and isModel3 then parsingModel := xqpmXQuery3
+          else if strBeginsWith(temp, '3.0') and isModel3 then parsingModel := xqpmXQuery3_0
+          else if strBeginsWith(temp, '3.1') and isModel3 then parsingModel := xqpmXQuery3_1
           else temp := 'fail';
           if not setXQueryVersion(temp) then
             raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 ' + ifthen(isModel3, ' (3.0 is disabled)', 'or 3.0'));
@@ -4160,7 +4164,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       module := TXQueryEngine.findNativeModule(anamespace);
 
       if staticContext <> nil then model := staticContext.model
-      else model := xqpmXQuery3;
+      else model := xqpmXQuery3_1;
 
       if (module <> nil) then begin
         f.func := module.findBasicFunction(alocalname, argcount, model);

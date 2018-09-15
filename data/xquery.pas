@@ -132,7 +132,7 @@ type
 
   TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
 
-  TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3, xqpmXQuery3);
+  TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1);
 
   //============================XQUERY CONTEXTS==========================
 
@@ -2424,17 +2424,17 @@ type
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.
-    function parseXPath2(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
+    function parseXPath2(s:string; sharedContext: TXQStaticContext = nil): IXQuery; deprecated 'use parseQuery';
     //** Parses a new XQuery 1.0 expression and stores it in tokenized form.
-    function parseXQuery1(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
-    //** Parses a new XPath 3.0 expression and stores it in tokenized form. Work in progress, only a small set of 3.0 statements is supported
-    function parseXPath3(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
-    //** Parses a new XQuery 3.0 expression and stores it in tokenized form. Work in progress, only a small set of 3.0 statements is supported
-    function parseXQuery3(s:string; sharedContext: TXQStaticContext = nil): IXQuery;
+    function parseXQuery1(s:string; sharedContext: TXQStaticContext = nil): IXQuery; deprecated 'use parseQuery';
+    //** Parses a new XPath 3.0 expression and stores it in tokenized form.
+    function parseXPath3(s:string; sharedContext: TXQStaticContext = nil): IXQuery; deprecated 'use parseQuery';
+    //** Parses a new XQuery 3.0 expression and stores it in tokenized form.
+    function parseXQuery3(s:string; sharedContext: TXQStaticContext = nil): IXQuery; deprecated 'use parseQuery';
     //** Parses a new CSS 3.0 Selector expression and stores it in tokenized form.
     function parseCSS3(s:string): IXQuery;
     //** Parses a new expression and stores it in tokenized form.
-    function parseQuery(s:string; model: TXQParsingModel; sharedContext: TXQStaticContext = nil): IXQuery;
+    function parseQuery(s:string; model: TXQParsingModel = xqpmXQuery3_1; sharedContext: TXQStaticContext = nil): IXQuery;
 
     function evaluate(var context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue; //**< Evaluates a previously parsed query and returns its value as IXQValue
@@ -2816,10 +2816,10 @@ type
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
-  function findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQBasicFunctionInfo;
-  function findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQComplexFunctionInfo;
-  function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3): TXQInterpretedFunctionInfo;
-  function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3): TXQOperatorInfo;
+  function findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQBasicFunctionInfo;
+  function findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQComplexFunctionInfo;
+  function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQInterpretedFunctionInfo;
+  function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
@@ -2935,6 +2935,8 @@ function xqvalueAndPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQV
 
 procedure freeAnnotations(annotations: TXQAnnotations);
 
+const xqpmXPath3 = xqpmXPath3_0;
+      xqpmXQuery3 = xqpmXQuery3_0;
 
 //for internal use
 function charUnicodeZero(const cp: integer): integer;
@@ -2995,7 +2997,7 @@ var
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
   const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
 
-  PARSING_MODEL3 = [xqpmXPath3, xqpmXQuery3];
+  PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
 
 
 
@@ -3375,7 +3377,7 @@ begin
          if namespace <> nil then temp.GlobalNamespaces.add(namespace);
          GlobalInterpretedNativeFunctionStaticContext.sender := temp;
          temp.StaticContext := GlobalInterpretedNativeFunctionStaticContext;
-         tempQuery := temp.parseTerm(source, xqpmXQuery3, temp.StaticContext);
+         tempQuery := temp.parseTerm(source, xqpmXQuery3_1, temp.StaticContext);
          definition := tempQuery.fterm as TXQTermDefineFunction;
          func := tempQuery.evaluate() as TXQValueFunction;
          func._AddRef;
@@ -6608,13 +6610,13 @@ end;
 
 function TXQueryEngine.parseXPath3(s: string; sharedContext: TXQStaticContext): IXQuery;
 begin
-  FLastQuery:=parseTerm(s, xqpmXPath3, sharedContext);
+  FLastQuery:=parseTerm(s, xqpmXPath3_0, sharedContext);
   result := FLastQuery;
 end;
 
 function TXQueryEngine.parseXQuery3(s: string; sharedContext: TXQStaticContext): IXQuery;
 begin
-  FLastQuery:=parseTerm(s, xqpmXQuery3, sharedContext);
+  FLastQuery:=parseTerm(s, xqpmXQuery3_0, sharedContext);
   result := FLastQuery;
 end;
 
@@ -6786,22 +6788,22 @@ end;
 
 function TXQueryEngine.evaluateXPath3(expression: string; tree: TTreeNode): IXQValue;
 begin
-  result := evaluate(expression, xqpmXPath3, tree);
+  result := evaluate(expression, xqpmXPath3_0, tree);
 end;
 
 function TXQueryEngine.evaluateXPath3(expression: string; const contextItem: IXQValue): IXQValue;
 begin
-  result := evaluate(expression, xqpmXPath3, contextItem);
+  result := evaluate(expression, xqpmXPath3_0, contextItem);
 end;
 
 function TXQueryEngine.evaluateXQuery3(expression: string; tree: TTreeNode): IXQValue;
 begin
-  result := evaluate(expression, xqpmXQuery3, tree);
+  result := evaluate(expression, xqpmXQuery3_0, tree);
 end;
 
 function TXQueryEngine.evaluateXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
 begin
-  result := evaluate(expression, xqpmXQuery3, contextItem);
+  result := evaluate(expression, xqpmXQuery3_0, contextItem);
 end;
 
 function TXQueryEngine.evaluateCSS3(expression: string; tree: TTreeNode): IXQValue;
@@ -6864,12 +6866,12 @@ end;
 
 class function TXQueryEngine.evaluateStaticXPath3(expression: string; tree: TTreeNode): IXQValue;
 begin
-  result := staticallyEval(expression, xqpmXPath3, tree);
+  result := staticallyEval(expression, xqpmXPath3_0, tree);
 end;
 
 class function TXQueryEngine.evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue;
 begin
-  result := staticallyEval(expression, xqpmXPath3, contextItem);
+  result := staticallyEval(expression, xqpmXPath3_0, contextItem);
 end;
 
 class function TXQueryEngine.evaluateStaticXQuery1(expression: string; tree: TTreeNode): IXQValue;
@@ -6884,12 +6886,12 @@ end;
 
 class function TXQueryEngine.evaluateStaticXQuery3(expression: string; tree: TTreeNode): IXQValue;
 begin
-  result := staticallyEval(expression, xqpmXQuery3, tree);
+  result := staticallyEval(expression, xqpmXQuery3_0, tree);
 end;
 
 class function TXQueryEngine.evaluateStaticXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
 begin
-  result := staticallyEval(expression, xqpmXQuery3, contextItem);
+  result := staticallyEval(expression, xqpmXQuery3_0, contextItem);
 end;
 
 class function TXQueryEngine.evaluateStaticCSS3(expression: string; tree: TTreeNode): IXQValue;
@@ -6972,7 +6974,7 @@ begin
   cxt.options :=ParsingOptions;
   cxt.options.AllowExtendedStrings:=true;
   cxt.staticContext := context;
-  cxt.parsingModel:=xqpmXPath3;
+  cxt.parsingModel:=xqpmXPath3_1;
   cxt.engine := self;
   try
     cxt.str := str;
@@ -7943,7 +7945,7 @@ begin
     for i := 0 to high(aparentModule) do parents[i] := aparentModule[i];
   end;
 
-  acceptedModels := [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3];
+  acceptedModels := [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1];
 end;
 
 constructor TXQNativeModule.create(const anamespace: INamespace);
@@ -8352,7 +8354,7 @@ collations:=TStringList.Create;
 collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;
 globalTypeParsingContext := TXQParsingContext.Create;
-globalTypeParsingContext.parsingModel := xqpmXQuery3;
+globalTypeParsingContext.parsingModel := xqpmXQuery3_1;
 globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 globalTypeParsingContext.options.AllowJSON:=true;
 //namespaces

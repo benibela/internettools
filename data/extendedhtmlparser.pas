@@ -1174,7 +1174,7 @@ begin
   //        and if xquery is included in a pattern, the xquery shares the context of the pattern
   // but if we mix it, lastquery will still contain a reference to a static context that has expired. Which will crash when the query is freed (i.e. a new query is read)
   //using parseTerm avoids all that, since it does not keep a lastquery
-  result := TXQueryEngineBreaker(FQueryEngine).parseTerm(expression, xqpmXQuery3, context);
+  result := TXQueryEngineBreaker(FQueryEngine).parseTerm(expression, xqpmXQuery3_1, context);
 end;
 
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;

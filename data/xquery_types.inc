@@ -461,7 +461,7 @@ var
   seq: TXQValueSequence;
   tempFilter: TXQPathMatchingStepFilter;
 begin
-  term := defaultQueryEngine.parseTerm(q, xqpmXQuery3, defaultQueryEngine.StaticContext);
+  term := defaultQueryEngine.parseTerm(q, xqpmXQuery3_1, defaultQueryEngine.StaticContext);
   try
     tempContext := defaultQueryEngine.getEvaluationContext();
 
@@ -1639,7 +1639,7 @@ var
   resseq: TXQValueSequence;
   i: Integer;
 begin
-  term := defaultQueryEngine.parseTerm(q, xqpmXQuery3, defaultQueryEngine.StaticContext);
+  term := defaultQueryEngine.parseTerm(q, xqpmXQuery3_1, defaultQueryEngine.StaticContext);
   try
     resseq := TXQValueSequence.create(getSequenceCount);
     for i := 0 to seq.Count - 1 do
