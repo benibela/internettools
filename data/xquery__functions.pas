@@ -5675,12 +5675,27 @@ end;
    PXPair = ^TXPair;
 
 function compareDirect(self: TObject; p1,p2: pointer): integer;
+var v1: PIXQValue absolute p1;
+    v2: PIXQValue absolute p2;
+    sortingContext: PSortingContext absolute self;
+    i, c1, c2: Integer;
 begin
-  result :=  PSortingContext(self)^.staticContext.compareDeepAtomic(PIXQValue(p1)^, PIXQValue(p2)^, PSortingContext(self)^.collation);
+  c1 := v1^.getSequenceCount;
+  c2 := v2^.getSequenceCount;
+  if (c1 = 1 ) and (c2 = 1) then exit( sortingContext^.staticContext.compareDeepAtomic(v1^, v2^, sortingContext^.collation) );
+
+  for i := 1 to min(c1, c2) do begin
+    result := sortingContext^.staticContext.compareDeepAtomic(v1^.get(i), v2^.get(i), sortingContext^.collation);
+    if result <> 0 then begin
+      if (result > 0) and (v1^.get(i).kind = pvkFloat) and (sortingContext^.staticContext.compareAtomic(v1^.get(i), v1^.get(i)) <> 0) then result := -1; //nan check
+      exit;
+    end;
+  end;
+  result := sign(c1 - c2);
 end;
 function compareWithKey(self: TObject; p1,p2: pointer): integer;
 begin
-  result :=  PSortingContext(self)^.staticContext.compareDeepAtomic(PXPair(p1)^.key, PXPair(p2)^.key, PSortingContext(self)^.collation);
+  result :=  compareDirect(self, @PXPair(p1)^.key, @PXPair(p2)^.key);
 end;
 
 
@@ -5693,8 +5708,9 @@ var
   stack: TXQEvaluationStack;
   list: TXQVList;
 begin
-  if argc >= 2 then sortContext.collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
+  if (argc >= 2) and not (args[1].isUndefined) then sortContext.collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else sortContext.collation := context.staticContext.collation;
+  sortContext.staticContext := context.staticContext;
   count := args[0].getSequenceCount;
   if count <= 1 then exit(args[0]);
   if argc < 3 then begin
@@ -5715,7 +5731,7 @@ begin
     //get keys
     for i := 0 to count - 1 do begin
       stack.topptr(0)^ := list[i];
-      tempArray[i].key := keyfunc.evaluate(context, nil);
+      tempArray[i].key := xqvalueAtomize(keyfunc.evaluate(context, nil));
       tempArray[i].orig := list[i];
     end;
     stack.popTo(stackSize);
