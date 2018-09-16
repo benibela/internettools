@@ -4131,7 +4131,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       if moduleResult <> '' then begin
         result += '  In module ' + namespaceGetURL(module.namespace);
         if equalNamespaces(module.namespace, XMLNamespace_XPathFunctions) then
-          if not (xqpmXPath2 in module.acceptedModels) then result += ' (XPath/XQuery 3.0)';
+          if not (xqpmXPath3_0 in module.acceptedModels) then result += ' (XPath/XQuery 3.1)'
+          else if not (xqpmXPath2 in module.acceptedModels) then result += ' (XPath/XQuery 3.0)';
         result += ':'+LineEnding+moduleResult+LineEnding;
       end;
       for i := 0 to high(module.parents) do

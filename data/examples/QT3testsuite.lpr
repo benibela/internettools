@@ -1150,41 +1150,41 @@ begin
   dependencyCacheFalse.Sorted:=true;
 
   put('spec', 'XP20', config.version in [xqpmXPath2]);
-  put('spec', 'XP20+', config.version in [xqpmXPath2, xqpmXPath3]);
-  put('spec', 'XP30', config.version in [xqpmXPath3]);
-  put('spec', 'XP30+', config.version in [xqpmXPath3]);
+  put('spec', 'XP20+', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1]);
+  put('spec', 'XP30', config.version in [xqpmXPath3_0]);
+  put('spec', 'XP30+', config.version in [xqpmXPath3_0, xqpmXPath3_1]);
 
   put('spec', 'XQ10', config.version in [xqpmXQuery1]);
-  put('spec', 'XQ10+', config.version in [xqpmXQuery1, xqpmXQuery3]);
-  put('spec', 'XQ30', config.version in [xqpmXQuery3]);
-  put('spec', 'XQ30+', config.version in [xqpmXQuery3]);
-  put('spec', 'XQ10 XQ30', config.version in [xqpmXQuery1, xqpmXQuery3]);
+  put('spec', 'XQ10+', config.version in [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
+  put('spec', 'XQ30', config.version in [xqpmXQuery3_0]);
+  put('spec', 'XQ30+', config.version in [xqpmXQuery3_0, xqpmXQuery3_1]);
+  put('spec', 'XQ10 XQ30', config.version in [xqpmXQuery1, xqpmXQuery3_0]);
 
   put('spec', 'XP20 XQ10', config.version in [xqpmXPath2, xqpmXQuery1]);
-  put('spec', 'XP20+ XQ10+', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
-  put('spec', 'XP20+ XQ30+', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery3]);
+  put('spec', 'XP20+ XQ10+', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
+  put('spec', 'XP20+ XQ30+', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery3_0, xqpmXQuery3_1]);
 
-  put('spec', 'XP30 XQ30', config.version in [xqpmXPath3, xqpmXQuery3]);
-  put('spec', 'XP30+ XQ10+', config.version in [xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
-  put('spec', 'XP30+ XQ30+', config.version in [xqpmXPath3, xqpmXQuery3]);
+  put('spec', 'XP30 XQ30', config.version in [xqpmXPath3_0, xqpmXQuery3_0]);
+  put('spec', 'XP30+ XQ10+', config.version in [xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
+  put('spec', 'XP30+ XQ30+', config.version in [xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery3_1, xqpmXQuery3_0]);
 
-  put('spec', 'XP20 XP30 XQ10 XQ30', config.version in [xqpmXPath2, xqpmXPath3, xqpmXQuery1, xqpmXQuery3]);
+  put('spec', 'XP20 XP30 XQ10 XQ30', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXQuery1, xqpmXQuery3_0]);
 
 
-  put('spec', 'XP31', false);
-  put('spec', 'XP31+', false);
-  put('spec', 'XQ31', false);
-  put('spec', 'XQ31+', false);
-  put('spec', 'XQ31+ XP31+', false);
-  put('spec', 'XP31+ XQ31+', false);
-  put('spec', 'XQ31 XP31', false);
-  put('spec', 'XP31 XQ31', false);
-  put('spec', 'XP31+ XQ31', false);
+  put('spec', 'XP31', config.version in [xqpmXPath3_1]);
+  put('spec', 'XP31+', config.version in [xqpmXPath3_1]);
+  put('spec', 'XQ31', config.version in [xqpmXQuery3_1]);
+  put('spec', 'XQ31+', config.version in [xqpmXQuery3_1]);
+  put('spec', 'XQ31+ XP31+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
+  put('spec', 'XP31+ XQ31+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
+  put('spec', 'XQ31 XP31', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
+  put('spec', 'XP31 XQ31', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
+  put('spec', 'XP31+ XQ31', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
 
-  put('spec', 'XT30+ XP31+ XQ31+', false);
-  put('spec', 'XP31+ XQ31+ XT30+', false);
+  put('spec', 'XT30+ XP31+ XQ31+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
+  put('spec', 'XP31+ XQ31+ XT30+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
 
-  put('spec', 'XT30+', false);
+  put('spec', 'XT30+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
 
   put('feature', 'collection-stability', true);
   put('feature', 'non_unicode_codepoint_collation', true);
@@ -1763,11 +1763,13 @@ begin
 
   case clr.readString('mode') of
     'xquery1': config.version := xqpmXQuery1;
-    'xquery3': config.version := xqpmXQuery3;
+    'xquery3': config.version := xqpmXQuery3_0;
+    'xquery3.1': config.version := xqpmXQuery3_1;
     'xpath2': config.version := xqpmXPath2;
-    'xpath3': config.version := xqpmXPath3;
+    'xpath3': config.version := xqpmXPath3_0;
+    'xpath3.1': config.version := xqpmXPath3_1;
   end;
-  if config.version in [xqpmXPath3, xqpmXQuery3] then begin
+  if config.version in [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1] then begin
     if GetEnvironmentVariable('QTTEST') <> '42' then begin
       {$ifndef windows}
       writeln(stderr, 'You must set enviroment variables QTTEST="42" QTTEST2="other" QTTESTEMPTY=""');
@@ -1826,7 +1828,7 @@ begin
   xq.ParsingOptions.AllowJSON:=false;
   xq.ParsingOptions.AllowJSONLiterals:=false;
   xq.ParsingOptions.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
-  if config.version in [xqpmXPath2, xqpmXPath3] then xq.ParsingOptions.LineEndingNormalization := xqlenNone
+  if config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1] then xq.ParsingOptions.LineEndingNormalization := xqlenNone
   else xq.ParsingOptions.LineEndingNormalization := xqlenXML11;
   xq.StaticContext.collation := xq.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint', '');
   xq.StaticContext.stripBoundarySpace:=true;

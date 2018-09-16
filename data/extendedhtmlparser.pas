@@ -750,7 +750,7 @@ THtmlTemplateParser=class
 //** xml compatible namespace url to define new template prefixes
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 
-type TExtractionKind = (ekAuto, ekXPath2, ekXPath3, ekPatternHTML, ekPatternXML, ekCSS, ekXQuery1, ekXQuery3, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
+type TExtractionKind = (ekAuto, ekXPath2, ekXPath3_0, ekXPath3_1, ekXQuery1, ekXQuery3_0, ekXQuery3_1, ekPatternHTML, ekPatternXML, ekCSS, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
 function guessExtractionKind(e: string): TExtractionKind;
 
 const
@@ -2455,7 +2455,7 @@ begin
   }
 
 
-  if (e = '') or (e = '.' {just context item}) then exit(ekXPath3);
+  if (e = '') or (e = '.' {just context item}) then exit(ekXPath3_1);
   if e[1] in [#0..#32] then e := trim(e);
   if (e[1] = '<') then exit(ekPatternHTML);
 
@@ -2466,9 +2466,9 @@ begin
      checkWords('declare', ['function', 'variable', 'namespace', 'default', 'boundary-space', 'base-uri', 'option', 'construction', 'copy-namespace']) or
      checkWords('for', ['sliding', 'tumbling'])
      then
-    exit(ekXQuery3);
+    exit(ekXQuery3_1);
 
-  result := ekXPath3;
+  result := ekXPath3_1;
 
   dots := 0;
   for i := 1 to length(e) do
@@ -2477,10 +2477,10 @@ begin
       '#': exit(ekCSS);
       '.': if ((i = 1) or (e[i-1] in ['a'..'z','A'..'Z'])) and ((i = length(e)) or (e[i+1] in ['a'..'z','A'..'Z'])) then
          dots+=1;
-      else exit(ekXPath3);
+      else exit(ekXPath3_1);
     end;
   if dots > 0 then exit(ekCSS)
-  else exit(ekXPath3);
+  else exit(ekXPath3_1);
 end;
 
 

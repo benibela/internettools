@@ -228,13 +228,13 @@ begin
       pxpparser.StaticContext.baseURI:=dataFileName;
       TXQueryEngineBreaker(pxpParser).addAWeirdGlobalVariable('', 'json');
       case querykind of
-        ekXQuery1, ekXQuery3: begin
+        ekXQuery1, ekXQuery3_0, ekXQuery3_1: begin
           pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQuery;
-          pxpParser.parseXQuery3(query, pxpParser.StaticContext);
+          pxpParser.parseQuery(query, xqpmXQuery3_1, pxpParser.StaticContext);
         end;
-        ekXPath2, ekXPath3: begin
+        ekXPath2, ekXPath3_0, ekXPath3_1: begin
           pxpParser.ParsingOptions.StringEntities := xqseIgnoreLikeXPath;
-          pxpParser.parseXQuery3(query, pxpParser.StaticContext) //no point in using a less powerful language.
+          pxpParser.parseQuery(query, xqpmXQuery3_1, pxpParser.StaticContext) //no point in using a less powerful language.
         end;
         ekCSS: pxpParser.parseCSS3(query);
         else raise Exception.Create('internal error 21412466');
