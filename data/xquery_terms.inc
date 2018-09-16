@@ -309,6 +309,97 @@ begin
   TXQTermReadObjectProperty(result).propname := propname;
 end;
 
+constructor TXQTermJSONLookup.create(aunary: boolean);
+begin
+  unary := aunary;
+end;
+
+function TXQTermJSONLookup.evaluate(var context: TXQEvaluationContext): IXQValue;
+var source: IXQValue;
+  keys: IXQValue;
+  pv, pw: PIXQValue;
+  procedure raiseInvalidKey(code: string);
+  var
+    key: String;
+  begin
+    case mode of
+      xqtjlmName: key := propname;
+      xqtjlmParenthesized: key := keys.toXQuery;
+      else key := '??';
+      end;
+    raise EXQEvaluationException.Create(code, 'Invalid key ('+key+') for ', nil, source, self);
+  end;
+
+var
+  ar: TXQValueJSONArray;
+  seq: TXQValueSequence;
+  i: Int64;
+  pp: TXQProperty;
+  pk: PIXQValue;
+begin
+  if unary then begin
+    source := context.SeqValue;
+    if source = nil then raiseTypeError0004('No context item');
+  end else source := children[0].evaluate(context);
+  keys := nil;
+  if mode = xqtjlmParenthesized then keys := children[high(children)].evaluate(context);
+  result := nil;
+  seq := nil;
+  for pv in source.GetEnumeratorPtrUnsafe do begin
+    case pv^.kind of
+      pvkArray: begin
+        ar := pv^ as TXQValueJSONArray;
+        case mode of
+          xqtjlmInteger: if (integerKey >= 1) and (integerKey <= ar.seq.Count) then xqvalueSeqConstruct(result, seq, ar.seq[integerKey - 1])
+                         else raiseInvalidKey('FOAY0001');
+          xqtjlmName: raiseInvalidKey('XPTY0004');
+          xqtjlmParenthesized:
+            for pk in keys.GetEnumeratorPtrUnsafe do begin
+              if not pk^.instanceOf(baseSchema.integer) then raiseInvalidKey('XPTY0004');
+              i := pk^.toInt64;
+              if (i >= 1) and (i <= ar.seq.Count) then xqvalueSeqConstruct(result, seq, ar.seq[i - 1])
+              else raiseInvalidKey('FOAY0001');
+            end;
+            xqtjlmWild:
+              for pw in ar.GetEnumeratorMembersPtrUnsafe do
+                xqvalueSeqConstruct(result, seq, pw^);
+        end;
+      end;
+      pvkObject: begin
+        case mode of
+          xqtjlmInteger: xqvalueSeqConstruct(result, seq, pv^.getProperty(IntToStr(integerKey)));
+          xqtjlmName: xqvalueSeqConstruct(result, seq, pv^.getProperty(propname));
+          xqtjlmParenthesized:
+            for pk in keys.GetEnumeratorPtrUnsafe do begin
+              xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^.toString));
+            end;
+          xqtjlmWild:
+            for pp in (pv^ as TXQValueObject).getPropertyEnumerator do
+              xqvalueSeqConstruct(result, seq, pv^.getProperty(pp.Value.toString));
+        end;
+      end
+    else raiseTypeError0004('Need array/map', pv^);
+    end;
+  end;
+  if result = nil then result := xqvalue();
+end;
+
+function TXQTermJSONLookup.getContextDependencies: TXQContextDependencies;
+begin
+  Result:=inherited getContextDependencies;
+  if unary then result += [xqcdFocusItem];
+end;
+
+function TXQTermJSONLookup.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermJSONLookup(result).mode := mode;
+  TXQTermJSONLookup(result).unary := unary;
+  TXQTermJSONLookup(result).integerKey := integerKey;
+  TXQTermJSONLookup(result).propname := propname
+end;
+
+
 { TXQTermIf }
 
 constructor TXQTermIf.create;

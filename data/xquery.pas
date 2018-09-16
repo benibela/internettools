@@ -2043,6 +2043,18 @@ type
     function clone: TXQTerm; override;
   end;
 
+  TXQTermJSONLookupMode = (xqtjlmInteger, xqtjlmName, xqtjlmParenthesized, xqtjlmWild);
+  TXQTermJSONLookup = class(TXQTermWithChildren)
+    mode: TXQTermJSONLookupMode;
+    unary: boolean;
+    integerKey: integer;
+    propname: string;
+    constructor create(aunary: boolean);
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
+  end;
+
   { TXQTermConstructor }
 
   TXQTermConstructor = class(TXQTermWithChildren)
@@ -3004,6 +3016,7 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
 
 constructor TXQMapStringObject.Create;
 begin

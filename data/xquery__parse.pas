@@ -107,7 +107,7 @@ protected
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(): TXQTerm;
-
+  function parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
 
   function parseFlower(akind: string): TXQTermFlower;
   function parseSomeEvery(const akind: string): TXQTermSomeEvery;
@@ -2328,6 +2328,34 @@ begin
   result := optimizeConstantChildren(parseSequenceLike(TXQTermJSONArray.Create, ']', false));
 end;
 
+function TXQParsingContext.parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
+begin
+  if not (parsingModel in PARSING_MODEL3_1) then raiseSyntaxError('Need 3.1');
+  inc(pos);
+  result := TXQTermJSONLookup.create(expr = nil);
+  if expr <> nil then result.push(expr);
+  case pos^ of
+    '0'..'9': begin
+      if not TryStrToInt(nextToken(), result.integerKey) then raiseSyntaxError('Need (integer) key');
+      result.mode := xqtjlmInteger
+    end;
+    '*': begin
+      result.mode := xqtjlmWild;
+      inc(pos);
+    end;
+    '(': begin
+      inc(pos);
+      result.push(parsePrimaryLevel); //todo: memory leak?
+      result.mode := xqtjlmParenthesized;
+      expect(')');
+    end;
+    else begin
+      result.propname := nextTokenNCName();
+      result.mode := xqtjlmName;
+    end;
+  end;
+end;
+
 function createDynamicErrorTerm(const code, msg: string): TXQTermNamedFunction;
 begin
   result := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'error', [
@@ -2443,6 +2471,7 @@ var
     end;
   end;
 
+
 begin
   result := nil;
   skipWhitespaceAndComment();
@@ -2516,6 +2545,7 @@ begin
       inc(pos);
       exit(parseXString());
     end;
+    '?': exit(parseJSONLookup(nil));
   end;
 
   try
@@ -2807,7 +2837,7 @@ begin
     while true do begin
       word := nextToken(true);
       case word of
-        '', ',', ';', ':', '?', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'group', 'collation', 'case', 'default', 'count':
+        '', ',', ';', ':', ')', ']', '}', 'else', 'return', 'satisfies', 'for', 'let', 'order', 'where', 'stable', 'end', 'only', 'ascending', 'descending', 'start', 'empty', 'group', 'collation', 'case', 'default', 'count':
           exit(astroot);
         '[': begin
           expect('[');
@@ -2845,6 +2875,12 @@ begin
         end;
         '|': if options.AllowJSON and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
              else pushBinaryOp(TXQueryEngine.findOperator(pos)); //| operator
+        '?': begin
+          if (pos+1)^ <> ':' {jsoniq} then begin
+            replace := ripBinOpApart(@astroot, 10000);
+            replace^ := parseJSONLookup(replace^);
+          end else exit(astroot);
+        end
         else begin
           op := TXQueryEngine.findOperator(pos);
           if op <> nil then pushBinaryOp(op)
