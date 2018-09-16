@@ -106,7 +106,7 @@ protected
   function parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
-  function parseJSONLikeArray(): TXQTerm;
+  function parseJSONLikeArray(term: TXQTermWithChildren; closingParen: char = ']'): TXQTerm;
   function parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
 
   function parseFlower(akind: string): TXQTermFlower;
@@ -2322,10 +2322,10 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseJSONLikeArray(): TXQTerm;
+function TXQParsingContext.parseJSONLikeArray(term: TXQTermWithChildren; closingParen: char = ']'): TXQTerm;
 begin
   //expect('['); parsed by caller
-  result := optimizeConstantChildren(parseSequenceLike(TXQTermJSONArray.Create, ']', false));
+  result := optimizeConstantChildren(parseSequenceLike(term, closingParen, false));
 end;
 
 function TXQParsingContext.parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
@@ -2530,9 +2530,11 @@ begin
       exit(parseJSONLikeObjectConstructor);
     end;
     '[': begin
-      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected [. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like array) ');
       inc(pos);
-      exit(parseJSONLikeArray());
+      if options.AllowJSON then result := TXQTermJSONArray.Create
+      else if parsingModel in PARSING_MODEL3_1 then result := TXQTermArray3_1.Create
+      else raiseSyntaxError('Unexpected [. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like array) ');
+      exit(parseJSONLikeArray(TXQTermWithChildren(result)));
     end;
     '%': begin
       inc(pos);
@@ -2604,6 +2606,10 @@ begin
            expect('{'); result := parse(); expect('}');
            exit;
          end;
+        'array': if parsingModel in PARSING_MODEL3_1 then begin
+          expect('{');
+          exit(parseJSONLikeArray(TXQTermJSONArray.Create, '}'));
+        end;
       end;
       '#': begin
         require3('Named Function Reference');

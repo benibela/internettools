@@ -1596,6 +1596,10 @@ type
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
+  TXQTermArray3_1 = class(TXQTermWithChildren)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+    function getContextDependencies: TXQContextDependencies; override;
+  end;
 
   { TXQTermType }
 
@@ -3016,6 +3020,7 @@ var
 
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
+
 
 
 constructor TXQMapStringObject.Create;

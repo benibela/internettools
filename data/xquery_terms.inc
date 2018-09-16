@@ -1171,6 +1171,26 @@ begin
   for i:= 0 to high(children) do result += children[i].getContextDependencies;
 end;
 
+function TXQTermArray3_1.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  i: Integer;
+  list: TXQVList;
+begin
+  list := TXQVList.create(length(children));
+  list.Count := length(children);
+  result := TXQValueJSONArray.create(list);
+  for i := 0 to high(children) do
+    list[i] := children[i].evaluate(context);
+end;
+
+function TXQTermArray3_1.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+end;
+
 
 { TXQTermSomeEvery }
 
