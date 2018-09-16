@@ -373,7 +373,7 @@ begin
   test(TXQueryEngine.evaluateStaticXPath3('1 + 1 + (let $t := 10 return $t)').toString, '12', 'evaluateStaticXPath3 a failed');
 
 
-  writeln('XPath 3: ', count, ' completed');
+  writeln('XPath 3.0: ', count, ' completed');
   ps.free;
   xml.Free;
 end;

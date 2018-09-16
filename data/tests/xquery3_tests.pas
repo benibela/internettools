@@ -423,7 +423,7 @@ begin
 
   newinterfacetests;
 
-  writeln('XQuery 3: ', count, ' completed');
+  writeln('XQuery 3.0: ', count, ' completed');
 
   finally
   ps.free;

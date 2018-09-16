@@ -2595,7 +2595,10 @@ end;
 function xqFunctionTrace(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := args[0];
-  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnTrace) then context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], args[1]);
+  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnTrace) then begin
+    if argc = 1 then context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], nil)
+    else context.staticContext.sender.OnTrace(context.staticContext.sender, args[0], args[1]);
+  end;
 end;
 
 
@@ -5622,9 +5625,125 @@ begin
   end;
 end;
 
+function xqFunctionContains_Token(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  collation: TXQCollation;
+  input, token: string;
+  splitted: TStringArray;
+  v: PIXQValue;
+  i: Integer;
+begin
+  if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
+  else collation := context.staticContext.collation;
+
+  if args[0].getSequenceCount = 0 then exit(xqvalue(false));
+  token := trim(args[1].toString);
+  if (token = '') then exit(xqvalue(false));
+
+  for v in args[0].GetEnumeratorPtrUnsafe do begin
+    input := strTrimAndNormalize(v^.toString, WHITE_SPACE);
+
+    splitted := strSplit(input, ' ');
+    for i := 0 to high(splitted) do
+      if collation.equal(splitted[i], token) then
+        exit(xqvalue(true));
+  end;
+  result := xqvalue(false);
+end;
+
+function xqFunctionDefault_Language(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  result := TXQValueString.create(baseSchema.language, 'en');
+end;
 
 
+function xqFunctionParse_Ietf_Date({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  result := xqFunctionParse_date(argc, args); //todo: correct format
+end;
 
+
+type TSortingContext = record
+  staticContext: TXQStaticContext;
+  collation: TXQCollation;
+end;
+   PSortingContext = ^TSortingContext;
+   TXPair = record
+     key: IXQValue;
+     orig: IXQValue;
+   end;
+   PXPair = ^TXPair;
+
+function compareDirect(self: TObject; p1,p2: pointer): integer;
+begin
+  result :=  PSortingContext(self)^.staticContext.compareDeepAtomic(PIXQValue(p1)^, PIXQValue(p2)^, PSortingContext(self)^.collation);
+end;
+function compareWithKey(self: TObject; p1,p2: pointer): integer;
+begin
+  result :=  PSortingContext(self)^.staticContext.compareDeepAtomic(PXPair(p1)^.key, PXPair(p2)^.key, PSortingContext(self)^.collation);
+end;
+
+
+function xqFunctionSort(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  sortContext: TSortingContext;
+  keyfunc: TXQValueFunction;
+  tempArray: array of TXPair;
+  count, i, stacksize: Integer;
+  stack: TXQEvaluationStack;
+  list: TXQVList;
+begin
+  if argc >= 2 then sortContext.collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
+  else sortContext.collation := context.staticContext.collation;
+  count := args[0].getSequenceCount;
+  if count <= 1 then exit(args[0]);
+  if argc < 3 then begin
+    list := args[0].toXQVList;
+    result := TXQValueSequence.create(list);
+    list.sort(@compareDirect, TObject(@sortContext));
+  end else begin
+    keyfunc := args[2] as TXQValueFunction;
+    SetLength(tempArray, count);
+    list := (args[0] as TXQValueSequence).seq;
+
+    //prepare for function call
+    stack := context.temporaryVariables;
+    stacksize := stack.Count;
+    stack.push(list[0]);
+    keyfunc.contextOverrideParameterNames(context, 1);
+
+    //get keys
+    for i := 0 to count - 1 do begin
+      stack.topptr(0)^ := list[i];
+      tempArray[i].key := keyfunc.evaluate(context, nil);
+      tempArray[i].orig := list[i];
+    end;
+    stack.popTo(stackSize);
+
+
+    stableSort(@tempArray[0], @tempArray[high(tempArray)] , sizeof(tempArray[0]), @compareWithKey, TObject(@sortContext));
+
+    list := TXQVList.create(count);
+    for i := 0 to count - 1 do
+      list.add(tempArray[i].orig);
+    result := TXQValueSequence.create(list);
+  end;
+end;
+
+function xqFunctionTokenize_1(argc: SizeInt; argv: PIXQValue): IXQValue;
+var input: string;
+begin
+  input := strTrimAndNormalize(argv[0].toString, WHITE_SPACE);
+  if input = '' then exit(xqvalue);
+  result := xqvalue(strSplit(input, ' '));
+end;
+
+{
+function xqFunction(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  requiredArgCount(argc, );
+end;
+}
 
 var fn3, fn3_1, fn, pxp, pxpold, op, x: TXQNativeModule;
 
@@ -5654,7 +5773,7 @@ begin
   }
   fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
   fn3_1.acceptedModels := [xqpmXPath3_1, xqpmXQuery3_1];
-  fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
+  fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3_1]);
   fn3.acceptedModels := [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
   fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3]);
   TXQueryEngine.registerNativeModule(fn);
@@ -5904,6 +6023,18 @@ begin
 
 
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, ['() as xs:string', '($arg as node()?) as xs:string']);
+
+  //3.1 todo: apply, collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
+
+  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, ['($input as xs:string*, $token as xs:string) as xs:boolean', '($input 	 as xs:string*, $token 	 as xs:string, $collation 	 as xs:string) as xs:boolean']);
+  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, ['() as xs:language']);
+  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date, ['($value as xs:string?) as xs:dateTime?']);
+  fn3_1.registerFunction('sort', @xqFunctionSort, ['($input as item()*) as item()*', '($input as item()*, $collation as xs:string?) as item()*', '($input as item()*, $collation 	 as xs:string?, $key as function(item()) as xs:anyAtomicType*) as item()*']);
+  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1,['($input as xs:string?) as xs:string*']);
+  fn3_1.registerFunction('trace', @xqFunctionTrace, ['($value as item()*) as item()*']);
+  fn3_1.registerFunction('error', @xqFunctionError,['($error as xs:QName?) as none']);
+
+
 
   //Operators
   //The type information are just the function declarations of the up-backing functions

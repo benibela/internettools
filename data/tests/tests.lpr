@@ -10,7 +10,7 @@ uses
   xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
   simplehtmltreeparser, xquery, internetaccess_tests, xpath3_tests, xquery3_tests, bigdecimal_tests, parsertests, simpleinternet_tests,
-commontestutils, extendedhtmlparser;
+commontestutils, extendedhtmlparser, xpath3_1_tests;
 
 var
   start: TDateTime;
@@ -41,7 +41,8 @@ begin
 
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
-  xpath3_tests.unittests(testerrors, false); //}
+  xpath3_tests.unittests(testerrors, false);
+  xpath3_1_tests.unittests(testerrors);
   xquery3_tests.unittests(testerrors);
   extendedhtmlparser_tests.unitTests(testerrors);
   simpleinternet_tests.unittests();

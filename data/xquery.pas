@@ -966,6 +966,7 @@ type
 
     function toBooleanEffective: boolean; override;
 
+    //term is used for error handling, arguments are on the stack
     function evaluate(const outerContext: TXQEvaluationContext; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
     function evaluateInContext(var inContext: TXQEvaluationContext; const term: TXQTerm): IXQValue; //**< Calls the function with the given arguments. Evaluation context is the context the function was defined in.
     procedure contextOverrideParameterNames(const inContext: TXQEvaluationContext; count: integer);
@@ -2591,6 +2592,7 @@ public
   //**This can be much faster, but will cause a crash, unless the reference count is corrected later, e.g. by xqvalueVaporize on source or dest.
   procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
   procedure xqvalueVaporize(var dest: IXQValue); inline;
+
 type
   (***
   @abstract(A XQuery variable)
@@ -5944,6 +5946,7 @@ begin
   fbuffer[i] := child;
   fcount+=1;
 end;
+
 
 procedure TXQVCustomList.revert;
 var

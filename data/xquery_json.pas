@@ -444,7 +444,7 @@ begin
 end;
 
 
-var jn, pxp, libjn: TXQNativeModule;
+var jn, pxp, libjn, fn3_1: TXQNativeModule;
     XMLNamespace_JSONiqFunctions, XMLNamespace_JSONiqLibraryFunctions: INamespace;
 
 initialization
@@ -476,6 +476,12 @@ initialization
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*', '($arg as xs:string, $options as object()) as item()*'], [xqcdContextOther]);
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
+
+  fn3_1 := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
+  while length(fn3_1.parents) > 0 do fn3_1 := fn3_1.parents[0];
+  //todo: check 3.1 semantics (e.g. null => ())
+  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, ['($href as xs:string?) as item()?', { '($href as xs:string?, $options as map(*)) as item()?',} '($href as xs:string?, $options as object()) as item()?']);
+  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, ['($json-text as xs:string?) as item()?', { '($json-text as xs:string?, $options as map(*)) as item()?',} '($json-text as xs:string?, $options as object()) as item()?']);
 
 
   XMLNamespace_JSONiqLibraryFunctions:=TNamespace.make('http://jsoniq.org/function-library', 'libjn');
