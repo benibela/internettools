@@ -2872,8 +2872,8 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
         XMLNamespaceURL_XPathFunctionsMath = XMLNamespaceURL_XPathFunctions + '/math';
-        XMLNamespaceURL_XPathFunctionsArray = XMLNamespaceURL_XPathFunctions + 'array';
-        XMLNamespaceURL_XPathFunctionsMap = XMLNamespaceURL_XPathFunctions + 'map';
+        XMLNamespaceURL_XPathFunctionsArray = XMLNamespaceURL_XPathFunctions + '/array';
+        XMLNamespaceURL_XPathFunctionsMap = XMLNamespaceURL_XPathFunctions + '/map';
 
         XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
         XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
