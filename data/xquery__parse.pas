@@ -677,7 +677,7 @@ begin
     'switch': reserved := isModel3;
 
 
-//    'array', 'map': result := isModel31;
+    'array', 'map': reserved := parsingModel in PARSING_MODEL3_1;
 
     else reserved := false;
   end;
