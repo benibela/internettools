@@ -1108,18 +1108,18 @@ begin
           result.kind:=tikAny;
         end;
 
-         'array': begin
-           if hadNoNamespace and (options.AllowJSON or (parsingModel in PARSING_MODEL3_1)) then begin
-             Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_;
-             expect('(');
-             skipWhitespaceAndComment();
-             case pos^ of
-               ')': if not options.AllowJSON then raiseSyntaxError('Need array(*) or JSONiq');
-               '*': begin require3_1(); inc(pos); end;
-               else raiseSyntaxError('Not implemented yet. todo');
-             end;
-             expect(')');
+       'array': begin
+         if hadNoNamespace and (options.AllowJSON or (parsingModel in PARSING_MODEL3_1)) then begin
+           Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_;
+           expect('(');
+           skipWhitespaceAndComment();
+           case pos^ of
+             ')': if not options.AllowJSON then raiseSyntaxError('Need array(*) or JSONiq');
+             '*': begin require3_1(); inc(pos); end;
+             else raiseSyntaxError('Not implemented yet. todo');
            end;
+           expect(')');
+         end;
          end;
          'object', 'json-item', 'structured-item': begin
            if hadNoNamespace and options.AllowJSON then begin
