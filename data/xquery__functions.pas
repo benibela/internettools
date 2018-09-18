@@ -5944,7 +5944,7 @@ var
 begin
   a := (argv^ as TXQValueJSONArray);
   p := argv[1].toInt64 - 1;
-  if (p < 0) or (p >= a.Size) then raiseInvalidArrayOutOfBounds(argv^, p);
+  if (p < 0) or (p > a.Size) then raiseInvalidArrayOutOfBounds(argv^, p);
   iter := a.GetEnumeratorMembersPtrUnsafe;
   list := TXQVList.create(a.Size + 1);
   iter.CopyToList(list, p);
