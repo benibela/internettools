@@ -67,6 +67,7 @@ protected
 
   procedure requireXQuery(s: string = '');
   procedure require3(s: string = '');
+  procedure require3_1(s: string = '');
   procedure requireXQuery3(s: string = '');
   function isModel3: boolean;
   procedure refuseReservedFunctionName(const name: string);
@@ -635,6 +636,12 @@ begin
     raiseInvalidModel('At least XQuery/XPath version 3.0 is required '+s);
 end;
 
+procedure TXQParsingContext.require3_1(s: string);
+begin
+  if not (parsingModel in PARSING_MODEL3_1) then
+    raiseInvalidModel('At least XQuery/XPath version 3.1 is required '+s);
+end;
+
 procedure TXQParsingContext.requireXQuery3(s: string);
 begin
   if (parsingModel <> xqpmXQuery3_0) and (parsingModel <> xqpmXQuery3_1) then raiseInvalidModel('XQuery version 3.0 is required '+s);
@@ -1101,15 +1108,27 @@ begin
           result.kind:=tikAny;
         end;
 
-         'array', 'object', 'json-item', 'structured-item': begin
-           if options.AllowJSON and hadNoNamespace then begin
+         'array': begin
+           if hadNoNamespace and (options.AllowJSON or (parsingModel in PARSING_MODEL3_1)) then begin
+             Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_;
+             expect('(');
+             skipWhitespaceAndComment();
+             case pos^ of
+               ')': if not options.AllowJSON then raiseSyntaxError('Need array(*) or JSONiq');
+               '*': begin require3_1(); inc(pos); end;
+               else raiseSyntaxError('Not implemented yet. todo');
+             end;
+             expect(')');
+           end;
+         end;
+         'object', 'json-item', 'structured-item': begin
+           if hadNoNamespace and options.AllowJSON then begin
              expect('('); expect(')');
              case word of
                'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
                'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseSchema.structuredItem; end;
-               'array': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_; end;
                'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
-               else raiseParsingError('XPST0003', 'WTF??');
+               else raiseSyntaxError('WTF??');
              end;
            end
          end;

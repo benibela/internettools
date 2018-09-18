@@ -1,5 +1,5 @@
 {
-Copyright (C) 2008 - 2017 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2018 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -3060,7 +3060,7 @@ function xqFunctionRemove({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i, count: Integer;
  iterator: TXQValueEnumeratorPtrUnsafe;
- list: TXQVListBreaker;
+ list: TXQVList;
 begin
   i := args[1].toInt64;
   if (args[0].kind <> pvkSequence) then
@@ -3073,12 +3073,11 @@ begin
 
   dec(i);
 
-  list := TXQVListBreaker(TXQVList.create);
-  list.setCount(count - 1);
+  list := TXQVList.create(count - 1 );
   iterator := args[0].GetEnumeratorPtrUnsafe;
-  iterator.CopyBlock(list.fbuffer, i );
+  iterator.CopyToList(list, i );
   if iterator.MoveNext then
-    iterator.CopyBlock(@list.fbuffer[i], count - i - 1 );
+    iterator.CopyToList(list, count - i - 1 );
   xqvalueSeqSqueezed(result, list);
 end;
 
@@ -3114,12 +3113,11 @@ begin
   if len = 1 then
     exit(args[0].get(from));
 
-  resseq := TXQValueSequence.create(0);
+  resseq := TXQValueSequence.create(len);
   resseqseq := resseq.seq;
-  TXQVListBreaker(resseqseq).setCount(len);
   iterator := args[0].GetEnumeratorPtrUnsafe;
   if iterator.MoveMany(from - 1) then
-    iterator.CopyBlock(TXQVListBreaker(resseqseq).fbuffer, len);
+    iterator.CopyToList(resseqseq, len);
   result := resseq;
 end;
 
@@ -3972,13 +3970,72 @@ begin
   result := xqvalue(length(f.parameters));
 end;
 
+type TBatchFunctionCall = record
+  tempcontext: TXQEvaluationContext;
+  func: TXQValueFunction;
+  stack: TXQEvaluationStack;
+  stacksize: Integer;
+  procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
+  procedure done;
+  function call(): IXQValue; inline;
+  function call1(const v: IXQValue): IXQValue;
+  function call2(const v, w: IXQValue): IXQValue;
+end;
+procedure TBatchFunctionCall.init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
+var
+  i: Integer;
+begin
+  func := f as TXQValueFunction;
+  stack := outerContext.temporaryVariables;
+  stacksize := stack.Count;
+  tempcontext := func.context;
+  tempcontext.temporaryVariables := outerContext.temporaryVariables;
+  tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
+  for i := 0 to high(func.parameters) do
+    stack.push(f);
+  func.contextOverrideParameterNames(tempcontext, length(func.parameters));
+end;
 
+procedure TBatchFunctionCall.done;
+begin
+  stack.popTo(stackSize);
+end;
+
+function TBatchFunctionCall.call(): IXQValue; inline;
+begin
+  result := func.evaluateInContext(tempcontext, nil);
+end;
+
+function TBatchFunctionCall.call1(const v: IXQValue): IXQValue;
+begin
+  stack.topptr(0)^ := v;
+  result := func.evaluateInContext(tempcontext, nil);
+end;
+
+function TBatchFunctionCall.call2(const v, w: IXQValue): IXQValue;
+begin
+  stack.topptr(1)^ := v;
+  stack.topptr(0)^ := w;
+  result := func.evaluateInContext(tempcontext, nil);
+end;
+
+
+procedure foldLeft(const context: TXQEvaluationContext; const iter: TXQValueEnumeratorPtrUnsafe; stack: TXQEvaluationStack; func: TXQValueFunction);
+var
+  v: PIXQValue;
+begin
+  //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
+  for v in iter do begin
+    stack.topptr(0)^ := v^;
+    stack.topptr(1)^ := func.evaluate(context, nil);
+  end;
+  //result is stack.topptr(1)^
+end;
 
 function xqFunctionFold(const context: TXQEvaluationContext; left: boolean; args: PIXQValue): IXQValue;
 var
   func: TXQValueFunction;
   count: Integer;
-  v: PIXQValue;
   i, stacksize: Integer;
   stack: TXQEvaluationStack;
   seq: IXQValue;
@@ -3995,11 +4052,7 @@ begin
   stack.push(stack.top);
   func.contextOverrideParameterNames(context, 2);
   if left then begin
-    //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
-    for v in seq.GetEnumeratorPtrUnsafe do begin
-      stack.topptr(0)^ := v^;
-      stack.topptr(1)^ := func.evaluate(context, nil);
-    end;
+    foldLeft(context, seq.GetEnumeratorPtrUnsafe, stack, func);
     result := stack.topptr(1)^;
   end else begin
     // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
@@ -4022,7 +4075,6 @@ function xqFunctionFold_right(const context: TXQEvaluationContext; {%H-}argc: Si
 begin
   result := xqFunctionFold(context, false, args);
 end;
-
 
 function xqFunctionFor_each_pair(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -4050,6 +4102,13 @@ begin
     stack.topptr(0)^ := seq2.get(i);
     resseq.add(func.evaluate(context, nil));
   end;
+  {
+  for i := 1 to count do begin
+    iter1.MoveNext;
+    iter2.MoveNext;
+    outlist.add(f.call2(iter1.Current^, iter2.Current^));
+  end;
+}
   result := resseq;
   xqvalueSeqSqueeze(result);
   stack.popTo(stackSize);
@@ -5699,28 +5758,23 @@ begin
 end;
 
 
-function xqFunctionSort(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+procedure sortXQList(list: TXQVList; const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue);
 var
   sortContext: TSortingContext;
   keyfunc: TXQValueFunction;
   tempArray: array of TXPair;
   count, i, stacksize: Integer;
   stack: TXQEvaluationStack;
-  list: TXQVList;
 begin
   if (argc >= 2) and not (args[1].isUndefined) then sortContext.collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else sortContext.collation := context.staticContext.collation;
   sortContext.staticContext := context.staticContext;
-  count := args[0].getSequenceCount;
-  if count <= 1 then exit(args[0]);
   if argc < 3 then begin
-    list := args[0].toXQVList;
-    result := TXQValueSequence.create(list);
     list.sort(@compareDirect, TObject(@sortContext));
   end else begin
+    count := list.count;
     keyfunc := args[2] as TXQValueFunction;
     SetLength(tempArray, count);
-    list := (args[0] as TXQValueSequence).seq;
 
     //prepare for function call
     stack := context.temporaryVariables;
@@ -5739,11 +5793,19 @@ begin
 
     stableSort(@tempArray[0], @tempArray[high(tempArray)] , sizeof(tempArray[0]), @compareWithKey, TObject(@sortContext));
 
-    list := TXQVList.create(count);
     for i := 0 to count - 1 do
-      list.add(tempArray[i].orig);
-    result := TXQValueSequence.create(list);
+      list[i] := tempArray[i].orig;
   end;
+end;
+
+function xqFunctionSort(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+begin
+  if args[0].getSequenceCount <= 1 then exit(args[0]);
+  list := args[0].toXQVList;
+  result := TXQValueSequence.create(list);
+  sortXQList(list, context, argc, args);
 end;
 
 function xqFunctionTokenize_1(argc: SizeInt; argv: PIXQValue): IXQValue;
@@ -5754,6 +5816,313 @@ begin
   result := xqvalue(strSplit(input, ' '));
 end;
 
+
+function arrayAsList(const a: IXQValue): TXQVList;
+begin
+  result := (a as TXQValueJSONArray).seq;
+end;
+
+procedure raiseInvalidArrayOutOfBounds(const a: IXQValue; index: Int64);
+begin
+  raise EXQEvaluationException.create('FOAY0001', 'Invalid index: ' + IntToStr(index + 1), nil, a);
+end;
+
+function xqFunctionArraySize(argc: SizeInt; argv: PIXQValue): IXQValue;
+begin
+  result := xqvalue(arrayAsList(argv^).Count);
+end;
+
+function xqFunctionArrayGet(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+  p: Int64;
+begin
+  list := arrayAsList(argv^);
+  p := argv[1].toInt64 - 1;
+  if (p < 0) or (p >= list.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
+  result := list[p];
+end;
+
+function xqFunctionArrayPut(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+  p: Int64;
+begin
+  list := arrayAsList(argv^);
+  p := argv[1].toInt64 - 1;
+  if (p < 0) or (p >= list.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
+  list := TXQVList.create(list);
+  list[p] := argv[2];
+  result := TXQValueJSONArray.create(list);
+end;
+
+function xqFunctionArrayAppend(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list, list2: TXQVList;
+begin
+  list := arrayAsList(argv^);
+  list2 := TXQVList.create(list.Count + 1);
+  list2.add(list);
+  list2.addInArray(argv[1]);
+  result := TXQValueJSONArray.create(list2);
+end;
+
+function xqFunctionArraySubarray(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  a: TXQValueJSONArray;
+  p, len: SizeInt;
+  iter: TXQValueEnumeratorPtrUnsafe;
+  list: TXQVList;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  p := argv[1].toInt64 - 1;
+  if argc = 3 then begin
+    len := argv[2].toInt64;
+    if len < 0 then raise EXQEvaluationException.create('FOAY0002', 'Negative length', nil, argv^);
+  end else begin
+    len := a.Size - p;
+  end;
+  if (p < 0) or (p + len >= a.Size + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
+  iter := a.GetEnumeratorMembersPtrUnsafe;
+  list := TXQVList.create(len);
+  if iter.MoveMany(p) then
+    iter.CopyToList(list, len);
+  result := TXQValueJSONArray.create(list);
+end;
+
+function xqFunctionArrayRemove(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  a: TXQValueJSONArray;
+  iter: TXQValueEnumeratorPtrUnsafe;
+  p: SizeInt;
+  list: TXQVList;
+  indices: TSizeintArray;
+  i: SizeInt;
+  pv: PIXQValue;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  iter := a.GetEnumeratorMembersPtrUnsafe;
+  case argv[1].getSequenceCount of
+    0: exit(argv^);
+    1: begin
+      p := argv[1].toInt64 - 1;
+      if (p < 0) or (p >= a.Size) then raiseInvalidArrayOutOfBounds(argv^, p);
+      list := TXQVList.create(a.Size - 1);
+      iter.CopyToList(list, p  );
+      if iter.MoveNext then
+        iter.CopyToList(list, a.Size - p - 1 );
+    end;
+    else begin
+      SetLength(indices, argv[1].getSequenceCount);
+      i := 0;
+      for pv in argv[1].GetEnumeratorPtrUnsafe do begin
+        indices[i] := pv^.toInt64 - 1;
+        if (indices[i] < 0) or (indices[i] >= a.Size) then raiseInvalidArrayOutOfBounds(argv^, indices[i]);
+        inc(i);
+      end;
+      stableSort(indices);
+      list := TXQVList.create(a.Size - length(indices));
+      p := 0;
+      for i := 0 to high(indices) do
+        if p <= indices[i] then begin
+          iter.CopyToList(list, indices[i] - p);
+          iter.MoveNext;
+          p := indices[i] + 1;
+        end;
+      if p < a.Size then iter.CopyToList(list, a.Size - p);
+    end;
+  end;
+  result := TXQValueJSONArray.create(list);
+end;
+
+function xqFunctionArrayInsert_before(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  a: TXQValueJSONArray;
+  list: TXQVList;
+  p: Int64;
+  iter: TXQValueEnumeratorPtrUnsafe;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  p := argv[1].toInt64 - 1;
+  if (p < 0) or (p >= a.Size) then raiseInvalidArrayOutOfBounds(argv^, p);
+  iter := a.GetEnumeratorMembersPtrUnsafe;
+  list := TXQVList.create(a.Size + 1);
+  iter.CopyToList(list, p);
+  list.addInArray(argv[2]);
+  iter.CopyToList(list, a.Size - p);
+  result := TXQValueJSONArray.create(list);
+end;
+
+function xqFunctionArrayHead(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  a: TXQValueJSONArray;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  if a.Size = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
+  result := a.seq[0];
+end;
+
+function xqFunctionArrayTail(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  a: TXQValueJSONArray;
+  list: TXQVList;
+  p: Int64;
+  iter: TXQValueEnumeratorPtrUnsafe;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  if a.Size = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
+  iter := a.GetEnumeratorMembersPtrUnsafe;
+  list := TXQVList.create(a.Size - 1);
+  iter.MoveNext;
+  iter.CopyToList(list, a.Size - 1);
+  result := TXQValueJSONArray.create(list);
+end;
+
+function xqFunctionArrayReverse(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+begin
+  list := TXQVList.create(arrayAsList(argv^));
+  list.revert;
+  result := TXQValueJSONArray.create(list);
+end;
+
+function xqFunctionArrayJoin(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+  pv: PIXQValue;
+begin
+  list := TXQVList.create();
+  for pv in argv^.GetEnumeratorPtrUnsafe do begin
+    list.add((pv^ as TXQValueJSONArray).seq);
+  end;
+  result := TXQValueJSONArray.create(list);
+end;
+
+
+function xqFunctionArrayFor_each(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+  a: TXQValueJSONArray;
+  f: TBatchFunctionCall;
+  pv: PIXQValue;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  list := TXQVList.create(a.Size);
+  result := TXQValueJSONArray.create(list);
+  f.init(context, argv[1]);
+  for pv in a.GetEnumeratorMembersPtrUnsafe do
+    list.addInArray(f.call1(pv^));
+  f.done;
+end;
+
+function xqFunctionArrayFilter(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+  a: TXQValueJSONArray;
+  f: TBatchFunctionCall;
+  pv: PIXQValue;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  list := TXQVList.create(a.Size);
+  result := TXQValueJSONArray.create(list);
+  f.init(context, argv[1]);
+  for pv in a.GetEnumeratorMembersPtrUnsafe do
+    if f.call1(pv^).toBooleanEffective then
+      list.addInArray(pv^);
+  f.done;
+end;
+
+function xqFunctionArrayFold_left(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  a: TXQValueJSONArray;
+  f: TBatchFunctionCall;
+  pv: PIXQValue;
+begin
+  a := (argv^ as TXQValueJSONArray);
+  f.init(context, argv[2]);
+  f.stack.topptr(1)^ := argv[1];
+  foldLeft(context, a.GetEnumeratorMembersPtrUnsafe, f.stack, f.func);
+  result := f.stack.topptr(1)^;
+  f.done;
+end;
+
+function xqFunctionArrayFold_right(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  f: TBatchFunctionCall;
+  pv: PIXQValue;
+  list: TXQVList;
+  i: Integer;
+begin
+  list := arrayAsList(argv^);
+  f.init(context, argv[2]);
+  f.stack.topptr(0)^ := argv[1];
+  for i := list.count -1 downto 0 do with f do begin
+    stack.topptr(1)^ := list[i];
+    stack.topptr(0)^ := call();
+  end;
+  result := f.stack.topptr(0)^;
+  f.done;
+end;
+
+function xqFunctionArrayFor_each_pair(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+  i: Integer;
+  a, b: TXQValueJSONArray;
+  count: Int64;
+  f: TBatchFunctionCall;
+  iter1, iter2: TXQValueEnumeratorPtrUnsafe;
+begin
+  a := argv[0] as TXQValueJSONArray;
+  b := argv[1] as TXQValueJSONArray;
+  iter1 := a.GetEnumeratorMembersPtrUnsafe;
+  iter2 := b.GetEnumeratorMembersPtrUnsafe;
+  count := min(a.Size, b.Size);
+  list := TXQVList.create(count);
+  result := TXQValueJSONArray.create(list);
+  f.init(context, argv[2]);
+  for i := 1 to count do begin
+    iter1.MoveNext;
+    iter2.MoveNext;
+    list.addInArray(f.call2(iter1.Current^, iter2.Current^));
+  end;
+  f.done;
+end;
+
+function xqFunctionArraySort(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+begin
+  list := TXQVList.create(arrayAsList(argv^));
+  result := TXQValueJSONArray.create(list);
+  sortXQList(list, context, argc, argv);
+end;
+
+procedure flatten(const iter: TXQValueEnumeratorPtrUnsafe; outlist: TXQVList);
+var
+  pv: PIXQValue;
+begin
+  for pv in iter do begin
+    case pv^.kind of
+      pvkArray: flatten( (pv^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, outlist);
+      pvkSequence: flatten( pv^.GetEnumeratorPtrUnsafe, outlist);
+      else outlist.add(pv^);
+    end;
+  end;
+end;
+
+function xqFunctionArrayFlatten(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  list: TXQVList;
+begin
+  list := txqvlist.create(argv^.getSequenceCount);
+  result := TXQValueSequence.create(list);
+  flatten(argv^.GetEnumeratorPtrUnsafe, list);
+end;
+
+
+
 {
 function xqFunction(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -5761,7 +6130,7 @@ begin
 end;
 }
 
-var fn3, fn3_1, fn, pxp, pxpold, op, x: TXQNativeModule;
+var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray: TXQNativeModule;
 
 
 
@@ -5800,7 +6169,6 @@ begin
   TXQueryEngine.registerNativeModule(pxp);
   op := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators);
   TXQueryEngine.registerNativeModule(op);
-
 
   //my functions
   pxpold.registerFunction('extract',2,4,@xqFunctionExtract, []);
@@ -6051,6 +6419,27 @@ begin
   fn3_1.registerFunction('error', @xqFunctionError,['($error as xs:QName?) as none']);
 
 
+  fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
+  TXQueryEngine.registerNativeModule(fnarray);
+  fnarray.registerFunction('size', @xqFunctionArraySize, ['($array as array(*)) as xs:integer']);
+  fnarray.registerFunction('get', @xqFunctionArrayGet, ['($array as array(*), $position as xs:integer) as item()*']);
+  fnarray.registerFunction('put', @xqFunctionArrayPut, ['( $array as array(*), $position as xs:integer, $member as item()*) as array(*)']);
+  fnarray.registerFunction('append', @xqFunctionArrayAppend, ['($array as array(*), $appendage as item()*) as array(*)']);
+  fnarray.registerFunction('subarray', @xqFunctionArraySubarray, ['($array as array(*), $start as xs:integer) as array(*)', '($array as array(*),$start as xs:integer,$length as xs:integer) as array(*)']);
+  fnarray.registerFunction('remove', @xqFunctionArrayRemove, ['($array as array(*), $positions as xs:integer*) as array(*)']);
+  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before, ['( $array as array(*), $position as xs:integer, $member as item()*) as array(*)']);
+  fnarray.registerFunction('head', @xqFunctionArrayHead, ['($array as array(*)) as item()*']);
+  fnarray.registerFunction('tail', @xqFunctionArrayTail, ['($array as array(*)) as array(*)']);
+  fnarray.registerFunction('reverse', @xqFunctionArrayReverse, ['($array as array(*)) as array(*)']);
+  fnarray.registerFunction('join', @xqFunctionArrayJoin, ['($arrays as array(*)*) as array(*)']);
+  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, ['( $array as array(*), $action as function(item()*) as item()*) as array(*)']);
+  fnarray.registerFunction('filter', @xqFunctionArrayFilter, ['( $array as array(*), $function as function(item()*) as xs:boolean) as array(*)']);
+  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, ['( $array as array(*),$zero as item()*,$function as function(item()*, item()*) as item()*) as item()*']);
+  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, ['( $array as array(*),$zero as item()*,$function as function(item()*, item()*) as item()*) as item()*']);
+  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, ['( $array1 as array(*),$array2 as array(*),$function as function(item()*, item()*) as item()*) as array(*)']);
+  fnarray.registerFunction('sort', @xqFunctionArraySort, ['($array as array(*)) as array(*)', '($array as array(*), $collation as xs:string?) as array(*)', '( $array as array(*), $collation as xs:string?, $key as function(item()*) as xs:anyAtomicType*) as array(*)']);
+  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten, ['($input as item()*) as item()*']);
+
 
   //Operators
   //The type information are just the function declarations of the up-backing functions
@@ -6124,7 +6513,9 @@ begin
   fn3.free;
   fn3_1.free;
   op.free;
+  fnarray.free;
 end;
+
 
 end.
 

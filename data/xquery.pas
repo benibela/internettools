@@ -103,6 +103,7 @@ type
     function MoveMany(count: sizeint): Boolean;
     procedure CopyBlock(target: PIXQValue); //**< Copies all XQValue to the destination buffer and increases their ref count. For maximal performance, there is no check that the buffer is large enough
     procedure CopyBlock(target: PIXQValue; count: SizeInt); //**< Copies count XQValue to the destination buffer and increases their ref count.
+    procedure CopyToList(list: TXQVList; count: SizeInt);
     property Current: PIXQValue read FCurrent;
     function GetEnumerator: TXQValueEnumeratorPtrUnsafe;
   end;
@@ -883,6 +884,7 @@ type
 
     function GetEnumeratorMembers: TXQValueEnumerator;
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
+    function Size: SizeInt; inline;
 
     function toBooleanEffective: boolean; override;
 
@@ -1318,9 +1320,9 @@ type
     procedure insertSingle(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
     procedure put(i: integer; const AValue: IXQValue); inline; //**< Puts a IXQValue to a node sequence
   public
-    constructor create(capacity: integer = 0);
     destructor Destroy; override;
     procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
+    procedure addInArray(const value: IXQValue);
     function get(i: integer): IXQValue; inline; //**< Gets a PXQValue from the list.
     function last: IXQValue; //**< Last PXQValue from the list.
     function first: IXQValue; //**< First PXQValue from the list.
@@ -1335,11 +1337,13 @@ type
 
   (*** @abstract(List of TXQValue-s). If a sequence is inserted/added, it is flattened, so only the contained items are added  *)
   TXQVList = class(TXQVCustomList)
+    constructor create(capacity: integer = 0);
+    constructor create(other: TXQVCustomList);
     procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addOrdered(const node: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(node: TTreeNode);
-    procedure add(list: TXQVList);
+    procedure add(list: TXQVCustomList);
     procedure addOrdered(list: TXQVList);
     function stringifyNodes: TXQVList;
     function hasNodes: boolean;
@@ -2867,7 +2871,10 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
 
   const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
   const XMLNamespaceURL_XPathFunctions = 'http://www.w3.org/2005/xpath-functions';
-        XMLNamespaceURL_XPathFunctionsMath = 'http://www.w3.org/2005/xpath-functions/math';
+        XMLNamespaceURL_XPathFunctionsMath = XMLNamespaceURL_XPathFunctions + '/math';
+        XMLNamespaceURL_XPathFunctionsArray = XMLNamespaceURL_XPathFunctions + 'array';
+        XMLNamespaceURL_XPathFunctionsMap = XMLNamespaceURL_XPathFunctions + 'map';
+
         XMLNamespaceURL_XMLSchema = 'http://www.w3.org/2001/XMLSchema';
         XMLNamespaceURL_XMLSchemaInstance = 'http://www.w3.org/2001/XMLSchema-instance';
         XMLNamespaceURL_XQueryLocalFunctions = 'http://www.w3.org/2005/xquery-local-functions';
@@ -2940,7 +2947,7 @@ type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
 end;
 
 
-var XMLNamespace_XPathFunctions, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: INamespace;
+var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_XPathFunctionsMap, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: INamespace;
 
 
 function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
@@ -4806,6 +4813,13 @@ begin
   end;
 end;
 
+procedure TXQValueEnumeratorPtrUnsafe.CopyToList(list: TXQVList; count: SizeInt);
+begin
+  list.reserve(list.Count + count);
+  CopyBlock(@list.fbuffer[list.Count], count);
+  list.fcount += count;
+end;
+
 function TXQValueEnumeratorPtrUnsafe.GetEnumerator: TXQValueEnumeratorPtrUnsafe;
 begin
   result := self;
@@ -5685,7 +5699,16 @@ end;
 
 
 
+constructor TXQVList.create(capacity: integer);
+begin
+  reserve(capacity);
+  fcount := 0;
+end;
 
+constructor TXQVList.create(other: TXQVCustomList);
+begin
+  add(other);
+end;
 
 procedure TXQVList.insert(i: integer; value: IXQValue);
 var
@@ -5792,7 +5815,7 @@ begin
   fcount += 1;
 end;
 
-procedure TXQVList.add(list: TXQVList);
+procedure TXQVList.add(list: TXQVCustomList);
 var
   i: Integer;
 begin
@@ -5845,6 +5868,15 @@ begin
   compress;
 end;
 
+procedure TXQVCustomList.addInArray(const value: IXQValue);
+begin
+  if fcount = fcapacity then
+    reserve(fcount + 1);
+  PPointer(fbuffer)[fcount] := value;
+  value._AddRef;
+  fcount += 1;
+end;
+
 function TXQVCustomList.get(i: integer): IXQValue;
 begin
   checkIndex(i);
@@ -5872,6 +5904,7 @@ begin
   fcount:=0;
   setBufferSize(0);
 end;
+
 
 function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
 type PIXQValue = ^IXQValue;
@@ -5940,11 +5973,7 @@ begin
 end;
 
 
-constructor TXQVCustomList.create(capacity: integer);
-begin
-  reserve(capacity);
-  fcount := 0;
-end;
+
 {$ImplicitExceptions on}
 
 destructor TXQVCustomList.Destroy;
@@ -7837,6 +7866,8 @@ begin
     'local': result := XMLNamespace_XQueryLocalFunctions;
     'pxp': result := XMLNamespace_MyExtensionsMerged;
     'x': result := XMLNamespace_MyExtensionsNew;
+    'array': result := XMLnamespace_XPathFunctionsArray;
+    'map': result := XMLnamespace_XPathFunctionsMap;
     //'op': result := XMLNamespace_MyExtensionOperators;
     else result := nil;
   end;
@@ -8381,6 +8412,8 @@ globalTypeParsingContext.options.AllowJSON:=true;
 //namespaces
 GlobalStaticNamespaces:=TNamespaceList.Create;
 XMLNamespace_XPathFunctions:=TNamespace.make(XMLNamespaceURL_XPathFunctions, 'fn');
+XMLnamespace_XPathFunctionsArray:=TNamespace.make(XMLNamespaceURL_XPathFunctionsArray, 'array');
+XMLnamespace_XPathFunctionsMap:=TNamespace.make(XMLNamespaceURL_XPathFunctionsMap, 'map');
 XMLNamespace_XMLSchema:=TNamespace.make(XMLNamespaceURL_XMLSchema, 'xs');
 XMLNamespace_XMLSchemaInstance:=TNamespace.make(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
 XMLNamespace_XQueryLocalFunctions:=TNamespace.make(XMLNamespaceURL_XQueryLocalFunctions, 'local');

@@ -2206,6 +2206,11 @@ begin
   end else TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
+function TXQValueJSONArray.Size: sizeint;
+begin
+  result := seq.Count;
+end;
+
 function TXQValueJSONArray.toBooleanEffective: boolean;
 begin
   result := true;

@@ -94,6 +94,31 @@ begin
   t('let $a := array{0 to 2, 7} return ($a?2, ":", $a?*, ":", $a?(1+2,1))', '1 : 0 1 2 7 : 2 0');
   t('[0 to 2, 7]!(?1, ":", ?2)', '0 1 2 : 7');
 
+  t('array:size([1 to 3])', '1');
+  t('array:size(array { 1 to 3 })', '3');
+  t('array:get([1 to 3], 1)', '1 2 3');
+  t('array:get(array { 1 to 3 }, 1)', '1');
+  t('array:put(array{ 1 to 3}, 2, "x")?*', '1 x 3');
+  t('array:append(array{ 1 to 3}, "x")?*', '1 2 3 x');
+  t('array:subarray(array{ 1 to 3}, 2)?*', '2 3');
+  t('array:subarray(array{ 1 to 5}, 2, 2)?*', '2 3');
+  t('array:remove(array{ 0 to 4}, (3,2) )?*', '0 3 4');
+  t('array:remove(array{ 0 to 4}, 4 )?*', '0 1 2 4');
+  t('array:remove(array{ 0 to 7}, (1,3,5,7) )?*', '1 3 5 7');
+  t('array:insert-before(array{ 0 to 3}, 2, "x" )?*', '0 x 1 2 3');
+  t('array:head(array{ 1 to 3})', '1');
+  t('array:tail(array{ 1 to 3})?*', '2 3');
+  t('array:reverse(array{ 1 to 3})?*', '3 2 1');
+  t('array:join((array{ 1 to 3}, array{ 1 to 2}))?*', '1 2 3 1 2');
+  t('array:for-each(array{ 1 to 3}, function($i){$i * 2})?*', '2 4 6');
+  t('array:filter(array{ 0 to 3}, function($i){$i ne 2})?*', '0 1 3');
+  t('array:fold-left(array{ 1 to 3}, 0, function($a, $b){$a + $b})', '6');
+  t('array:fold-right(array{ 1 to 3}, 0, function($a, $b){$a + $b})', '6');
+  t('array:for-each-pair(array{ 1 to 3}, array{ 30,20,10}, function($a, $b){$a + $b})?*', '31 22 13');
+  t('array:sort(array{ 100,10,30,17,18})?*', '10 17 18 30 100');
+  t('array:flatten((array{ 1 to 2}, array{ array{ array{ 1 to 3}}}, array{ "x"}, array{ }, "y"))', '1 2 1 2 3 x y');
+
+
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
   xml.Free;
