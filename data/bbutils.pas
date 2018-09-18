@@ -150,6 +150,7 @@ const CP_UTF32 = 12000;
 type
   TStringArray=array of string;
   TLongintArray =array of longint;
+  TSizeintArray =array of SizeInt;
   TLongwordArray =array of longword;
   TInt64Array =array of int64;
   TFloatArray = array of float;
@@ -690,8 +691,9 @@ type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
 procedure stableSort(a,b: pointer; size: SizeInt; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
 //**general stable sort functions for arrays (modifying the array inline and returning it)
-function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject=nil): TLongintArray; overload;
+function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TLongintArray; overload;
 function stableSort(strArray: TStringArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TStringArray; overload;
+function stableSort(intArray: TSizeintArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TSizeintArray; overload;
 
 
 type TBinarySearchChoosen = (bsAny, bsFirst, bsLast);
@@ -4644,11 +4646,17 @@ begin
 
 end;
 
-function stableSort(intArray: TLongintArray;
-  compareFunction: TPointerCompareFunction; compareFunctionData: TObject): TLongintArray;
+function compareLongint(c:TObject; a, b:pointer):longint;
+begin
+  ignore(c);
+  result := PLongint(a)^ - PLongint(b)^;
+end;
+
+function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject): TLongintArray;
 begin
   result := intArray;
   if length(intArray)<=1  then exit;
+  if not Assigned(compareFunction) then compareFunction := @compareLongint;
   stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
 
@@ -4664,6 +4672,20 @@ begin
   if length(strArray)<=1  then exit;
   if assigned(compareFunction) then stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),compareFunction,compareFunctionData)
   else stableSort(@strArray[0],@strArray[high(strArray)],sizeof(strArray[0]),@compareString,nil);
+end;
+
+function compareSizeint(c:TObject; a, b:pointer):longint;
+begin
+  ignore(c);
+  result := PSizeInt(a)^ - PSizeInt(b)^;
+end;
+
+function stableSort(intArray: TSizeintArray; compareFunction: TPointerCompareFunction; compareFunctionData: TObject): TSizeintArray;
+begin
+  result := intArray;
+  if length(intArray)<=1  then exit;
+  if not Assigned(compareFunction) then compareFunction := @compareSizeint;
+  stableSort(@intArray[0],@intArray[high(intArray)],sizeof(intArray[0]),compareFunction,compareFunctionData);
 end;
 
 
