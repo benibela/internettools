@@ -2466,9 +2466,9 @@ type
 
 protected
     PatternMatcherTextStart, PatternMatcherTextEnd: TTreeNode;
+public
     function evaluate(expression: string; model: TXQParsingModel; tree:TTreeNode = nil): IXQValue;
     function evaluate(expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue;
-public
     //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
     function evaluateXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
     function evaluateXPath2(expression: string; const contextItem: IXQValue): IXQValue;

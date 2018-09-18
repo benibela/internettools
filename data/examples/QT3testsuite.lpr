@@ -862,6 +862,7 @@ function TAssertionAssert.check(errorCode: string): TTestCaseResult;
   end;
 
 const OK: array[boolean] of TTestCaseResult = (tcrFail, tcrPass);
+      ASSERTION_PARSING_MODEL = xqpmXPath3_1;
 var
   str: String;
   regex: TWrappedRegExpr;
@@ -873,7 +874,7 @@ begin
       exit(tcrFail);
 
   case kind of
-    aakAssert: result := OK[xq.evaluateXPath3(value).toBoolean];
+    aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
     aakEq: try
       result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, config.version).evaluate(),  nil) = 0];
     except
@@ -904,7 +905,7 @@ begin
     end;
 
     aakEmpty: result := OK[res.isUndefined];
-    aakType: result := OK[xq.evaluateXPath3('$result instance of '+value).toBoolean];
+    aakType: result := OK[xq.evaluate('$result instance of '+value, ASSERTION_PARSING_MODEL).toBoolean];
     aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
     aakFalse: result := OK[(res.kind = pvkBoolean) and not res.toBoolean];
     aakStringValue: begin
