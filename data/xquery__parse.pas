@@ -1941,9 +1941,10 @@ var
 begin
   requireXQuery('for extensions');
   expect('#');
-  if nextTokenEQName(url, prefix, pragma) = xqnmPrefix then
-    if prefix = '' then raiseParsingError('XPST0081', 'Extension name requires namespace')
-    else url := staticContext.findNamespaceURLMandatory(prefix, xqdnkUnknown);
+  if nextTokenEQName(url, prefix, pragma) = xqnmPrefix then begin
+    if (prefix = '') and not (parsingModel in PARSING_MODEL3_1) then raiseParsingError('XPST0081', 'Extension name requires namespace');
+    url := staticContext.findNamespaceURLMandatory(prefix, xqdnkUnknown);
+  end;
   if (pos^ <> '#') and not (pos^ in WHITE_SPACE) then raiseSyntaxError('Expected whitespace or #');
   //just ignore it
   while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
