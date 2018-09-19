@@ -1431,7 +1431,7 @@ begin
   end;
 
   for v in xq.evaluateXPath2('*:context-item', e) do
-    contextItem := xq.evaluateXPath2(v.toNode['select']);
+    contextItem := xq.evaluate(v.toNode['select'], xqpmXPath3_1);
 
   u := xq.evaluateXPath2('*:collection', e);
   if not u.isUndefined then begin
@@ -1478,6 +1478,7 @@ begin
           'percent':  decimalformat.formats.chars[xqdfpPercent] := strDecodeUTF8Character(att.realvalue, temp);
           'per-mille':  decimalformat.formats.chars[xqdfpPerMille] := strDecodeUTF8Character(att.realvalue, temp);
           'zero-digit':  decimalformat.formats.chars[xqdfpZeroDigit] := strDecodeUTF8Character(att.realvalue, temp);
+          'exponent-separator': decimalformat.formats.chars[xqdfpExponentSeparator] := strDecodeUTF8Character(att.realvalue, temp);
           'name':  begin
             decimalformat.localname := att.realvalue;
             if pos(':', decimalformat.localname) > 0 then begin
