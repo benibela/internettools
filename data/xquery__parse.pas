@@ -1116,7 +1116,7 @@ begin
            case pos^ of
              ')': if not options.AllowJSON then raiseSyntaxError('Need array(*) or JSONiq');
              '*': begin require3_1(); inc(pos); end;
-             else raiseSyntaxError('Not implemented yet. todo');
+             else result.push(parseSequenceType(flags));
            end;
            expect(')');
          end;

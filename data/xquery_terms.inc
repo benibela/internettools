@@ -876,6 +876,16 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
 
 
   function instanceOfSingleType(const sub: IXQValue): boolean;
+    function checkArrayMembers: boolean;
+    var
+      pv: PIXQValue;
+    begin
+      for pv in (sub as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do
+        if not TXQTermSequenceType(children[0]).instanceOf(pv^) then
+          exit(false);
+      result := true;
+    end;
+
   var
     t: TXSType;
     fun: TXQValueFunction;
@@ -886,6 +896,8 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
       tikAtomic: begin
         t := sub.typeAnnotation;;
         result := t.derivedFrom(atomicTypeInfo);
+        if result and (length(children) > 0) and (atomicTypeInfo = baseJSONiqSchema.array_) then
+          result := checkArrayMembers;
       end;
       tikFunctionTest: begin
         if sub.kind <> pvkFunction then exit(false);
