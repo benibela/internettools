@@ -375,7 +375,7 @@ begin
             end;
           xqtjlmWild:
             for pp in (pv^ as TXQValueObject).getPropertyEnumerator do
-              xqvalueSeqConstruct(result, seq, pv^.getProperty(pp.Value.toString));
+              xqvalueSeqConstruct(result, seq, pp.Value);
         end;
       end
     else raiseTypeError0004('Need array/map', pv^);
