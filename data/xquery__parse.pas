@@ -2630,6 +2630,10 @@ begin
           expect('{');
           exit(parseJSONLikeArray(TXQTermJSONArray.Create, '}'));
         end;
+        'map': if parsingModel in PARSING_MODEL3_1 then begin
+          expect('{');
+          exit(parseJSONLikeObjectConstructor());
+        end;
       end;
       '#': begin
         require3('Named Function Reference');
