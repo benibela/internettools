@@ -93,6 +93,7 @@ begin
   t('array{0 to 2, 7}!(?2,":",?*,":",?(1+2,1))', '1 : 0 1 2 7 : 2 0');
   t('let $a := array{0 to 2, 7} return ($a?2, ":", $a?*, ":", $a?(1+2,1))', '1 : 0 1 2 7 : 2 0');
   t('[0 to 2, 7]!(?1, ":", ?2)', '0 1 2 : 7');
+  t('[4,5,6] ! (concat(?, ?1, ?2, ?, ?)(?, ?3, ?)("<",">")) ', '<456>');
 
   t('array:size([1 to 3])', '1');
   t('array:size(array { 1 to 3 })', '3');
@@ -118,6 +119,8 @@ begin
   t('array:sort(array{ 100,10,30,17,18})?*', '10 17 18 30 100');
   t('array:flatten((array{ 1 to 2}, array{ array{ array{ 1 to 3}}}, array{ "x"}, array{ }, "y"))', '1 2 1 2 3 x y');
 
+  t('map { "a": "b", "c": "d", 123: 456 } ! (. ? c, ":", . ? 123, ":", ?123, ":", ?(("a","b","c","d")))', 'd : 456 : 456 : b d');
+  t('sort((map { "a": "b", "c": "d", 123: 456 } ? *) ! string())', '456 b d');
 
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;

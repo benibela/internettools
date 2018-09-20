@@ -912,14 +912,20 @@ end;
 function TXQParsingContext.parseSequenceLike(target: TXQTermWithChildren; closingChar: char; allowPartialApplication: boolean): TXQTermWithChildren;
 var partialApplications: integer;
   procedure nextValue;
+  var
+    marker: PChar;
   begin
     if allowPartialApplication then begin;
       skipWhitespaceAndComment();
       if pos^ = '?' then begin
+        marker := pos;
         inc(pos);
-        inc(partialApplications);
-        target.push(TXQTermPlaceholderVariable.Create);
-        exit;
+        skipWhitespaceAndComment();
+        if (pos^ = ',') or (pos^ = ')') or not (parsingModel in PARSING_MODEL3_1) then begin
+          inc(partialApplications);
+          target.push(TXQTermPlaceholderVariable.Create);
+          exit;
+        end else pos := marker;
       end;
     end;
     target.push(parse());
@@ -2354,6 +2360,7 @@ begin
   inc(pos);
   result := TXQTermJSONLookup.create(expr = nil);
   if expr <> nil then result.push(expr);
+  skipWhitespaceAndComment();
   case pos^ of
     '0'..'9': begin
       if not TryStrToInt(nextToken(), result.integerKey) then raiseSyntaxError('Need (integer) key');
