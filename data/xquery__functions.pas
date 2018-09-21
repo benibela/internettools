@@ -5966,7 +5966,6 @@ function xqFunctionArrayTail(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
   list: TXQVList;
-  p: Int64;
   iter: TXQValueEnumeratorPtrUnsafe;
 begin
   a := (argv^ as TXQValueJSONArray);
@@ -6037,7 +6036,6 @@ function xqFunctionArrayFold_left(const context: TXQEvaluationContext; argc: Siz
 var
   a: TXQValueJSONArray;
   f: TBatchFunctionCall;
-  pv: PIXQValue;
 begin
   a := (argv^ as TXQValueJSONArray);
   f.init(context, argv[2]);
@@ -6050,7 +6048,6 @@ end;
 function xqFunctionArrayFold_right(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   f: TBatchFunctionCall;
-  pv: PIXQValue;
   list: TXQVList;
   i: Integer;
 begin
