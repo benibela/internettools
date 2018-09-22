@@ -374,7 +374,7 @@ begin
               xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^.toString));
             end;
           xqtjlmWild:
-            for pp in (pv^ as TXQValueObject).getPropertyEnumerator do
+            for pp in pv^.getPropertyEnumerator do
               xqvalueSeqConstruct(result, seq, pp.Value);
         end;
       end

@@ -2969,7 +2969,7 @@ var
   function equal(const a,b: IXQValue): boolean; inline;
   begin
     with context.staticContext do
-      result :=comparableTypes(a as txqvalue, b as txqvalue) and equalAtomic(a, b, collationOverride);
+      result :=comparableTypes(a.toValue, b.toValue) and equalAtomic(a, b, collationOverride);
   end;
 
 var  i: Integer;
@@ -4085,8 +4085,8 @@ var
   i, stacksize: Integer;
   stack: TXQEvaluationStack;
 begin
-  seq1 := args[0] as TXQValue;
-  seq2 := args[1] as TXQValue;
+  seq1 := args[0].toValue;
+  seq2 := args[1].toValue;
   func := args[2] as TXQValueFunction;
 
   stack := context.temporaryVariables;

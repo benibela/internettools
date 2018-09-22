@@ -4389,7 +4389,7 @@ var ak, bk: TXQValueKind;
 
   function getFirst(const seq: TXQValue): txqvalue;
   begin
-    result := seq.get(1) as txqvalue;
+    result := seq.get(1).toValue;
   end;
 
   function compareCommonEqualKind(): integer;
@@ -4458,7 +4458,7 @@ var ak, bk: TXQValueKind;
     if tok <> pvkQName then temp := (tov.typeAnnotation as TXSSimpleType).primitive.createValue(from)
     else temp := ((tov.typeAnnotation as TXSSimpleType).primitive as TXSQNameType).cast(from, Self);
     temp._AddRef;
-    result := temp as TXQValue;;
+    result := temp.toValue;;
   end;
 begin
   ak := a.kind; bk := b.kind;
@@ -4539,7 +4539,7 @@ end;
 
 function TXQStaticContext.compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
 begin
-  result := compareAtomic(a as TXQValue, b as TXQValue, overrideCollation);
+  result := compareAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
 procedure TXQStaticContext.compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
@@ -4621,7 +4621,7 @@ end;
 
 function TXQStaticContext.compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
 begin
-  result := compareDeepAtomic(a as txqvalue, b as txqvalue, overrideCollation);
+  result := compareDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
 function TXQStaticContext.equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
@@ -4639,7 +4639,7 @@ end;
 
 function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result := equalDeepAtomic(a as txqvalue, b as txqvalue, overrideCollation);
+  result := equalDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
 class function TXQStaticContext.comparableTypes(const a, b: TXQValue): boolean;
@@ -7729,7 +7729,7 @@ begin
                   end;
                 end;
                 tneaDescendant:
-                  jsoniqDescendants(n^ as TXQValue, command.value);
+                  jsoniqDescendants(n^.toValue, command.value);
                 tneaSameNode:
                   newList.add(n^);
               end;

@@ -2064,7 +2064,7 @@ var
 begin
   i := values.indexOf(name);
   if i >= 0 then begin
-    if value <> nil then value^ := values.get(i) as txqvalue;
+    if value <> nil then value^ := values.get(i).toValue;
     exit(true);
   end;
   result := prototype <> nil;
