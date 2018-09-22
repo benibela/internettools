@@ -4179,6 +4179,7 @@ type TSerializationParams = record
   itemSeparator: string;
   procedure setDefault;
   procedure setFromNode(paramNode: TTreeNode);
+  procedure setFromMap(const v: IXQValue);
 end;
 
 procedure TSerializationParams.setDefault;
@@ -4244,6 +4245,61 @@ begin
    end;
 end;
 
+procedure TSerializationParams.setFromMap(const v: IXQValue);
+var
+  pp: TXQProperty;
+  procedure raiseInvalidParameter;
+  begin
+    raiseXPTY0004TypeError(v, 'Invalid parameter for '+ pp.Name);
+  end;
+
+  function valueBool: Boolean;
+  begin
+    if pp.Value.kind = pvkBoolean then result := pp.value.toBoolean
+    else raiseInvalidParameter;
+  end;
+  function valueString(): string;
+  begin
+    if pp.Value.kind = pvkString then result := pp.value.toString
+    else raiseInvalidParameter;
+  end;
+
+begin
+  for pp in v.getPropertyEnumerator do begin
+    case pp.Value.getSequenceCount of
+      0: continue;
+      1: ; //fine
+      else case pp.Name of
+        'cdata-section-elements', 'suppress-indentation': ; //fine
+        else raiseXPTY0004TypeError(v, 'Invalid parameter');
+      end;
+    end;
+    case pp.Name of
+      'allow-duplicate-names': valueBool(); //todo
+      'byte-order-mark': valueBool(); //todo
+      'cdata-section-elements': ; //todo
+      'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
+      'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
+      'encoding': encoding := valueString();
+      'escape-uri-attributes': valueBool(); //todo
+      'html-version': if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64) else raiseInvalidParameter;
+      'include-content-type': valueBool(); //todo
+      'indent': valueBool(); //todo
+      'item-separator': itemSeparator := valueString();
+      'json-node-output-method': ; //todo
+      'media-type': valueString(); //todo
+      'method': method := valueString();
+      'normalization-form': valueString(); //todo
+      'omit-xml-declaration': omitXmlDeclaration := valueBool();
+      'standalone': if valueBool() then standalone := 'yes' else standalone := 'no';
+      'suppress-indentation': ;
+      'undeclare-prefixes': valueBool(); //todo
+      'use-character-maps': ; //todo
+      'version': version := valueString();
+    end;
+  end;
+end;
+
 
 function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -4269,7 +4325,12 @@ begin
   //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
   arg := args[0];
   params.setDefault;
-  if argc = 2 then params.setFromNode(args[1].toNode);
+  if argc = 2 then
+    case args[1].kind of
+      pvkObject: params.setFromMap(args[1]);
+      pvkNode: params.setFromNode(args[1].toNode);
+      else raiseXPTY0004TypeError(args[1], 'serialize params must be map() or node');
+    end;
 
   firstElement := nil;
   for v in arg.GetEnumeratorPtrUnsafe do with params do begin
@@ -6571,7 +6632,8 @@ begin
   fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
   fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
   {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  fn3.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '( 	$arg 	 as item()*,  $params 	 as element(Q{http://www.w3.org/2010/xslt-xquery-serialization}serialization-parameters)?) as xs:string']);
+  fn3.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '($arg as item()*,$params as element(Q{http://www.w3.org/2010/xslt-xquery-serialization}serialization-parameters)?) as xs:string']);
+  fn3_1.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '($arg as item()*,$params as item()?) as xs:string']);
 
   fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, ['($href as xs:string?) as xs:string?', '($href as xs:string?, $encoding as xs:string) as xs:string?'], []);
   fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, ['($href as xs:string?) as xs:boolean', '($href as xs:string?, $encoding as xs:string) as xs:boolean'], []);
