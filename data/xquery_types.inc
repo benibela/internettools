@@ -2239,7 +2239,7 @@ begin
   end else TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
-function TXQValueJSONArray.Size: sizeint;
+function TXQValueJSONArray.Size: SizeInt;
 begin
   result := seq.Count;
 end;
@@ -2247,6 +2247,29 @@ end;
 function TXQValueJSONArray.toBooleanEffective: boolean;
 begin
   result := true;
+end;
+
+function TXQValueJSONArray.toString: string;
+begin
+  result := toJoinedString('');
+end;
+
+function TXQValueJSONArray.toJoinedString(const sep: string): string;
+var
+  sb: TStrBuilder;
+  i: sizeint;
+begin
+  case seq.Count of
+    0: exit('');
+    1: exit(seq[0].toJoinedString(sep));
+  end;
+  sb.init(@result);
+  sb.append(seq[0].toJoinedString(sep));
+  for i := 1 to seq.Count - 1 do begin
+    sb.append(sep);
+    sb.append(seq[i].toJoinedString(sep));
+  end;
+  sb.final;
 end;
 
 function TXQValueJSONArray.clone: IXQValue;

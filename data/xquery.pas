@@ -899,6 +899,8 @@ type
     function Size: SizeInt; override;
 
     function toBooleanEffective: boolean; override;
+    function toString: string; override;
+    function toJoinedString(const sep: string=' '): string; override;
 
     function clone: IXQValue; override;
 
