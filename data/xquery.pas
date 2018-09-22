@@ -8140,12 +8140,12 @@ function TXQNativeModule.findBasicFunction(const name: string; argCount: integer
 var
   i: Integer;
 begin
-  if model in acceptedModels then begin
-    result := TXQBasicFunctionInfo(findFunction(basicFunctions, name, argCount));
-    if result <> nil then exit;
-  end;
   for i := 0 to high(parents) do begin
     result := parents[i].findBasicFunction(name, argCount, model);
+    if result <> nil then exit;
+  end;
+  if model in acceptedModels then begin
+    result := TXQBasicFunctionInfo(findFunction(basicFunctions, name, argCount));
     if result <> nil then exit;
   end;
   result := nil;
@@ -8155,13 +8155,13 @@ function TXQNativeModule.findComplexFunction(const name: string; argCount: integ
 var
   i: Integer;
 begin
-  if model in acceptedModels then begin
-   result := TXQComplexFunctionInfo(findFunction(complexFunctions, name, argCount));
-   if result <> nil then exit;
-  end;
   for i := 0 to high(parents) do begin
     result := parents[i].findComplexFunction(name, argCount, model);
     if result <> nil then exit;
+  end;
+  if model in acceptedModels then begin
+   result := TXQComplexFunctionInfo(findFunction(complexFunctions, name, argCount));
+   if result <> nil then exit;
   end;
   result := nil;
 end;
@@ -8170,13 +8170,13 @@ function TXQNativeModule.findInterpretedFunction(const name: string; argCount: i
 var
   i: Integer;
 begin
-  if model in acceptedModels then begin
-   result := TXQInterpretedFunctionInfo(findFunction(interpretedFunctions, name, argCount));
-   if result <> nil then exit;
-  end;
   for i := 0 to high(parents) do begin
     result := parents[i].findInterpretedFunction(name, argCount, model);
     if result <> nil then exit;
+  end;
+  if model in acceptedModels then begin
+   result := TXQInterpretedFunctionInfo(findFunction(interpretedFunctions, name, argCount));
+   if result <> nil then exit;
   end;
   result := nil;
 end;

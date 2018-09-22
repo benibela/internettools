@@ -122,7 +122,9 @@ begin
   t('map { "a": "b", "c": "d", 123: 456 } ! (. ? c, ":", . ? 123, ":", ?123, ":", ?(("a","b","c","d")))', 'd : 456 : 456 : b d');
   t('sort((map { "a": "b", "c": "d", 123: 456 } ? *) ! string())', '456 b d');
 
-  t('(1,2,3) => join("x")', '1x2x3');
+  t('string-join((1,2,3))', '123');
+
+  t('(1,2,3) => string-join("x")', '1x2x3');
   t('"foo" => upper-case() => translate("O", "X")', 'FXX' );
   t('"foo" => (upper-case#1)() => (translate#3)("O", "Y")', 'FYY');
   t('100 + 2 * "3x" => translate("x", "") => xs:integer()', '106');
