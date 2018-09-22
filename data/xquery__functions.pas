@@ -5683,6 +5683,24 @@ begin
   end;
 end;
 
+function xqFunctionApply(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  pv: PIXQValue;
+  stack: TXQEvaluationStack;
+  stacksize: Integer;
+  f: TXQValueFunction;
+begin
+  f := args[0] as TXQValueFunction;
+  if length(f.parameters) <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+  stack := context.temporaryVariables;
+  stacksize := stack.Count;
+  for pv in args[1].GetEnumeratorMembersPtrUnsafe do
+    stack.push(pv^);
+  f.contextOverrideParameterNames(context, length(f.parameters));
+  result := f.evaluate(context, nil);
+  stack.popTo(stacksize);
+end;
+
 function xqFunctionContains_Token(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   collation: TXQCollation;
@@ -6566,8 +6584,9 @@ begin
 
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, ['() as xs:string', '($arg as node()?) as xs:string']);
 
-  //3.1 todo: apply, collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
+  //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
 
+  fn3_1.registerFunction('apply', @xqFunctionApply, ['($function as function(*), $array as array(*)) as item()*']);
   fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, ['($input as xs:string*, $token as xs:string) as xs:boolean', '($input 	 as xs:string*, $token 	 as xs:string, $collation 	 as xs:string) as xs:boolean']);
   fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, ['() as xs:language']);
   fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date, ['($value as xs:string?) as xs:dateTime?']);

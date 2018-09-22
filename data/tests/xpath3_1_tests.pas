@@ -80,6 +80,7 @@ begin
 
   XQGlobalTrimNodes:=false;
 
+  t('apply(concat#4, ["a", "b", "c", "d"])', 'abcd');
   t('contains-token("red green blue ", "red")', 'true');
   t('contains-token(("red", "green", "blue"), " red ")', 'true');
   t('contains-token("red, green, blue", "red")', 'false');
@@ -150,6 +151,8 @@ begin
   t('data([1,2,[],[[3]]])', '1 2 3');
   //t('[1] + 2', '3');
   t('(deep-equal([1,2], [1,2]), deep-equal([], [()]), deep-equal([], [[]]))', 'true false false');
+
+  t('``[foobar`{1+2+3}``{"a","b","c"}`xyz`{}`]``', 'foobar6a b cxyz');
 
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
