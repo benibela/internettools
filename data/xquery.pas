@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {$mode objfpc}
 {$modeswitch advancedrecords}
+{$modeswitch autoderef}
 {$H+}
 {$DEFINE ALLOW_EXTERNAL_DOC_DOWNLOAD}
 
@@ -372,6 +373,7 @@ type
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData;
+    function Size: SizeInt;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated 'use toXQuery'; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
@@ -382,6 +384,7 @@ type
     function clone: IXQValue; //**< Returns a clone of this value (deep copy). It is also an ref-counted interface, but can be safely be modified without affecting possible other references.
     function GetEnumerator: TXQValueEnumerator; //**< Implements the enumerator for for..in.@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
+    function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 
     function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $_. Use this to do an operation on all values of a sequence, e.g. @code(sum($_))
     function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $_1, $_2, ...
@@ -453,6 +456,7 @@ type
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
+    function Size: SizeInt; virtual;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated;
     function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; virtual;
@@ -476,6 +480,7 @@ type
 
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;virtual; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
+    function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; virtual;
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
@@ -848,7 +853,7 @@ type
 
     class function classKind: TXQValueKind; override;
 
-    function Size: SizeInt;
+    function Size: SizeInt; override;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
     function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
@@ -890,8 +895,8 @@ type
     function isUndefined: boolean; override;
 
     function GetEnumeratorMembers: TXQValueEnumerator;
-    function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
-    function Size: SizeInt; inline;
+    function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; override;
+    function Size: SizeInt; override;
 
     function toBooleanEffective: boolean; override;
 
@@ -3714,27 +3719,37 @@ var x: PIXQValue;
   t: TXSType;
 begin
   if v.getSequenceCount = 0 then exit(v);
-  if v.kind = pvkSequence then begin
-    isAlreadyAtomized := true;
-    for x in v.GetEnumeratorPtrUnsafe do
-      if not x^.instanceOf(baseSchema.AnyAtomicType) then begin
-        isAlreadyAtomized := false;
-        break;
-      end;
-    if isAlreadyAtomized then exit(v);
-    seqResult := TXQValueSequence.create(v.getSequenceCount);
-    for x in v.GetEnumeratorPtrUnsafe do seqResult.seq.add(xqvalueAtomize(x^));
-    result := seqResult;
-    exit
-  end;
-  if v.instanceOf(baseSchema.AnyAtomicType) then exit(v);
-  if v.kind <> pvkNode then
-    if v.kind = pvkFunction then raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.')
+  case v.kind of
+    pvkSequence: begin
+      isAlreadyAtomized := true;
+      for x in v.GetEnumeratorPtrUnsafe do
+        if not x^.instanceOf(baseSchema.AnyAtomicType) then begin
+          isAlreadyAtomized := false;
+          break;
+        end;
+      if isAlreadyAtomized then exit(v);
+      seqResult := TXQValueSequence.create(v.getSequenceCount);
+      for x in v.GetEnumeratorPtrUnsafe do seqResult.seq.add(xqvalueAtomize(x^));
+      result := seqResult;
+      exit
+    end;
+    pvkNode: begin
+      t := TXQValueNode.nodeTypeAnnotation(v.toNode);
+      if t = baseSchema.untyped then t := baseSchema.untypedAtomic; //????
+      result := t.createValue(v.toString);
+    end;
+    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
+    pvkArray: begin
+      seqResult := TXQValueSequence.create(v.getSequenceCount);
+      for x in v.GetEnumeratorMembersPtrUnsafe do seqResult.seq.add(xqvalueAtomize(x^));
+      result := seqResult;
+      exit;
+    end;
+    else if v.instanceOf(baseSchema.AnyAtomicType) then exit(v)
     else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.toXQuery());
-  t := TXQValueNode.nodeTypeAnnotation(v.toNode);
-  if t = baseSchema.untyped then t := baseSchema.untypedAtomic; //????
-  result := t.createValue(v.toString);
+  end;
 end;
+
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
   procedure raiseFOTY0015(const v: IXQValue);
@@ -3742,32 +3757,62 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
     raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.toXQuery() + ' passed to deep-equal')
   end;
 
-var i:integer;
-    enum1, enum2: TXQValueEnumeratorPtrUnsafe;
+var i, j:integer;
+    enum1, enum2, enum1array, enum2array: TXQValueEnumeratorPtrUnsafe;
+    pa, pb: PIXQValue;
+    tempv: TXQValue;
+    pp: TXQProperty;
 begin
   if a.getSequenceCount <> b.getSequenceCount then
     exit(false);
 
-  enum1 := a.GetEnumeratorPtrUnsafe; enum1.MoveNext;
-  enum2 := b.GetEnumeratorPtrUnsafe; enum2.MoveNext;
+  enum1 := a.GetEnumeratorPtrUnsafe;
+  enum2 := b.GetEnumeratorPtrUnsafe;
   for i := 0 to a.getSequenceCount - 1 do begin
-    if enum2.Current^.kind = pvkFunction then raiseFOTY0015(enum2.Current^);
-
-    if enum1.Current^.instanceOf(baseSchema.AnyAtomicType) then begin
-      if not (enum2.Current^.instanceOf(baseSchema.anyAtomicType))
-         or not context.staticContext.equalDeepAtomic(enum1.Current^, enum2.Current^, collation) then
-        exit(false);
-    end else begin
-      if enum1.Current^.kind = pvkFunction then raiseFOTY0015(enum1.Current^);
-      if collation = nil then
-        collation := context.staticContext.nodeCollation;
-      if (enum2.Current^.instanceOf(baseSchema.anyAtomicType)) or
-         (((enum1.Current^.kind = pvkNode) or (enum2.Current^.kind = pvkNode))
-            and not enum1.Current^.toNode.isDeepEqual(enum2.Current^.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
-        exit(false);
-    end;
     enum1.MoveNext;
     enum2.MoveNext;
+    pa := enum1.Current;
+    pb := enum2.Current;
+    case pb.kind of
+      pvkFunction: raiseFOTY0015(pb^);
+      pvkArray: begin
+        if pa.kind <> pvkArray then exit(false);
+        if pa.Size <> pb.Size then exit(false);
+        enum1array := pa.GetEnumeratorMembersPtrUnsafe;
+        enum2array := pb.GetEnumeratorMembersPtrUnsafe;
+        for j := 0 to pa.Size - 1 do begin
+          enum1array.MoveNext;
+          enum2array.MoveNext;
+          result := xqvalueDeep_equal(context, enum1array.Current^, enum2array.Current^, collation);
+          if not result then exit;
+        end;
+      end;
+      pvkObject: begin
+        if pa.kind <> pvkObject then exit(false);
+        if pa.Size <> pb.Size then exit(false);
+        for pp in pa.getPropertyEnumerator do
+          if not pb.hasProperty(pp.Name, @tempv) then exit(false)
+          else if not xqvalueDeep_equal(context, pp.Value, tempv, collation) then exit(false);
+      end
+      else begin
+        if pa.instanceOf(baseSchema.AnyAtomicType) then begin
+          if not (pb.instanceOf(baseSchema.anyAtomicType))
+             or not context.staticContext.equalDeepAtomic(pa^, pb^, collation) then
+            exit(false);
+        end else begin
+          case pa.kind of
+            pvkFunction: raiseFOTY0015(pa^);
+            pvkObject, pvkArray: exit(false);
+          end;
+          if collation = nil then
+            collation := context.staticContext.nodeCollation;
+          if (pb.instanceOf(baseSchema.anyAtomicType)) or
+             (((pa.kind = pvkNode) or (pb.kind = pvkNode))
+                and not pa.toNode.isDeepEqual(pb.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
+            exit(false);
+        end;
+      end;
+    end;
   end;
   result := true;
 end;

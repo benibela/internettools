@@ -343,9 +343,19 @@ begin
   result := nil;
 end;
 
+function TXQValue.Size: SizeInt;
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL', 'Only arrays and objects have a size');
+end;
+
 function TXQValue.GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
   TXQValueEnumeratorPtrUnsafe.makesingleelement(self, result);
+end;
+
+function TXQValue.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL', 'Array enumerator called on non array.');
 end;
 
 function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
