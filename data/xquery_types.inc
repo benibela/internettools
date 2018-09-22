@@ -304,6 +304,11 @@ begin
   end;
 end;
 
+function TXQValue.toValue: TXQValue;
+begin
+  result := self;
+end;
+
 function TXQValue.getSequenceCount: integer;
 begin
   result := 1;

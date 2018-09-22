@@ -146,6 +146,8 @@ begin
   t('1 => (10 ! 100 ! 2 => (3 => (concat#3)(?, ?))(?))()', '321');
   t('(10, 20) ! array { "a" || ., "b" || ., "c" || . } ? 2 => insert-before(2, "x")', 'b10 x b20');
 
+  t('([1,2] = [3,4], [1, 2, 3] = [4,5,3,6], ([], [1,2]) = ([], [2,3]))', 'false true true');
+
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
   xml.Free;

@@ -215,6 +215,7 @@ type
     procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
     function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
     function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
+    function compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
     //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
     function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
@@ -363,6 +364,7 @@ type
     function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single element, the array contains that element; if it is a sequence, the array contains each element of the sequence
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
     function toXQuery: string; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
+    function toValue: TXQValue;
 
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
@@ -441,8 +443,9 @@ type
     function toDateTime: TDateTime; virtual; //**< Returns the value as dateTime; dynamically converted, if necessary
     function toNode: TTreeNode; virtual; //**< Returns the value as node, or nil if it is not a node
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single value, the array contains just this value; if it is a sequence, the array contains all members of the sequence
-    function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (and "destroys it", however you have to free the list)
+    function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (Beware: you have to free the list)
     function toXQuery: string; virtual; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
+    function toValue: TXQValue;
 
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
@@ -4104,7 +4107,7 @@ begin
   end;
 end;
 
-function TXQStaticContext.clone: TXQStaticContext;
+function TXQStaticContext.clone(): TXQStaticContext;
 begin
   result := TXQStaticContext.Create;
   result.assign(self);
@@ -4467,7 +4470,7 @@ begin
       exit(compareCommon(getFirst(a),b,overrideCollation,castUnknownToString));
     end;
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
-    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
+    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
   end;
   case bk of
     pvkUndefined: exit(-2);
@@ -4557,56 +4560,43 @@ end;
 
 function TXQStaticContext.equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result := equalAtomic(a as txqvalue,b as txqvalue,overrideCollation);
+  result := equalAtomic(a.toValue,b.toValue,overrideCollation);
+end;
+
+function TXQStaticContext.compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+var enum1, enum2: TXQValueEnumeratorPtrUnsafe;
+  compres: Integer;
+  va, vb: TXQValue;
+begin
+  enum1 := a;
+  while enum1.MoveNext do begin
+    va := enum1.Current^.toValue;
+    if va.kind <> pvkArray then begin
+      enum2 := b;
+      while enum2.MoveNext do begin
+        vb := enum2.Current^.toValue;
+        if vb.kind <> pvkArray then begin;
+          compres := compareCommon(va, vb, overrideCollation, false);
+          result := (compres = accept1) or (compres = accept2);
+        end else result := compareGeneral(va.GetEnumeratorPtrUnsafe, (vb as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, overrideCollation, accept1, accept2);;
+        if result then exit;
+      end;
+    end else begin
+      result := compareGeneral( (va as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, b, overrideCollation, accept1, accept2);
+      if result then exit;
+    end;
+  end;
+  result := false;
 end;
 
 function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
-  function compare(x,y: TXQValue): integer; inline;
-  begin
-    result :=  compareCommon(x, y, overrideCollation, false);
-  end;
-
-var
-  compres: Integer;
-  seq, plain: TXQValue;
-  i: Integer;
-  j: Integer;
-  ak, bk: TXQValueKind;
 begin
-  ak := a.kind; bk := b.kind;
-  if (ak in [pvkUndefined]) or (bk in [pvkUndefined]) then
-    result := false
-  else if (ak <> pvkSequence) and (bk <> pvkSequence) then begin
-    compres := compare(a,b);
-    result := (compres = accept1) or (compres = accept2);
-  end else if (ak = pvkSequence) and (bk = pvkSequence) then begin
-    result := false;
-    for i:=0 to TXQValueSequence(a).seq.Count-1 do
-      for j:=0 to TXQValueSequence(b).seq.Count-1 do begin
-        compres := compare(TXQValueSequence(a).seq[i] as TXQValue, TXQValueSequence(b).seq[j] as TXQValue);
-        if (compres = accept1) or (compres=accept2) then exit(true);
-      end;
-  end else begin
-    if ak = pvkSequence then begin
-     seq := a;
-     plain := b;
-    end else begin
-      seq := b;
-      plain := a;
-      accept1:=-accept1;
-      accept2:=-accept2;
-    end;
-    result := false;
-    for i:=0 to TXQValueSequence(seq).seq.Count-1 do begin
-      compres := compare(TXQValueSequence(seq).seq[i] as TXQValue, plain);
-      if (compres = accept1) or (compres=accept2) then exit(true);
-    end;
-  end;
+  result := compareGeneral(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe, overrideCollation,  accept1, accept2);
 end;
 
 function TXQStaticContext.compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
 begin
-  result := compareGeneral(a as TXQValue,b as TXQValue,overrideCollation, accept1,accept2);
+  result := compareGeneral(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe, overrideCollation,  accept1, accept2);
 end;
 
 procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
