@@ -107,6 +107,7 @@ protected
   function parseString(const w: string): string;
   function parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
+  function parseX31String(): TXQTerm;
   function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(term: TXQTermWithChildren; closingParen: char = ']'): TXQTerm;
   function parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
@@ -2334,6 +2335,60 @@ begin
     result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'string', [result]);
 end;
 
+function TXQParsingContext.parseX31String(): TXQTerm;
+var
+  marker: PChar;
+  temp: TXQTerm;
+  procedure pushRaw;
+  var
+    len: SizeInt;
+  begin
+    len := pos - marker;
+    if len <= 0 then exit;
+    TXQTermWithChildren(result).push(TXQTermConstant.create(normalizeLineEnding(strFromPchar(marker, len))));
+  end;
+
+begin
+  require3_1();
+  Result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', []);
+  try
+    expect('``[');
+    marker := pos;
+    while pos^ <> #0 do begin
+      case pos^ of
+        '`': if (pos+1)^ = '{' then begin
+          pushRaw;
+          inc(pos, 2);
+          skipWhitespaceAndComment();
+          if pos^ <> '}' then
+            TXQTermWithChildren(result).push(TXQTermNamedFunction.create(XMLNamespaceURL_MyExtensionsNew, 'join', [parsePrimaryLevel]));
+          expect('}`');
+          marker := pos;
+          continue;
+        end;
+        ']': if ((pos+1)^ = '`') and ((pos+2)^ = '`') then begin
+          pushRaw;
+          inc(pos, 3);
+          case length(TXQTermWithChildren(result).children) of
+            0: begin result.free; result := TXQTermConstant.create(''); end;
+            1: begin
+              temp := result;
+              result := TXQTermWithChildren(result).children[0];
+              SetLength(TXQTermWithChildren(temp).children, 0);
+              temp.free;
+            end;
+          end;
+          exit;
+        end;
+      end;
+      inc(pos);
+    end;
+    raiseSyntaxError('Incomplete string constructor');
+  except
+    on EXQParsingException do begin result.free; raise; end;
+  end;
+end;
+
 function TXQParsingContext.parseJSONLikeObjectConstructor(): TXQTerm;
 var
   token: String;
@@ -2608,6 +2663,7 @@ begin
       exit(parseXString());
     end;
     '?': exit(parseJSONLookup(nil));
+    '`': if strBeginsWith(pos, '``[') then exit(parseX31String());
   end;
 
   try
