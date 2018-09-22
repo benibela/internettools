@@ -96,6 +96,7 @@ protected
   function parseSequenceLike(target: TXQTermWithChildren; closingChar: char = ')'; allowPartialApplication: boolean = false): TXQTermWithChildren;
   function parseFunctionCall(target: TXQTermWithChildren): TXQTerm;
   function isKindTestFunction(const word: string): boolean;  //Lookahead to recognize KindTest of the XPath-EBNF
+  function createFunctionCall(const url, prefix, local: string; mode: TXQNamespaceMode): TXQTermNamedFunction;
   procedure parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parseSequenceTypeUnion(const flags: TXQSequenceTypeFlags): TXQTermSequenceType;
@@ -234,6 +235,12 @@ begin
   end;
 end;
 
+function acceptedModelsToStr(models: TXQParsingModels): string;
+begin
+  if not (xqpmXPath3_0 in models) then result := ' requires XPath/XQuery 3.1'
+  else if not (xqpmXPath2 in models) then result := ' requires XPath/XQuery 3.0'
+  else result := 'Invalid parsing model';
+end;
 
 function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitVariable(pt: PXQTerm);
@@ -970,6 +977,13 @@ begin
     'namespace-node': result := isModel3;
     else result := false;
   end;
+end;
+
+function TXQParsingContext.createFunctionCall(const url, prefix, local: string; mode: TXQNamespaceMode): TXQTermNamedFunction;
+begin
+  if (prefix = '') then refuseReservedFunctionName(local);
+  result := TXQTermNamedFunction.create();
+  result.name := TXQEQNameUnresolved.makeEQName(URL, prefix, local, mode);
 end;
 
 procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
@@ -2619,11 +2633,7 @@ begin
           end;
           if axis <> '' then raiseParsingError('XPST0003', 'Not an kind/node test');
         end;
-
-
-        if (namespacePrefix = '') then refuseReservedFunctionName(word);
-        result := TXQTermNamedFunction.create();
-        TXQTermNamedFunction(result).name := TXQEQNameUnresolved.makeEQName(namespaceURL, namespacePrefix, word, namespaceMode);
+        result := createFunctionCall(namespaceURL, namespacePrefix, word, namespaceMode);
         result := parseFunctionCall(TXQTermNamedFunction(result));
         exit();
       end;
@@ -2645,9 +2655,7 @@ begin
       '#': begin
         require3('Named Function Reference');
         expect('#');
-        if (namespacePrefix = '') then refuseReservedFunctionName(word);
-        result := TXQTermNamedFunction.create();
-        TXQTermNamedFunction(result).name := TXQEQNameUnresolved.makeEQName(namespaceURL, namespacePrefix, word, namespaceMode);
+        result := createFunctionCall(namespaceURL, namespacePrefix, word, namespaceMode);
         result := TXQTermDefineFunction.CreateReference(TXQTermNamedFunction(result), StrToIntWithError(nextToken()));
         TXQTermDefineFunction(result).name := TXQEQNameUnresolved.makeEQNameWithPrefix(namespaceURL, namespacePrefix, word, namespaceMode);
         exit(result);
@@ -2799,18 +2807,51 @@ var astroot: TXQTerm;
   function parseSomething: TXQTerm;
   begin
     result := parse();
-    if result = nil then raiseParsingError('XPST0003', 'Unexpected query end');
+    if result = nil then raiseSyntaxError('Unexpected query end');
   end;
 
 
   procedure pushBinaryOp(const opinfo: TXQOperatorInfo);
+  var replace: PXQTerm;
+
+    procedure handleArrowOperator;
+    var
+      dynamicFunction: TXQTerm;
+      namespaceURL, namespacePrefix, localName: string;
+      namespaceMode: TXQNamespaceMode;
+      funcCall: TXQTermWithChildren;
+    begin
+      skipWhitespaceAndComment();
+      case pos^ of
+        '$', '(': begin
+          dynamicFunction := parseValue;
+          funcCall := TXQTermDynamicFunctionCall.Create(dynamicFunction);
+        end;
+        else begin
+          namespaceMode := nextTokenEQName(namespaceURL, namespacePrefix, localName, true);
+          funcCall := createFunctionCall(namespaceURL, namespacePrefix, localName, namespaceMode);
+        end;
+      end;
+      expect('(');
+      funcCall.push(replace^);
+      replace^ := funcCall;
+      replace^ := parseFunctionCall(funcCall)
+    end;
+
   var res: TXQTermBinaryOp;
-      replace: PXQTerm;
+    procedure createBinOpTerm;
+    begin
+      res := TXQTermBinaryOp.Create(opinfo);
+      res.push(replace^);
+      replace^ := res;
+    end;
+
     procedure handleCastStrangeness;
     var
       st: TXQTermSequenceType;
       isCast: Boolean;
     begin
+      createBinOpTerm;
       expect(res.op.followedBy); //assume we read instance of/cast/castable/treat as
       isCast := ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs));
       if isCast then st := parseSequenceType([xqstIsCast])
@@ -2823,16 +2864,19 @@ var astroot: TXQTerm;
     if (opinfo.name[1] in ['a'..'z','A'..'Z']) and (pos^ in ['a'..'z','A'..'Z','0'..'9','.','-'])  then
       raiseSyntaxError('Need whitespace after operator');
 
-    if opinfo.require3 then require3();
+    if ([parsingModel]*opinfo.acceptedModels) = [] then
+      raiseSyntaxError(acceptedModelsToStr(opinfo.acceptedModels));
 
     replace := ripBinOpApart(@astroot, opinfo.priority);
 
-    res := TXQTermBinaryOp.Create(opinfo);
-    res.push(replace^);
-    replace^ := res;
-
-    if res.op.followedBy <> '' then handleCastStrangeness
-    else res.push(parseValue());
+    if xqofSpecialParsing in opinfo.flags then begin
+      if opinfo.followedBy <> '' then handleCastStrangeness
+      else if opinfo.name = '=>' then handleArrowOperator
+      else raiseSyntaxError('20180922 Unknown operator');
+    end else begin
+      createBinOpTerm;
+      res.push(parseValue());
+    end;
   end;
 
   var word: string;
@@ -2885,7 +2929,7 @@ begin
           expect(']');
         end;
         '(': begin
-          expect('('); skipWhitespaceAndComment();
+          expect('(');
           replace := ripBinOpApart(@astroot, 10000); //TODO: check
           replace^ := TXQTermDynamicFunctionCall.Create(replace^);
           replace^ := parseFunctionCall(TXQTermDynamicFunctionCall(replace^))
@@ -4204,8 +4248,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       if moduleResult <> '' then begin
         result += '  In module ' + namespaceGetURL(module.namespace);
         if equalNamespaces(module.namespace, XMLNamespace_XPathFunctions) then
-          if not (xqpmXPath3_0 in module.acceptedModels) then result += ' (XPath/XQuery 3.1)'
-          else if not (xqpmXPath2 in module.acceptedModels) then result += ' (XPath/XQuery 3.0)';
+          result += acceptedModelsToStr(module.acceptedModels);
         result += ':'+LineEnding+moduleResult+LineEnding;
       end;
       for i := 0 to high(module.parents) do

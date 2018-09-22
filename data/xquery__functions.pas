@@ -50,32 +50,31 @@ type TXQValueDateTimeBreaker= class(TXQValueDateTime) end;
      TXQueryEngineBreaker = class(TXQueryEngine) end;
 
 //abstract functions
+function raisePlaceHolderError(const cxt: TXQEvaluationContext; const ta, tb: IXQValue; const name: string): IXQValue;
+begin
+  ignore(cxt); ignore(ta); ignore(tb);
+  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder '+name+' called');
+  result := xqvalue();
+end;
 function xqvalueNodeStepChild(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  ignore(cxt); ignore(ta); ignore(tb);
-  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op:/ called');
-  result := xqvalue();
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: /');
 end;
-
 function xqvalueNodeStepDescendant(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  ignore(cxt); ignore(ta); ignore(tb);
-  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: // called');
-  result := xqvalue();
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: //');
 end;
-
 function xqvalueAssignment(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  ignore(cxt); ignore(ta); ignore(tb);
-  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: := called');
-  result := xqvalue();
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: :=');
 end;
-
 function xqvalueSimpleMap(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
-  ignore(cxt); ignore(ta); ignore(tb);
-  raise EXQEvaluationException.Create('pxp:INTERNAL', 'placeholder op: ! called');
-  result := xqvalue();
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: !');
+end;
+function xqvalueArrowOperator(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+begin
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: =>');
 end;
 
 
@@ -6128,6 +6127,9 @@ end;
 }
 
 var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray: TXQNativeModule;
+const
+      PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
+      PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
 
 
 
@@ -6154,9 +6156,9 @@ begin
 
   }
   fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
-  fn3_1.acceptedModels := [xqpmXPath3_1, xqpmXQuery3_1];
+  fn3_1.acceptedModels := PARSING_MODEL3_1;
   fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3_1]);
-  fn3.acceptedModels := [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
+  fn3.acceptedModels := PARSING_MODEL3;
   fn := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3]);
   TXQueryEngine.registerNativeModule(fn);
   pxpold := TXQNativeModule.Create(TNamespace.create(#0'.benibela.de','hidden'));
@@ -6446,10 +6448,12 @@ begin
 
   op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [], []);
   op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [], []);
-  op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [], []).require3:=true;
+  op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [], []).acceptedModels := PARSING_MODEL3;
 
   op.registerBinaryOp('unary~hack-', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
   op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+
+  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax, xqofSpecialParsing], [], []).acceptedModels:= PARSING_MODEL3_1;
 
   op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], [], []);
   op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], [], []);
@@ -6473,7 +6477,7 @@ begin
 
   op.registerBinaryOp('to',@xqvalueTo,60,[],['to($firstval as xs:integer?, $lastval as xs:integer?) as xs:integer*'], []);
 
-  op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],['($arg1 as xs:anyAtomicType?, $arg2 as xs:anyAtomicType?) as xs:string'], []).require3:=true;
+  op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],['($arg1 as xs:anyAtomicType?, $arg2 as xs:anyAtomicType?) as xs:string'], []).acceptedModels:=PARSING_MODEL3;
 
   op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString],['numeric-equal($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'duration-equal($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-equal($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-equal($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', 'gYear-equal($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', 'gDay-equal($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', 'QName-equal($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
   op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString], ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', '($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', '($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', '($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', '($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', '($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', '($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', '($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', '($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);

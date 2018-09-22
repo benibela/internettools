@@ -134,6 +134,7 @@ type
   TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
 
   TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1);
+  TXQParsingModels = set of TXQParsingModel;
 
   //============================XQUERY CONTEXTS==========================
 
@@ -1442,7 +1443,9 @@ type
   //**Information about a xquery binary operator
   TXQOperatorFlags = set of (xqofAssociativeSyntax, //if the syntax is associative. (not the semantic!). e.g. @code(1 + 2 + 3) is valid, but @code(1 eq 2 = true()) is a syntax error;
                              xqofCastUntypedToString,
-                             xqofCastUntypedToDouble);
+                             xqofCastUntypedToDouble,
+                             xqofSpecialParsing
+                             );
   TXQOperatorInfo = class(TXQAbstractFunctionInfo)
     name: string;
     func: TXQBinaryOp;
@@ -1450,7 +1453,7 @@ type
     flags: TXQOperatorFlags;
     followedBy: string;
     contextDependencies: TXQContextDependencies;
-    require3: boolean;
+    acceptedModels: TXQParsingModels;
   end;
 
 
@@ -2817,7 +2820,7 @@ type
 
  {** A native XQuery module. Each native module has a certain namespace and declares functions, types and operators *}
  TXQNativeModule = class
-  acceptedModels: set of TXQParsingModel;
+  acceptedModels: TXQParsingModels;
   namespace: INamespace;
   parents: array of TXQNativeModule;
   constructor create(const anamespace: INamespace; const aparentModule: array of TXQNativeModule);
@@ -8112,6 +8115,7 @@ begin
   result.priority:=priority;
   result.flags := flags;
   result.contextDependencies:=contextDependencies;
+  result.acceptedModels := [xqpmXPath2, xqpmXQuery1, xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
   spacepos := pos(' ', name);
   i := binaryOpLists.IndexOf(name[1]);
   if i < 0 then begin
@@ -8125,6 +8129,7 @@ begin
     result.name := copy(name, 1, spacepos-1);
     list.AddObject(result.name, (result));
     result.followedBy := strCopyFrom(name, spacepos+1);
+    include(result.flags, xqofSpecialParsing);
   end;
   parseTypeChecking(result, typeChecking, true);
   for i := 0 to high(result.versions) do
