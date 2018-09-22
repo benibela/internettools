@@ -315,6 +315,11 @@ begin
   exit(xqvalue);
 end;
 
+function TXQValue.hasProperty(const name: string; value: PXQValue): boolean;
+begin
+  result := false;
+end;
+
 function TXQValue.getProperty(const name: string): IXQValue;
 begin
   ignore(name);
@@ -1939,6 +1944,19 @@ end;
 class function TXQValueObject.classKind: TXQValueKind;
 begin
   Result:=pvkObject;
+end;
+
+function TXQValueObject.Size: SizeInt;
+var
+  temp: TStringList;
+begin
+  if prototype = nil then result := values.count
+  else begin
+    temp := TStringList.Create;
+    enumerateKeys(temp);
+    result := temp.Count;
+    temp.free;
+  end;
 end;
 
 procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);

@@ -122,6 +122,20 @@ begin
   t('map { "a": "b", "c": "d", 123: 456 } ! (. ? c, ":", . ? 123, ":", ?123, ":", ?(("a","b","c","d")))', 'd : 456 : 456 : b d');
   t('sort((map { "a": "b", "c": "d", 123: 456 } ? *) ! string())', '456 b d');
 
+  t('map:merge( ( map {}, map { "a": 1 }, map { "a": 2, "b": 3}) ) ! ("a:", ?a, "b:", ?b)', 'a: 1 b: 3');
+  t('map:merge( ( map {}, map { "a": 1 }, map { "a": 2, "b": 3}), map { "duplicates": "use-last" } ) ! ("a:", ?a, "b:", ?b)', 'a: 2 b: 3');
+  t('map:merge( ( map {}, map { "a": 1 }, map { "a": 2, "b": 3}), map { "duplicates": "combine" } ) ! ("a:", ?a, "b:", ?b)', 'a: 1 2 b: 3');
+  t('map:size(map {}) + 10* map:size(map{"a": 2}) + 100 * map:size(map{"a": 2, "b": 3})', '210');
+  t('map:keys(map{"a": 2, "b": 3})', 'a b');
+  t('map:contains(map{"a": 2, "b": 3}, "b")', 'true');
+  t('map:get(map{"a": 2, "b": 3}, "b")', '3');
+  t('map:find((map {"a": 1}, map{"a": (2,3), "b": [map{"a": 7}]}), "a")?*', '1 2 3 7');
+  t('sort(map:put( map {"a": 1, "b": 2, "c": 3}, "b", 17 ) ? *)', '1 3 17');
+  t('serialize-json(map:entry( "a", "b" ))', '{"a": "b"}');
+  t('sort(map:remove( map {"a": 1, "b": 2, "c": 3, "d": 4}, ("b", "d", "e") ) ? *)', '1 3');
+  t('sort(map:for-each(map{"a": 2, "b": 3}, function($k, $v){$k ||$v}))', 'a2 b3');
+
+
   t('string-join((1,2,3))', '123');
 
   t('(1,2,3) => string-join("x")', '1x2x3');

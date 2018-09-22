@@ -6118,15 +6118,172 @@ begin
 end;
 
 
+function xqFunctionMapMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
+type TDuplicateResolve = (drReject, drUseFirst, drUseLast, drCombine);
+var duplicates: TDuplicateResolve = drUseFirst;
+  value: TXQValue;
+  pv: PIXQValue;
+  resobj: TXQValueObject;
+  pprop: TXQProperty;
+  tempseq: TXQValueSequence;
+begin
+  if argc >= 2 then begin
+    if argv[1].hasProperty('duplicates', @value) then
+      case value.toString of
+        'reject': duplicates := drReject;
+        'use-any', 'use-first': duplicates := drUseFirst;
+        'use-last': duplicates := drUseLast;
+        'combine': duplicates := drCombine;
+        else raise EXQEvaluationException.create('FOJS0005', 'Invalid duplicates option', nil, argv[1]);
+      end;
+  end;
+  if argv[0].getSequenceCount = 1 then exit(argv[0]);
+  resobj := TXQValueObject.create();
+  result := resobj;
+  for pv in argv[0].GetEnumeratorPtrUnsafe do begin
+    for pprop in pv^.getPropertyEnumerator do begin
+      if resobj.hasProperty(pprop.Name, @value) then begin
+        case duplicates of
+          drReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+          drUseFirst: ;
+          drUseLast: resobj.setMutable(pprop.Name, pprop.Value);
+          drCombine: begin
+            tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+            tempseq.add(value);
+            tempseq.add(pprop.Value);
+            resobj.setMutable(pprop.Name, tempseq);
+          end;
+        end;
+      end else resobj.setMutable(pprop.Name, pprop.Value);
+    end;
+  end;
+end;
+
+function xqFunctionMapSize(argc: SizeInt; argv: PIXQValue): IXQValue;
+begin
+  result := xqvalue((argv[0] as TXQValueObject).size);
+end;
+
+function xqFunctionMapKeys(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  keys: TStringList;
+begin
+  keys := TStringList.Create;
+  (argv[0] as TXQValueObject).enumerateKeys(keys);
+  result := xqvalue(keys);
+  keys.free;
+end;
+
+function xqFunctionMapContains(argc: SizeInt; argv: PIXQValue): IXQValue;
+begin
+  result := xqvalue(argv[0].hasProperty(argv[1].toString, nil));
+end;
+
+function xqFunctionMapGet(argc: SizeInt; argv: PIXQValue): IXQValue;
+begin
+  result := xqvalue(argv[0].getProperty(argv[1].toString));
+end;
+
+procedure mapFind(outseq: TXQVList; const key: string; const v: IXQValue);
+var
+  pv, pw: PIXQValue;
+  pp: TXQProperty;
+begin
+  for pv in v.GetEnumeratorPtrUnsafe do begin
+    case pv^.kind of
+      pvkArray:
+        for pw in (pv^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do
+          mapFind(outseq, key, pw^);
+      pvkObject:
+        for pp in pv^.getPropertyEnumerator do begin
+          if pp.Name = key then outseq.addInArray(pp.Value)
+          else mapFind(outseq, key, pp.Value);
+        end;
+    end;
+  end;
+end;
+
+function xqFunctionMapFind(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  l: TXQVList;
+begin
+  l := TXQVList.create();
+  result := TXQValueJSONArray.create(l);
+  mapFind(l, argv[1].toString, argv[0]);
+end;
+
+function xqFunctionMapPut(argc: SizeInt; argv: PIXQValue): IXQValue;
+begin
+  result := (argv[0] as TXQValueObject).setImmutable(argv[1].toString, argv[2]);
+end;
+
+function xqFunctionMapEntry(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  obj: TXQValueObject;
+begin
+  obj := TXQValueObject.create();
+  obj.setMutable(argv[0].toString, argv[1]);
+  result := obj;
+end;
+
+function xqFunctionMapRemove(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  obj: TXQValueObject;
+  pp: TXQProperty;
+  keys: array of String;
+  i: Integer;
+  pv: PIXQValue;
+  keep: Boolean;
+begin
+  obj := TXQValueObject.create();
+  SetLength(keys, argv[1].getSequenceCount);
+  i := 0;
+  for pv in argv[1].GetEnumeratorPtrUnsafe do begin
+    keys[i] := pv^.toString;
+    inc(i);
+  end;
+  for pp in argv[0].getPropertyEnumerator do begin
+    keep := true;
+    for i := 0 to high(keys) do
+      if keys[i] = pp.Name then keep := false;
+    if keep then
+      obj.setMutable(pp.Name, pp.Value);
+  end;
+  result := obj;
+end;
+
+function xqFunctionMapFor_Each(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var f: TBatchFunctionCall;
+    l: TXQVList;
+    pp: TXQProperty;
+begin
+  l := TXQVList.create((argv[0] as TXQValueObject).size);
+  result := TXQValueSequence.create(l);
+  with f do begin
+    init(context, argv[1]);
+    for pp in argv[0].getPropertyEnumerator do begin
+      l.add(call2(xqvalue(pp.Name), pp.Value));
+    end;
+    done;
+  end;
+  xqvalueSeqSqueeze(result);
+end;
+
+
 
 {
-function xqFunction(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionMap(argc: SizeInt; argv: PIXQValue): IXQValue;
+begin
+
+end;
+
+function xqFunction({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, );
 end;
 }
 
-var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray: TXQNativeModule;
+var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray, fnmap: TXQNativeModule;
 const
       PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
       PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
@@ -6441,6 +6598,20 @@ begin
   fnarray.registerFunction('sort', @xqFunctionArraySort, ['($array as array(*)) as array(*)', '($array as array(*), $collation as xs:string?) as array(*)', '( $array as array(*), $collation as xs:string?, $key as function(item()*) as xs:anyAtomicType*) as array(*)']);
   fnarray.registerFunction('flatten', @xqFunctionArrayFlatten, ['($input as item()*) as item()*']);
 
+  fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
+  TXQueryEngine.registerNativeModule(fnmap);
+  fnmap.registerFunction('merge', @xqFunctionMapMerge, ['($maps as map(*)*) as map(*)', '($maps as map(*)*,$options as map(*)) as map(*)']);
+  fnmap.registerFunction('size', @xqFunctionMapSize, ['($map as map(*)) as xs:integer']);
+  fnmap.registerFunction('keys', @xqFunctionMapKeys, ['($map as map(*)) as xs:anyAtomicType*']);
+  fnmap.registerFunction('contains', @xqFunctionMapContains, ['($map as map(*),$key as xs:anyAtomicType) as xs:boolean']);
+  fnmap.registerFunction('get', @xqFunctionMapGet, ['($map as map(*),$key as xs:anyAtomicType) as item()*']);
+  fnmap.registerFunction('find', @xqFunctionMapFind, ['($input as item()*,$key as xs:anyAtomicType) as array(*)']);
+  fnmap.registerFunction('put', @xqFunctionMapPut, ['($map as map(*),$key as xs:anyAtomicType, $value as item()*) as map(*)']);
+  fnmap.registerFunction('entry', @xqFunctionMapEntry, ['($key as xs:anyAtomicType,$value as item()*) as map(*)']);
+  fnmap.registerFunction('remove', @xqFunctionMapRemove, ['($map as map(*),$keys as xs:anyAtomicType*) as map(*)']);
+  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, ['($map as map(*),$action as function(xs:anyAtomicType, item()*) as item()*) as item()*']);
+
+
 
   //Operators
   //The type information are just the function declarations of the up-backing functions
@@ -6517,6 +6688,7 @@ begin
   fn3_1.free;
   op.free;
   fnarray.free;
+  fnmap.free;
 end;
 
 

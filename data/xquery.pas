@@ -366,6 +366,7 @@ type
 
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
+    function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData;
@@ -445,6 +446,7 @@ type
 
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
+    function hasProperty(const name: string; value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
@@ -843,7 +845,8 @@ type
 
     class function classKind: TXQValueKind; override;
 
-    function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function Size: SizeInt;
+    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
     function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
 
@@ -8185,13 +8188,13 @@ function TXQNativeModule.findBinaryOp(const name: string; model: TXQParsingModel
 var
   i: Integer;
 begin
-  if model in acceptedModels then begin
-   result := TXQOperatorInfo(findFunction(binaryOpFunctions, name, 2));
-   if result <> nil then exit;
-  end;
   for i := 0 to high(parents) do begin
     result := parents[i].findBinaryOp(name, model);
     if result <> nil then exit;
+  end;
+  if model in acceptedModels then begin
+   result := TXQOperatorInfo(findFunction(binaryOpFunctions, name, 2));
+   if result <> nil then exit;
   end;
   result := nil;
 end;

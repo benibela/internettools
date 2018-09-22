@@ -885,6 +885,22 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           exit(false);
       result := true;
     end;
+    function checkMap: boolean;
+    var
+      pp: TXQProperty;
+      notEmpty: Boolean;
+    begin
+      notEmpty := false;
+      for pp in sub.getPropertyEnumerator do begin
+        notEmpty := true;
+        if not TXQTermSequenceType(children[1]).instanceOf(pp.Value) then
+          exit(false);
+      end;
+      //todo: check keys
+      //todo: check function calls convertType/checkType ?
+      if notEmpty then result := TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY'))
+      else result := true;
+    end;
 
   var
     t: TXSType;
@@ -896,8 +912,10 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
       tikAtomic: begin
         t := sub.typeAnnotation;;
         result := t.derivedFrom(atomicTypeInfo);
-        if result and (length(children) > 0) and (atomicTypeInfo = baseJSONiqSchema.array_) then
-          result := checkArrayMembers;
+        if result and (length(children) > 0) then begin
+          if (atomicTypeInfo = baseJSONiqSchema.array_) then result := checkArrayMembers
+          else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkMap;
+        end;
       end;
       tikFunctionTest: begin
         if sub.kind <> pvkFunction then exit(false);

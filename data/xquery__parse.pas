@@ -1130,7 +1130,8 @@ begin
 
        'array': begin
          if hadNoNamespace and (options.AllowJSON or (parsingModel in PARSING_MODEL3_1)) then begin
-           Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.array_;
+           Result.kind:=tikAtomic;
+           result.atomicTypeInfo := baseJSONiqSchema.array_;
            expect('(');
            skipWhitespaceAndComment();
            case pos^ of
@@ -1140,8 +1141,26 @@ begin
            end;
            expect(')');
          end;
+       end;
+
+       'map': if hadNoNamespace then begin
+         require3_1();
+         Result.kind:=tikAtomic;
+         result.atomicTypeInfo := baseJSONiqSchema.object_;
+         expect('(');
+         skipWhitespaceAndComment();
+         case pos^ of
+           '*': inc(pos);
+           else begin
+             result.push(parseSequenceType(flags));
+             expect(',');
+             result.push(parseSequenceType(flags));
+           end;
          end;
-         'object', 'json-item', 'structured-item': begin
+         expect(')');
+       end;
+
+       'object', 'json-item', 'structured-item': begin
            if hadNoNamespace and options.AllowJSON then begin
              expect('('); expect(')');
              case word of
