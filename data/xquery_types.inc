@@ -1592,10 +1592,10 @@ var i: integer;
 begin
   if seq.count = 0 then exit('');
   builder.init(@result);
-  builder.append(seq[0].toString);
+  builder.append(seq[0].toJoinedString(sep));
   for i := 1 to seq.count - 1 do begin
     builder.append(sep);
-    builder.append(seq[i].toString);
+    builder.append(seq[i].toJoinedString(sep));
   end;
   builder.final;
 end;
