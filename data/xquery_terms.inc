@@ -4009,7 +4009,9 @@ var
 var i: integer;
   nameValueEvaluated: IXQValue;
 begin
-  if not (typ in [tetOpen,tetAttribute, tetDocument]) then nameValueEvaluated := nameValue.evaluate(context);
+  if not (typ in [tetOpen,tetAttribute, tetDocument]) then
+    if nameValue <> nil then nameValueEvaluated := nameValue.evaluate(context)
+    else nameValueEvaluated := xqvalue();
   if (typ = tetText) and (nameValueEvaluated.isUndefined) then exit(xqvalue);
 
   subcontext:=@context;

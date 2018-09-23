@@ -134,6 +134,7 @@ protected
   function parseOrExpr: TXQTerm;       //OrExpr
   function parse: TXQTerm;             //ExprSingle
   function parsePrimaryLevel: TXQTerm; //Expr
+  function parseOptionalExpr31: TXQTerm; //Expr?
   function parseModuleInternal(): TXQTerm;
 
 
@@ -1964,8 +1965,8 @@ begin
           end else result.push(tempSeq); //that's really slow for nodes because it makes a deep copy of them if they are taken from a subsequence. But if it's mixing atomic/nodes flattening the sequences makes the separator spaces wrong
         end else result.push(tempSeq);
       end else result.nameValue := parsePrimaryLevel;
-    end else if not expectName then
-      raiseParsingError('XPST0003', 'This type of node must not be empty ');
+    end else if not (parsingModel in PARSING_MODEL3_1) and (result.typ = tetNamespace) then
+      raiseSyntaxError('This type of node must not be empty ');
     expect('}');
   except
     result.free;
@@ -1998,9 +1999,8 @@ begin
   end;
   expect('{');
   skipWhitespaceAndComment();
-  if pos^ = '}' then raiseParsingError('XQST0079', 'Extension expr needs expr');
-  result := parsePrimaryLevel;
-  expect('}');
+  if (pos^ = '}') and not (parsingModel in PARSING_MODEL3_1) then raiseParsingError('XQST0079', 'Extension expr needs expr');
+  result := parseOptionalExpr31;
 end;
 
 function TXQParsingContext.parseVariable: TXQTermPendingEQNameToken;
@@ -2106,10 +2106,7 @@ begin
       result.push(parseSequenceType([]));
     end;
     case nextToken() of
-      '{': begin
-        result.push(parsePrimaryLevel);
-        expect('}');
-      end;
+      '{': result.push(parseOptionalExpr31);
       'external': if anonymous then raiseSyntaxError('Anonymous function cannot be external');
       else raiseSyntaxError('Function body { } or external expected');
     end;
@@ -2145,9 +2142,8 @@ var
   local: string;
 begin
   expect('{');
-  result := TXQTermTryCatch.Create(parsePrimaryLevel);
+  result := TXQTermTryCatch.Create(parseOptionalExpr31);
   try
-    expect('}');
     token := nextToken(true);
     while token = 'catch' do begin
       expect('catch');
@@ -2163,8 +2159,7 @@ begin
         token := nextToken();
       until token <> '|';
       if token <> '{' then raiseSyntaxError('{ expected');
-      result.catches[high(result.catches)].expr := parsePrimaryLevel;
-      expect('}');
+      result.catches[high(result.catches)].expr := parseOptionalExpr31;
       token := nextToken(true);
     end;
   except
@@ -2715,7 +2710,7 @@ begin
       '{': case word of
         'unordered', 'ordered': begin //TODO: actually use that
            requireXQuery();
-           expect('{'); result := parse(); expect('}');
+           expect('{'); result := parseOptionalExpr31;
            exit;
          end;
         'array': if parsingModel in PARSING_MODEL3_1 then begin
@@ -3109,6 +3104,19 @@ begin
     result.free;
     raise;
   end;
+end;
+
+function TXQParsingContext.parseOptionalExpr31: TXQTerm;
+begin
+  if parsingModel in PARSING_MODEL3_1 then begin
+    skipWhitespaceAndComment();
+    if pos^ = '}' then begin
+      inc(pos);
+      exit(TXQTermSequence.Create);
+    end;
+  end;
+  result := parsePrimaryLevel;
+  expect('}');
 end;
 
 procedure resolveFunctionParams(f: TXQTermDefineFunction; sc: TXQStaticContext);
