@@ -2592,7 +2592,7 @@ begin
   t('json(''true'')', 'true');
   t('jn:members(json(''[1, 2, 3]''))', '1');
   t('join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
-  t('join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3  '); //this should raise an error
+  t('join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3 4 5 6 7'); //this should raise an error in JSONiq, but correct in 3.1
   t('join(jn:members(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', '1 2 3 4 5 6');
   t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', 'a');
   t('join(jn:keys(([1, 2, 3], {"a": 17}, [4,5,6], {"a": 7, "b": 8, "c": 89}, "hallo", {"b": []})))', 'a b c');
