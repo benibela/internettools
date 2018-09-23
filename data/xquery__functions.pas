@@ -34,6 +34,8 @@ uses
 procedure initializeFunctions;
 procedure finalizeFunctions;
 
+
+
 implementation
 
 uses xquery, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta,
@@ -6198,8 +6200,7 @@ end;
 
 
 function xqFunctionMapMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
-type TDuplicateResolve = (drReject, drUseFirst, drUseLast, drCombine);
-var duplicates: TDuplicateResolve = drUseFirst;
+var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
   value: TXQValue;
   pv: PIXQValue;
   resobj: TXQValueObject;
@@ -6208,13 +6209,7 @@ var duplicates: TDuplicateResolve = drUseFirst;
 begin
   if argc >= 2 then begin
     if argv[1].hasProperty('duplicates', @value) then
-      case value.toString of
-        'reject': duplicates := drReject;
-        'use-any', 'use-first': duplicates := drUseFirst;
-        'use-last': duplicates := drUseLast;
-        'combine': duplicates := drCombine;
-        else raise EXQEvaluationException.create('FOJS0005', 'Invalid duplicates option', nil, argv[1]);
-      end;
+      duplicates.setFromString(value.toString);
   end;
   if argv[0].getSequenceCount = 1 then exit(argv[0]);
   resobj := TXQValueObject.create();
@@ -6223,10 +6218,10 @@ begin
     for pprop in pv^.getPropertyEnumerator do begin
       if resobj.hasProperty(pprop.Name, @value) then begin
         case duplicates of
-          drReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
-          drUseFirst: ;
-          drUseLast: resobj.setMutable(pprop.Name, pprop.Value);
-          drCombine: begin
+          xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+          xqmdrUseFirst: ;
+          xqmdrUseLast: resobj.setMutable(pprop.Name, pprop.Value);
+          xqmdrCombine: begin
             tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
             tempseq.add(value);
             tempseq.add(pprop.Value);
@@ -6348,19 +6343,29 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-
-
-{
-function xqFunctionMap(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionParseJson(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  parser: TXQJsonParser;
 begin
-
+  parser.context := @context;
+  result := parser.parse(argc, args);
 end;
 
-function xqFunction({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionJSON_Doc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  data: String;
+  contenttype: string;
+  parser: TXQJsonParser;
 begin
-  requiredArgCount(argc, );
+  if args[0].isUndefined then exit(args[0]);
+  data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FODC0002');
+
+  parser.context := @context;
+  result := parser.parse(argc, args);
 end;
-}
+
+
+
 
 var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray, fnmap: TXQNativeModule;
 const
@@ -6657,6 +6662,8 @@ begin
   fn3_1.registerFunction('trace', @xqFunctionTrace, ['($value as item()*) as item()*']);
   fn3_1.registerFunction('error', @xqFunctionError,['($error as xs:QName?) as none']);
 
+  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, ['($href as xs:string?) as item()?',  '($href as xs:string?, $options as map(*)) as item()?']);
+  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, ['($json-text as xs:string?) as item()?',  '($json-text as xs:string?, $options as map(*)) as item()?']);
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   TXQueryEngine.registerNativeModule(fnarray);

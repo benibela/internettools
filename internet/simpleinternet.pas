@@ -251,7 +251,7 @@ begin
         context.ParentElement := tree.getLastTree;
         context.RootElement := tree.getLastTree;
       end else
-        pxpParser.VariableChangelog.add('json', parseJSON(data)); //TODO: this is bad, it leaks all JSON data, till the engine is reset
+        pxpParser.VariableChangelog.add('json', TXQJsonParser.parse(data, [jpoAllowMultipleTopLevelItems, jpoJSONiq])); //TODO: this is bad, it leaks all JSON data, till the engine is reset
 
       result := pxpParser.evaluate(context);
     end;

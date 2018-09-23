@@ -18,7 +18,7 @@
 unit xquery_json;
 
 {
-Copyright (C) 2008 - 2015 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2018 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -44,9 +44,7 @@ interface
 uses
   Classes, SysUtils, bigdecimalmath, xquery;
 
-type TParseJSONOption = (pjoAllowMultipleTopLevelItems, pjoLiberal, pjoAllowTrailingComma);
-  TParseJSONOptions = set of TParseJSONOption;
-function parseJSON(const data: string; options: TParseJSONOptions = [pjoAllowMultipleTopLevelItems]): IXQValue;
+
 
 implementation
 
@@ -101,261 +99,12 @@ end;
 
 
 
-function parseJSON(const data: string; options: TParseJSONOptions): IXQValue;
-var
-  scanner: TJSONScanner;
-
-  procedure raiseError(message: string = 'error');
-  var token: string;
-  begin
-    Str(scanner.CurToken, token);
-    raise EXQEvaluationException.create('jerr:JNDY0021', message+' at ' + scanner.CurTokenString +' (' + token +') in '+scanner.CurLine);
-  end;
-
-  function nextToken: TJSONToken;
-  begin
-    try
-      while scanner.FetchToken = tkWhitespace do ;
-    except
-      on e: EScannerError do
-        raiseError('Failed to parse JSON: '+ e.Message);
-    end;
-    result := scanner.CurToken;
-  end;
-
-
-  function parseNumber: Ixqvalue;
-  var
-    temp64: Int64;
-    tempFloat: Extended;
-    tempd: BigDecimal;
-    tempchar: Char;
-  begin
-    if TryStrToInt64(scanner.CurTokenString, temp64) then exit(xqvalue(temp64));
-    if TryStrToBigDecimal(scanner.CurTokenString, @tempd) then
-      if striContains(scanner.CurTokenString, 'E')  then exit(baseSchema.double.createValue(tempd))
-      else if strContains(scanner.CurTokenString, '.')  then exit(baseSchema.decimal.createValue(tempd))
-      else exit(baseSchema.integer.createValue(tempd));
-    if TryStrToFloat(scanner.CurTokenString, tempFloat) then
-      if striContains(scanner.CurTokenString, 'E') then exit(baseSchema.double.createValue(tempFloat))
-      else exit(TXQValueDecimal.create(tempFloat));
-    if (pjoLiberal in options) and ((scanner.CurTokenString = '+') or (scanner.CurTokenString = '-')) then begin
-      tempchar := scanner.CurTokenString[1];
-      if scanner.FetchToken = tkIdentifier then
-        case scanner.CurTokenString of
-          'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity':
-            case tempchar of
-              '+': exit(xqvalue(getPosInf)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
-              '-': exit(xqvalue(getNegInf));
-            end;
-        end;
-    end;
-    raiseError('Invalid number');
-    result := nil; //hide warning
-  end;
-
-
-var containerStack: array of TXQValue;
-    containerCount: integer;
-    parsingPhase: ( jppArrayExpectValue, jppArrayExpectComma,
-                   jppObjectExpectKey, jppObjectExpectComma, jppObjectExpectValue,
-                   jppRoot);
-    currentContainer: TXQValue;
-
-  procedure setCurrentContainer; inline;
-  begin
-    if containerCount > 0 then
-      currentContainer := containerStack[containerCount-1]
-     else
-      currentContainer := nil;
-  end;
-
-  procedure popContainer;
-  begin
-    if containerCount = 0 then raiseError('Unexpected closing parenthesis');
-    containerCount -= 1;
-    setCurrentContainer;
-    if currentContainer = nil then parsingPhase := jppRoot
-    else if currentContainer.ClassType = TXQValueJSONArray then parsingPhase := jppArrayExpectComma
-    else parsingPhase := jppObjectExpectComma;
-  end;
-
-  function pushContainer(container: txqvalue): txqvalue;
-  begin
-    if length(containerStacK) = containerCount then
-      if containerCount < 16 then setlength(containerstack, 16)
-      else setlength(containerstack, containercount * 2);
-    containerStack[containerCount] := container;
-    inc(containerCount);
-    result := container;
-  end;
-
-
-  var objectKey: string;
-      tempSeq: TXQValueSequence;
-
-  procedure pushValue(const v: ixqvalue);
-  var
-    hadResult: Boolean;
-  begin
-    case parsingPhase of
-      jppArrayExpectValue: begin
-        TXQValueJSONArray(currentContainer).add(v);
-        parsingPhase := jppArrayExpectComma;
-        if currentContainer.ClassType <> TXQValueJSONArray then raiseError(); //error needs to be raised last, or it can cause memory leaks
-      end;
-      jppObjectExpectValue: begin
-        TXQValueObject(currentContainer).setMutable(objectKey, v);
-        parsingPhase := jppObjectExpectComma;
-        if currentContainer.ClassType <> TXQValueObject then raiseError();
-      end;
-      jppRoot: begin
-        hadResult := (result <> nil);
-        xqvalueSeqConstruct(result, tempSeq, v);
-        if hadResult and not (pjoAllowMultipleTopLevelItems in options) then
-          raiseError();
-      end;
-      jppArrayExpectComma,
-      jppObjectExpectKey,
-      jppObjectExpectComma: raiseError('value not allowed');
-    end;
-  end;
-
-  procedure readObjectKey;
-  begin
-    //if not (scanner.CurToken in [tkString, tkIdentifier]) then raiseError('Expected property name');
-    objectKey := scanner.CurTokenString;
-    if nextToken <> tkColon then raiseError('Expected : between property name and value');
-    parsingPhase := jppObjectExpectValue;
-  end;
-
-
-var scannerOptions:  {$if FPC_FULLVERSION > 30000}TJSONOptions{$else}boolean{$endif};
-  i: Integer;
-begin
-  result := nil;
-  currentContainer := nil;
-  containerStack := nil;
-  containerCount := 0;
-  parsingPhase := jppRoot;
-  tempSeq := nil;
-  {$if FPC_FULLVERSION > 30000}
-  scannerOptions := [joUTF8];
-  if not (pjoLiberal in options) then include(scannerOptions, joStrict);
-  if pjoAllowTrailingComma in options then include(scannerOptions, joIgnoreTrailingComma);
-  {$else}
-  scannerOptions := true;
-  {$endif}
-  scanner := TJSONScanner.Create(data, scannerOptions);
-  try
-
-    nextToken;
-    while true do begin
-      case scanner.CurToken of
-        tkEOF: break;
-        tkString:
-          if parsingPhase = jppObjectExpectKey then readObjectKey
-          else pushValue(xqvalue(scanner.CurTokenString));
-        tkNumber: pushValue(parseNumber);
-        tkFalse: pushValue(xqvalueFalse);
-        tkTrue: pushValue(xqvalueTrue);
-        tkNull: pushValue(TXQValueJSONNull.create);
-
-        tkComma: case parsingPhase of
-          jppObjectExpectComma: parsingPhase := jppObjectExpectKey;
-          jppArrayExpectComma: parsingPhase := jppArrayExpectValue;
-          else raiseError();
-        end;
-        //tkColon,                 // ':'
-        tkCurlyBraceOpen: begin
-          pushValue(pushContainer(TXQValueObject.create()));
-          setCurrentContainer;
-          case nextToken of
-            tkCurlyBraceClose: popContainer;
-            else begin
-              parsingPhase := jppObjectExpectKey;
-              continue;
-            end;
-          end;
-        end;
-        tkCurlyBraceClose:
-          if (parsingPhase = jppObjectExpectComma) or ((parsingPhase = jppObjectExpectKey) and (pjoAllowTrailingComma in options)) then popContainer
-          else raiseError();
-        tkSquaredBraceOpen: begin
-          pushValue(pushContainer(TXQValueJSONArray.create()));
-          setCurrentContainer;
-          case nextToken of
-            tkSquaredBraceClose: popContainer;
-            else begin
-              parsingPhase := jppArrayExpectValue;
-              continue;
-            end;
-          end;
-        end;
-        tkSquaredBraceClose:
-          if (parsingPhase = jppArrayExpectComma) or ((parsingPhase = jppArrayExpectValue) and (pjoAllowTrailingComma in options)) then popContainer
-          else raiseError();
-        tkIdentifier:
-          if pjoLiberal in options then begin
-            if parsingPhase = jppObjectExpectKey then readObjectKey
-            else case scanner.CurTokenString of
-              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(getPosInf));
-              'NAN', 'NaN', 'nan': pushValue(xqvalue(getNaN));
-              else raiseError();
-            end;
-          end else raiseError();
-        //tkComment:
-        //tkUnknown
-        else raiseError();
-      end;
-      nextToken;
-    end;
-
-    if containerCount > 0 then begin
-      for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
-        if containerStack[i].ClassType = TXQValueJSONArray then TXQValueJSONArray(containerStack[i]).seq.clear
-        else TXQValueObject(containerStack[i]).values.clear;
-      raiseError('unclosed');
-    end;
-
-    if result = nil then result := xqvalue;
-  finally
-    //for i := 0 to containerCount - 1 do containerStack[i]._Release;
-    scanner.free;
-  end;
-end;
-
-
-function xqFunctionParseJsonX({%H-}argc: SizeInt; args: PIXQValue; defaults: TParseJSONOptions): IXQValue; //must be simple due to being in retrieve
-var
-  options: TParseJSONOptions;
-  procedure setOption(const name: string; option: TParseJSONOption);
-  var value: IXQValue;
-    active: Boolean;
-  begin
-    value := args[1].getProperty(name);
-    if (value.getSequenceCount > 0) then begin
-      if (value.getSequenceCount >= 2) or not (value.get(1).instanceOf(baseSchema.boolean)) then
-        raise EXQEvaluationException.create('jerr:JNTY0020', 'Expected true/false got: '+value.toXQuery()+' for property ' + name);
-      active := value.toBoolean;
-    end else active := option in defaults;
-    if active then Include(options, option)
-    else Exclude(options, option);
-  end;
-begin
-  options := defaults;
-  if (argc = 2) and (args[1].kind = pvkObject) then begin
-    setOption('jsoniq-multiple-top-level-items', pjoAllowMultipleTopLevelItems);
-    setOption('trailing-comma', pjoAllowTrailingComma);
-    setOption('liberal', pjoLiberal);
-  end;
-
-  result := parseJSON(args[0].toString, options);
-end;
-
 function xqFunctionParseJson({%H-}argc: SizeInt; args: PIXQValue): IXQValue; overload;//must be simple due to being in retrieve
+var
+  parser: TXQJsonParser;
 begin
-  result := xqFunctionParseJsonX(argc, args, [pjoAllowMultipleTopLevelItems]);
+  parser.options := [jpoAllowMultipleTopLevelItems, jpoJSONiq];
+  result := parser.parse(argc, args);
 end;
 
 function xqFunctionSerialize_Json({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -366,38 +115,37 @@ begin
   result := xqvalue(a.jsonSerialize(tnsXML));
 end;
 
-function xqFunctionJSON_DocX(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; defaults: TParseJSONOptions): IXQValue;
+function xqFunctionJSON_Doc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
   data: String;
   contenttype: string;
-  temp: array[0..1] of IXQValue;
+  parser: TXQJsonParser;
 begin
   url := args[0].toString;
   if url = '' then exit(xqvalue);
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
-  temp[0] := xqvalue(data);
-  if argc = 2 then temp[1] := args[1];
-  result := xqFunctionParseJsonX(argc, @temp[0], defaults);
+  parser.options := [jpoAllowMultipleTopLevelItems, jpoJSONiq];
+  if argc = 2 then parser.setConfigFromMap(args[1]);
+
+  result := parser.parse(data);
 end;
 
-function xqFunctionJSON_Doc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-begin
-  result := xqFunctionJSON_DocX(context, argc, args, [pjoAllowMultipleTopLevelItems]);
-end;
 
-function xqFunctionJSON(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionJSON(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  s: String;
-const defaults: TParseJSONOptions = [pjoAllowMultipleTopLevelItems, pjoLiberal, pjoAllowTrailingComma];
+  parser: TXQJsonParser;
+  s, url, contenttype, data: String;
 begin
+  parser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
+  if argc = 2 then parser.setConfigFromMap(args[1]);
   s := args[0].toString;
-  if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then
-     result := xqFunctionJSON_DocX(context, argc, args, defaults)
-   else
-     result := xqFunctionParseJsonX(argc, args, defaults);
+  if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then begin
+    data := context.staticContext.retrieveFromURI(s, contenttype, 'FODC0002');
+  end else data := s;
+  result := parser.parse(data);
 end;
 
 function xqFunctionKeys({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -444,7 +192,7 @@ begin
 end;
 
 
-var jn, pxp, libjn, fn3_1: TXQNativeModule;
+var jn, pxp, libjn: TXQNativeModule;
     XMLNamespace_JSONiqFunctions, XMLNamespace_JSONiqLibraryFunctions: INamespace;
 
 initialization
@@ -477,11 +225,6 @@ initialization
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*', '($arg as xs:string, $options as object()) as item()*'], [xqcdContextOther]);
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
-  fn3_1 := TXQueryEngine.findNativeModule(XMLNamespaceURL_XPathFunctions);
-  while length(fn3_1.parents) > 0 do fn3_1 := fn3_1.parents[0];
-  //todo: check 3.1 semantics (e.g. null => ())
-  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, ['($href as xs:string?) as item()?', { '($href as xs:string?, $options as map(*)) as item()?',} '($href as xs:string?, $options as object()) as item()?']);
-  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, ['($json-text as xs:string?) as item()?', { '($json-text as xs:string?, $options as map(*)) as item()?',} '($json-text as xs:string?, $options as object()) as item()?']);
 
 
   XMLNamespace_JSONiqLibraryFunctions:=TNamespace.make('http://jsoniq.org/function-library', 'libjn');
