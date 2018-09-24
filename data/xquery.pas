@@ -2988,6 +2988,17 @@ type
     function parse(const data: string): IXQValue;
     class function parse(const data: string; someOptions: TOptions): IXQValue; static;
   end;
+  TXQBatchFunctionCall = record
+    tempcontext: TXQEvaluationContext;
+    func: TXQValueFunction;
+    stack: TXQEvaluationStack;
+    stacksize: Integer;
+    procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
+    procedure done;
+    function call(): IXQValue; inline;
+    function call1(const v: IXQValue): IXQValue;
+    function call2(const v, w: IXQValue): IXQValue;
+  end;
 
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -3941,6 +3952,45 @@ begin
   result := xqvalue(temp);
 end;
 
+procedure TXQBatchFunctionCall.init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
+var
+  i: Integer;
+begin
+  func := f as TXQValueFunction;
+  stack := outerContext.temporaryVariables;
+  stacksize := stack.Count;
+  tempcontext := func.context;
+  tempcontext.temporaryVariables := outerContext.temporaryVariables;
+  tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
+  for i := 0 to high(func.parameters) do
+    stack.push(f);
+  func.contextOverrideParameterNames(tempcontext, length(func.parameters));
+end;
+
+procedure TXQBatchFunctionCall.done;
+begin
+  stack.popTo(stackSize);
+end;
+
+function TXQBatchFunctionCall.call(): IXQValue; inline;
+begin
+  result := func.evaluateInContext(tempcontext, nil);
+end;
+
+function TXQBatchFunctionCall.call1(const v: IXQValue): IXQValue;
+begin
+  stack.topptr(0)^ := v;
+  result := func.evaluateInContext(tempcontext, nil);
+end;
+
+function TXQBatchFunctionCall.call2(const v, w: IXQValue): IXQValue;
+begin
+  stack.topptr(1)^ := v;
+  stack.topptr(0)^ := w;
+  result := func.evaluateInContext(tempcontext, nil);
+end;
+
+
 procedure TXQMapDuplicateResolveHelper.setFromString(const s: string);
 begin
   case s of
@@ -4150,29 +4200,58 @@ var containerStack: array of TXQValue;
   end;
 
   function escapeAll(s: string): string;
+  var sb: TStrBuilder;
+    cp: Integer;
   begin
     result := '';
-    result := s;
-    //todo;
+    sb.init(@result, length(s));
+    for cp in strIterator(s) do
+      case cp of
+        $20..ord('\')-1, ord('\')+1..$D7FF, $E000..$FFFD, $10000..$10FFFF: sb.appendCodePoint(cp);
+        ord('\'): sb.append('\\');
+        9: sb.append('\t');
+        10: sb.append('\n');
+        13: sb.append('\r');
+        8: sb.append('\b');
+        else if cp <= $FFFF then begin
+          sb.append('\u');
+          sb.append(IntToHex(cp, 4));
+        end;
+      end;
+    sb.final;
   end;
   function escapeInvalid(s: string): string;
-  var orig: string;
+  var sb: TStrBuilder;
+    cp: Integer;
   begin
     result := '';
-    result := s;
-    //todo;
+    sb.init(@result, length(s));
+    for cp in strIterator(s) do
+      if isValidXMLCharacter(cp) then sb.appendCodePoint(cp)
+      else sb.appendCodePoint($FFFD);
+    sb.final;
   end;
   function escapeInvalidCallback(s: string): string;
-  var orig: string;
+  var sb: TStrBuilder;
+      f: TXQBatchFunctionCall;
+      cp: Integer;
+
   begin
     result := '';
-    result := s;
-    //todo;
+    f.init(context^, escapeFunction);
+    sb.init(@result, length(s));
+    for cp in strIterator(s) do
+      if isValidXMLCharacter(cp) then sb.appendCodePoint(cp)
+      else begin
+        f.stack.topptr(0)^ := xqvalue('\u'+IntToHex(cp, 4));
+        sb.append(f.call().toString);
+      end;
+    sb.final;
   end;
 
   function readString: string;
-  const SUSPICIOUS_CHARS_NORMAL = [#0..#8, #11, #12, #14..#$1F, #$80..#$C1, #$F4..#$FF];
-  const SUSPICIOUS_CHARS_ESCAPE = [#0..#$1F, '\', #$80..#$C1, #$F4..#$FF];
+  const SUSPICIOUS_CHARS_NORMAL = [#0..#8, #11, #12, #14..#$1F, #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
+  const SUSPICIOUS_CHARS_ESCAPE = [#0..#$1F, '\', #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
   var
     c: Char;
     suspicious: Boolean;
@@ -4192,7 +4271,7 @@ var containerStack: array of TXQValue;
     end;
     if not suspicious then exit;
     if jpoEscapeCharacters in options then result := escapeAll(result)
-    else if escapeFunction = nil then result := escapeInvalid(result)
+    else if (context = nil) or (escapeFunction = nil)  then result := escapeInvalid(result)
     else result := escapeInvalidCallback(result)
   end;
 

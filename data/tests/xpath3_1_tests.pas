@@ -90,6 +90,9 @@ begin
   t('sort(("zzz", "aaa", "a", "tt"), default-collation(), function($x){string-length($x)})', 'a tt zzz aaa');
 
   t('serialize-json(parse-json("[1,2,{""foo"": 123}]"))', '[1, 2, {"foo": 123}]');
+  t('parse-json("[""ab\u0007cd"", null, 123]") ? *', 'ab'#7'cd 123');
+  t('parse-json("[""ab\u0007cd"", null, 123]", map {"escape": true()} ) ? *', 'ab\u0007cd 123');
+  t('parse-json("[1,]", map {"liberal": true()} ) ? *', '1');
 
   t('array{0 to 2, 7}!(?2,":",?*,":",?(1+2,1))', '1 : 0 1 2 7 : 2 0');
   t('let $a := array{0 to 2, 7} return ($a?2, ":", $a?*, ":", $a?(1+2,1))', '1 : 0 1 2 7 : 2 0');
@@ -153,6 +156,8 @@ begin
   t('(deep-equal([1,2], [1,2]), deep-equal([], [()]), deep-equal([], [[]]))', 'true false false');
 
   t('``[foobar`{1+2+3}``{"a","b","c"}`xyz`{}`]``', 'foobar6a b cxyz');
+
+
 
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;

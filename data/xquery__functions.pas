@@ -3962,54 +3962,6 @@ begin
   result := xqvalue(length(f.parameters));
 end;
 
-type TBatchFunctionCall = record
-  tempcontext: TXQEvaluationContext;
-  func: TXQValueFunction;
-  stack: TXQEvaluationStack;
-  stacksize: Integer;
-  procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
-  procedure done;
-  function call(): IXQValue; inline;
-  function call1(const v: IXQValue): IXQValue;
-  function call2(const v, w: IXQValue): IXQValue;
-end;
-procedure TBatchFunctionCall.init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
-var
-  i: Integer;
-begin
-  func := f as TXQValueFunction;
-  stack := outerContext.temporaryVariables;
-  stacksize := stack.Count;
-  tempcontext := func.context;
-  tempcontext.temporaryVariables := outerContext.temporaryVariables;
-  tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
-  for i := 0 to high(func.parameters) do
-    stack.push(f);
-  func.contextOverrideParameterNames(tempcontext, length(func.parameters));
-end;
-
-procedure TBatchFunctionCall.done;
-begin
-  stack.popTo(stackSize);
-end;
-
-function TBatchFunctionCall.call(): IXQValue; inline;
-begin
-  result := func.evaluateInContext(tempcontext, nil);
-end;
-
-function TBatchFunctionCall.call1(const v: IXQValue): IXQValue;
-begin
-  stack.topptr(0)^ := v;
-  result := func.evaluateInContext(tempcontext, nil);
-end;
-
-function TBatchFunctionCall.call2(const v, w: IXQValue): IXQValue;
-begin
-  stack.topptr(1)^ := v;
-  stack.topptr(0)^ := w;
-  result := func.evaluateInContext(tempcontext, nil);
-end;
 
 
 procedure foldLeft(const context: TXQEvaluationContext; const iter: TXQValueEnumeratorPtrUnsafe; stack: TXQEvaluationStack; func: TXQValueFunction);
@@ -6074,7 +6026,7 @@ function xqFunctionArrayFor_each(const context: TXQEvaluationContext; argc: Size
 var
   list: TXQVList;
   a: TXQValueJSONArray;
-  f: TBatchFunctionCall;
+  f: TXQBatchFunctionCall;
   pv: PIXQValue;
 begin
   a := (argv^ as TXQValueJSONArray);
@@ -6090,7 +6042,7 @@ function xqFunctionArrayFilter(const context: TXQEvaluationContext; argc: SizeIn
 var
   list: TXQVList;
   a: TXQValueJSONArray;
-  f: TBatchFunctionCall;
+  f: TXQBatchFunctionCall;
   pv: PIXQValue;
 begin
   a := (argv^ as TXQValueJSONArray);
@@ -6106,7 +6058,7 @@ end;
 function xqFunctionArrayFold_left(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
-  f: TBatchFunctionCall;
+  f: TXQBatchFunctionCall;
 begin
   a := (argv^ as TXQValueJSONArray);
   f.init(context, argv[2]);
@@ -6118,7 +6070,7 @@ end;
 
 function xqFunctionArrayFold_right(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  f: TBatchFunctionCall;
+  f: TXQBatchFunctionCall;
   list: TXQVList;
   i: Integer;
 begin
@@ -6139,7 +6091,7 @@ var
   i: Integer;
   a, b: TXQValueJSONArray;
   count: Int64;
-  f: TBatchFunctionCall;
+  f: TXQBatchFunctionCall;
   iter1, iter2: TXQValueEnumeratorPtrUnsafe;
 begin
   a := argv[0] as TXQValueJSONArray;
@@ -6318,7 +6270,7 @@ begin
 end;
 
 function xqFunctionMapFor_Each(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
-var f: TBatchFunctionCall;
+var f: TXQBatchFunctionCall;
     l: TXQVList;
     pp: TXQProperty;
 begin
