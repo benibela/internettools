@@ -1801,15 +1801,6 @@ begin
 end;
 {$ImplicitExceptions on}
 
-function isValidXMLCharacter(const codepoint: integer): boolean; inline;
-begin
-  case codepoint of
-    $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: result := true;
-    $1..$1F: result := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
-    else result := false;
-  end;
-end;
-
 
 function strIsUtf8Encoded(const s: RawByteString): boolean; inline;
 begin
@@ -6347,6 +6338,7 @@ function xqFunctionParseJson(const context: TXQEvaluationContext; argc: SizeInt;
 var
   parser: TXQJsonParser;
 begin
+  parser.init;
   parser.context := @context;
   result := parser.parse(argc, args);
 end;
@@ -6360,8 +6352,9 @@ begin
   if args[0].isUndefined then exit(args[0]);
   data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FODC0002');
 
+  parser.init;
   parser.context := @context;
-  result := parser.parse(argc, args);
+  result := parser.parse(data);
 end;
 
 

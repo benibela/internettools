@@ -1776,6 +1776,16 @@ begin
   Result:=true;
 end;
 
+function isValidXMLCharacter(const codepoint: integer): boolean; inline;
+begin
+  case codepoint of
+    $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: result := true;
+    $1..$1F: result := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
+    else result := false;
+  end;
+end;
+
+
 function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
 begin
   if (node = nil) then exit('');

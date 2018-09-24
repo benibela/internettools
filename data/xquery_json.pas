@@ -103,6 +103,7 @@ function xqFunctionParseJson({%H-}argc: SizeInt; args: PIXQValue): IXQValue; ove
 var
   parser: TXQJsonParser;
 begin
+  parser.init;
   parser.options := [jpoAllowMultipleTopLevelItems, jpoJSONiq];
   result := parser.parse(argc, args);
 end;
@@ -127,6 +128,7 @@ begin
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
+  parser.init;
   parser.options := [jpoAllowMultipleTopLevelItems, jpoJSONiq];
   if argc = 2 then parser.setConfigFromMap(args[1]);
 
@@ -139,6 +141,7 @@ var
   parser: TXQJsonParser;
   s, url, contenttype, data: String;
 begin
+  parser.init;
   parser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
   if argc = 2 then parser.setConfigFromMap(args[1]);
   s := args[0].toString;
