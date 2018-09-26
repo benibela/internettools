@@ -4241,7 +4241,11 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
             if isAnonymousFunction then raiseParsingError('XQST0125', 'anonymous functions cannot be public or private');
           end;
           XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance,
-          XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath: raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
+          XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath:
+            raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
+          XMLNamespaceURL_XPathFunctionsArray, XMLNamespaceURL_XPathFunctionsMap:
+            if staticContext.model in PARSING_MODEL3_1 then
+              raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
         end;
       end;
     end;
