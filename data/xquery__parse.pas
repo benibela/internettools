@@ -1716,10 +1716,9 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
         '{': if (pos+1)^ <> '{' then begin
           if mustBeLiteral then raiseParsingError('XQST0022', 'Enclosed expression not allowed') ;
           pos += 1;
-          temp := parsePrimaryLevel;
+          temp := parseOptionalExpr31;
           if objInheritsFrom(temp, TXQTermConstructor) then parent.push(TXQTermSequence.Create().push([temp]))
           else parent.push(temp);
-          expect('}');
           atBoundary := (border = '<') and staticContext.stripBoundarySpace;
         end else begin
           pushElementContent('{');
@@ -2441,7 +2440,7 @@ function TXQParsingContext.parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
 begin
   if not (parsingModel in PARSING_MODEL3_1) then raiseSyntaxError('Need 3.1');
   inc(pos);
-  result := TXQTermJSONLookup.create(expr = nil);
+  result := TXQTermJSONLookup.create(expr = nil); //todo: memory leak?
   if expr <> nil then result.push(expr);
   skipWhitespaceAndComment();
   case pos^ of
@@ -2454,9 +2453,14 @@ begin
       inc(pos);
     end;
     '(': begin
-      inc(pos);
-      result.push(parsePrimaryLevel); //todo: memory leak?
       result.mode := xqtjlmParenthesized;
+      inc(pos);
+      skipWhitespaceAndComment();
+      if pos^ <> ')' then
+        result.push(parsePrimaryLevel)
+      else
+        result.push(TXQTermSequence.create());
+
       expect(')');
     end;
     else begin
