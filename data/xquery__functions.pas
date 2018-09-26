@@ -4274,7 +4274,7 @@ begin
     case args[1].kind of
       pvkObject: params.setFromMap(args[1]);
       pvkNode: params.setFromNode(args[1].toNode);
-      else raiseXPTY0004TypeError(args[1], 'serialize params must be map() or node');
+      else if args[1].getSequenceCount > 0 then raiseXPTY0004TypeError(args[1], 'serialize params must be map() or node');
     end;
 
   firstElement := nil;
