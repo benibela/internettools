@@ -342,7 +342,7 @@ begin
     if source = nil then raiseTypeError0004('No context item');
   end else source := children[0].evaluate(context);
   keys := nil;
-  if mode = xqtjlmParenthesized then keys := children[high(children)].evaluate(context);
+  if mode = xqtjlmParenthesized then keys := xqvalueAtomize(children[high(children)].evaluate(context));
   result := nil;
   seq := nil;
   for pv in source.GetEnumeratorPtrUnsafe do begin
@@ -355,14 +355,14 @@ begin
           xqtjlmName: raiseInvalidKey('XPTY0004');
           xqtjlmParenthesized:
             for pk in keys.GetEnumeratorPtrUnsafe do begin
-              if not pk^.instanceOf(baseSchema.integer) then raiseInvalidKey('XPTY0004');
+              if not pk^.instanceOf(baseSchema.integer) and not pk^.instanceOf(baseSchema.untypedAtomic)  then raiseInvalidKey('XPTY0004');
               i := pk^.toInt64;
               if (i >= 1) and (i <= ar.seq.Count) then xqvalueSeqConstruct(result, seq, ar.seq[i - 1])
               else raiseInvalidKey('FOAY0001');
             end;
-            xqtjlmWild:
-              for pw in ar.GetEnumeratorMembersPtrUnsafe do
-                xqvalueSeqConstruct(result, seq, pw^);
+          xqtjlmWild:
+            for pw in ar.GetEnumeratorMembersPtrUnsafe do
+              xqvalueSeqConstruct(result, seq, pw^);
         end;
       end;
       pvkObject: begin
