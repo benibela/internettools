@@ -4431,6 +4431,10 @@ end;
 function TXQTermDefineFunction.getContextDependencies: TXQContextDependencies;
 begin
   result := ALL_CONTEXT_DEPENDENCIES - ALL_CONTEXT_DEPENDENCIES_FOCUS;
+  case kind of
+    xqtdfStaticPartialApplication: result += children[high(children)].getContextDependencies;
+    xqtdfDynamicPartialApplication: result += children[0].getContextDependencies;
+  end;
 end;
 
 function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
