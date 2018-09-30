@@ -3006,7 +3006,10 @@ type
     func: TXQValueFunction;
     stack: TXQEvaluationStack;
     stacksize: Integer;
-    procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
+    //prepares calls to f on outerContext.
+    //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
+    //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
+    procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
     procedure done;
     function call(): IXQValue; inline;
     function call1(const v: IXQValue): IXQValue;
@@ -3965,18 +3968,20 @@ begin
   result := xqvalue(temp);
 end;
 
-procedure TXQBatchFunctionCall.init(const outerContext: TXQEvaluationContext; const f: ixqvalue);
+procedure TXQBatchFunctionCall.init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue);
 var
   i: Integer;
 begin
-  func := f as TXQValueFunction;
+  func := f.toValue as TXQValueFunction;
   stack := outerContext.temporaryVariables;
   stacksize := stack.Count;
   tempcontext := func.context;
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
   tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
-  for i := 0 to high(func.parameters) do
-    stack.push(f);
+  if def = nil then begin
+    for i := 0 to high(func.parameters) do
+      stack.push(f);
+  end else for i := 0 to high(func.parameters) do stack.push(def);
   func.contextOverrideParameterNames(tempcontext, length(func.parameters));
 end;
 

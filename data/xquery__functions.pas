@@ -3964,49 +3964,45 @@ end;
 
 
 
-procedure foldLeft(const context: TXQEvaluationContext; const iter: TXQValueEnumeratorPtrUnsafe; stack: TXQEvaluationStack; func: TXQValueFunction);
+procedure foldLeft(var f: TXQBatchFunctionCall; const iter: TXQValueEnumeratorPtrUnsafe);
 var
   v: PIXQValue;
 begin
   //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
-  for v in iter do begin
-    stack.topptr(0)^ := v^;
-    stack.topptr(1)^ := func.evaluate(context, nil);
-  end;
+  with f do
+    for v in iter do begin
+      stack.topptr(0)^ := v^;
+      stack.topptr(1)^ := call();
+    end;
   //result is stack.topptr(1)^
 end;
 
 function xqFunctionFold(const context: TXQEvaluationContext; left: boolean; args: PIXQValue): IXQValue;
 var
-  func: TXQValueFunction;
   count: Integer;
-  i, stacksize: Integer;
-  stack: TXQEvaluationStack;
+  i: Integer;
   seq: IXQValue;
+  f: TXQBatchFunctionCall;
 begin
-  func := args[2] as TXQValueFunction;
   count := args[0].getSequenceCount;
   if count = 0 then exit(args[1]);
 
-  stack := context.temporaryVariables;
-  stacksize := stack.Count;
-
   seq := args[0];
-  stack.push(args[1]);
-  stack.push(stack.top);
-  func.contextOverrideParameterNames(context, 2);
-  if left then begin
-    foldLeft(context, seq.GetEnumeratorPtrUnsafe, stack, func);
-    result := stack.topptr(1)^;
-  end else begin
-    // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
-    for i := count downto 1 do begin
-      stack.topptr(1)^ := seq.get(i);
-      stack.topptr(0)^ := func.evaluate(context, nil);
+  with f do begin
+    init(context, args[2], args[1]);
+    if left then begin
+      foldLeft(f, seq.GetEnumeratorPtrUnsafe);
+      result := stack.topptr(1)^;
+    end else begin
+      // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
+      for i := count downto 1 do begin
+        stack.topptr(1)^ := seq.get(i);
+        stack.topptr(0)^ := call();
+      end;
+      result := f.stack.topptr(0)^;
     end;
-    result := stack.topptr(0)^;
+    done;
   end;
-  stack.popTo(stacksize);
 end;
 
 
@@ -6061,9 +6057,8 @@ var
   f: TXQBatchFunctionCall;
 begin
   a := (argv^ as TXQValueJSONArray);
-  f.init(context, argv[2]);
-  f.stack.topptr(1)^ := argv[1];
-  foldLeft(context, a.GetEnumeratorMembersPtrUnsafe, f.stack, f.func);
+  f.init(context, argv[2], argv[1]);
+  foldLeft(f, a.GetEnumeratorMembersPtrUnsafe);
   result := f.stack.topptr(1)^;
   f.done;
 end;
