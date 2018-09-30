@@ -2975,8 +2975,21 @@ type
   end;
 
   TXQJsonParser = object
-    type TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
-         TOptions = set of TOption;
+    type
+    //**Parsing options
+    //**@value jpoAllowMultipleTopLevelItems allow @code([], [], {}) as input
+    //**@value jpoLiberal             does not set joStrict for fpc's json scanner
+    //**@value jpoAllowTrailingComma  sets joIgnoreTrailingComma for fpc's json scanner
+    //**@value jpoEscapeCharacters    escapes characters for XPath/XQuery 3.1, e.g. return strings with \n or \uxxxx
+    //**@value jpoJSONiq              change from XPath/XQuery 3.1 parsing mode to JSONiq:
+    //**       @table(
+    //**       @rowHead(@cell(input)   @cell(XPath/XQuery 3.1)    @cell(  JSONiq))
+    //**       @row(@cell(number)      @cell(double  )            @cell(  int, decimal, double))
+    //**       @row(@cell(null)        @cell(empty sequence, () ) @cell(  null          ))
+    //**       @row(@cell(invalid)     @cell(err:FOJS0001)        @cell(  jerr:JNDY0021))
+    //**       )
+    TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
+    TOptions = set of TOption;
   public
     context: PXQEvaluationContext;
     options: TOptions;
