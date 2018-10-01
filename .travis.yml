@@ -31,8 +31,8 @@ before_install:
   - ld -v
   - sudo apt-get install binutils-2.26
   - ld -v
-  - ln -sf /usr/lib/binutils-2.26/bin/* /usr/bin/
-  - ln -sf /usr/lib/binutils-2.26/ldscripts/* /usr/lib/ldscripts/
+  - sudo ln -sf /usr/lib/binutils-2.26/bin/* /usr/bin/
+  - sudo ln -sf /usr/lib/binutils-2.26/ldscripts/* /usr/lib/ldscripts/
   - ld -v
   
 install:
