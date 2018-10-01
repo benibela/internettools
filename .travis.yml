@@ -27,6 +27,7 @@ matrix:
 before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &
+  - sudo apt-get update
 
 install:
   - git clone https://github.com/benibela/travis-lazarus travis-lazarus
