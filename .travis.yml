@@ -28,7 +28,10 @@ before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &
   - sudo apt-get update
-
+  - ld -v
+  - sudo apt-get install binutils-2.26
+  - ld -v
+  
 install:
   - git clone https://github.com/benibela/travis-lazarus travis-lazarus
   - travis-lazarus/.travis.install.py
