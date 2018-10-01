@@ -59,9 +59,9 @@ script:
   - if [[ "$LAZ_ENV" != qemu-arm ]]; then lazbuild $LAZ_OPT data/examples/xqueryExampleGUI.lpi; fi
   - if [[ "$LAZ_ENV" != qemu-arm ]]; then lazbuild $LAZ_OPT internet/examples/autoupdatetest.lpi; fi
   - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/tests/tests.lpr 
-  - delp -r .
+  - find -name "*.o" -or -name "*.ppu" -or -name "*.ppw" | xargs rm
   - fpc -O3 -gl $FPCSEARCHPATHS $FPC_OPT data/examples/xqueryExample.pas
-  - delp -r .
+  - find -name "*.o" -or -name "*.ppu" -or -name "*.ppw" | xargs rm
   - fpc -O4 -gl $FPCSEARCHPATHS -Furcmdline $FPC_OPT data/examples/QT3testsuite.lpr
   - $LAZ_ENV data/tests/tests
 
