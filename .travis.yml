@@ -28,12 +28,9 @@ before_install:
   # Start virtual display server
   - Xvfb $DISPLAY &
   - sudo apt-get update
-  - ld -v
   - sudo apt-get install binutils-2.26
-  - ld -v
   - sudo ln -sf /usr/lib/binutils-2.26/bin/* /usr/bin/
   - sudo ln -sf /usr/lib/binutils-2.26/ldscripts/* /usr/lib/ldscripts/
-  - ld -v
   
 install:
   - git clone https://github.com/benibela/travis-lazarus travis-lazarus
@@ -62,8 +59,8 @@ script:
   - if [[ "$LAZ_ENV" != qemu-arm ]]; then lazbuild $LAZ_OPT data/examples/xqueryExampleGUI.lpi; fi
   - if [[ "$LAZ_ENV" != qemu-arm ]]; then lazbuild $LAZ_OPT internet/examples/autoupdatetest.lpi; fi
   - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/tests/tests.lpr 
-  - fpc -O2 -gl $FPCSEARCHPATHS $FPC_OPT data/examples/xqueryExample.pas
-  - fpc -O2 -gl $FPCSEARCHPATHS -Furcmdline $FPC_OPT data/examples/QT3testsuite.lpr
+  - fpc -O3 -gl $FPCSEARCHPATHS $FPC_OPT data/examples/xqueryExample.pas
+  - fpc -O4 -gl $FPCSEARCHPATHS -Furcmdline $FPC_OPT data/examples/QT3testsuite.lpr
   - $LAZ_ENV data/tests/tests
 
 notifications:
