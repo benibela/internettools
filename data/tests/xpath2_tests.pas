@@ -4122,6 +4122,7 @@ begin
   t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"></head><body><meta name="d"></body></html>', '<meta name="a"><meta name="b"/></head><meta name="c"><body><meta name="d"></body></html>');
   t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"><meta name="d"></head><body></body></html>', '<meta name="a"><meta name="b"/></head><meta name="c"><meta name="d"></body></html>');
   t('outer-html(/)', '<html><head><meta name="a"><meta name="b"><meta name="c"></head><body>foobar<meta name="d"></body></html>', '<meta name="a"><meta name="b"/></head><meta name="c">foobar<meta name="d"></body></html>');
+  t('string-join(/html/head/meta/inner-text(), "")', '');
   t('outer-html(/)', '<html><head><meta name="a"></head><body><unknown><meta name="b"><meta name="c">foobar<meta name="d"></unknown></body></html>', '<meta name="a"><unknown><meta name="b"/></head><meta name="c">foobar<meta name="d"></body></html>');
   t('outer-html(/)', '<html><head></head><body>empty</body></html>', 'empty');
   t('outer-html(/)', '<html><head></head><body>empty</body></html>', '<body>empty</body>');

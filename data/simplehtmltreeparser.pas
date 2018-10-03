@@ -1503,8 +1503,10 @@ begin
         else skipElement := false;
       end;
       if not skipElement then skipElement := CSSHasHiddenStyle(cur['style']);
-      if skipElement then cur := cur.reverse
-      else begin
+      if skipElement then begin
+        cur := cur.reverse;
+        continue;
+      end else begin
         case cur.hash of
           HTMLNodeNameHashs.br: if striEqual(cur.value, 'br') then builder.append(#10);
           HTMLNodeNameHashs.td: if striEqual(cur.value, 'td') then builder.append(#9);
