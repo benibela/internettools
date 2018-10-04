@@ -2055,6 +2055,7 @@ begin
   case from of
      CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII: case toCPActual of
         CP_WINDOWS1252, CP_LATIN1, CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII: begin
+          strConvert := '';
           convertExtendedUnicode();
           exit;
         end;

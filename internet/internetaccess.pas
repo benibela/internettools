@@ -1184,13 +1184,11 @@ procedure TInternetAccess.enumerateAdditionalHeaders(const target: TDecodedUrl; 
   end;
 
 var
-  hadHeader: array[THeaderKind] of Boolean;
+  hadHeader: array[THeaderKind] of Boolean = (false, false, false, false, false, false, false, false);
   i: Integer;
   kind: THeaderKind;
   temp: String;
 begin
-  FillChar(hadHeader{%H-}, sizeof(hadHeader), 0);
-
   for i := 0 to additionalHeaders.Count - 1 do begin
      kind := parseHeaderLineKind(additionalHeaders[i]);
      hadHeader[kind] := true;

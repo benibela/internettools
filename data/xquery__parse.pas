@@ -248,7 +248,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitVariable(pt: PXQTerm);
   var v: TXQTermVariable;
     q: TXQuery;
-    replacement: TXQTermVariableGlobal;
+    replacement: TXQTermVariableGlobal = nil;
     declaration: TXQTermDefineVariable;
   begin
     v := TXQTermVariable(pt^);
@@ -380,7 +380,7 @@ var
     v: TXQTermVariable;
 
 var oldContext: TXQStaticContext;
-    oldLastVarIndex: integer;
+    oldLastVarIndex: integer = -1;
   procedure goToNewContext(nc: TXQStaticContext);
   begin
     oldLastVarIndex := lastVariableIndex;
@@ -915,6 +915,7 @@ begin
     xqlenNone:  result := s;
     xqlenXML1:  result := strNormalizeLineEndings(s);
     xqlenXML11: result := strNormalizeLineEndingsUTF8(s);
+    else result := s;
   end;
 end;
 
@@ -1009,8 +1010,10 @@ procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQP
   procedure parseEQNameToStep;
   var
     namespaceUrl, namespacePrefix, local: string;
+    temp: TXQNamespaceMode;
   begin
-    case nextTokenEQName(namespaceUrl, namespacePrefix, local) of
+    temp := nextTokenEQName(namespaceUrl, namespacePrefix, local);
+    case temp of
       xqnmPrefix: begin
         kindTest.namespaceURLOrPrefix := namespacePrefix;
         kindTest.matching += [qmCheckNamespacePrefix];
@@ -2912,20 +2915,20 @@ var astroot: TXQTerm;
       replace^ := parseFunctionCall(funcCall)
     end;
 
-  var res: TXQTermBinaryOp;
-    procedure createBinOpTerm;
+    function createBinOpTerm: TXQTermBinaryOp;
     begin
-      res := TXQTermBinaryOp.Create(opinfo);
-      res.push(replace^);
-      replace^ := res;
+      result := TXQTermBinaryOp.Create(opinfo);
+      result.push(replace^);
+      replace^ := result;
     end;
 
+  var res: TXQTermBinaryOp;
     procedure handleCastStrangeness;
     var
       st: TXQTermSequenceType;
       isCast: Boolean;
     begin
-      createBinOpTerm;
+      res := createBinOpTerm;
       expect(res.op.followedBy); //assume we read instance of/cast/castable/treat as
       isCast := ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs));
       if isCast then st := parseSequenceType([xqstIsCast])
@@ -2948,7 +2951,7 @@ var astroot: TXQTerm;
       else if opinfo.name = '=>' then handleArrowOperator
       else raiseSyntaxError('20180922 Unknown operator');
     end else begin
-      createBinOpTerm;
+      res := createBinOpTerm;
       res.push(parseValue());
     end;
   end;

@@ -2389,7 +2389,7 @@ function guessDateFormat(const d: string): string;
 var state: (gdfsFirstDigits, gdfsFirstSeparator, gdfsMiddleDigits, gdfsMiddleLetters, gdfsSecondSeparator);
   i, start: Integer;
   builder: TStrBuilder;
-  direction: (gdfsYMD, gdfsDMY);
+  direction: (gdfsYMD, gdfsDMY) = gdfsYMD;
 begin
   state := gdfsFirstDigits;
   builder.init(@result, 10);

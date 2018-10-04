@@ -82,7 +82,7 @@ const UsingFLRE = {$IFDEF USE_FLRE}true{$ELSE}false{$endif} ;
 
 implementation
 
-uses math, simplehtmltreeparser, strutils;
+uses math, simplehtmltreeparser;
 
 {$IFDEF USE_FLRE_WITH_CACHE}
 var flreCache: TFLRECacheHashMap;
@@ -1049,6 +1049,7 @@ end;
 initialization
   flreCache := TFLRECacheHashMap.Create;
   flreCacheList := TFPList.Create;
+  flreCacheLock := default(TRTLCriticalSection);
   InitCriticalSection(flreCacheLock);
 
 finalization
