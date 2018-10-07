@@ -3831,6 +3831,7 @@ var
     while subcontext^.findNamespace(result, xqdnkAny) <> nil do result += 'X';
   end;
 
+  var previousValueWasAtomic: boolean;
   procedure addNodeAsKid;
   var
     doc: TTreeNode;
@@ -3840,6 +3841,7 @@ var
     namespaceIndex: Integer;
   begin
     kid.parent := tree;
+    previousValueWasAtomic := false;
     case kid.typ of
       tetAttribute: begin
         if (kid.namespace <> nil) and (kid.namespace.getPrefix <> '') then begin
@@ -3907,7 +3909,7 @@ var
     end;
   end;
 
-  procedure addValue(const v: IXQValue; firstAtomic: boolean = true);
+  procedure addValue(const v: IXQValue);
   var temp: TTreeNode;
       i: integer;
       tempNamespaces: TNamespaceList;
@@ -3970,25 +3972,27 @@ var
         end;
         addNodeAsKid;
       end;
-      pvkSequence: begin
-        firstAtomic := true;
-        for x in v.GetEnumeratorPtrUnsafe do begin
-          addValue(x^, firstAtomic);
-          firstAtomic := x^.kind = pvkNode;
+      pvkSequence:
+        for x in v.GetEnumeratorPtrUnsafe do
+          addValue(x^);
+      pvkArray:
+        for x in v.GetEnumeratorMembersPtrUnsafe do
+          addValue(x^);
+      pvkFunction, pvkObject: raiseEvaluationError('XQTY0105', 'Functions passed to element constructor');
+      else begin
+        if (lastKid = nil) or (lastKid.typ <> tetText) then begin
+          kid := TTreeNode.create(tetText);
+          if previousValueWasAtomic then kid.value:=' ' + v.toString
+          else kid.value := v.toString;
+          kid.offset:=baseOffset;
+          baseOffset+=1;
+          addKid;
+        end else begin
+          if lastKid.typ <> tetText then raiseEvaluationError('pxp:INTERNAL', 'No atomic value before this one exist, but this one is not the first atomic value.');
+          if previousValueWasAtomic then lastKid.value += ' ' + v.toString
+          else lastKid.value += v.toString;
         end;
-      end;
-      pvkFunction: raiseEvaluationError('XQTY0105', 'Functions passed to element constructor')
-      else if (lastKid = nil) or (lastKid.typ <> tetText) then begin
-        kid := TTreeNode.create(tetText);
-        if firstAtomic then kid.value:=v.toString
-        else kid.value := ' '+ v.toString;
-        kid.offset:=baseOffset;
-        baseOffset+=1;
-        addKid;
-      end else begin
-        if lastKid.typ <> tetText then raiseEvaluationError('pxp:INTERNAL', 'No atomic value before this one exist, but this one is not the first atomic value.');
-        if firstAtomic then lastKid.value += v.toString
-        else lastKid.value += ' ' + v.toString;
+        previousValueWasAtomic := true;
       end;
     end;
   end;
@@ -3996,16 +4000,24 @@ var
   function valueToString(const v: IXQValue): string;
   var
     first: Boolean;
-    x: PIXQValue;
+    procedure enumToString(const enum: TXQValueEnumeratorPtrUnsafe);
+    var x: PIXQValue;
+    begin
+      for x in enum do begin
+        if not first then result += ' ';
+        case x^.kind of
+          pvkFunction, pvkObject: raiseEvaluationError('FOTY0013', 'Cannot serialize function');
+          pvkArray: enumToString(x^.GetEnumeratorMembersPtrUnsafe);
+          else result += x^.toString;
+        end;
+        first := false;
+      end;
+    end;
+
   begin
     first := true;
     result := '';
-    for x in v.GetEnumeratorPtrUnsafe do begin
-      if not first then result += ' ';
-      if x^.kind = pvkFunction then raiseEvaluationError('FOTY0013', 'Cannot serialize function');
-      result += x^.toString;
-      first := false;
-    end;
+    enumToString(v.GetEnumeratorPtrUnsafe);
   end;
 
   procedure setTreeHash;
@@ -4147,7 +4159,6 @@ begin
           for i := 0 to oldnamespacecount - 1 do
             tree.addNamespaceDeclaration(context.namespaces.items[i], false);
 
-
         for i:=0 to high(children) do begin
           if objInheritsFrom(children[i], TXQTermConstructor) then begin
             //if TXQTermConstructor(children[i]).isNamespaceConstructor then continue;
@@ -4156,8 +4167,10 @@ begin
               if (kid.namespace <> nil) then needNamespaceList.addIfNewPrefixUrl(kid.namespace);
             end;}
             addNodeAsKid;
-          end else
+          end else begin
+            previousValueWasAtomic:=false; //because constant text contents is stored as string not as text node
             addValue(children[i].evaluate(subcontext^));
+          end;
         end;
 
         kid := TTreeNode.create(tetClose, tree.value);
