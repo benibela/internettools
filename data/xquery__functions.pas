@@ -5736,8 +5736,224 @@ end;
 
 
 function xqFunctionParse_Ietf_Date({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+const DAYNAMES: array[0..13] of string = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun');
+      MONTHNAMES: array[0..11] of string = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+      TZNAMES: array[0..10] of string = ('UTC', 'UT', 'GMT', 'EST', 'EDT', 'CST', 'CDT', 'MST', 'MDT', 'PST', 'PDT');
+      TZNAMES_HOURS: array[0..10] of integer = ( 0, 0,    0,   -5   ,  -4  ,   -6 ,  -5  ,  -7  ,  -6  ,  -8  ,  -7);
+var p: pchar;
+
+  procedure raiseInvalid;
+  begin
+    raise EXQEvaluationException.create('FORG0010', 'Invalid ietf date. Parse error before or around: ' + p, nil, args[0]);
+  end;
+  procedure skipWhitespace;
+  begin
+    while p^ in [#9,#$A, #$D, #$20] do inc(p);
+  end;
+  procedure expect(const s: string);
+  begin
+    skipWhitespace;
+    if not strBeginsWith(p, s) then raiseInvalid;
+    inc(p, length(s));
+  end;
+
+
+  function getStringFromArray(a: PString; ahigh: integer; required: boolean = true): integer;
+  var
+    i: Integer;
+    q: pchar;
+  begin
+    skipWhitespace;
+    for i := 0 to ahigh do
+      if striBeginsWith(p, a[i]) then begin
+        q := p + length(a[i]);
+        if not (q^ in [#9,#$A, #$D, #$20, ',', '-', ')', #0]) then raiseInvalid;
+        if required then p := q;
+        exit(i);
+      end;
+    if required then raiseInvalid;
+    result := -1;
+  end;
+
+  function getNumber(out digitCount: integer): integer;
+  begin
+    result := 0;
+    digitCount := 0;
+    while p^ in ['0'..'9'] do begin
+      result := result * 10 + (ord(p^) - ord('0'));
+      inc(digitCount);
+      inc(p);
+    end;
+    if digitCount = 0 then raiseInvalid;
+  end;
+
+var dt: TXQValueDateTimeData;
+
+  procedure monthname;
+  begin
+    dt.month := getStringFromArray(MONTHNAMES, high(MONTHNAMES)) + 1;
+  end;
+
+  procedure dsep;
+  var
+    q: PChar;
+  begin
+    q := p;
+    skipWhitespace;
+    if p^ = '-' then inc(p);
+    skipWhitespace;
+    if q = p then raiseInvalid;
+  end;
+
+  procedure time;
+  var
+    digitCount, tempsign, temp: integer;
+    function hours: integer;
+    begin
+      hours := getNumber(digitCount);
+      if hours > 24 then raiseInvalid;
+      if digitCount > 2 then raiseInvalid;
+    end;
+    function minutes: integer;
+    begin
+      minutes := getNumber(digitCount);
+      if minutes > 59 then raiseInvalid;
+      if digitCount <> 2 then raiseInvalid;
+    end;
+
+  begin
+    dt.hour := hours;
+
+    if p^ <> ':' then raiseInvalid;
+    inc(p);
+
+    dt.min := minutes;
+
+    if p^ = ':' then begin
+      inc(p);
+      dt.seconds := getNumber(digitCount);
+      if dt.seconds > 59 then raiseInvalid;
+      if digitCount <> 2 then raiseInvalid;
+      if p^ = '.' then begin
+        inc(p);
+        dt.microsecs := getNumber(digitCount);
+        if digitCount > 6 then raiseInvalid;
+        dt.microsecs *= powersOf10[6 - digitCount];
+      end;
+    end;
+
+    skipWhitespace;
+
+    case p^ of
+      '+', '-': begin
+        if p^ = '+' then tempsign := 1
+        else tempsign := -1;
+        inc(p);
+        dt.timezone := getNumber(digitCount);
+        case digitCount of
+          1, 2: begin //HH
+            if dt.timezone >= 15 then raiseInvalid;
+            dt.timezone := dt.timezone * tempsign * 60;
+            if p^ = ':' then begin //MM
+              inc(p);
+              if p^ in ['0'..'9'] then begin
+                temp := minutes;
+                if temp > 59 then raiseInvalid;
+                dt.timezone += tempsign * temp;
+              end;
+            end;
+          end;
+          3, 4: dt.timezone :=  tempsign * ( (dt.timezone div 100) * 60 + (dt.timezone mod 100) );  //HMM or HHMM
+          else raiseInvalid;
+        end;
+        skipWhitespace;
+        if p^ = '(' then begin
+          inc(p);
+          getStringFromArray(@TZNAMES[0], high(TZNAMES)); //ignored
+          expect(')');
+        end;
+      end;
+      'a'..'z', 'A'..'Z': begin
+        dt.timezone := getStringFromArray(TZNAMES, high(TZNAMES));
+        dt.timezone := TZNAMES_HOURS[dt.timezone]*60;
+      end
+    end;
+  end;
+
+  procedure year;
+  var
+    digitCount: integer;
+  begin
+    dt.year := getNumber(digitCount);
+    case digitCount of
+      2: inc(dt.year, 1900);
+      4: ;
+      else raiseInvalid;
+    end;
+  end;
+
+  procedure daynum;
+  var
+    digitCount: integer;
+  begin
+    dt.day := getNumber(digitCount);
+    if dt.day = 0 then raiseInvalid;
+    if digitCount > 2 then raiseInvalid;
+  end;
+
+  procedure asctime;
+  begin
+    monthname;
+    dsep;
+    daynum;
+    skipWhitespace;
+    time;
+    skipWhitespace;
+    year;
+  end;
+
+  procedure datespec_time;
+  begin
+    daynum;
+    dsep;
+    monthname;
+    dsep;
+    year;
+
+    skipWhitespace;
+
+    time;
+  end;
+
+var temp: string;
 begin
-  result := xqFunctionParse_date(argc, args); //todo: correct format
+  if args[0].isUndefined then exit(args[0]);
+  temp := args[0].toString;
+  p := pchar(temp);
+
+  fillchar(dt, sizeof(dt), 0);
+  dt.timezone:=0;
+
+  skipWhitespace;
+  if p^ in ['A'..'Z', 'a'..'z'] then begin
+    if getStringFromArray(MONTHNAMES, high(MONTHNAMES), false) <> -1 then asctime
+    else begin
+      getStringFromArray(DAYNAMES, high(DAYNAMES)); //ignored
+      if p^ = ',' then inc(p);
+      if not (p^ in [#9,#$A, #$D, #$20]) then raiseInvalid;
+      skipWhitespace;
+      if p^ in ['A'..'Z', 'a'..'z'] then asctime
+      else datespec_time;
+    end;
+  end else datespec_time;
+
+  skipWhitespace;
+  if p^ <> #0 then raiseInvalid;
+
+  if dt.day > MonthDays[dateIsLeapYear(dt.year), dt.month] then raiseInvalid;
+
+  result := TXQValueDateTime.create(baseSchema.dateTime, dt);
+//  writeln(result.toString);
 end;
 
 
