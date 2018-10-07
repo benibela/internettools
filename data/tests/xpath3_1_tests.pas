@@ -139,6 +139,12 @@ begin
   t('sort(map:remove( map {"a": 1, "b": 2, "c": 3, "d": 4}, ("b", "d", "e") ) ? *)', '1 3');
   t('sort(map:for-each(map{"a": 2, "b": 3}, function($k, $v){$k ||$v}))', 'a2 b3');
 
+  t('(map {}, array {}) ! (position(), . instance of map(*), . instance of map(string,string), '+
+              '. instance of array(*), . instance of array(string), ' +
+              '"F", . instance of function(*), . instance of function(integer) as item()*, . instance of function(integer) as item(), . instance of function(string) as item()*, . instance of function(string) as item() )',
+  '1 true true false false F true true false true false 2 false false true true F true true false false false');
+
+
 
   t('string-join((1,2,3))', '123');
 

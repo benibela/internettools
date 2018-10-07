@@ -917,15 +917,41 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkMap;
         end;
       end;
-      tikFunctionTest: begin
-        if sub.kind <> pvkFunction then exit(false);
-        if length(arguments) = 0 then exit(true);
-        fun := sub as TXQValueFunction;
-        if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
-        for i := 0 to high(fun.parameters) do
-          if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
-        if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
-        else result := arguments[high(arguments)].isItemStar();
+      tikFunctionTest: case sub.kind of
+        pvkFunction: begin
+          if length(arguments) = 0 then exit(true);
+          fun := sub as TXQValueFunction;
+          if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
+          for i := 0 to high(fun.parameters) do
+            if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
+          if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
+          else result := arguments[high(arguments)].isItemStar();
+        end;
+        pvkArray, pvkObject: begin
+          //map:   function(A) as item()*,  A: any atomic
+          //array: function(xs:integer) as item()*
+          case length(arguments) of
+            0: result := true;
+            2: begin
+              if not (arguments[high(arguments)].isItemStar()) then exit(false);
+              with arguments[0] do begin
+                if (allowNone) or (allowMultiple) then exit(false);
+                case kind of
+                  tikNone: exit(false);
+                  tikAtomic:
+                    case sub.kind of
+                      pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
+                      pvkObject: result := true;
+                    end;
+                  tikAny: result := true;
+                  else result := false;
+                end;
+              end;
+            end;
+            else result := false;
+          end;
+        end
+        else result := false;
       end;
       else result := false; //hide warning
     end;
@@ -1008,49 +1034,77 @@ begin
   result := subtypeItemTypeOf(tb);
 end;
 
-
-function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
-  function subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean;
-  var
-    i: Integer;
-  begin
-    if xsa.derivedFrom(xsb) then exit(true);
-    result := false;
-    if objInheritsFrom(xsa, TXSUnionType) then begin
-      //should test for "Ai is a pure union type, and every type t in the transitive membership of Ai satisfies subtype-itemType(t, Bi)."
-      //does it work???
-      result := true;
-      for i := 0 to high(TXSUnionType(atomicTypeInfo).members) do
-        if not subtypeItemTypeAtomic(TXSUnionType(atomicTypeInfo).members[i], xsb) then
-          exit(false);
-    end;
-  end;
+class function TXQTermSequenceType.subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean;
 var
   i: Integer;
 begin
+  if xsa.derivedFrom(xsb) then exit(true);
+  result := false;
+  if objInheritsFrom(xsa, TXSUnionType) then begin
+    //should test for "Ai is a pure union type, and every type t in the transitive membership of Ai satisfies subtype-itemType(t, Bi)."
+    //does it work???
+    result := true;
+    for i := 0 to high(TXSUnionType(xsa).members) do
+      if not subtypeItemTypeAtomic(TXSUnionType(xsa).members[i], xsb) then
+        exit(false);
+  end;
+end;
+
+function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
+var
+  i: Integer;
+  tempExpectedKeyType: TXSType;
+  tempExpectedValueChild: integer;
+begin
   if (kind = tikAtomic) and (tb.kind = tikAtomic) and subtypeItemTypeAtomic(atomicTypeInfo, tb.atomicTypeInfo) then
     exit(true);
-  if tb.kind = tikAny then exit(true);
-  if (kind = tikElementTest) and (tb.kind = tikElementTest) then begin
-    if tb.nodeMatching.matching  = MATCH_ALL_NODES then exit(true);
-    if nodeMatching.matching * MATCH_ALL_NODES <> tb.nodeMatching.matching * MATCH_ALL_NODES then exit(false);
-    if (qmValue in tb.nodeMatching.matching) and (not (qmValue in nodeMatching.matching) or (tb.nodeMatching.value <> nodeMatching.value))  then exit(false);
-    if (qmCheckNamespaceURL in tb.nodeMatching.matching) and (not (qmCheckNamespaceURL in nodeMatching.matching) or (tb.nodeMatching.namespaceURLOrPrefix <> nodeMatching.namespaceURLOrPrefix))  then exit(false);
-    if (qmCheckNamespacePrefix in tb.nodeMatching.matching) and (not (qmCheckNamespacePrefix in nodeMatching.matching) or (tb.nodeMatching.namespaceURLOrPrefix <> nodeMatching.namespaceURLOrPrefix))  then exit(false);
-    if (tb.nodeMatching.requiredType <> nil)
-        and ((tb.nodeMatching.requiredType.kind <> tikAtomic) or (tb.nodeMatching.requiredType.atomicTypeInfo.name <> 'anyType') or (tb.nodeMatching.requiredType.atomicTypeInfo.base <> nil)) then
-      exit((nodeMatching.requiredType <> nil) and (nodeMatching.requiredType.subtypeOf(tb.nodeMatching.requiredType)));
-    exit(true);
-  end;
-  if (kind = tikFunctionTest) and (tb.kind = tikFunctionTest) then begin
-    if length(tb.arguments) > 0 then begin
-      if length(arguments) <> length(tb.arguments) then exit(false);
-      for i := 0 to high(arguments) - 1 do
-        if not tb.arguments[i].subtypeOf(arguments[i]) then exit(false);
-      if not arguments[high(arguments)].subtypeOf(tb.arguments[high(tb.arguments)]) then exit(false);
+  case tb.kind of
+    tikAny: exit(true);
+    tikElementTest: begin
+      if kind <> tikElementTest then exit(false);
+      if tb.nodeMatching.matching  = MATCH_ALL_NODES then exit(true);
+      if nodeMatching.matching * MATCH_ALL_NODES <> tb.nodeMatching.matching * MATCH_ALL_NODES then exit(false);
+      if (qmValue in tb.nodeMatching.matching) and (not (qmValue in nodeMatching.matching) or (tb.nodeMatching.value <> nodeMatching.value))  then exit(false);
+      if (qmCheckNamespaceURL in tb.nodeMatching.matching) and (not (qmCheckNamespaceURL in nodeMatching.matching) or (tb.nodeMatching.namespaceURLOrPrefix <> nodeMatching.namespaceURLOrPrefix))  then exit(false);
+      if (qmCheckNamespacePrefix in tb.nodeMatching.matching) and (not (qmCheckNamespacePrefix in nodeMatching.matching) or (tb.nodeMatching.namespaceURLOrPrefix <> nodeMatching.namespaceURLOrPrefix))  then exit(false);
+      if (tb.nodeMatching.requiredType <> nil)
+          and ((tb.nodeMatching.requiredType.kind <> tikAtomic) or (tb.nodeMatching.requiredType.atomicTypeInfo.name <> 'anyType') or (tb.nodeMatching.requiredType.atomicTypeInfo.base <> nil)) then
+        exit((nodeMatching.requiredType <> nil) and (nodeMatching.requiredType.subtypeOf(tb.nodeMatching.requiredType)));
+      exit(true);
     end;
-    //subtype-assertions(AnnotationsA, AnnotationsB) is not defined (??)
-    exit(true);
+    tikFunctionTest:
+      case kind of
+        tikFunctionTest: begin
+          if length(tb.arguments) > 0 then begin
+            if length(arguments) <> length(tb.arguments) then exit(false);
+            for i := 0 to high(arguments) - 1 do
+              if not tb.arguments[i].subtypeOf(arguments[i]) then exit(false);
+            if not arguments[high(arguments)].subtypeOf(tb.arguments[high(tb.arguments)]) then exit(false);
+          end;
+          //subtype-assertions(AnnotationsA, AnnotationsB) is not defined (??)
+          exit(true);
+        end;
+        tikAtomic: if (atomicTypeInfo = baseJSONiqSchema.object_) or (atomicTypeInfo = baseJSONiqSchema.array_) then begin
+          case length(tb.arguments) of
+            0: exit(true);
+            2: ;
+            else exit(false);
+          end;
+          if atomicTypeInfo = baseJSONiqSchema.object_ then begin
+            tempExpectedKeyType := baseSchema.anyAtomicType;
+            tempExpectedValueChild := 1;
+          end else begin
+            tempExpectedKeyType := baseSchema.integer;
+            tempExpectedValueChild := 0;
+          end;
+          if tb.arguments[0].isAtomicType(tempExpectedKeyType) then begin //todo: allow super types?
+            if tb.arguments[1].isItemStar() then exit(true);
+            if (high(children) = tempExpectedValueChild) and (TXQTermSequenceType(children[tempExpectedValueChild]).kind = tikAtomic)  then
+              exit(tb.arguments[1].isAtomicType(TXQTermSequenceType(children[tempExpectedValueChild]).atomicTypeInfo, true));
+          end;
+          exit(false);
+        end;
+      end;
   end;
   exit(false);
 end;
@@ -1059,7 +1113,6 @@ function TXQTermSequenceType.functionCoercion(const v: IXQValue): IXQValue;
 var
   fun: TXQValueFunction;
   needCoercion: Boolean;
-  f: TXQValueFunction;
   i: Integer;
   fresult: TXQValueFunction;
   tempvar: TXQTermVariable;
@@ -1067,50 +1120,61 @@ begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
   //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.toXQuery());
   if length(arguments) = 0 then exit(v);
-  fun := v as TXQValueFunction;
-  if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
-  needCoercion := false;
-  for i := 0 to high(fun.parameters) do
-    if (not arguments[i].isItemStar)
-       and ((fun.parameters[i].seqtype = nil) or not fun.parameters[i].seqtype.subtypeOf(arguments[i])) then begin
-      needCoercion:=true;
-      break;
+  case v.kind of
+    pvkFunction: begin
+      fun := v as TXQValueFunction;
+      if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
+      needCoercion := false;
+      for i := 0 to high(fun.parameters) do
+        if (not arguments[i].isItemStar)
+           and ((fun.parameters[i].seqtype = nil) or not fun.parameters[i].seqtype.subtypeOf(arguments[i])) then begin
+          needCoercion:=true;
+          break;
+        end;
+      if not needCoercion then
+        if (not arguments[high(arguments)].isItemStar) and (((fun.resulttype = nil) or not fun.resulttype.subtypeOf(arguments[high(arguments)])))
+            then
+              needCoercion := true;
+      if not needCoercion then exit(v);
+      fresult := TXQValueFunction.create();
+      fresult.namespaceURL := fun.namespaceURL;
+      fresult.namespacePrefix := fun.namespacePrefix;
+      fresult.name:=fun.name;
+      copyAnnotations(fresult.annotations, fun.annotations);
+      fresult.context := fun.context;
     end;
-  if not needCoercion then
-    if (not arguments[high(arguments)].isItemStar) and (((fun.resulttype = nil) or not fun.resulttype.subtypeOf(arguments[high(arguments)])))
-        then
-          needCoercion := true;
-  if not needCoercion then exit(v);
-
+    pvkObject, pvkArray: begin
+      if (length(arguments) <> 1 + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
+      fresult := TXQValueFunction.create();
+    end;
+  end;
   //see TXQTermDefineFunction.defineDynamicPartialApplication
-  f := fun;
-  fresult := TXQValueFunction.create();
-  fresult.namespaceURL := f.namespaceURL;
-  fresult.namespacePrefix := f.namespacePrefix;
-  fresult.name:=f.name;
-  copyAnnotations(fresult.annotations, f.annotations);
-  fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
+  fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(v));
   setlength(fresult.parameters, length(arguments) - 1);
-  for i := 0 to high(f.parameters) do begin
+  for i := 0 to high(fresult.parameters) do begin
     tempvar := TXQTermVariable.create(IntToStr(i)+'.');
-    tempvar.index := high(f.parameters);
+    tempvar.index := high(fresult.parameters);
     TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
     fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
     fresult.parameters[i].seqtype := TXQTermSequenceType(arguments[i].clone);
   end;
   fresult.ownsTerms := true;
   fresult.resulttype := TXQTermSequenceType(arguments[high(arguments)].clone);
-  fresult.context := f.context;
   result := fresult;
 end;
 
-function TXQTermSequenceType.isItemStar: boolean;
+function TXQTermSequenceType.isItemStar(): boolean;
 var
   i: Integer;
 begin
   result := (kind = tikAny) and allowMultiple and allowNone;
   if kind = tikUnion then
     for i := 0 to high(children) do result := result or TXQTermSequenceType(children[i]).isItemStar();
+end;
+
+function TXQTermSequenceType.isAtomicType(a: TXSType; shouldAllowNone: boolean; shouldAllowMultiple: boolean): boolean;
+begin
+  result := (kind = tikAtomic) and (atomicTypeInfo = a) and (allowNone = shouldAllowNone) and (allowMultiple = shouldAllowMultiple);
 end;
 
 function TXQTermSequenceType.clone: TXQTerm;

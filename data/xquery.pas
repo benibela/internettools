@@ -1657,9 +1657,12 @@ type
     function instanceOf(const node: TTreeNode): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
   private
+    class function subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean; static;
+    //if self is a subtype-itemtype of tb
     function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
     function functionCoercion(const v: IXQValue): IXQValue;
     function isItemStar(): boolean;
+    function isAtomicType(a: TXSType; shouldAllowNone: boolean = false;  shouldAllowMultiple: boolean = false): boolean;
   end;
 
   { TXQTermVariable }
@@ -5955,8 +5958,14 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
   begin
     result := w;
     if typ.kind = tikFunctionTest then begin
-      if w.kind <> pvkFunction then term.raiseTypeError0004('Expected function', result);
-      if context.staticContext.strictTypeChecking then result := typ.functionCoercion(w);
+      case w.kind of
+        pvkFunction:
+          if context.staticContext.strictTypeChecking then result := typ.functionCoercion(w);
+        pvkArray, pvkObject:
+          result := typ.functionCoercion(w);
+        else
+          term.raiseTypeError0004('Expected function', result);
+      end;
       exit;
     end;
 
