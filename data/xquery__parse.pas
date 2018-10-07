@@ -2001,7 +2001,10 @@ begin
   end;
   expect('{');
   skipWhitespaceAndComment();
-  if (pos^ = '}') and not (parsingModel in PARSING_MODEL3_1) then raiseParsingError('XQST0079', 'Extension expr needs expr');
+  if (pos^ = '}') then begin//and not (parsingModel in PARSING_MODEL3_1) then
+    //this might be valid if we know the extension and do not need this fallback term
+    raiseParsingError('XQST0079', 'Extension expr needs expr');
+  end;
   result := parseOptionalExpr31;
 end;
 
