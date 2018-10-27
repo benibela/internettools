@@ -1574,11 +1574,48 @@ begin
 end;
 
 function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var temp: TXQVArray;
-  propName: String;
+  function combineHttpEncoded(obj: TXQValueObject): IXQValue;
+  var temp: TXQVArray;
+      propName, oldUrl, prefix: String;
+      decoded: TDecodedUrl;
+      excludedParts: TDecodedUrlParts;
+      newEncoded: IXQValue;
+
+  begin
+    SetLength(temp, 3);
+    temp[1] := args[1];
+    temp[2] := obj.getProperty('charset');
+
+    if striEqual(obj.getProperty('method').toString, 'POST') then begin
+      propName := 'post';
+      prefix := '';
+      temp[0] := obj.getProperty(propName);
+    end else begin
+      propName := 'url';
+      temp[0] := obj.getProperty(propName);
+      oldUrl := temp[0].toString;
+      if strContains(oldUrl, '?') and not strEndsWith(oldUrl, '?') and not strContains(oldUrl, '#') then prefix := ''
+      else begin
+        excludedParts := [dupParams, dupLinkTarget];
+        decoded := decodeURL(oldUrl, false);
+        if not strIsAbsoluteURI(oldUrl) then Include(excludedParts, dupProtocol)
+        else if (decoded.host <> '') and (decoded.path = '') then decoded.path := '/';
+        if decoded.params = '?' then decoded.params := ''; //check here, because uri-combine handles it wrong (turns '?' into '?=&')
+        temp[0] := xqvalue(decoded.params);
+        prefix := decoded.combinedExclude(excludedParts);
+        if not strBeginsWith(decoded.params, '?') then prefix += '?';
+      end;
+    end;
+
+    newEncoded := xqFunctionUri_combine(context, 3, @temp[0]);
+    if prefix = '' then result := obj.setImmutable(propName, newEncoded)
+    else result := obj.setImmutable(propName, prefix + newEncoded.toString);
+  end;
+
+var
   headers: IXQValue;
   h: PIXQValue;
-  multipart: String;
+  multipart, tempstr: String;
   mime: TMIMEMultipartData;
   obj: TXQValueObject;
   tempSeq: TXQValueSequence;
@@ -1613,44 +1650,41 @@ var temp: TXQVArray;
 
 begin
   requiredArgCount(argc, 2);
-  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].toXQuery());
+  if args[0] is TXQValueObject then //raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].toXQuery());
+     obj := args[0].toValue as TXQValueObject
+   else begin
+     obj := TXQValueObject.create();
+     obj.setMutable('url', args[0].toString);
+     result := obj;
+   end;
+
 
   multipart := '';
-  headers := args[0].getProperty('headers');
+  headers := obj.getProperty('headers');
   for h in headers.GetEnumeratorPtrUnsafe do begin
-    propName := h^.toString;
-    if striBeginsWith(propName, 'Content-Type') and striContains(propName, ContentTypeMultipart) then begin
-      multipart:=propName;
+    tempstr := h^.toString;
+    if striBeginsWith(tempstr, 'Content-Type') and striContains(tempstr, ContentTypeMultipart) then begin
+      multipart:=tempstr;
       break;
     end;
   end;
 
   if multipart = '' then begin
-    if args[0].getProperty('method').toString = 'POST' then propName := 'post'
-    else propName := 'url';
-
-    SetLength(temp, 3);
-    temp[0] := args[0].getProperty(propName);
-    temp[1] := args[1];
-    temp[2] := args[0].getProperty('charset');
-
-
-    result := (args[0] as TXQValueObject).setImmutable(propName, xqFunctionUri_combine(context, 3, @temp[0]));
+    result := combineHttpEncoded(obj);
   end else begin
-    obj := args[0] as TXQValueObject;
     multipart := trim(strCopyFrom(multipart, pos('=', multipart) + 1));
     if strBeginsWith(multipart, '"') then multipart := copy(multipart, 2, length(multipart) - 2);
 
     mime.parse(args[0].getProperty('post').toString, multipart);
     mimeCombine();
-    obj := obj.setImmutable('post', mime.compose(propName, multipart));
+    obj := obj.setImmutable('post', mime.compose(tempstr, multipart));
 
-    if propName <> multipart then begin
+    if tempstr <> multipart then begin
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
-      tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(propName)));
+      tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
       for h in headers.GetEnumeratorPtrUnsafe do begin
-        propName := h^.toString;
-        if not striBeginsWith(propName, 'Content-Type') then
+        tempstr := h^.toString;
+        if not striBeginsWith(tempstr, 'Content-Type') then
           tempSeq.add(h^);
       end;
       obj := obj.setImmutable('headers', tempSeq);
@@ -6602,7 +6636,7 @@ begin
   pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
   pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
   pxpold.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
-  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
+  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as item(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
 
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
   'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+

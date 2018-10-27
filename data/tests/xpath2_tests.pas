@@ -3329,6 +3329,32 @@ begin
   t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b","a3[]": "b3"},"c=d",{"a2[]": "b2"})))', '{"post": "a%5B%5D=b&a3%5B%5D=b3&c=d&a2%5B%5D=b2", "url": "http://foo/?x=y", "method": "POST"}');
   t('serialize-json(request-combine({"url": "http://foo/?x=y", "method": "POST"}, ({"a[]": "b"},"c=d",{"a2[]": "b2"},"e=f","g=h")))', '{"post": "a%5B%5D=b&c=d&a2%5B%5D=b2&e=f&g=h", "url": "http://foo/?x=y", "method": "POST"}');
 
+  t('serialize-json(request-combine("http://www.abc.de", "a=b"))', '{"url": "http://www.abc.de/?a=b"}');
+  t('serialize-json(request-combine("http://www.abc.de#abc", "a=b"))', '{"url": "http://www.abc.de/?a=b"}');
+  t('serialize-json(request-combine("http://www.abc.de", ("a=b", "d=e")))', '{"url": "http://www.abc.de/?a=b&d=e"}');
+  t('serialize-json(request-combine("http://www.abc.de/", "a=b"))', '{"url": "http://www.abc.de/?a=b"}');
+  t('request-combine("http://www.abc.de/#abc", "a=b").url', 'http://www.abc.de/?a=b');
+  t('request-combine("http://www.abc.de/x", "a=b").url', 'http://www.abc.de/x?a=b');
+  t('request-combine("https://www.abc.de/x#abc", "a=b").url', 'https://www.abc.de/x?a=b');
+  t('request-combine("https://www.abc.de/y/", "a=b").url', 'https://www.abc.de/y/?a=b');
+  t('request-combine("http://www.abc.de/?", "a=b").url', 'http://www.abc.de/?a=b');
+  t('request-combine("http://www.abc.de/?x=y", "a=b").url', 'http://www.abc.de/?x=y&a=b');
+  t('request-combine("http://www.abc.de?x=y", "a=b").url', 'http://www.abc.de?x=y&a=b'); //does this make sense ?
+  t('request-combine("https://www.abc.de/y/?x=y", "a=b").url', 'https://www.abc.de/y/?x=y&a=b');
+
+  t('request-combine("", "a=b").url', '?a=b');
+  t('request-combine("?", "a=b").url', '?a=b');
+  t('request-combine("#abc", "a=b").url', '?a=b');
+  t('request-combine("x", "a=b").url', 'x?a=b');
+  t('request-combine("/#abc", "a=b").url', '/?a=b');
+  t('request-combine("/x", "a=b").url', '/x?a=b');
+  t('request-combine("/x#abc", "a=b").url', '/x?a=b');
+  t('request-combine("/y/", "a=b").url', '/y/?a=b');
+  t('request-combine("/?", "a=b").url', '/?a=b');
+  t('request-combine("/?x=y", "a=b").url', '/?x=y&a=b');
+  t('request-combine("?x=y", "a=b").url', '?x=y&a=b');
+  t('request-combine("/y/?x=y", "a=b").url', '/y/?x=y&a=b');
+
 
   t('join(for $r in (random(), random(), random()) return if ($r >= 0 and $r < 1) then "O" else "F")', 'O O O');
   t('join(for $r in (random(10), random(10), random(10.5)) return if ($r >= 0 and $r < 10) then "O" else "F")', 'O O O');
