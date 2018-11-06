@@ -808,6 +808,7 @@ end;
 
 function TJavaEnv.getArrayLength(a: jobject): jint;
 begin
+  if a = nil then exit(0);
   result := env^^.GetArrayLength(env, a);
 end;
 
