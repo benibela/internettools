@@ -91,6 +91,7 @@ type
   TMIMEMultipartSubData = record
     data: string;
     headers: TStringArray;
+    function getFormDataName: string;
   end;
   PMIMEMultipartSubData = ^TMIMEMultipartSubData;
 
@@ -490,6 +491,16 @@ begin
   tempdebug.free;
   except
   end;
+end;
+
+function TMIMEMultipartSubData.getFormDataName: string;
+var
+  j: Integer;
+begin
+  for j := 0 to high(headers) do
+     if striBeginsWith(headers[j], 'Content-Disposition:') then
+       exit(striBetween(headers[j], 'name="', '"')); //todo: decoding
+  result := '';
 end;
 
 class function TInternetAccessDataBlock.create(const s: string): TInternetAccessDataBlock;

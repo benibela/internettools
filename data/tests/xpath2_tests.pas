@@ -3297,6 +3297,7 @@ begin
   t('form-combine($f, {"foo": 17}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'17'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   t('form-combine($f, {"foo": {"value": 17, "headers": "Content-Type: image/png"}}).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10'Content-Type: image/png'#13#10#13#10'17'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');
   RandSeed:=123;
+  t('serialize-json(request-decode($f))', '{"protocol": "pseudo", "host": "test", "params": {"foo": "bar", "Y": "456"}, "method": "POST", "headers": "Content-Type: multipart/form-data; boundary=---------------------------1212jhjg2ypsdofx0235p2z5as09", "post": "\r\n-----------------------------1212jhjg2ypsdofx0235p2z5as09\r\nContent-Disposition: form-data; name=\"foo\"\r\n\r\nbar\r\n-----------------------------1212jhjg2ypsdofx0235p2z5as09\r\nContent-Disposition: form-data; name=\"Y\"\r\n\r\n456\r\n-----------------------------1212jhjg2ypsdofx0235p2z5as09--", "url": "pseudo://test/multi"}');
   randomboundary := baseboundary + TMIMEMultipartData.randomLetter;
   RandSeed:=123;
   t('form(//form[4], {"foo": "---------------------------1212jhjg2ypsdofx0235p2z5as09", "t": {"value": 17123, "filename": "xyz"}}).post', #13#10'--'+randomboundary+''#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'---------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'--'+randomboundary+''#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'--'+randomboundary+''#13#10'Content-Disposition: form-data; name="t"; filename="xyz"'#13#10#13#10'17123'#13#10'--'+randomboundary+'--');
@@ -3354,6 +3355,16 @@ begin
   t('request-combine("/?x=y", "a=b").url', '/?x=y&a=b');
   t('request-combine("?x=y", "a=b").url', '?x=y&a=b');
   t('request-combine("/y/?x=y", "a=b").url', '/y/?x=y&a=b');
+
+  t('serialize-json(request-decode("http://a/b/c"))', '{"url": "http://a/b/c", "protocol": "http", "host": "a"}');
+  t('serialize-json(request-decode("http://a/b/c?x=y"))', '{"url": "http://a/b/c?x=y", "protocol": "http", "host": "a", "path": "b/c", "query": "x=y", "params": {"x": "y"}}');
+  t('serialize-json(request-decode("http://a/b/c?x=y&d=e"))', '{"url": "http://a/b/c?x=y&d=e", "protocol": "http", "host": "a", "path": "b/c", "query": "x=y&d=e", "params": {"x": "y", "d": "e"}}');
+  t('join(request-decode("http://a/b/c?x=y&d=e&d=f").params.d)', 'e f');
+  t('serialize-json(request-decode("http://a:123/b/c?x=y+f&d=e&e=f#9"))', '{"url": "http://a:123/b/c?x=y+f&d=e&e=f#9", "protocol": "http", "host": "a", "port": "123", "path": "b/c", "query": "x=y+f&d=e&e=f", "target": "9", "params": {"x": "y f", "d": "e", "e": "f"}}');
+  t('join(request-decode("http://a/b/c?x=y&d=e&d=f").params.d)', 'e f');
+  t('serialize-json(request-decode({"url": "http://x/y", "post": "f=g", "method": "POST"}))', '{"protocol": "http", "host": "x", "params": {"f": "g"}, "url": "http://x/y", "post": "f=g", "method": "POST"}');
+
+
 
 
   t('join(for $r in (random(), random(), random()) return if ($r >= 0 and $r < 1) then "O" else "F")', 'O O O');

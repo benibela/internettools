@@ -1573,6 +1573,25 @@ begin
   result := xqvalue(res);
 end;
 
+function getMultipartHeader(const v: IXQValue): string;
+var
+  headers: IXQValue;
+  h: PIXQValue;
+  tempstr: String;
+begin
+  result := '';
+  headers := v.getProperty('headers');
+  for h in headers.GetEnumeratorPtrUnsafe do begin
+    tempstr := h^.toString;
+    if striBeginsWith(tempstr, 'Content-Type') and striContains(tempstr, ContentTypeMultipart) then begin
+      result := tempstr;
+      result := trim(strCopyFrom(result, pos('=', result) + 1));
+      if strBeginsWith(result, '"') then result := copy(result, 2, length(result) - 2);
+      exit;
+    end;
+  end;
+end;
+
 function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
   function combineHttpEncoded(obj: TXQValueObject): IXQValue;
   var temp: TXQVArray;
@@ -1659,6 +1678,7 @@ begin
    end;
 
 
+  //todo: merge with getMultipartHeader
   multipart := '';
   headers := obj.getProperty('headers');
   for h in headers.GetEnumeratorPtrUnsafe do begin
@@ -1691,6 +1711,91 @@ begin
     end;
     result := obj;
   end;
+end;
+
+function xqFunctionRequest_decode(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var paramobj: TXQValueObject;
+  procedure addParam(const name, value: string);
+  var tempseq: TXQValueSequence;
+      v: txqvalue;
+  begin
+    if paramobj.hasProperty(name, @v) then begin
+      tempseq := TXQValueSequence.create(v.getSequenceCount + 1);
+      tempseq.add(v);
+      tempseq.add(xqvalue(value));
+      paramobj.setMutable(name, tempseq);
+    end else paramobj.setMutable(name, value);
+  end;
+
+  procedure parseParamsUriEncoded(const q: ixqvalue);
+  var
+    names, values, specialNames: TStringArray;
+    specialValues: TXQVArray;
+    i: Integer;
+  begin
+    if paramobj = nil then paramobj := TXQValueObject.create();
+    urlEncodingFromValue(q, @context.staticContext.nodeCollation.equal, false, CP_NONE, names, values, specialNames, specialValues);
+    for i := 0 to high(names) do
+      addParam(names[i], values[i]);
+  end;
+  procedure parseParamsMime(const data, boundary: string);
+  var mime: TMIMEMultipartData;
+    i: Integer;
+  begin
+    if paramobj = nil then paramobj := TXQValueObject.create();
+    mime.parse(data, boundary);
+    for i := 0 to high(mime.data) do
+      addParam(mime.data[i].getFormDataName, mime.data[i].data);
+  end;
+
+var
+  url, multipart: String;
+  decoded: TDecodedUrl;
+  resobj: TXQValueObject;
+
+
+begin
+  resobj := TXQValueObject.create();
+  result := resobj;
+  paramobj := nil;
+  if args[0].kind = pvkObject then begin
+    resobj.prototype := args[0];
+    url := args[0].getProperty('url').toString;
+    if striEqual(args[0].getProperty('method').toString, 'POST') then begin
+      multipart := getMultipartHeader(args[0]);
+      if multipart = '' then parseParamsUriEncoded(args[0].getProperty('post'))
+      else parseParamsMime(args[0].getProperty('post').toString, multipart);
+    end;
+  end else begin
+    url := args[0].toString;
+    resobj.setMutable('url', url);
+  end;
+  if url <> '' then begin
+    decoded := decodeURL(url);
+    resobj.setMutable('protocol', decoded.protocol);
+    if decoded.username <> '' then
+      resobj.setMutable('username', decoded.username);
+    if decoded.password <> '' then
+      resobj.setMutable('password', decoded.password);
+    if decoded.host <> '' then
+      resobj.setMutable('host', decoded.host);
+    if decoded.port <> '' then
+      resobj.setMutable('port', decoded.port);
+    if decoded.params <> '' then begin
+      if strBeginsWith(decoded.path, '/') then delete(decoded.path, 1, 1);
+      resobj.setMutable('path', decoded.path);
+    end;
+    if decoded.params <> '' then begin
+      if strBeginsWith(decoded.params, '?') then delete(decoded.params, 1, 1);
+      resobj.setMutable('query', decoded.params);
+      parseParamsUriEncoded(xqvalue(decoded.params));
+    end;
+    if decoded.linktarget <> '' then begin
+      if strBeginsWith(decoded.linktarget, '#') then delete(decoded.linktarget, 1, 1);
+      resobj.setMutable('target', decoded.linktarget);
+    end;
+  end;
+  if paramobj <> nil then resobj.setMutable('params', paramobj);
 end;
 
 function xqFunctionResolve_Html(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -6637,6 +6742,7 @@ begin
   pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
   pxpold.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
   pxpold.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as item(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
+  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, ['($request as item()) as object()']);
 
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
   'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
