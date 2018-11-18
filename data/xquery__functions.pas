@@ -1592,6 +1592,7 @@ begin
   end;
 end;
 
+
 function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
   function combineHttpEncoded(obj: TXQValueObject): IXQValue;
   var temp: TXQVArray;
@@ -1669,37 +1670,26 @@ var
 
 begin
   requiredArgCount(argc, 2);
-  if args[0] is TXQValueObject then //raise EXQEvaluationException.create('pxp:FORM', 'Expected object {"url", "method", "post"}, got: '+args[0].toXQuery());
-     obj := args[0].toValue as TXQValueObject
-   else begin
-     obj := TXQValueObject.create();
-     obj.setMutable('url', args[0].toString);
-     result := obj;
-   end;
-
-
-  //todo: merge with getMultipartHeader
-  multipart := '';
-  headers := obj.getProperty('headers');
-  for h in headers.GetEnumeratorPtrUnsafe do begin
-    tempstr := h^.toString;
-    if striBeginsWith(tempstr, 'Content-Type') and striContains(tempstr, ContentTypeMultipart) then begin
-      multipart:=tempstr;
-      break;
-    end;
+  if args[0] is TXQValueObject then begin
+    multipart := getMultipartHeader(args[0]);
+    obj := args[0].toValue as TXQValueObject;
+  end else begin
+    multipart:='';
+    obj := TXQValueObject.create();
+    obj.setMutable('url', args[0].toString);
+    result := obj;
   end;
+
 
   if multipart = '' then begin
     result := combineHttpEncoded(obj);
   end else begin
-    multipart := trim(strCopyFrom(multipart, pos('=', multipart) + 1));
-    if strBeginsWith(multipart, '"') then multipart := copy(multipart, 2, length(multipart) - 2);
-
     mime.parse(args[0].getProperty('post').toString, multipart);
     mimeCombine();
     obj := obj.setImmutable('post', mime.compose(tempstr, multipart));
 
     if tempstr <> multipart then begin
+      headers := obj.getProperty('headers');
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
       tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
       for h in headers.GetEnumeratorPtrUnsafe do begin
