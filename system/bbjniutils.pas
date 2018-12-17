@@ -10,7 +10,16 @@ interface
 uses
   Classes, SysUtils, jni, bbutils;
 
-type EAndroidInterfaceException = class(Exception);
+type
+    EJNIException = class(Exception)
+    protected
+      cause: jobject;
+    public
+      constructor create(msg: string;  acause: jobject = nil);
+      destructor Destroy; override;
+    end;
+    EAndroidInterfaceException = class(EJNIException);
+    JNIExceptionClass = class of EJNIException;
 
 
 type
@@ -101,11 +110,14 @@ type
 
   function arrayToJArray(a: array of string): jobject;
 
-  procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
+  procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: JNIExceptionClass);
   procedure RethrowJavaExceptionIfThereIsOne();
   function ExceptionDescribeAndClear: string;
   function ExceptionCheck: boolean;
 
+  procedure Throw(e: jobject);
+  procedure Throw(c: jclass; e: EJNIException);
+  procedure Throw(c: pchar; e: EJNIException);
   procedure ThrowNew(c: jclass; error: string);
   procedure ThrowNew(c: pchar; error: string);
 
@@ -284,6 +296,18 @@ end;
 procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 begin
   if assigned(onUnload) then onUnload();
+end;
+
+constructor EJNIException.create(msg: string; acause: jobject);
+begin
+  inherited create(msg);
+  cause := j.newGlobalRefAndDelete(acause);
+end;
+
+destructor EJNIException.Destroy;
+begin
+  j.deleteGlobalRef(cause);
+  inherited Destroy;
 end;
 
 
@@ -1101,10 +1125,13 @@ begin
 end;
 
 
-procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne(aExceptionClass: ExceptClass);
+procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne(aExceptionClass: JNIExceptionClass);
+var cause: jobject;
 begin
-  if ExceptionCheck then
-    raise aexceptionClass.create(ExceptionDescribeAndClear);
+  if ExceptionCheck then begin
+    cause := env^^.ExceptionOccurred(env);
+    raise aexceptionClass.create(ExceptionDescribeAndClear, cause);
+  end;
 
 end;
 
@@ -1124,13 +1151,43 @@ begin
   temp:= env^^.CallObjectMethod(env, je, getmethod('java/lang/Object', 'getClass', '()Ljava/lang/Class;'));
   result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, getmethod('java/lang/Class', 'getName', '()Ljava/lang/String;'))) + ': '
           + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, getmethod('java/lang/Throwable', 'getMessage', '()Ljava/lang/String;')));
-  env^^.DeleteLocalRef(env, temp);
-  env^^.DeleteLocalRef(env, je);
+  DeleteLocalRef(temp);
+  deleteLocalRef(je);
 end;
 
 function TJavaEnv.ExceptionCheck: boolean;
 begin
   result := env^^.ExceptionCheck(env) <> JNI_FALSE
+end;
+
+procedure TJavaEnv.Throw(e: jobject);
+begin
+  env^^.Throw(env, e);
+end;
+
+procedure TJavaEnv.Throw(c: jclass; e: EJNIException);
+var args: array[0..1] of jvalue;
+  signature: String;
+  eoo: jobject;
+begin
+  args[0].l := stringToJString(e.Message);
+  if e.cause <> nil then begin
+    args[1].l := e.cause;
+    signature := '(Ljava/lang/String;Ljava/lang/Throwable;)V';
+  end else signature := '(Ljava/lang/String;)V';
+  eoo := NewObject(c, getmethod(c, '<init>', pchar(signature)), @args[0]);
+  Throw(eoo);
+  deleteLocalRef(eoo);
+  deleteLocalRef(args[0].l);
+end;
+
+procedure TJavaEnv.Throw(c: pchar; e: EJNIException);
+var
+  lr: jclass;
+begin
+  lr := getclass(c);
+  Throw(lr, e);
+  deleteLocalRef(lr);
 end;
 
 procedure TJavaEnv.ThrowNew(c: jclass; error: string);
@@ -1139,8 +1196,12 @@ begin
 end;
 
 procedure TJavaEnv.ThrowNew(c: pchar; error: string);
+var
+  lr: jclass;
 begin
-  ThrowNew(getclass(c), error);
+  lr := getclass(c);
+  ThrowNew(lr, error);
+  deleteLocalRef(lr);
 end;
 
 function TJavaEnv.inputStreamToStringAndDelete(stream: jobject): string;
