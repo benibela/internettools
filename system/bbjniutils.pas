@@ -219,6 +219,8 @@ var jvmref: PJavaVM; //**< Java VM reference as passed to JNI_OnLoad.
 var onLoad: function: integer;
 var onUnload: procedure;
 
+const JNI_VERSION_DEFAULT = JNI_VERSION_1_6;
+
 function needJ: TJavaEnv;
 
 
@@ -271,7 +273,7 @@ begin
   end;
   //debugln(inttostr( ThreadID)+' needJ: '+strFromPtr(j.env));
   if j.env = nil then begin
-    attachArgs.version:=JNI_VERSION_1_2;
+    attachArgs.version:=JNI_VERSION_DEFAULT;
     attachArgs.name:=nil;
     attachArgs.group:=nil;
     if jvmref^^.AttachCurrentThread(jvmref,@j.env,@attachArgs) <> 0 then
@@ -290,7 +292,7 @@ function JNI_OnLoad(vm: PJavaVM; reserved: pointer): jint; {$ifdef mswindows}std
 begin
   jvmref := vm;
   if assigned(onLoad) then result := onload()
-  else result := JNI_VERSION_1_4;
+  else result := JNI_VERSION_DEFAULT;
 end;
 
 procedure JNI_OnUnload(vm: PJavaVM; reserved: pointer); {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
