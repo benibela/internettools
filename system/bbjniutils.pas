@@ -29,16 +29,14 @@ type
  TStringConversionMode = (scmAssumeMUTF8, scmConvertValidUTF8ToMUTF8, scmConvertAndRepairUTF8ToMUTF8);
  TJavaEnv = record
   env: PJNIEnv;
-
+ private
+  procedure checkResult(r: pointer; kind, n, sig: pchar);
+ public
   function getclass(n: pchar): jclass;
   function getmethod(c: jclass; n, sig: pchar): jmethodID;
-  function getmethod(classname: pchar; n, sig: pchar): jmethodID;
   function getfield(c: jclass; n, sig: pchar): jfieldID;
-  function getfield(classname: pchar; n, sig: pchar): jfieldID;
   function getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
-  function getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
   function getstaticfield(c: jclass; n, sig: pchar): jfieldID;
-  function getstaticfield(classname: pchar; n, sig: pchar): jfieldID;
 
   function getObjectField(obj: jobject; id: jfieldID): jobject;
   function getStringField(obj: jobject; id: jfieldID): string;
@@ -195,8 +193,29 @@ var jvmref: PJavaVM; //**< Java VM reference as passed to JNI_OnLoad.
     jCustomClassLoaderFindClassMethod: jmethodID;
 
     jCommonClasses: record
+      &Object: record
+        classRef: jclass;
+        getClass: jmethodID;
+      end;
+      &Class: record
+        classRef: jclass;
+        getName: jmethodID;
+      end;
       &String: record
         classRef: jclass;
+      end;
+      Throwable: record
+        classRef: jclass;
+        getMessage: jmethodID;
+      end;
+      //arrayListClass: jclass;
+      ArrayList: record
+        classRef: jclass;
+        get_I, size: jmethodID;
+      end;
+      Map: record
+        classRef: jclass;
+        get_L: jmethodID;
       end;
       InputStream: record
         classRef: jclass;
@@ -223,7 +242,6 @@ const JNI_VERSION_DEFAULT = JNI_VERSION_1_6;
 
 function needJ: TJavaEnv;
 
-
 function JNI_OnLoad(vm:PJavaVM;reserved:pointer):jint; {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 procedure JNI_OnUnload(vm:PJavaVM;reserved:pointer); {$ifdef mswindows}stdcall;{$else}cdecl;{$endif}
 
@@ -243,7 +261,28 @@ procedure initializeCommonClasses;
 begin
   if commonClassesInitialized then exit;
   with jCommonClasses, j do begin
+    with &Object do begin
+      classRef := newGlobalRefAndDelete(j.getclass('java/lang/Object'));
+      getClass := getmethod(classRef, 'getClass', '()Ljava/lang/Class;');
+    end;
+    with &Class do begin
+      classRef := newGlobalRefAndDelete(getclass('java/lang/Class'));
+      getName := getmethod(classRef, 'getName', '()Ljava/lang/String;');
+    end;
     &String.classRef := newGlobalRefAndDelete(getclass('java/lang/String'));
+    with Throwable do begin
+      classRef := newGlobalRefAndDelete(getclass('java/lang/Throwable'));
+      getMessage := getmethod(classRef, 'getMessage', '()Ljava/lang/String;');
+    end;
+    with Map do begin
+      classRef := newGlobalRefAndDelete(getclass('java/util/Map'));
+      get_L := getmethod(classRef, 'get', '(Ljava/lang/Object;)Ljava/lang/Object;')
+    end;
+    with ArrayList do begin
+      classRef := newGlobalRefAndDelete(getclass('java/util/ArrayList'));
+      get_I := getmethod(classRef, 'get', '(I)Ljava/lang/Object;');
+      size := getmethod(classRef, 'size', '()I');
+    end;
     with InputStream do begin
       classRef := newGlobalRefAndDelete(getclass('java/io/InputStream'));
       read_B := getmethod(classRef, 'read', '([B)I');
@@ -503,6 +542,12 @@ begin
   result := j.newGlobalRefAndDelete(self);
 end;
 
+procedure TJavaEnv.checkResult(r: pointer; kind, n, sig: pchar);
+begin
+  RethrowJavaExceptionIfThereIsOne();
+  if r = nil then
+    raise EAndroidInterfaceException.Create('Failed to find '+string(kind)+' '+string(n)+' '+string(sig));
+end;
 
 
 function TJavaEnv.getclass(n: pchar): jclass;
@@ -520,65 +565,30 @@ begin
     if result <> nil then exit;
   end;
   result := env^^.FindClass(env, n);
-  RethrowJavaExceptionIfThereIsOne();
+  checkResult(result, 'class', n, '');
 end;
 function TJavaEnv.getmethod(c: jclass; n, sig: pchar): jmethodID;
 begin
   result := env^^.GetMethodID(env, c, n, sig);
-  RethrowJavaExceptionIfThereIsOne();
-end;
-
-function TJavaEnv.getmethod(classname: pchar; n, sig: pchar): jmethodID;
-var
-  c: jclass;
-begin
-  c := getclass(classname);
-  result := getmethod(c, n, sig);
-  deleteLocalRef(c);
+  checkResult(result, 'method', n, '');
 end;
 
 function TJavaEnv.getfield(c: jclass; n, sig: pchar): jfieldID;
 begin
   result := env^^.GetFieldID(env, c, n, sig);
-end;
-
-function TJavaEnv.getfield(classname: pchar; n, sig: pchar): jfieldID;
-var
-  c: jclass;
-begin
-  c := getclass(classname);
-  result := env^^.GetFieldID(env, c, n, sig);
-  deleteLocalRef(c);
+  checkResult(result, 'field', n, '');
 end;
 
 function TJavaEnv.getstaticmethod(c: jclass; n, sig: pchar): jmethodID;
 begin
   result := env^^.GetStaticMethodID(env, c, n, sig);
-  if (result = nil) or (env^^.ExceptionCheck(env)<>0) then
-    raise EAndroidInterfaceException.Create('TAndroidInternetAccess: Failed to find method: '+string(n)+' '+string(sig));
-end;
-
-function TJavaEnv.getstaticmethod(classname: pchar; n, sig: pchar): jmethodID;
-var
-  c: jclass;
-begin
-  c := getclass(classname);
-  result := getstaticmethod(c, n, sig);
-  deleteLocalRef(c);
+  checkResult(result, 'static method', n, '');
 end;
 
 function TJavaEnv.getstaticfield(c: jclass; n, sig: pchar): jfieldID;
 begin
   result := env^^.GetStaticFieldID(env, c, n, sig);
-end;
-
-function TJavaEnv.getstaticfield(classname: pchar; n, sig: pchar): jfieldID;
-var
-  c: jclass;
-begin
-  c := getclass(classname);
-  result := getstaticfield(c, n, sig);
-  deleteLocalRef(c);
+  checkResult(result, 'static field', n, '');
 end;
 
 function TJavaEnv.getObjectField(obj: jobject; id: jfieldID): jobject;
@@ -1150,9 +1160,9 @@ begin
   if je = nil then exit('');
   env^^.ExceptionDescribe(env);
   env^^.ExceptionClear(env); //carefully, we need to clear before calling anything else
-  temp:= env^^.CallObjectMethod(env, je, getmethod('java/lang/Object', 'getClass', '()Ljava/lang/Class;'));
-  result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, getmethod('java/lang/Class', 'getName', '()Ljava/lang/String;'))) + ': '
-          + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, getmethod('java/lang/Throwable', 'getMessage', '()Ljava/lang/String;')));
+  temp:= env^^.CallObjectMethod(env, je, jCommonClasses.&Object.getClass);
+  result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, jCommonClasses.&Class.getName)) + ': '
+          + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, jCommonClasses.Throwable.getMessage));
   DeleteLocalRef(temp);
   deleteLocalRef(je);
 end;
@@ -1250,7 +1260,7 @@ end;
 
 function TJavaEnv.getMapProperty(map: jobject; value: jobject): jobject;
 begin
-  result := callObjectMethod(map, getmethod('java/util/Map', 'get', '(Ljava/lang/Object;)Ljava/lang/Object;'), @value);
+  result := callObjectMethod(map, jCommonClasses.Map.get_L, @value);
 end;
 
 {$ifdef android}
