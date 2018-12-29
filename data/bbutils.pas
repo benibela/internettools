@@ -1697,7 +1697,7 @@ var p:SizeInt;
     m: SizeInt;
     reslen: SizeInt;
 begin
-  SetLength(splitted,0);
+  splitted := nil;
   reslen := 0;
   if s='' then begin
     if includeEmpty then begin
@@ -1903,7 +1903,7 @@ function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawB
 
 var toCPActual: TSystemCodePage;
 
-  procedure convertUtf8ToWesternEurope(var result: RawByteString);
+  procedure convertUtf8ToWesternEurope(out result: RawByteString);
   var
     cp: Integer;
     i, reslen: SizeInt;
@@ -1940,7 +1940,7 @@ var toCPActual: TSystemCodePage;
     SetCodePage(result, toCP, false);
   end;
 
-  procedure convertWesternEurope(var result: RawByteString);
+  procedure convertWesternEurope(out result: RawByteString);
   var
     i: SizeInt;
   begin
@@ -1952,7 +1952,7 @@ var toCPActual: TSystemCodePage;
     SetCodePage(result, toCP, false);
   end;
 
-  procedure convertWesternEuropeToUtf8(var result: RawByteString);
+  procedure convertWesternEuropeToUtf8(out result: RawByteString);
   var
     len, reslen, i: SizeInt;
     builder: TStrBuilder;
