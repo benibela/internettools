@@ -2626,14 +2626,17 @@ end;
 
 function strEscape(s: string; const toEscape: TCharSet; escapeChar: ansichar): string;
 var
- i: SizeInt;
+  i: SizeInt;
+  sb: TStrBuilder;
 begin
   result := '';
   if length(s) = 0 then exit;
+  sb.init(@result, length(s));
   for i:=1 to length(s) do begin
-    if s[i] in toEscape then result := result +  escapeChar;
-    result := result +  s[i];
+    if s[i] in toEscape then sb.append(escapeChar);
+    sb.append(s[i]);
   end;
+  sb.final;
 end;
 
 function charEncodeHexDigitUp(digit: integer): char;
