@@ -2,6 +2,7 @@ unit xpath2_tests;
 
 {$mode objfpc}{$H+}
 
+{$ifndef cpuarm}{$define TEST_FLOAT}{$endif}
 interface
 
 uses
@@ -780,7 +781,7 @@ begin
   t('round-half-to-even(0.5E0)', '0', '');
   t('round-half-to-even(1.5E0)', '2', '');
   t('round-half-to-even(2.5E0)', '2', '');
-  t('round-half-to-even(3.567812E+3, 2)', '3567.81', '');
+  {$ifdef TEST_FLOAT}t('round-half-to-even(3.567812E+3, 2)', '3567.81', '');{$endif}
   t('round-half-to-even(4.7564E-3, 2)', '0', '');
   t('round-half-to-even(35612.25, -2)', '35600', '');
   t('round-half-to-even(xs:double("NaN"))', 'NaN', '');
