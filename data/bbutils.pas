@@ -514,7 +514,7 @@ function strIterator(const s: RawByteString): TStrIterator;
 
 //** Str builder. Preliminary. Interface might change at any time
 type TStrBuilder = object
-private
+protected
   next, bufferend: pchar; //next empty pchar and first pos after the string
   encoding: TSystemCodePage;
   procedure appendWithEncodingConversion(const s: RawByteString);
@@ -531,10 +531,10 @@ public
   function isEmpty: boolean; inline;
   procedure reserveadd(delta: SizeInt);
   procedure append(c: char); inline;
-  procedure append(const s: RawByteString); inline;
+  procedure append(const s: RawByteString);
   procedure appendCodePoint(const codepoint: integer);
-  procedure append(const p: pchar; const l: SizeInt); inline;
-  procedure appendBuffer(const block; l: LongInt); inline;
+  procedure append(const p: pchar; const l: SizeInt);
+  procedure appendBuffer(const block; l: LongInt);
   procedure appendHexEntity(codepoint: integer);
   procedure chop(removedCount: SizeInt);
 end;
@@ -840,6 +840,7 @@ begin
   threadedCallBase(TProcedureOfObject(procedureToMethod(proc)),TNotifyEvent(isfinished));
 end;
 
+{$ImplicitExceptions off}
 function charDecodeDigit(c: char): integer;
 begin
   case c of
@@ -859,9 +860,222 @@ begin
     else raise Exception.Create('Character '+c+' is not a valid hex digit');
   end;
 end;
+function charEncodeHexDigitUp(digit: integer): char;
+begin
+  case digit of
+    0..9: result := chr(ord('0') + digit);
+    $A..$F: result := chr(ord('A') - $A + digit);
+    else begin assert(false); result := #0; end;
+  end;
+end;
+
+{$ImplicitExceptions on}
 
 
 //=========================String functions======================
+
+function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
+begin
+  //this is basically TranslatePlaceholderCP, but that is unaccessible in fpc's astrings.inc
+  case e of
+    CP_ACP: result := {$IFDEF FPC_HAS_CPSTRING}DefaultSystemCodePage
+                      {$else}{$ifdef windows}GetACP
+                      {$else}CP_UTF8
+                      {$endif}{$endif};
+    {$ifdef windows}{$ifndef WINCE}
+    CP_OEMCP: result := GetOEMCP;
+    {$endif}{$endif}
+
+    else result := e;
+  end;
+end;
+
+function strActualEncoding(const str: RawByteString): TSystemCodePage;
+begin
+  result := strActualEncoding(StringCodePage(str));
+end;
+
+
+{$ifdef fpc}
+function TStrIterator.MoveNext: Boolean;
+begin
+  result := pos <= length(s);
+  fcurrent := strDecodeUTF8Character(s, pos);
+end;
+
+function TStrIterator.GetEnumerator: TStrIterator;
+begin
+  result := self;
+end;
+
+function strIterator(const s: RawByteString): TStrIterator;
+begin
+  result.s := s;
+  result.pos := 1;
+end;
+
+procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
+var temp: RawByteString;
+begin
+  temp := s;
+  SetCodePage(temp, encoding);
+  append(pchar(temp), length(temp));
+end;
+
+procedure TStrBuilder.appendCodePointToUtf8String(const codepoint: integer);
+var
+  l: Integer;
+begin
+  l := strGetUnicodeCharacterUTFLength(codepoint);
+  if next + l > bufferend then reserveadd(l);
+  strGetUnicodeCharacterUTF(codepoint, next);
+  inc(next, l);
+end;
+
+procedure TStrBuilder.appendCodePointWithEncodingConversion(const codepoint: integer);
+var temp: RawByteString;
+  p: PChar;
+begin
+  temp := strGetUnicodeCharacter(codepoint, encoding);
+  p := pchar(pointer(temp));
+  append(p, length(temp));
+end;
+
+procedure TStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
+begin
+  buffer := abuffer;
+  if basecapacity <= 0 then basecapacity := 1;
+  SetLength(buffer^, basecapacity); //need to create a new string to prevent aliasing
+  //if length(buffer^) < basecapacity then
+  //else UniqueString(buffer^);    //or could uniquestring be enough?
+
+  next := pchar(buffer^);
+  bufferend := next + length(buffer^);
+
+  //encoding := strActualEncoding(buffer^);
+  SetCodePage(RawByteString(buffer^), aencoding, false);
+  encoding := strActualEncoding(aencoding);
+end;
+
+procedure TStrBuilder.clear;
+begin
+  next := Pointer(buffer^);
+end;
+
+function TStrBuilder.count: SizeInt;
+begin
+  result := next - pointer(buffer^);
+end;
+
+function TStrBuilder.isEmpty: boolean;
+begin
+  result := pchar(buffer^) = next;
+end;
+
+procedure TStrBuilder.final;
+begin
+  if next <> bufferend then begin
+    setlength(buffer^, count);
+    next := pchar(buffer^) + length(buffer^);
+    bufferend := next;
+  end;
+end;
+
+procedure TStrBuilder.reserveadd(delta: SizeInt);
+var
+  oldlen: SizeInt;
+begin
+  if next + delta > bufferend then begin
+    oldlen := count;
+    SetLength(buffer^, max(2*length(buffer^), oldlen + delta));
+    next := pchar(buffer^) + oldlen;
+    bufferend := pchar(buffer^) + length(buffer^);
+  end;
+end;
+
+procedure TStrBuilder.append(c: char);
+begin
+  if next >= bufferend then reserveadd(1);
+  next^ := c;
+  inc(next);
+end;
+
+procedure TStrBuilder.append(const s: RawByteString);
+var
+  l: SizeInt;
+begin
+  if length(s) <= 0 then exit;
+  if strActualEncoding(s) = encoding then begin
+    l := length(s);
+    if next + l > bufferend then reserveadd(l);
+    move(pbyte(s)^, next^, l);
+    inc(next, l);
+  end else
+    appendWithEncodingConversion(s);
+end;
+
+procedure TStrBuilder.appendRaw(const s: RawByteString);
+begin
+  append(pchar(pointer(s)), length(s));
+end;
+
+procedure TStrBuilder.appendCodePoint(const codepoint: integer);
+begin
+  case encoding of
+    CP_NONE, CP_UTF8:
+      appendCodePointToUtf8String(codepoint);
+    CP_ASCII, CP_LATIN1:
+      if codepoint <= 127 then
+        append(chr(codepoint));
+    else
+      appendCodePointWithEncodingConversion(codepoint);
+  end;
+end;
+
+procedure TStrBuilder.append(const p: pchar; const l: SizeInt);
+begin
+  if l <= 0 then exit;
+  if next + l > bufferend then reserveadd(l);
+  move(p^, next^, l);
+  inc(next, l);
+end;
+
+procedure TStrBuilder.appendBuffer(const block; l: LongInt);
+begin
+  if l <= 0 then exit;
+  if next + l > bufferend then reserveadd(l);
+  move(block, next^, l);
+  inc(next, l);
+end;
+
+
+procedure TStrBuilder.appendHexEntity(codepoint: integer);
+begin
+  append('&#x');
+  if codepoint <= $FF then begin
+    if codepoint > $F then append(charEncodeHexDigitUp( codepoint shr 4 ));
+    append(charEncodeHexDigitUp(  codepoint and $F ))
+  end else appendHexNumber(codepoint);
+  append(';');
+end;
+
+procedure TStrBuilder.chop(removedCount: SizeInt);
+begin
+  dec(next, removedCount);
+  if next < pointer(buffer^) then next := pointer(buffer^);
+end;
+
+procedure TStrBuilder.appendHexNumber(codepoint: integer);
+var
+  digits: Integer;
+begin
+  digits := 1;
+  while codepoint shr (4 * digits) > 0 do inc(digits);
+  append(IntToHex(codepoint, digits));
+end;
+
+{$endif}
+
 
 function strlmove(dest, source: pansichar; destLen, sourceLen: SizeInt): pansichar;
 begin
@@ -888,27 +1102,9 @@ end;
 
 //---------------------Comparison----------------------------
 
-function strActualEncoding(const str: RawByteString): TSystemCodePage;
-begin
-  result := strActualEncoding(StringCodePage(str));
-end;
 
 
-function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
-begin
-  //this is basically TranslatePlaceholderCP, but that is unaccessible in fpc's astrings.inc
-  case e of
-    CP_ACP: result := {$IFDEF FPC_HAS_CPSTRING}DefaultSystemCodePage
-                      {$else}{$ifdef windows}GetACP
-                      {$else}CP_UTF8
-                      {$endif}{$endif};
-    {$ifdef windows}{$ifndef WINCE}
-    CP_OEMCP: result := GetOEMCP;
-    {$endif}{$endif}
 
-    else result := e;
-  end;
-end;
 
 //--Length-limited
 function strlEqual(const p1, p2: pansichar; const l: SizeInt): boolean;
@@ -1014,18 +1210,27 @@ end;
 
 
 function strlsequal(p: pansichar; const s: string; l: SizeInt): boolean;
+var
+  q: PAnsiChar;
 begin
-  result:=(l = length(s)) and ((l = 0) or (strlsequal(p, pansichar(pointer(s)),l,l)));
+  q := pansichar(pointer(s));
+  result:=(l = length(s)) and ((l = 0) or (strlsequal(p, q, l,l)));
 end;
 
 function strlequal(p: pansichar; const s: string; l: SizeInt): boolean;
+var
+  q: PAnsiChar;
 begin
-  result := (l = length(s)) and ( (l = 0) or strlsequal(p, pansichar(pointer(s)), l, l));
+  q := pansichar(pointer(s));
+  result := (l = length(s)) and ( (l = 0) or strlsequal(p, q, l, l));
 end;
 
 function strliequal(p: pansichar; const s:string;l: SizeInt): boolean;
+var
+  q: PAnsiChar;
 begin
-  result := (l = length(s)) and ( (l = 0) or strlsiequal(p, pansichar(pointer(s)), l, l));
+  q := pansichar(pointer(s));
+  result := (l = length(s)) and ( (l = 0) or strlsiequal(p, q, l, l));
 end;
 
 
@@ -1064,48 +1269,72 @@ begin
 end;
 
 function strlbeginswith(const p: pansichar; l: SizeInt; const expectedStart: string): boolean;
+var
+  q: PAnsiChar;
 begin
-  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsequal(p,pansichar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
+  q := pansichar(pointer(expectedStart));
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsequal(p,q,length(expectedStart),length(expectedStart))));
 end;
 
 function strlibeginswith(const p: pansichar; l: SizeInt; const expectedStart: string): boolean;
+var
+  q: PAnsiChar;
 begin
-  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsiequal(p,pansichar(pointer(expectedStart)),length(expectedStart),length(expectedStart))));
+  q := pansichar(pointer(expectedStart));
+  result:=(expectedStart='') or ((l>=length(expectedStart)) and (strlsiequal(p,q,length(expectedStart),length(expectedStart))));
 end;
 
 
 function strbeginswith(const p: pansichar; const expectedStart: string): boolean;
+var
+  q: PAnsiChar;
 begin
-  result:=(expectedStart='') or (strlnsequal(p, pansichar(pointer(expectedStart)), length(expectedStart)));
+  q := pansichar(pointer(expectedStart));
+  result:=(expectedStart='') or (strlnsequal(p, q, length(expectedStart)));
 end;
 
 function stribeginswith(const p: pansichar; const expectedStart: string): boolean;
+var
+  q: PAnsiChar;
 begin
-  result:=(expectedStart='') or (strlnsiequal(p, pansichar(pointer(expectedStart)), length(expectedStart)));
+  q := pansichar(pointer(expectedStart));
+  result:=(expectedStart='') or (strlnsiequal(p, q, length(expectedStart)));
 end;
 
 function strbeginswith(const strToBeExaminated,expectedStart: string): boolean;
+var
+  strLength, expectedLength: SizeInt;
 begin
-  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsequal(pansichar(pointer(strToBeExaminated)), pansichar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
+  strLength := length(strToBeExaminated);
+  expectedLength := length(expectedStart);
+  result:= (strLength >= expectedLength) and ( (expectedStart='') or (CompareByte(PByte(strToBeExaminated)^, pbyte(expectedStart)^, expectedLength ) = 0));
 end;
 
 function stribeginswith(const strToBeExaminated,expectedStart: string): boolean;
+var
+  strLength, expectedLength: SizeInt;
 begin
-  result:=(expectedStart='') or ((strToBeExaminated <> '') and strlsiequal(pansichar(pointer(strToBeExaminated)), pansichar(pointer(expectedStart)), length(expectedStart), length(expectedStart)));
+  strLength := length(strToBeExaminated);
+  expectedLength := length(expectedStart);
+  result:= (strLength >= expectedLength) and ( (expectedStart='') or strlsiequal(pansichar(pointer(strToBeExaminated)), pansichar(pointer(expectedStart)), expectedLength));
 end;
 
 function strendswith(const strToBeExaminated, expectedEnd: string): boolean;
+var
+  strLength, expectedLength: SizeInt;
 begin
-  result := (length(strToBeExaminated)>=Length(expectedEnd)) and
+  strLength := length(strToBeExaminated);
+  expectedLength := length(expectedEnd);
+  result := ( strLength >= expectedLength ) and
             ( (expectedEnd='') or
-              (strlsequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
+              (CompareByte(strToBeExaminated[strLength-expectedLength+1], PByte(expectedEnd)^, expectedLength) = 0) );
 end;
 
 function striendswith(const strToBeExaminated, expectedEnd: string): boolean;
 begin
   result := (length(strToBeExaminated)>=Length(expectedEnd)) and
             ( (expectedEnd='') or
-              (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd),length(expectedEnd))) );
+              (strlsiequal(@strToBeExaminated[length(strToBeExaminated)-length(expectedEnd)+1],pansichar(pointer(expectedEnd)),length(expectedEnd))) );
 end;
 
 function strlsIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
@@ -1160,20 +1389,6 @@ begin
   result:=-1;
 end;
 
-function strIndexOf(const str, searched: string): SizeInt;
-begin
-  result := strIndexOf(str, searched, 1);      //no default paramert, so you can take the address of both functions
-end;
-
-function strIndexOf(const str: string; const searched: TCharSet): SizeInt;
-begin
-  result := strIndexOf(str, searched, 1);
-end;
-
-function striIndexOf(const str, searched: string): SizeInt;
-begin
-  result := striIndexOf(str, searched, 1);
-end;
 
 function strindexof(const str, searched: string; from: SizeInt): SizeInt;
 begin
@@ -1202,6 +1417,22 @@ begin
   if result < 0 then begin result := 0; exit; end;
   inc(result,  from);
 end;
+
+function strIndexOf(const str, searched: string): SizeInt;
+begin
+  result := strIndexOf(str, searched, 1);      //no default paramert, so you can take the address of both functions
+end;
+
+function strIndexOf(const str: string; const searched: TCharSet): SizeInt;
+begin
+  result := strIndexOf(str, searched, 1);
+end;
+
+function striIndexOf(const str, searched: string): SizeInt;
+begin
+  result := striIndexOf(str, searched, 1);
+end;
+
 
 function strlsLastIndexOf(str, searched: pansichar; l1, l2: SizeInt): SizeInt;
 var last: pansichar;
@@ -1287,6 +1518,21 @@ begin
 end;
 
 
+function strcontains(const str, searched: string; from: SizeInt): boolean;
+begin
+  result:=strindexof(str, searched, from) > 0;
+end;
+
+function strContains(const str: string; const searched: TCharSet; from: SizeInt): boolean;
+begin
+  result:=strindexof(str, searched, from) > 0;
+end;
+
+function stricontains(const str, searched: string; from: SizeInt): boolean;
+begin
+  result:=striindexof(str, searched, from) > 0;
+end;
+
 function strContains(const str, searched: string): boolean;
 begin
   result := strContains(str, searched, 1);
@@ -1302,20 +1548,6 @@ begin
   result := striContains(str, searched, 1);
 end;
 
-function strcontains(const str, searched: string; from: SizeInt): boolean;
-begin
-  result:=strindexof(str, searched, from) > 0;
-end;
-
-function strContains(const str: string; const searched: TCharSet; from: SizeInt): boolean;
-begin
-  result:=strindexof(str, searched, from) > 0;
-end;
-
-function stricontains(const str, searched: string; from: SizeInt): boolean;
-begin
-  result:=striindexof(str, searched, from) > 0;
-end;
 
 function strcopyfrom(const s: string; start: SizeInt): string; {$IFDEF HASINLINE} inline; {$ENDIF}
 begin
@@ -2639,14 +2871,6 @@ begin
   sb.final;
 end;
 
-function charEncodeHexDigitUp(digit: integer): char;
-begin
-  case digit of
-    0..9: result := chr(ord('0') + digit);
-    $A..$F: result := chr(ord('A') - $A + digit);
-    else begin assert(false); result := #0; end;
-  end;
-end;
 
 function strEscapeToHex(s:string; const toEscape: TCharSet; escape: string): string;
 var
@@ -2684,6 +2908,7 @@ var
   f, t: SizeInt;
   start: SizeInt;
   last: SizeInt;
+  pescape: PChar;
 begin
   if escape = '' then begin
     result := strDecodeHex(s);
@@ -2699,8 +2924,9 @@ begin
   f := start;
   t := start;
   last := length(s) - length(escape) + 1 - 2;
+  pescape := pchar(escape);
   while f <= last do begin
-    if strlsequal(@s[f], pchar(escape), length(escape)) then begin
+    if strlsequal(@s[f], pescape, length(escape)) then begin
       inc(f, length(escape));
       result[t] := chr(charDecodeHexDigit(s[f]) shl 4 or charDecodeHexDigit(s[f+1]));
       inc(f, 2);
@@ -3307,181 +3533,7 @@ end;
 
 
 
-{$ifdef fpc}
-function TStrIterator.MoveNext: Boolean;
-begin
-  result := pos <= length(s);
-  fcurrent := strDecodeUTF8Character(s, pos);
-end;
 
-function TStrIterator.GetEnumerator: TStrIterator;
-begin
-  result := self;
-end;
-
-function strIterator(const s: RawByteString): TStrIterator;
-begin
-  result.s := s;
-  result.pos := 1;
-end;
-
-procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
-var temp: RawByteString;
-begin
-  temp := s;
-  SetCodePage(temp, encoding);
-  append(pchar(temp), length(temp));
-end;
-
-procedure TStrBuilder.appendCodePointToUtf8String(const codepoint: integer);
-var
-  l: Integer;
-begin
-  l := strGetUnicodeCharacterUTFLength(codepoint);
-  if next + l > bufferend then reserveadd(l);
-  strGetUnicodeCharacterUTF(codepoint, next);
-  inc(next, l);
-end;
-
-procedure TStrBuilder.appendCodePointWithEncodingConversion(const codepoint: integer);
-begin
-  appendRaw(strGetUnicodeCharacter(codepoint, encoding));
-end;
-
-procedure TStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
-begin
-  buffer := abuffer;
-  if basecapacity <= 0 then basecapacity := 1;
-  SetLength(buffer^, basecapacity); //need to create a new string to prevent aliasing
-  //if length(buffer^) < basecapacity then
-  //else UniqueString(buffer^);    //or could uniquestring be enough?
-
-  next := pchar(buffer^);
-  bufferend := next + length(buffer^);
-
-  //encoding := strActualEncoding(buffer^);
-  SetCodePage(RawByteString(buffer^), aencoding, false);
-  encoding := strActualEncoding(aencoding);
-end;
-
-procedure TStrBuilder.clear;
-begin
-  next := Pointer(buffer^);
-end;
-
-procedure TStrBuilder.final;
-begin
-  if next <> bufferend then begin
-    setlength(buffer^, count);
-    next := pchar(buffer^) + length(buffer^);
-    bufferend := next;
-  end;
-end;
-
-function TStrBuilder.count: SizeInt;
-begin
-  result := next - pointer(buffer^);
-end;
-
-function TStrBuilder.isEmpty: boolean;
-begin
-  result := pchar(buffer^) = next;
-end;
-
-procedure TStrBuilder.reserveadd(delta: SizeInt);
-var
-  oldlen: SizeInt;
-begin
-  if next + delta > bufferend then begin
-    oldlen := count;
-    SetLength(buffer^, max(2*length(buffer^), oldlen + delta));
-    next := pchar(buffer^) + oldlen;
-    bufferend := pchar(buffer^) + length(buffer^);
-  end;
-end;
-
-procedure TStrBuilder.append(c: char);
-begin
-  if next >= bufferend then reserveadd(1);
-  next^ := c;
-  inc(next);
-end;
-
-procedure TStrBuilder.append(const s: RawByteString);
-begin
-  if strActualEncoding(s) = encoding then begin
-    appendRaw(s);
-  end else
-    appendWithEncodingConversion(s);
-end;
-
-procedure TStrBuilder.appendRaw(const s: RawByteString);
-begin
-  append(pchar(pointer(s)), length(s));
-end;
-
-procedure TStrBuilder.appendCodePoint(const codepoint: integer);
-begin
-  case encoding of
-    CP_NONE, CP_UTF8: begin
-      appendCodePointToUtf8String(codepoint);
-      exit;
-    end;
-    CP_ASCII, CP_LATIN1: begin
-      if codepoint <= 127 then begin
-        if next + 1 > bufferend then reserveadd(1);
-        next^ := chr(codepoint);
-        inc(next);
-        exit;
-      end;
-    end;
-  end;
-  appendCodePointWithEncodingConversion(codepoint);
-end;
-
-procedure TStrBuilder.append(const p: pchar; const l: SizeInt); inline;
-begin
-  if l <= 0 then exit;
-  if next + l > bufferend then reserveadd(l);
-  move(p^, next^, l);
-  inc(next, l);
-end;
-
-procedure TStrBuilder.appendBuffer(const block; l: LongInt);
-begin
-  if l <= 0 then exit;
-  if next + l > bufferend then reserveadd(l);
-  move(block, next^, l);
-  inc(next, l);
-end;
-
-
-procedure TStrBuilder.appendHexEntity(codepoint: integer);
-begin
-  append('&#x');
-  if codepoint <= $FF then begin
-    if codepoint > $F then append(charEncodeHexDigitUp( codepoint shr 4 ));
-    append(charEncodeHexDigitUp(  codepoint and $F ))
-  end else appendHexNumber(codepoint);
-  append(';');
-end;
-
-procedure TStrBuilder.chop(removedCount: SizeInt);
-begin
-  dec(next, removedCount);
-  if next < pointer(buffer^) then next := pointer(buffer^);
-end;
-
-procedure TStrBuilder.appendHexNumber(codepoint: integer);
-var
-  digits: Integer;
-begin
-  digits := 1;
-  while codepoint shr (4 * digits) > 0 do inc(digits);
-  append(IntToHex(codepoint, digits));
-end;
-
-{$endif}
 
 
 {$IFNDEF FPC}
@@ -4650,6 +4702,10 @@ begin
 
 end;
 
+
+{$I bbutils.inc}
+
+
 function compareLongint(c:TObject; a, b:pointer):longint;
 begin
   ignore(c);
@@ -4756,7 +4812,6 @@ begin
 end;
 
 
-{$I bbutils.inc}
 
 function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):RawByteString;
   procedure parseError;
