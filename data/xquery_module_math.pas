@@ -231,13 +231,13 @@ begin
 end;
 
 
-function mathIntPower(const a: xqfloat; i: int64): IXQValue;
+{function mathIntPower(const a: xqfloat; i: int64): IXQValue;
 begin
   if i = 0 then exit(xqv(1));
   if IsInfinite(a) then
     if (a < 0) and (odd(i)) then exit(xqv(-Infinity))
     else exit(xqv(Infinity));
-end;
+end;}
 
 function mathPow({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var

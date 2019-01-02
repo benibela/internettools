@@ -730,6 +730,7 @@ begin
     else raiseInternalError(1651217);
   end;
   raiseInternalError(1651218);
+  Result := nil;
 end;
 
 function TXQTermDefineVariable.getExpression: TXQTerm;
@@ -914,44 +915,45 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
         result := t.derivedFrom(atomicTypeInfo);
         if result and (length(children) > 0) then begin
           if (atomicTypeInfo = baseJSONiqSchema.array_) then result := checkArrayMembers
-          else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkMap;
+          else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkMap
+          else raiseInternalError(2019010327);
         end;
       end;
-      tikFunctionTest: case sub.kind of
-        pvkFunction: begin
-          if length(arguments) = 0 then exit(true);
-          fun := sub as TXQValueFunction;
-          if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
-          for i := 0 to high(fun.parameters) do
-            if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
-          if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
-          else result := arguments[high(arguments)].isItemStar();
-        end;
-        pvkArray, pvkObject: begin
-          //map:   function(A) as item()*,  A: any atomic
-          //array: function(xs:integer) as item()*
-          case length(arguments) of
-            0: result := true;
-            2: begin
-              if not (arguments[high(arguments)].isItemStar()) then exit(false);
-              with arguments[0] do begin
-                if (allowNone) or (allowMultiple) then exit(false);
-                case kind of
-                  tikNone: exit(false);
-                  tikAtomic:
-                    case sub.kind of
-                      pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
-                      pvkObject: result := true;
-                    end;
-                  tikAny: result := true;
-                  else result := false;
+      tikFunctionTest: begin
+        result := false; //hide warning
+        case sub.kind of
+          pvkFunction: begin
+            if length(arguments) = 0 then exit(true);
+            fun := sub as TXQValueFunction;
+            if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
+            for i := 0 to high(fun.parameters) do
+              if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
+            if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
+            else result := arguments[high(arguments)].isItemStar();
+          end;
+          pvkArray, pvkObject: begin
+            //map:   function(A) as item()*,  A: any atomic
+            //array: function(xs:integer) as item()*
+            case length(arguments) of
+              0: result := true;
+              2: begin
+                if not (arguments[high(arguments)].isItemStar()) then exit(false);
+                with arguments[0] do begin
+                  if (allowNone) or (allowMultiple) then exit(false);
+                  case kind of
+                    tikNone: exit(false);
+                    tikAtomic:
+                      case sub.kind of
+                        pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
+                        pvkObject: result := true;
+                      end;
+                    tikAny: result := true;
+                  end;
                 end;
               end;
             end;
-            else result := false;
-          end;
-        end
-        else result := false;
+          end
+        end;
       end;
       else result := false; //hide warning
     end;
@@ -1146,6 +1148,10 @@ begin
     pvkObject, pvkArray: begin
       if (length(arguments) <> 1 + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
       fresult := TXQValueFunction.create();
+    end;
+    else begin
+      raiseInternalError(2019010223);
+      exit(nil);
     end;
   end;
   //see TXQTermDefineFunction.defineDynamicPartialApplication

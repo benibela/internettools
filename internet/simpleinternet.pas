@@ -153,6 +153,20 @@ threadvar
   lastQueryWasPXP: boolean;
   lastRetrievedType: TRetrieveType;
 
+function defaultInternet: TInternetAccess;
+begin
+  result := internetaccess.defaultInternet;
+end;
+
+function defaultQueryEngine: TXQueryEngine;
+begin
+  result := xquery.defaultQueryEngine;
+end;
+
+procedure needInternetAccess;
+begin
+end;
+
 
 function retrieve(data: string): string;
 var trimmed: string;
@@ -195,6 +209,7 @@ begin
   case lastRetrievedType of
     rtRemoteURL: dataFileName := defaultInternet.lastUrl;
     rtFile: dataFileName := fileNameExpandToURI(datain);
+    else dataFileName := '';
   end;
   contentType := lastContentType;
   format := guessFormat(data, dataFileName, contentType);
@@ -280,19 +295,6 @@ begin
   xquery.freeThreadVars;
 end;
 
-function defaultInternet: TInternetAccess;
-begin
-  result := internetaccess.defaultInternet;
-end;
-
-function defaultQueryEngine: TXQueryEngine;
-begin
-  result := xquery.defaultQueryEngine;
-end;
-
-procedure needInternetAccess;
-begin
-end;
 
 
 function httpRequest(url: string): string;

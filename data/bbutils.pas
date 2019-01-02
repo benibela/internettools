@@ -222,6 +222,11 @@ function strlsEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overloa
 function strlsiEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
 function strlsiEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
 function strlsequal(p: pansichar; const s: string; l: SizeInt): boolean; overload;
+//equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
+function strlnsiequal(p1,p2:pansichar;l2: SizeInt):boolean;
+//equal comparison, case sensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
+function strlnsequal(p1,p2:pansichar;l2: SizeInt):boolean;
+
 
 function strlEqual(p:pansichar;const s:string; l: SizeInt):boolean; overload; //**< Tests if the strings are case-sensitive equal (same length and same characters)
 function strliEqual(p:pansichar;const s:string;l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters)

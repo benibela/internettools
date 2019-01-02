@@ -4326,12 +4326,12 @@ var
   function valueBool: Boolean;
   begin
     if pp.Value.kind = pvkBoolean then result := pp.value.toBoolean
-    else raiseInvalidParameter;
+    else begin raiseInvalidParameter; result := false; end
   end;
   function valueString(): string;
   begin
     if pp.Value.kind = pvkString then result := pp.value.toString
-    else raiseInvalidParameter;
+    else begin raiseInvalidParameter; result := ''; end
   end;
 
 begin
