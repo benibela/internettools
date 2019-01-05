@@ -1618,7 +1618,7 @@ var xpathText: TTreeNode;
 
     regex := attribs.Values['regex'];
     if regex<>'' then begin
-      tempa := xqvalueArray([value, xqvalue(regex), xqvalue(StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)), xqvalue('i')]);
+      xqvalueArray(tempa, [value, xqvalue(regex), xqvalue(StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)), xqvalue('i')]);
       value := xqFunctionExtract(length(tempa), @tempa[0]);
     end;
 

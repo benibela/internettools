@@ -837,6 +837,7 @@ end;
 
 function TJavaEnv.getIntArray(a: jobject): TLongintArray;
 begin
+  result := nil;
   SetLength(result, getArrayLength(a));
   if length(result) = 0 then exit;
   env^^.GetIntArrayRegion(env, a, 0, length(result), @result[0]);;

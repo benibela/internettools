@@ -2055,6 +2055,7 @@ var
 begin
   requireXQuery3('Annotations need XQuery 3');
   try
+    result := nil;
     setlength(result, 1);
     while true do begin
       with result[high(result)] do begin

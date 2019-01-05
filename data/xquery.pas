@@ -2627,7 +2627,7 @@ public
   //** The point is that it only creates a sequence if there are multiple values, and it is especially fast, if you do not expect multiple values.
   procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
 
-  function xqvalueArray(a: array of IXQValue): TXQVArray;
+  procedure xqvalueArray(var result: TXQVArray; a: array of IXQValue);
   //**Assigns source to dest without updating ref counts @br
   //**This can be much faster, but will cause a crash, unless the reference count is corrected later, e.g. by xqvalueVaporize on source or dest.
   procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
@@ -5820,7 +5820,7 @@ begin
   end;
 end;
 
-function xqvalueArray(a: array of IXQValue): TXQVArray;
+procedure xqvalueArray(var result: TXQVArray; a: array of IXQValue);
 var
   i: Integer;
 begin

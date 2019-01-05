@@ -82,7 +82,7 @@ begin
     result:=strDecodeHTMLEntities(p,l,fileEncoding)
    else
     result:=strFromPchar(p,l);
-  result:=strChangeEncoding(result,fileEncoding,outputEncoding);
+  result:=strConvert(result,fileEncoding,outputEncoding);
 end;
 
 function THTMLEventHandler.enterTagEvent(tagName: pchar; tagNameLen: SizeInt;

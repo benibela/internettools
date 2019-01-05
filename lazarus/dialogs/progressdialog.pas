@@ -23,7 +23,7 @@ type
   public
     { public declarations }
     addUnit: string;
-    constructor create(title,description:string;maxprogress:longint=100);
+    constructor create(title,description:string;maxprogress:longint=100); reintroduce;
     procedure setProgress(progress:longint);
     procedure progressEvent(sender:TObject;progress,maxprogress:longint);
   end;

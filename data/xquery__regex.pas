@@ -409,7 +409,7 @@ end;
 
 //This is a simplified version of regexprreencode that does not raise exceptions and just returns a nesting representation.
 //It returns an array of opening and closig(-) indices, e.g. ()(()) becomes 1,-1,2,3,-3,-2
-function regexprGetGroupNesting(regexpr: string): TLongintArray;
+procedure regexprGetGroupNesting(out result: TLongintArray; regexpr: string);
 var pos: integer;
 
   procedure abort;
@@ -933,7 +933,7 @@ begin
   if input <> '' then begin
     regex := wregexprParse(argc, argv, 2, false);
     if (argc > 2) and strContains(argv[2].toString, 'q') then nesting := nil
-    else nesting := regexprGetGroupNesting(argv[1].toString);
+    else regexprGetGroupNesting(nesting, argv[1].toString);
     try
       try
         {$IFDEF USE_SOROKINS_REGEX}

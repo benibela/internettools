@@ -5509,7 +5509,7 @@ begin
         if component = '' then begin
           if format = '' then format := '0';
           if pictured[i].modifier <> #0 then format += ';' + pictured[i].modifier else format += ';';
-          tempxqv :=xqvalueArray([xqvalue(number), xqvalue(format), xqvalue(lang)]);
+          xqvalueArray(tempxqv, [xqvalue(number), xqvalue(format), xqvalue(lang)]);
           component := xqFunctionFormat_Integer(context, 3, @tempxqv[0]).toString;
         end;
       end;

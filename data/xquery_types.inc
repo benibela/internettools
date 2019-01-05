@@ -10,7 +10,7 @@ end;
 
 function TXQValueUndefined.toArray: TXQVArray;
 begin
-  setlength(result, 0);
+  result := nil;
 end;
 
 function TXQValueUndefined.toXQVList: TXQVList;
@@ -138,8 +138,9 @@ end;
 
 function TXQValue.toArray: TXQVArray;
 begin
-  setlength(result, 1);
-  result[0] := self;
+  result := [self];
+  //setlength(result, 1);
+  //result[0] := self;
 end;
 
 {$ImplicitExceptions off}
@@ -343,7 +344,7 @@ begin
   result := nil;
 end;
 
-function TXQValue.Size: SizeInt;
+function TXQValue.Size: SizeInt; noreturn;
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Only arrays and objects have a size');
 end;
@@ -353,7 +354,7 @@ begin
   TXQValueEnumeratorPtrUnsafe.makesingleelement(self, result);
 end;
 
-function TXQValue.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
+function TXQValue.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; noreturn;
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Array enumerator called on non array.');
 end;
@@ -1615,8 +1616,9 @@ end;
 
 function TXQValueSequence.toArray: TXQVArray;
 var
-  i: Integer;
+  i: SizeInt;
 begin
+  result := nil;
   setlength(result, seq.Count);
   for i:=0 to high(result) do result[i] := seq[i];
 end;
