@@ -138,9 +138,9 @@ end;
 
 function TXQValue.toArray: TXQVArray;
 begin
-  result := [self];
-  //setlength(result, 1);
-  //result[0] := self;
+  result := nil;
+  setlength(result, 1);
+  result[0] := self;
 end;
 
 {$ImplicitExceptions off}
