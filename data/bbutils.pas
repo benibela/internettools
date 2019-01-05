@@ -1027,14 +1027,17 @@ end;
 procedure TStrBuilder.appendCodePoint(const codepoint: integer);
 begin
   case encoding of
-    CP_NONE, CP_UTF8:
+    CP_NONE, CP_UTF8: begin
       appendCodePointToUtf8String(codepoint);
+      exit;
+    end;
     CP_ASCII, CP_LATIN1:
-      if codepoint <= 127 then
+      if codepoint <= 127 then begin
         append(chr(codepoint));
-    else
-      appendCodePointWithEncodingConversion(codepoint);
+        exit;
+      end
   end;
+  appendCodePointWithEncodingConversion(codepoint);
 end;
 
 procedure TStrBuilder.append(const p: pchar; const l: SizeInt);
