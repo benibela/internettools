@@ -1253,22 +1253,25 @@ end;
 
 function strEqual(const s1, s2: RawByteString): boolean;
 begin
+  {$if (FPC_FULLVERSION >= 20700) and (FPC_FULLVERSION <= 30200)}
+  //the first fpc versions with codepage aware strings had really bad equality tests
   if pointer(s1) = pointer(s2) then begin
     result := true;
     exit;
   end;
-  {$IFDEF FPC_HAS_CPSTRING}
   if StringCodePage(s1) <> StringCodePage(s2) then
     if strActualEncoding(StringCodePage(s1)) <> strActualEncoding(StringCodePage(s2)) then begin
       result := s1 = s2; //this is slow due to encoding conversion
       exit;
     end;
-  {$ENDIF}
   if length(s1) <> length(s2) then begin
     result := false;
     exit;
   end;
   result:=CompareByte(pchar(pointer(s1))^, pchar(pointer(s2))^, length(s1)) = 0;
+  {$else}
+  result := s1 = s2;
+  {$endif}
 end;
 
 function striequal(const s1, s2: rawbytestring): boolean;
