@@ -82,7 +82,6 @@ end;
 
 
 
-
 //========================================XPATH 2.0/XQUERY 1.0 FUNCTIONS=========================================
 
 function xqvalueF(const v: xqfloat; const typeRef1, typeRef2: IXQValue): IXQValue;
@@ -1745,6 +1744,7 @@ var
 
 
 begin
+  requiredArgCount(argc, 1);
   resobj := TXQValueObject.create();
   result := resobj;
   paramobj := nil;
@@ -6175,6 +6175,7 @@ end;
 function xqFunctionTokenize_1(argc: SizeInt; argv: PIXQValue): IXQValue;
 var input: string;
 begin
+  requiredArgCount(argc, 1);
   input := strTrimAndNormalize(argv[0].toString, WHITE_SPACE);
   if input = '' then exit(xqvalue);
   result := xqvalue(strSplit(input, ' '));

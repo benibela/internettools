@@ -57,7 +57,9 @@ interface
 uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
-   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif};
+   {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
+   xquery__functions
+   ;
 
 
 
@@ -100,6 +102,7 @@ type
     fcurrent, flast: PIXQValue;
     class procedure clear(out enum: TXQValueEnumeratorPtrUnsafe); static;
     class procedure makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe); static;
+    function MoveNextSingleElement: Boolean;
   public
     function MoveNext: Boolean; inline;
     function MoveMany(count: sizeint): Boolean;
@@ -3058,8 +3061,14 @@ var
     nan: 'NaN');
 const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAttribute,qmDocument];
 
+type TXQueryInternals = object
+//private
+    class var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
+    class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); noreturn;
+end;
+
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, xquery__parse, xquery__functions, bbutilsbeta;
+uses base64, jsonscanner, strutils, xquery__regex, xquery__parse, bbutilsbeta;
 
 var
   XQFormats : TFormatSettings = (
@@ -5283,19 +5292,24 @@ begin
   enum.fcurrent := nil;
 end;
 
+function TXQValueEnumeratorPtrUnsafe.MoveNextSingleElement: Boolean;
+begin
+  //this must only be called if fcurrent = flast.
+  //i.e. fsingleelement should only used if fcurrent = flast = nil.
+  result := (fcurrent = nil) and (fsingleelement <> nil);
+  if result then begin
+    fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
+    flast := @fsingleelement;
+  end;
+end;
+
 function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
 begin
   result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs many times
-  if result then begin
-    inc(fcurrent);
-    exit;
-  end;
-  //if we get here fcurrent = flast. So fsingleelement is only used if fcurrent = flast = nil.
-  if (fcurrent = nil) and (fsingleelement <> nil) then begin
-    fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
-    flast := @fsingleelement;
-    exit(true);
-  end;
+  if result then
+    inc(fcurrent)
+  else
+    result := MoveNextSingleElement; //not inlined since it only occurs once
 end;
 
 function TXQValueEnumeratorPtrUnsafe.MoveMany(count: sizeint): Boolean;
@@ -5657,7 +5671,7 @@ end;
 {$IMPLICITEXCEPTIONS OFF}
 
 
-var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
+
 threadvar threadLocalCache: record
    runningEngines: integer;
    commonValues: array[TXQValueKind] of TXQValue;
@@ -5682,15 +5696,15 @@ end;
 
 function xqvalue: IXQValue;
 begin
-  result := commonValuesUndefined;
+  result := TXQueryInternals.commonValuesUndefined;
   //result := TXQValueUndefined.Create;
 end;
 
 function xqvalue(const v: Boolean): IXQValue;
 begin
   case v of
-    true:  result := commonValuesTrue;
-    false: result := commonValuesFalse;
+    true:  result := TXQueryInternals.commonValuesTrue;
+    false: result := TXQueryInternals.commonValuesFalse;
   end;
 
   //result := TXQValueBoolean.Create(v);
@@ -5698,12 +5712,12 @@ end;
 
 function xqvalueTrue: IXQValue;
 begin
-  result := commonValuesTrue;
+  result := TXQueryInternals.commonValuesTrue;
 end;
 
 function xqvalueFalse: IXQValue;
 begin
-  result := commonValuesFalse;
+  result := TXQueryInternals.commonValuesFalse;
 end;
 
 function xqvalue(const v: Int64): IXQValue;
@@ -9004,9 +9018,9 @@ baseJSONiqSchema := TJSONiqAdditionSchema.create();
 
 xquery__functions.initializeFunctions;
 
-commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped); //the type should probably be sequence (as undefined = empty-sequence()). however that cause xqts failures atm.
-commonValuesTrue := TXQValueBoolean.create(true);
-commonValuesFalse := TXQValueBoolean.create(false);
+TXQueryInternals.commonValuesUndefined := TXQValueUndefined.create(baseSchema.untyped); //the type should probably be sequence (as undefined = empty-sequence()). however that cause xqts failures atm.
+TXQueryInternals.commonValuesTrue := TXQValueBoolean.create(true);
+TXQueryInternals.commonValuesFalse := TXQValueBoolean.create(false);
 
 
 baseSchema.cacheDescendants; //this ignores the jsoniq types
@@ -9036,9 +9050,9 @@ baseSchema.free;
 baseJSONiqSchema.free;
 GlobalInterpretedNativeFunctionStaticContext.Free;
 GlobalStaticNamespaces.Free;
-commonValuesUndefined := nil;
-commonValuesTrue := nil;
-commonValuesFalse := nil;
+TXQueryInternals.commonValuesUndefined := nil;
+TXQueryInternals.commonValuesTrue := nil;
+TXQueryInternals.commonValuesFalse := nil;
 TXQueryEngine.freeCommonCaches;
 end.
 

@@ -239,7 +239,7 @@ end;
   else result := false;} //todo
 
 
-procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string);
+class procedure TXQueryInternals.raiseXSCEError(const err: TXSCastingError; const from, to_: string);
 var
   temp: String;
 begin
@@ -260,7 +260,7 @@ var temp: TXQValue;
   err: TXSCastingError;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then raiseXSCEError(err, v.toXQuery(), name);
+  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, v.toXQuery(), name);
   result := temp;
 end;
 
@@ -268,7 +268,7 @@ function TXSType.createValue(const v: Int64): IXQValue;
 var err: TXSCastingError;
   procedure fail;
   begin
-    raiseXSCEError(err, IntToStr(v), name)
+    TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
   end;
 
 var temp: TXQValue;
@@ -284,7 +284,7 @@ var temp: TXQValue;
 
 procedure fail;
 begin
-  raiseXSCEError(err, FloatToStr(v), name);
+  TXQueryInternals.raiseXSCEError(err, FloatToStr(v), name);
 end;
 
 begin
@@ -298,7 +298,7 @@ var temp: TXQValue;
   err: TXSCastingError;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then raiseXSCEError(err, BigDecimalToStr(v), name);
+  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, BigDecimalToStr(v), name);
   result := temp;
 end;
 
@@ -307,7 +307,7 @@ var temp: TXQValue;
   err: TXSCastingError;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then raiseXSCEError(err, v, name);
+  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, v, name);
   result := temp;
 end;
 
