@@ -3200,6 +3200,7 @@ end;
 
 constructor TXQMapStringOwningObject.Create;
 begin
+  inherited create;
   Sorted := true;
   OwnsObjects:=true;
   Duplicates := dupAccept;

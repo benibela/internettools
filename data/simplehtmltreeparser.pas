@@ -909,6 +909,7 @@ end;
 
 constructor TAttributeList.Create;
 begin
+  inherited create;
   OwnsObjects:=true;
 end;
 
