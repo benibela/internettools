@@ -1,7 +1,7 @@
 {
 A collection of often needed functions missing in FPC
 
-Copyright (C) 2008 - 2017  Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2019  Benito van der Zander (BeniBela)
                            benito@benibela.de
                            www.benibela.de
 

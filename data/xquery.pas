@@ -23,7 +23,7 @@
 unit xquery;
 
 {
-Copyright (C) 2008 - 2017 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2019 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -58,7 +58,7 @@ uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
-   xquery__functions
+   xquery__functions //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
    ;
 
 
