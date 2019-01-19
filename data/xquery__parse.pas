@@ -25,23 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
-  Classes, SysUtils, xquery;
+  Classes, SysUtils;
+
+
+function createXQParsingContext: TObject;
+
+implementation
+uses bbutils, simplehtmltreeparser, strutils, math, bbutilsbeta, xquery;
 
 type
  TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow, xqstNoMultiples);
  TXQSequenceTypeFlags = set of TXQSequenceTypeFlag;
- TXQTermPendingEQNameTokenPending = (xqptUnknown, xqptVariable, xqptAttribute, xqptElement);
- TXQTermPendingEQNameToken = class(TXQTermEQNameToken )
-   mode: TXQNamespaceMode;
-   data: integer;
-   pending: TXQTermPendingEQNameTokenPending;
-   constructor create;
-   constructor create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; somedata: integer = 0);
-   constructor create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; realterm: TXQTermPendingEQNameTokenPending);
-   function resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind = xqdnkUnknown): string;
-   function resolveAndFree(const staticContext: TXQStaticContext): TXQTerm;
-   function clone: TXQTerm; override;
- end;
+
 
  TXQEQNameUnresolved = class(TXQEQNameWithPrefix)
    function resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind = xqdnkUnknown): string;
@@ -152,11 +147,6 @@ protected
   function optimizeConstantChildren(seq: TXQTermWithChildren): TXQTerm;
 end;
 
-implementation
-uses bbutils, simplehtmltreeparser, strutils, math, bbutilsbeta;
-
-type
-
  { TJSONLiteralReplaceVisitor }
 
  TJSONLiteralReplaceVisitor = class(TXQTerm_Visitor)
@@ -242,6 +232,11 @@ begin
   if not (xqpmXPath3_0 in models) then result := ' requires XPath/XQuery 3.1'
   else if not (xqpmXPath2 in models) then result := ' requires XPath/XQuery 3.0'
   else result := 'Invalid parsing model';
+end;
+
+function createXQParsingContext: TObject;
+begin
+  result := TXQParsingContext.create();
 end;
 
 function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
@@ -508,58 +503,6 @@ begin
   inherited Destroy;
 end;
 
-constructor TXQTermPendingEQNameToken.create;
-begin
-
-end;
-
-constructor TXQTermPendingEQNameToken.create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; somedata: integer);
-begin
-  inherited Create(anamespaceurl, aprefix, alocalpart);
-  mode := amode;
-  data := somedata;
-end;
-
-constructor TXQTermPendingEQNameToken.create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode;
-  realterm: TXQTermPendingEQNameTokenPending);
-begin
-  inherited Create(anamespaceurl, aprefix, alocalpart);
-  pending := realterm;
-  mode := amode;
-end;
-
-function TXQTermPendingEQNameToken.resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind): string;
-begin
-  if mode = xqnmPrefix then begin
-    namespaceurl := staticContext.findNamespaceURLMandatory(namespaceprefix, kind);
-  end;
-  result := TNamespace.uniqueUrl(namespaceurl);
-end;
-
-function TXQTermPendingEQNameToken.resolveAndFree(const staticContext: TXQStaticContext): TXQTerm;
-begin
-  case pending of
-    xqptVariable: begin
-      result := TXQTermVariable.create(localpart, resolveURI(staticContext, xqdnkUnknown));
-    end;
-    xqptAttribute: begin
-      result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkUnknown), namespaceprefix, localpart);
-    end;
-    xqptElement: begin
-      result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkElementType), namespaceprefix, localpart);
-    end;
-    else{xqptUnknown: }begin raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238'); result := nil; end;
-  end;
-  free;
-end;
-
-function TXQTermPendingEQNameToken.clone: TXQTerm;
-begin
-  Result:=inherited clone;
-  TXQTermPendingEQNameToken(result).mode := mode;
-  TXQTermPendingEQNameToken(result).data := data;
-  TXQTermPendingEQNameToken(result).pending := pending;
-end;
 
 
 function TXQEQNameUnresolved.resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind): string;
@@ -659,6 +602,13 @@ end;
 function TXQParsingContext.isModel3: boolean;
 begin
   result := parsingModel in PARSING_MODEL3;
+end;
+
+function TXQParsingContext.replaceEntitiesIfNeeded(const s: string): string;
+begin
+  result := s;
+  if ((parsingModel in PARSING_MODEL_XQUERY) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
+    Result := replaceEntitiesAlways(Result);
 end;
 
 procedure TXQParsingContext.refuseReservedFunctionName(const name: string);
@@ -2227,12 +2177,7 @@ begin
   result += strcopyfrom(s, p);
 end;
 
-function TXQParsingContext.replaceEntitiesIfNeeded(const s: string): string;
-begin
-  result := s;
-  if ((parsingModel in PARSING_MODEL_XQUERY) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
-    Result := replaceEntitiesAlways(Result);
-end;
+
 
 
 function TXQParsingContext.parseString(const w: string): string;
@@ -3256,7 +3201,7 @@ begin
   for i := high(sc.functions) downto oldFunctionCount do begin
     overriden := -1;
     for j := i - 1 downto 0 do
-      if equalNamespaces(sc.functions[i].namespaceURL, sc.functions[j].namespaceURL)
+      if (sc.functions[i].namespaceURL = sc.functions[j].namespaceURL)
          and (sc.functions[i].name = sc.functions[j].name)
          and (length(sc.functions[i].parameters) = length(sc.functions[j].parameters))
          then begin
@@ -3272,7 +3217,7 @@ begin
         for k := 0 to high(otherModule.children)  do
           if objInheritsFrom(otherModule.children[k], TXQTermDefineFunction) then begin
             otherFunction := TXQTermDefineFunction(otherModule.children[k]);
-            if equalNamespaces(sc.functions[i].namespaceURL, otherFunction.name.namespaceURL)
+            if (sc.functions[i].namespaceURL = otherFunction.name.namespaceURL)
                and (sc.functions[i].name = otherFunction.name.localname)
                and (length(sc.functions[i].parameters) = (otherFunction.parameterCount)) then
                  raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and imported '+otherFunction.debugTermToString());

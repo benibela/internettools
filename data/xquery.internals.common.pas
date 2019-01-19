@@ -27,6 +27,8 @@ interface
 uses
   SysUtils;
 
+
+
 type TRaiseXQEvaluationExceptionCallback = procedure (const code, message: string);
 
 var raiseXQEvaluationExceptionCallback: TRaiseXQEvaluationExceptionCallback = nil;

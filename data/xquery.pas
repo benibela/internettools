@@ -58,7 +58,7 @@ uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
-   xquery__functions //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
+   xquery__functions, xquery__parse //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
    ;
 
 
@@ -961,7 +961,6 @@ type
     function clone: TXQEQNameWithPrefix;
   end;
 
-
   TXQAnnotation = record
     name: TXQEQName;
     params: array of TXQTerm;
@@ -1681,6 +1680,20 @@ type
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
   end;
+
+  TXQTermPendingEQNameTokenPending = (xqptUnknown, xqptVariable, xqptAttribute, xqptElement);
+  TXQTermPendingEQNameToken = class(TXQTermEQNameToken )
+    mode: TXQNamespaceMode;
+    data: integer;
+    pending: TXQTermPendingEQNameTokenPending;
+    constructor create;
+    constructor create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; somedata: integer = 0);
+    constructor create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; realterm: TXQTermPendingEQNameTokenPending);
+    function resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind = xqdnkUnknown): string;
+    function resolveAndFree(const staticContext: TXQStaticContext): TXQTerm;
+    function clone: TXQTerm; override;
+  end;
+
 
   TXQTermVariable = class(TXQTerm)
     namespace: string;
@@ -2944,18 +2957,18 @@ procedure freeThreadVars;
 
 type TXQAbstractParsingContext = class
 protected
- engine: TXQueryEngine;
+  engine: TXQueryEngine;
 
- options: TXQParsingOptions;
- parsingModel: TXQParsingModel;
- encoding: TSystemCodePage;
- staticContext: TXQStaticContext;
+  options: TXQParsingOptions;
+  parsingModel: TXQParsingModel;
+  encoding: TSystemCodePage;
+  staticContext: TXQStaticContext;
 
- str: string;
- pos: pchar;
- procedure parseQuery(aquery: TXQuery); virtual; abstract;
- procedure parseQueryXStringOnly(aquery: TXQuery); virtual; abstract;
- procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); virtual; abstract;
+  str: string;
+  pos: pchar;
+  procedure parseQuery(aquery: TXQuery); virtual; abstract;
+  procedure parseQueryXStringOnly(aquery: TXQuery); virtual; abstract;
+  procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); virtual; abstract;
 
 end;
 
@@ -3068,7 +3081,7 @@ type TXQueryInternals = object
 end;
 
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, xquery__parse, bbutilsbeta, xquery.internals.common;
+uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta, xquery.internals.common;
 
 var
   XQFormats : TFormatSettings = (
@@ -4021,6 +4034,61 @@ begin
   if namespaceprefix <> '' then result += namespaceprefix + ':';
   result += localpart;
 end;
+
+
+constructor TXQTermPendingEQNameToken.create;
+begin
+
+end;
+
+constructor TXQTermPendingEQNameToken.create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode; somedata: integer);
+begin
+  inherited Create(anamespaceurl, aprefix, alocalpart);
+  mode := amode;
+  data := somedata;
+end;
+
+constructor TXQTermPendingEQNameToken.create(anamespaceurl, aprefix, alocalpart: string; amode: TXQNamespaceMode;
+  realterm: TXQTermPendingEQNameTokenPending);
+begin
+  inherited Create(anamespaceurl, aprefix, alocalpart);
+  pending := realterm;
+  mode := amode;
+end;
+
+function TXQTermPendingEQNameToken.resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind): string;
+begin
+  if mode = xqnmPrefix then begin
+    namespaceurl := staticContext.findNamespaceURLMandatory(namespaceprefix, kind);
+  end;
+  result := TNamespace.uniqueUrl(namespaceurl);
+end;
+
+function TXQTermPendingEQNameToken.resolveAndFree(const staticContext: TXQStaticContext): TXQTerm;
+begin
+  case pending of
+    xqptVariable: begin
+      result := TXQTermVariable.create(localpart, resolveURI(staticContext, xqdnkUnknown));
+    end;
+    xqptAttribute: begin
+      result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkUnknown), namespaceprefix, localpart);
+    end;
+    xqptElement: begin
+      result := TXQTermEQNameToken.create(resolveURI(staticContext, xqdnkElementType), namespaceprefix, localpart);
+    end;
+    else{xqptUnknown: }begin raise EXQParsingException.create('XPST0003', 'Internal error 20160101181238'); result := nil; end;
+  end;
+  free;
+end;
+
+function TXQTermPendingEQNameToken.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermPendingEQNameToken(result).mode := mode;
+  TXQTermPendingEQNameToken(result).data := data;
+  TXQTermPendingEQNameToken(result).pending := pending;
+end;
+
 
 constructor TXQEQNameWithPrefix.create;
 begin
@@ -7624,13 +7692,13 @@ begin
 end;
 
 function TXQueryEngine.parseTerm(str: string; model: TXQParsingModel; context: TXQStaticContext): TXQuery;
-var cxt: TXQParsingContext;
+var cxt: TXQAbstractParsingContext;
   staticContextShared: Boolean;
 begin
   if str = '' then raise EXQParsingException.create('XPST0003', 'No input');
   staticContextShared := context <> nil;
   if context = nil then context := StaticContext.clone();
-  cxt := TXQParsingContext.Create;
+  cxt := createXQParsingContext as TXQAbstractParsingContext;
   cxt.encoding:=CP_UTF8;
   cxt.options := ParsingOptions;
   cxt.staticContext := context;
@@ -7649,7 +7717,7 @@ begin
 end;
 
 function TXQueryEngine.parseXStringNullTerminated(str: string): TXQuery;
-var cxt: TXQParsingContext;
+var cxt: TXQAbstractParsingContext;
     context: TXQStaticContext;
 begin
   context := StaticContext.clone();
@@ -7657,7 +7725,7 @@ begin
     result := TXQuery.Create(context, TXQTermSequence.Create);
     exit;
   end;
-  cxt := TXQParsingContext.Create;
+  cxt := createXQParsingContext as TXQAbstractParsingContext;
   cxt.encoding:=CP_UTF8;
   cxt.options :=ParsingOptions;
   cxt.options.AllowExtendedStrings:=true;
@@ -8888,7 +8956,7 @@ begin
   result := nil;
 end;
 
-var globalTypeParsingContext: TXQParsingContext;
+var globalTypeParsingContext: TXQAbstractParsingContext;
 
 procedure TXQNativeModule.parseTypeChecking(const info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean);
 begin
@@ -9107,7 +9175,7 @@ assert(SizeOf(IXQValue) = sizeof(pointer));
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;
 nativeModules := TStringList.Create;
-globalTypeParsingContext := TXQParsingContext.Create;
+globalTypeParsingContext := createXQParsingContext as TXQAbstractParsingContext;
 globalTypeParsingContext.parsingModel := xqpmXQuery3_1;
 globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 globalTypeParsingContext.options.AllowJSON:=true;
