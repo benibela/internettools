@@ -1252,6 +1252,11 @@ end;
 
 { TXQTermArray }
 
+procedure TXQValueJSONArray.add(const value: IXQValue);
+begin
+  seq.add(value);
+end;
+
 function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
@@ -2832,7 +2837,7 @@ begin
           f :=  functionStaticContext.functions[i];
           if (f.name = name.localname)
              and (length(f.parameters) = length(children))
-             and equalNamespaces(f.namespaceURL, name.namespaceURL) then begin
+             and (f.namespaceURL = name.namespaceURL) then begin
             interpretedFunction := f;
             break;
           end;
@@ -3471,7 +3476,7 @@ end;
 
 function TXQTermVariable.equalsVariable(v: TXQTermVariable): boolean;
 begin
-  result := (v.value = value) and equalNamespaces(namespace, v.namespace);
+  result := (v.value = value) and (namespace = v.namespace);
 end;
 
 function TXQTermVariable.evaluate(var context: TXQEvaluationContext): IXQValue;
@@ -4333,7 +4338,7 @@ end;
 procedure TXQTerm_VisitorTrackKnownVariables.undeclare(v: PXQTermVariable);
 begin
   Assert((overridenVariables.varstorage[overridenVariables.count-1].name = v^.value) and
-         equalNamespaces(overridenVariables.varstorage[overridenVariables.count-1].namespaceURL, v^.namespace));
+         (overridenVariables.varstorage[overridenVariables.count-1].namespaceURL = v^.namespace));
   overridenVariables.removeLast;
 end;
 

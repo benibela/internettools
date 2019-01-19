@@ -255,61 +255,7 @@ begin
   raise EXQEvaluationException.create('err:'+temp, 'Cannot cast '+from+' to '+to_);
 end;
 
-function TXSType.createValue(const v: IXQValue): IXQValue;
-var temp: TXQValue;
-  err: TXSCastingError;
-begin
-  err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, v.toXQuery(), name);
-  result := temp;
-end;
 
-function TXSType.createValue(const v: Int64): IXQValue;
-var err: TXSCastingError;
-  procedure fail;
-  begin
-    TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
-  end;
-
-var temp: TXQValue;
-begin
-  err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then fail;
-  result := temp;
-end;
-
-function TXSType.createValue(const v: xqfloat): IXQValue;
-var temp: TXQValue;
-  err: TXSCastingError;
-
-procedure fail;
-begin
-  TXQueryInternals.raiseXSCEError(err, FloatToStr(v), name);
-end;
-
-begin
-  err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then fail;
-  result := temp;
-end;
-
-function TXSType.createValue(const v: BigDecimal): IXQValue;
-var temp: TXQValue;
-  err: TXSCastingError;
-begin
-  err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, BigDecimalToStr(v), name);
-  result := temp;
-end;
-
-function TXSType.createValue(const v: String): IXQValue;
-var temp: TXQValue;
-  err: TXSCastingError;
-begin
-  err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, v, name);
-  result := temp;
-end;
 
 function TXSType.containsTransitive(t: TXSType): boolean;
 begin

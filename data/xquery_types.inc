@@ -208,10 +208,6 @@ begin
   result := ftypeAnnotation.name;
 end;
 
-function TXQValue.typeAnnotation: TXSType;
-begin
-  result := ftypeAnnotation;
-end;
 
 class function TXQValue.classKind: TXQValueKind;
 begin
@@ -1737,11 +1733,6 @@ begin
   result := seq.hasNodes;
 end;
 
-procedure TXQValueSequence.add(const value: IXQValue);
-begin
-  seq.add(value);
-end;
-
 procedure TXQValueSequence.addOrdered(const node: IXQValue);
 begin
   seq.addOrdered(node);
@@ -1778,28 +1769,9 @@ begin
   Result:=true;
 end;
 
-function isValidXMLCharacter(const codepoint: integer): boolean; inline;
-begin
-  case codepoint of
-    $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: result := true;
-    $1..$1F: result := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
-    else result := false;
-  end;
-end;
 
 
-function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
-begin
-  if (node = nil) then exit('');
-  case node.typ of
-    tetText, tetComment: result:=node.value;
-    tetAttribute: result := TTreeAttribute(node).realvalue;
-    tetOpen, tetDocument: result := node.deepNodeText(deepSeparator);
-    tetProcessingInstruction: exit(node.getAttribute(''));
-    else exit('');
-  end;
-  if XQGlobalTrimNodes then result := strTrim(Result);
-end;
+
 
 function TXQValueNode.toString: string;
 begin
@@ -1839,6 +1811,7 @@ begin
     tnsText: result := jsonStrEscape(toString);
     tnsXML: result := jsonStrEscape(node.outerXML());
     tnsHTML: result := jsonStrEscape(node.outerHTML());
+    else result := '';
   end;
 end;
 
@@ -1850,6 +1823,7 @@ begin
     tnsText: result := xmlStrEscape(toString);
     tnsXML: result := xmlStrEscape(node.outerXML());
     tnsHTML: result := xmlStrEscape(node.outerHTML());
+    else result := '';
   end;
 end;
 
@@ -1876,19 +1850,7 @@ end;
 
 
 
-{ TXQProperty }
 
-function TXQProperty.GetName: string;
-begin
-  with enum do
-    result := vars.getName(idx);
-end;
-
-function TXQProperty.GetValue: IXQValue;
-begin
-  with enum do
-    result := vars.get(idx);
-end;
 
 { TXQValuePropertyEnumerator }
 
@@ -2372,10 +2334,6 @@ begin
   Result:= seq.hasNodes;
 end;
 
-procedure TXQValueJSONArray.add(const value: IXQValue);
-begin
-  seq.add(value);
-end;
 
 destructor TXQValueJSONArray.Destroy;
 begin

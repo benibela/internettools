@@ -1108,8 +1108,8 @@ type
     //** Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
     function createValue(const v: IXQValue): IXQValue; inline;
     function createValue(const v: Int64): IXQValue; inline;
-    function createValue(const v: xqfloat): IXQValue; inline;
-    function createValue(const v: BigDecimal): IXQValue; inline;
+    function createValue(const v: xqfloat): IXQValue;
+    function createValue(const v: BigDecimal): IXQValue;
     function createValue(const v: String): IXQValue; inline;
   protected
 
@@ -3106,6 +3106,682 @@ var
 
 function namespaceReverseLookup(const url: string): INamespace; forward;
 
+{$PUSH}{$HINTS OFF}
+procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: xqfloat); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: array of string); {inline; }begin end;
+procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
+procedure ignore(const intentionallyUnusedParameter: array of IXQValue); { inline; } begin end;
+{$POP}
+
+
+{$ImplicitExceptions off}
+procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
+begin
+  PPointer(@dest)^ := PPointer(@source)^;
+end;
+
+procedure xqvalueVaporize(var dest: IXQValue); inline;
+begin
+  PPointer(@dest)^ := nil;
+end;
+
+procedure xqswap(var a, b: IXQValue); inline;
+var
+  t: Pointer;
+begin
+  t := PPointer(@a)^ ;
+  PPointer(@a)^ := PPointer(@b)^;
+  PPointer(@b)^ := t;
+end;
+{$ImplicitExceptions on}
+
+
+
+
+class procedure TXQValueEnumeratorPtrUnsafe.clear(out enum: TXQValueEnumeratorPtrUnsafe);
+begin
+  enum.fcurrent := nil;
+  enum.fsingleelement := nil;
+  enum.flast := nil;
+end;
+
+class procedure TXQValueEnumeratorPtrUnsafe.makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe);
+begin
+  enum.fsingleelement := v;
+  enum.flast :=  nil;
+  enum.fcurrent := nil;
+end;
+
+function TXQValueEnumeratorPtrUnsafe.MoveNextSingleElement: Boolean;
+begin
+  //this must only be called if fcurrent = flast.
+  //i.e. fsingleelement should only used if fcurrent = flast = nil.
+  result := (fcurrent = nil) and (fsingleelement <> nil);
+  if result then begin
+    fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
+    flast := @fsingleelement;
+  end;
+end;
+
+function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
+begin
+  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs many times
+  if result then
+    inc(fcurrent)
+  else
+    result := MoveNextSingleElement; //not inlined since it only occurs once
+end;
+
+function TXQValueEnumeratorPtrUnsafe.MoveMany(count: sizeint): Boolean;
+begin
+  result := true;
+  while count > 0 do begin
+    result := MoveNext;
+    if not result then exit;
+    dec(count);
+    if fcurrent + count > flast then begin
+      count -= (flast - fcurrent) div sizeof(IXQValue);
+      fcurrent := flast;
+    end else begin
+      fcurrent += count;
+      count := 0;
+    end;
+  end;
+end;
+
+procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue);
+var
+  size: SizeInt;
+  endtarget: Pointer;
+begin
+  while MoveNext do begin
+    size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
+    move(fcurrent^, target^, size  );
+    endtarget := pointer(target) + size;
+    while target < endtarget do begin
+      target^._AddRef;
+      inc(target);
+    end;
+    fcurrent := flast;
+  end;
+end;
+
+//The iterator will copy from the element after current
+//After the copying current will be the last copied element
+procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue; count: SizeInt);
+var
+  size, maxsize: SizeInt;
+  endtarget: Pointer;
+begin
+  maxsize := count * sizeof(IXQValue);
+  while (maxsize > 0) and MoveNext  do begin
+    size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
+    if size > maxsize then size := maxsize;
+    move(fcurrent^, target^, size  );
+    endtarget := pointer(target) + size;
+    while target < endtarget do begin
+      target^._AddRef;
+      inc(target);
+    end;
+    maxsize -= size;
+    fcurrent := pointer(fcurrent) + size - sizeof(IXQValue) ;
+  end;
+end;
+
+procedure TXQValueEnumeratorPtrUnsafe.CopyToList(list: TXQVList; count: SizeInt);
+begin
+  list.reserve(list.Count + count);
+  CopyBlock(@list.fbuffer[list.Count], count);
+  list.fcount += count;
+end;
+
+function TXQValueEnumeratorPtrUnsafe.GetEnumerator: TXQValueEnumeratorPtrUnsafe;
+begin
+  result := self;
+end;
+
+function TXQValueEnumerator.GetCurrent: IXQValue;
+begin
+  result := ptr.current^;
+end;
+
+class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
+begin
+  TXQValueEnumeratorPtrUnsafe.clear(enum.ptr);
+end;
+
+function TXQValueEnumerator.MoveNext: Boolean;
+begin
+  result := ptr.MoveNext;
+end;
+
+function TXQValueEnumerator.GetEnumerator: TXQValueEnumerator;
+begin
+  result := self;
+end;
+
+
+
+procedure TXQVCustomList.checkIndex(i: integer);
+  procedure error;
+  begin
+    raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
+  end;
+
+begin
+  if (i < 0) or (i >= fcount) then error;
+end;
+
+
+procedure TXQVCustomList.put(i: integer; const AValue: IXQValue); inline;
+begin
+  checkIndex(i);
+  fbuffer[i] := AValue;
+end;
+
+procedure TXQVCustomList.delete(i: integer);
+begin
+  checkIndex(i);
+  fbuffer[i] := nil;
+  if i <> fcount - 1 then begin
+    move(fbuffer[i+1], fbuffer[i], (fcount - i - 1) * sizeof(IXQValue));
+    FillChar(fbuffer[fcount-1], sizeof(fbuffer[fcount-1]), 0);
+  end;
+  fcount -= 1;
+  compress;
+end;
+
+procedure TXQVCustomList.addInArray(const value: IXQValue);
+begin
+  if fcount = fcapacity then
+    reserve(fcount + 1);
+  PPointer(fbuffer)[fcount] := value;
+  value._AddRef;
+  fcount += 1;
+end;
+
+function TXQVCustomList.get(i: integer): IXQValue;
+begin
+  checkIndex(i);
+  result := fbuffer[i];
+end;
+
+function TXQVCustomList.last: IXQValue;
+begin
+  checkIndex(0);
+  result := fbuffer[fcount-1];
+end;
+
+function TXQVCustomList.first: IXQValue;
+begin
+  checkIndex(0);
+  result := fbuffer[0];
+end;
+
+
+
+
+function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
+type PIXQValue = ^IXQValue;
+begin
+  ignore(temp);
+  result:=TTreeNode.compareInDocumentOrder(PIXQValue(p1)^.toNode,PIXQValue(p2)^.toNode);
+end;
+
+procedure TXQVCustomList.sortInDocumentOrderUnchecked;
+begin
+  if fcount < 2 then exit;
+  stableSort(@fbuffer[0], @fbuffer[fcount-1], sizeof(IXQValue), @compareXQInDocumentOrder);
+end;
+
+
+{$ImplicitExceptions off}
+
+procedure TXQVCustomList.setBufferSize(c: integer);
+begin
+  ReAllocMem(fbuffer, c * sizeof(IXQValue));
+  fcapacity := c;
+end;
+
+procedure TXQVCustomList.reserve(cap: integer);
+var
+  oldcap: Integer;
+begin
+  if cap <= fcapacity then exit;
+
+  oldcap := fcapacity;
+  if cap < 4 then setBufferSize(4)
+  else if (cap < 1024) and (cap <= fcapacity * 2) then setBufferSize(fcapacity * 2)
+  else if (cap < 1024) then setBufferSize(cap)
+  else if cap <= fcapacity + 1024 then setBufferSize(fcapacity + 1024)
+  else setBufferSize(cap);
+
+  FillChar(fbuffer[oldcap], sizeof(IXQValue) * (fcapacity - oldcap), 0);
+end;
+
+procedure TXQVCustomList.compress;
+begin
+  if fcount <= fcapacity div 2 then setBufferSize(fcapacity div 2)
+  else if fcount <= fcapacity - 1024 then setBufferSize(fcapacity - 1024);
+end;
+
+procedure TXQVCustomList.setCount(c: integer);
+var
+  i: Integer;
+begin
+  reserve(c);
+  if c < fcount then begin
+    for i := c to fcount - 1 do
+      fbuffer[i]._Release;
+    FillChar(fbuffer[c], (fcount - c) * sizeof(IXQValue), 0);
+  end;
+  fcount:=c;
+end;
+
+
+
+
+{$ImplicitExceptions on}
+
+procedure TXQVCustomList.clear;
+var
+  i: Integer;
+begin
+  for i := 0 to fcount - 1 do
+    fbuffer[i]._Release;
+  fcount:=0;
+  setBufferSize(0);
+end;
+
+destructor TXQVCustomList.Destroy;
+begin
+  clear;
+  inherited Destroy;
+end;
+
+procedure TXQVCustomList.insertSingle(i: integer; child: IXQValue);
+begin
+  reserve(fcount + 1);
+  if i <> fcount then begin
+    checkIndex(i);
+    move(fbuffer[i], fbuffer[i+1], (fcount - i) * sizeof(fbuffer[i]));
+    fillchar(fbuffer[i],sizeof(fbuffer[i]),0);
+  end;
+  fbuffer[i] := child;
+  fcount+=1;
+end;
+
+
+procedure TXQVCustomList.revert;
+var
+ h: Integer;
+ i: Integer;
+begin
+  if count=0 then exit;
+  h :=count-1;
+  for i:=0 to count div 2 - 1 do //carefully here. xqswap(a,a) causes a memory leak
+    xqswap(fbuffer[i], fbuffer[h-i]);
+end;
+
+procedure TXQVCustomList.sort(cmp: TPointerCompareFunction; data: TObject);
+begin
+  if count <= 1 then exit;
+  stableSort(@fbuffer[0], @fbuffer[count-1], sizeof(fbuffer[0]), cmp, data);
+end;
+
+
+constructor TXQVList.create(capacity: integer);
+begin
+  reserve(capacity);
+  fcount := 0;
+end;
+
+constructor TXQVList.create(other: TXQVCustomList);
+begin
+  add(other);
+end;
+
+procedure TXQVList.insert(i: integer; value: IXQValue);
+var
+ v: PIXQValue;
+begin
+  assert(value <> nil);
+  case value.kind of
+    pvkSequence: begin
+      for v in value.GetEnumeratorPtrUnsafe do begin
+        insertSingle(i, v^);
+        i+=1;
+      end;
+    end;
+    pvkUndefined: ;
+    else insertSingle(i, value);
+  end;
+end;
+
+procedure TXQVList.add(const value: IXQValue);
+var
+ othercount: Integer;
+ enumerator: TXQValueEnumeratorPtrUnsafe;
+begin
+  assert(value <> nil);
+  case value.kind of
+    pvkSequence: begin
+      othercount := value.getSequenceCount;
+      if othercount > 0 then begin
+        enumerator := value.GetEnumeratorPtrUnsafe;
+        reserve(fcount + othercount);
+        enumerator.copyBlock(@fbuffer[fcount]);
+        inc(fcount, othercount);
+      end;
+    end;
+    pvkUndefined: ;
+    else begin
+      if fcount = fcapacity then
+        reserve(fcount + 1);
+      PPointer(fbuffer)[fcount] := value;
+      value._AddRef;
+      fcount += 1;
+    end;
+  end;
+end;
+
+procedure TXQVList.addOrdered(const node: IXQValue);
+var
+ a,b,m, cmp: Integer;
+ s: PIXQValue;
+ childnode: TTreeNode;
+begin
+  case node.kind of
+    pvkNode: begin
+      childnode:=node.toNode;
+      if (Count = 0) or (TTreeNode.compareInDocumentOrder(childnode, Items[count-1].toNode) > 0) then
+        add(node)
+      else if (TTreeNode.compareInDocumentOrder(childnode, Items[0].toNode) < 0) then
+        insertSingle(0, node)
+      else begin
+        a := 0;
+        b := count-1;
+        while a < b do begin
+          m := (a+b) div 2;
+          cmp:=TTreeNode.compareInDocumentOrder(childnode, Items[m].toNode);
+          if cmp <> 0 then begin
+            if cmp < 0 then b := m-1
+            else a := m + 1;
+          end else begin
+            a := m;
+            b := m;
+            break;
+          end;
+        end;
+        for m := b to a do begin
+          cmp:=TTreeNode.compareInDocumentOrder(childnode, Items[m].toNode);
+          if cmp <> 0 then begin
+            if cmp < 0 then begin insertSingle(m, node); exit; end
+            else begin insertSingle(m + 1, node); exit; end;
+          end else begin
+            if childnode <> Items[m].toNode then insertSingle(m, node); //safety check. cmp only returns 0 for identical nodes
+            exit;
+          end;
+        end;
+        raise EXQEvaluationException.Create('pxp:INTERNAL', 'binary insert failed');
+      end;
+    end;
+    pvkUndefined: ;
+    pvkSequence:
+      for s in node.GetEnumeratorPtrUnsafe do
+        addOrdered(s^); //TODO: optimize
+    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
+  end;
+end;
+
+procedure TXQVList.add(node: TTreeNode);
+var
+  temp: TXQValueNode; //faster than ixqvalue
+begin
+  if fcount = fcapacity then
+    reserve(fcount + 1);
+  temp := TXQValueNode.create(node);
+  PPointer(fbuffer)[fcount] := IXQValue(temp); //the cast on the left side avoids the fpc_assign call and implicit ref counting; the cast on the right side ensures we get the correct pointer without a temporary variable.
+  temp._AddRef;
+  fcount += 1;
+end;
+
+procedure TXQVList.add(list: TXQVCustomList);
+var
+  i: Integer;
+begin
+  for i := 0 to list.Count - 1 do list.fbuffer[i]._AddRef;
+  reserve(count + list.Count);
+  move(list.fbuffer[0], fbuffer[count], list.Count * sizeof(IXQValue));
+  fcount += list.Count;
+end;
+
+procedure TXQVList.addOrdered(list: TXQVList);
+var
+  i: Integer;
+begin
+  for i := 0 to list.Count - 1 do addOrdered(list.fbuffer[i]);
+end;
+
+function TXQVList.stringifyNodes: TXQVList;
+var
+  i: Integer;
+begin
+  result := TXQVList.create(Count);
+  for i := 0 to Count - 1 do
+    result.add(fbuffer[i].stringifyNodes);
+end;
+
+function TXQVList.hasNodes: boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to Count - 1 do
+    if fbuffer[i].hasNodes then exit(true);
+  result := false;
+end;
+
+
+
+
+
+{$IMPLICITEXCEPTIONS OFF}
+function xqvalue: IXQValue;
+begin
+  result := TXQueryInternals.commonValuesUndefined;
+  //result := TXQValueUndefined.Create;
+end;
+
+function xqvalue(const v: Boolean): IXQValue;
+begin
+  case v of
+    true:  result := TXQueryInternals.commonValuesTrue;
+    false: result := TXQueryInternals.commonValuesFalse;
+  end;
+
+  //result := TXQValueBoolean.Create(v);
+end;
+
+function xqvalueTrue: IXQValue;
+begin
+  result := TXQueryInternals.commonValuesTrue;
+end;
+
+function xqvalueFalse: IXQValue;
+begin
+  result := TXQueryInternals.commonValuesFalse;
+end;
+
+function xqvalue(const v: Int64): IXQValue;
+begin
+  {case v.value of
+    0: result := commonValues[cvk0];
+    1: if v.sign then result := commonValues[cvkM1] else  result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;                                }
+  result := TXQValueInt64.Create(v);
+end;
+
+function xqvalue(v: Integer): IXQValue;
+begin
+  {case v of
+    0: result := commonValues[cvk0];
+    1: result := commonValues[cvk1];
+    else result := TXQValueInt65.Create(v);
+  end;}
+  result := xqvalue(int64(v));
+end;
+
+
+function xqvalue(v: xqfloat): IXQValue;
+begin
+  result := TXQValueFloat.Create(v);
+end;
+
+{function xqvalue(v: TDateTime): IXQValue;
+begin
+  result := TXQValueDateTime.Create(v);
+end;}
+
+function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
+begin
+  result := nil;
+  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
+end;
+
+
+function xqvalue(const v: BigDecimal): IXQValue;
+begin
+  result := TXQValueDecimal.Create(v);
+end;
+
+function xqvalue(const v: string): IXQValue; inline;
+begin
+  {if v = '' then
+    result := commonValues[cvkEmptyString]
+   else}
+  result := TXQValueString.Create(v);
+end;
+
+function xqvalue(sl: TStringList): IXQValue;
+var
+  i: Integer;
+  list: TXQVList;
+begin
+  if sl.Count = 0 then exit(xqvalue());
+  if sl.Count = 1 then exit(xqvalue(sl[0]));
+
+  list := TXQVList.create(sl.Count);
+  for i:=0 to sl.Count - 1 do
+    list.add(xqvalue(sl[i]));
+  xqvalueSeqSqueezed(result, list)
+end;
+
+function TXQValue.typeAnnotation: TXSType;
+begin
+  result := ftypeAnnotation;
+end;
+
+procedure TXQValueSequence.add(const value: IXQValue);
+begin
+  seq.add(value);
+end;
+
+
+function xqvalue(const sl: array of string): IXQValue;
+var
+  resseq: TXQValueSequence;
+  i: Integer;
+begin
+  resseq := TXQValueSequence.create(length(sl));
+  for i := 0 to high(sl) do
+    resseq.add(TXQValueString.create(baseSchema.untypedAtomic, sl[i]));
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+end;
+
+function xqvalue(const sl: array of IXQValue): IXQValue;
+var
+  resseq: TXQValueSequence;
+  i: Integer;
+begin
+  resseq := TXQValueSequence.create(length(sl));
+  for i := 0 to high(sl) do
+    resseq.add(sl[i]);
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+end;
+
+function xqvalue(v: TTreeNode): IXQValue;
+begin
+  if v = nil then exit(xqvalue());
+  result := TXQValueNode.Create(v);
+end;
+
+procedure xqvalueSeqSqueeze(var v: IXQValue);
+begin
+  if (v.getSequenceCount > 1) or (v.kind <> pvkSequence) then exit;
+  v := v.get(1);
+end;
+
+procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList);
+begin
+  case l.Count of
+    0: result := xqvalue();
+    1: result := l[0];
+    else begin
+      result := TXQValueSequence.create(l);
+      exit;
+    end;
+  end;
+  l.free;
+end;
+
+procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
+begin
+  if result = nil then result := add
+  else begin
+    if seq = nil then begin
+      seq := TXQValueSequence.create(result);
+      result := seq;
+    end;
+    seq.add(add);
+  end;
+end;
+
+procedure xqvalueArray(var result: TXQVArray; a: array of IXQValue);
+var
+  i: Integer;
+begin
+  setlength(result, length(a));
+  for i := 0 to high(a) do Result[i] := a[i];
+end;
+
+
+
+
+
+// If the value is a sequence of exactly one element. That should not happen and this function should not be used.
+function xqvalueIsFakeSingleton(const v: IXQValue): boolean;
+begin
+  result := (v.kind = pvkSequence) and (v.getSequenceCount = 1) and (v.get(1) <> v)
+end;
+
+
+
+function xqvalueDecimalEqualInt(const d: IXQValue; const index: integer): boolean;
+begin
+  result := d.toDecimal = index;
+end;
+
+
+
+{$IMPLICITEXCEPTIONS ON}
 
 
 
@@ -3624,17 +4300,6 @@ begin
   else result := TNamespace.make(url, 'prefix');
 end;
 
-{$HINTS OFF}
-procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: IXQValue); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: TXQVArray); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: xqfloat); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: bigDecimal); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: TStringArray); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: array of string); {inline; }begin end;
-procedure ignore(const intentionallyUnusedParameter: TTreeNodeSerialization); inline; begin end;
-procedure ignore(const intentionallyUnusedParameter: array of IXQValue); { inline; } begin end;
-{$HINTS ON}
 
 function charUnicodeZero(const cp: integer): integer;
 const UNICODE_ZEROS: array[1..55] of integer = ($0030,$0660,$06F0,$07C0,$0966,$09E6,$0A66,$0AE6,$0B66,$0BE6,$0C66,$0CE6,$0D66,$0DE6,$0E50,$0ED0,$0F20,$1040,$1090,$17E0,$1810,$1946,$19D0,$1A80,$1A90,$1B50,$1BB0,$1C40,$1C50,$A620,$A8D0,$A900,$A9D0,$A9F0,$AA50,$ABF0,$FF10,$104A0,$11066,$110F0,$11136,$111D0,$112F0,$114D0,$11650,$116C0,$11730,$118E0,$16A60,$16B50,$1D7CE,$1D7D8,$1D7E2,$1D7EC,$1D7F6);
@@ -3692,6 +4357,27 @@ end;}
 
 {$I restoreRangeOverflowChecks.inc}
 
+function isValidXMLCharacter(const codepoint: integer): boolean; inline;
+begin
+  case codepoint of
+    $20..$D7FF, $E000..$FFFD, $10000..$10FFFF: result := true;
+    $1..$1F: result := (codepoint in [$9,$A,$D]) or (baseSchema.version = xsd11);
+    else result := false;
+  end;
+end;
+
+function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
+begin
+  if (node = nil) then exit('');
+  case node.typ of
+    tetText, tetComment: result:=node.value;
+    tetAttribute: result := TTreeAttribute(node).realvalue;
+    tetOpen, tetDocument: result := node.deepNodeText(deepSeparator);
+    tetProcessingInstruction: exit(node.getAttribute(''));
+    else exit('');
+  end;
+  if XQGlobalTrimNodes then result := strTrim(Result);
+end;
 
 function compareValue(a, b: xqfloat): integer;
 begin
@@ -3778,6 +4464,62 @@ begin
     raise EXQEvaluationException.create('XPTY0004', 'Expected '+typ.name+', got: '+v.toXQuery());
 end;
 
+function TXSType.createValue(const v: IXQValue): IXQValue;
+var temp: TXQValue;
+  err: TXSCastingError;
+begin
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, v.toXQuery(), name);
+  result := temp;
+end;
+
+function TXSType.createValue(const v: Int64): IXQValue;
+var err: TXSCastingError;
+  procedure fail;
+  begin
+    TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
+  end;
+
+var temp: TXQValue;
+begin
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then fail;
+  result := temp;
+end;
+
+function TXSType.createValue(const v: xqfloat): IXQValue;
+var temp: TXQValue;
+  err: TXSCastingError;
+
+procedure fail;
+begin
+  TXQueryInternals.raiseXSCEError(err, FloatToStr(v), name);
+end;
+
+begin
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then fail;
+  result := temp;
+end;
+
+function TXSType.createValue(const v: BigDecimal): IXQValue;
+var temp: TXQValue;
+  err: TXSCastingError;
+begin
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, BigDecimalToStr(v), name);
+  result := temp;
+end;
+
+function TXSType.createValue(const v: String): IXQValue;
+var temp: TXQValue;
+  err: TXSCastingError;
+begin
+  err := tryCreateValue(v, @temp);
+  if err <> xsceNoError then TXQueryInternals.raiseXSCEError(err, v, name);
+  result := temp;
+end;
+
 
 function xqvalueAtomize(const v: IXQValue): IXQValue;
 var x: PIXQValue;
@@ -3815,6 +4557,29 @@ begin
     else if v.instanceOf(baseSchema.AnyAtomicType) then exit(v)
     else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.toXQuery());
   end;
+end;
+
+
+function TXQVariableChangeLog.get(i: integer): IXQValue; inline;
+begin
+  result := varstorage[i].value;
+end;
+
+function TXQProperty.GetName: string;
+begin
+  with enum do
+    result := vars.getName(idx);
+end;
+
+function TXQProperty.GetValue: IXQValue;
+begin
+  with enum do
+    result := vars.get(idx);
+end;
+
+function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
+begin
+  result := equalDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
 
@@ -3980,6 +4745,527 @@ begin
   end;
   result := xqvalue(temp);
 end;
+
+
+{ TXQVariableStorage }
+
+procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespaceURL: string);
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
+
+  reserve(count + 1);
+
+  varstorage[count].namespaceURL := namespaceURL;
+  varstorage[count].name:=name;
+  varstorage[count].value:=value;
+  varstorage[count].propertyChange := false;
+
+  inc(varcount);
+end;
+
+procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
+var
+  oldObj, newValue: IXQValue;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
+  if len <= 0 then begin
+   add(variable, value, namespaceURL);
+   exit;
+  end;
+
+  if not hasVariable(variable, oldObj, namespaceURL) then
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(props, len, '.')+')');
+
+
+  if not (oldObj is TXQValueObject) then begin
+    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
+    newValue := (oldObj as TXQValueJSONArray).setImmutable(props, len, value);
+  end else newValue := (oldObj as TXQValueObject).setImmutable(props, len, value);
+
+  reserve(count + 1);
+
+  varstorage[count].namespaceURL := namespaceURL;
+  varstorage[count].name:=variable;
+  varstorage[count].value:=newValue;
+  varstorage[count].propertyChange := true;
+
+  inc(varcount);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: string);
+begin
+  add(name, xqvalue(value), '');
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: string; const namespaceURL: string);
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: integer; const namespaceURL: string = '');
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: xqfloat; const namespaceURL: string = '');
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: bigdecimal; const namespaceURL: string = '');
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: boolean; const namespaceURL: string = '');
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: TDateTime; const namespaceURL: string = '');
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(const name: string; const value: TTreeNode; const namespaceURL: string = '');
+begin
+  add(name, xqvalue(value), namespaceURL);
+end;
+
+procedure TXQVariableChangeLog.add(variable: TXQTermVariable; const value: IXQValue);
+begin
+  add(variable.value, value, variable.namespace);
+end;
+
+function TXQVariableChangeLog.get(const name: string): IXQValue;
+begin
+  result := get(name, '');
+end;
+
+function TXQVariableChangeLog.get(const name: string; const namespaceURL: string): IXQValue;
+var i:integer;
+begin
+  i := indexOf(name, namespaceUrl);
+  if i = -1 then
+    if parentLog <> nil then exit(parentLog.get(name, namespaceURL))
+    else exit(xqvalue());
+  result := varstorage[i].value;
+end;
+
+
+function TXQVariableChangeLog.getString(const name: string): string;
+begin
+  result := get(name, '').toString;
+end;
+
+function TXQVariableChangeLog.isPropertyChange(i: integer): boolean;
+begin
+  result := varstorage[i].propertyChange;
+end;
+
+function TXQVariableChangeLog.indexOf(const name: string;  const namespaceURL: string): integer;
+var i:longint;
+begin
+  for i:=varCount - 1 downto 0 do
+    if (varstorage[i].name = name) and (varstorage[i].namespaceURL = namespaceURL) then exit(i);
+  exit(-1);
+end;
+
+function TXQVariableChangeLog.getName(i: integer): string;
+begin
+  assert(i>=0); assert(i< count);
+  result := varstorage[i].name;
+end;
+
+function TXQVariableChangeLog.getNamespace(i: integer): string;
+begin
+  assert(i>=0); assert(i< count);
+  result := varstorage[i].namespaceURL;
+end;
+
+
+
+function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
+var
+  i: Integer;
+  list: TXQVList;
+begin
+  result := xqvalue();
+  list := TXQVList.create();
+  for i:=0 to count - 1 do
+    if (varstorage[i].name = name) and (varstorage[i].namespaceURL = namespaceURL) then
+      list.add(varstorage[i].value);
+  xqvalueSeqSqueezed(result, list)
+end;
+
+procedure TXQVariableChangeLog.clear;
+var
+  i: Integer;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
+  if varCount > 256 then setlength(varstorage, 0)
+  else for i := 0 to varCount - 1 do
+    varstorage[i].value := nil; //free value to reduce memory usage
+  if historyCount > 256 then setlength(histories, 0);
+  varCount := 0;
+  historyCount := 0;
+end;
+
+procedure TXQVariableChangeLog.remove(const name: string; const namespace: string);
+var
+  i: Integer;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
+  for i := count - 1 downto 0 do begin
+    if not strEqual(varstorage[i].name, name) or not strEqual(varstorage[i].namespaceURL, namespace) then continue;
+    varstorage[i].name := '';
+    varstorage[i].namespaceURL := '';
+    varstorage[i].value := nil;
+    dec(varcount);
+    if i < varcount then begin
+      move(varstorage[i + 1], varstorage[i], sizeof(varstorage[i]) * (varcount - i));
+      FillChar(varstorage[varcount], sizeof(varstorage[count]), 0);
+    end;
+  end;
+end;
+
+function TXQVariableChangeLog.pushAll: integer;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
+  if historyCount = length(histories) then
+    if length(histories) < 2 then SetLength(histories, 2)
+    else SetLength(histories, length(histories) * 2);
+  histories[historyCount] := varCount;
+  result := historyCount;
+  inc(historyCount);
+end;
+
+procedure TXQVariableChangeLog.popAll(level: integer = -1);
+var targetCount, targetHistoryCount, i: Integer;
+begin
+  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
+  if level < 0 then targetHistoryCount := historyCount + level
+  else targetHistoryCount := level;
+
+  if targetHistoryCount >= historyCount then exit;
+  if targetHistoryCount < 0 then
+      raise EXQEvaluationException.Create('pxp:INTERNAL', 'Nothing to pop');
+
+  targetCount := histories[targetHistoryCount];
+  historyCount := targetHistoryCount;
+  if targetCount < varCount then begin
+    for i := targetCount to varCount - 1 do varstorage[i].value := nil;
+    varCount := targetCount;
+  end;
+  if varCount < length(varstorage) shr 2 then SetLength(varstorage, varCount); //shrink
+end;
+
+procedure TXQVariableChangeLog.stringifyNodes;
+var
+  i: Integer;
+  pv: PIXQValue;
+  xhasNodes: Boolean;
+  list: TXQVList;
+begin
+  for i:=0 to count-1 do
+    case varstorage[i].value.kind of
+      pvkNode: varstorage[i].value := xqvalue(varstorage[i].value.toString);
+      pvkSequence: begin
+        xhasNodes := false;
+        for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
+          if pv^.kind = pvkNode then begin
+            xhasNodes := true;
+            break;
+          end;
+        if xhasNodes then begin
+          list := txqvlist.create(varstorage[i].value.getSequenceCount);
+          for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
+            if pv^.kind = pvkNode then list.add(xqvalue(pv^.toString))
+            else list.add(pv^);
+          varstorage[i].value := TXQValueSequence.create(list);
+        end;
+      end;
+    end
+end;
+
+function TXQVariableChangeLog.hasNodes: boolean;
+var i: integer;
+begin
+  for i:=varCount - 1 downto 0 do
+    if varstorage[i].value.hasNodes then exit(true);
+  result := false;
+end;
+
+procedure TXQVariableChangeLog.removeLast;
+begin
+  dec(varCount);
+  varstorage[varCount].value := nil;
+end;
+
+procedure TXQVariableChangeLog.pushOpenArray(const vs: array of IXQValue);
+var
+  i: Integer;
+begin
+  pushAll;
+  for i := 0 to high(vs) do
+    add('_'+IntToStr(i+1), vs[i]);
+end;
+
+procedure TXQVariableChangeLog.pushOpenArray(const untypedStrings: array of string);
+var
+  i: Integer;
+begin
+  pushAll;
+  for i := 0 to high(untypedStrings) do
+    add('_'+IntToStr(i+1), TXQValueString.create(baseSchema.untypedAtomic, untypedStrings[i]));
+end;
+
+procedure TXQVariableChangeLog.reserve(newcap: integer);
+begin
+  if newcap <= length(varstorage) then exit;
+  if newcap > 2 * length(varstorage) then SetLength(varstorage, newcap)
+  else SetLength(varstorage, 2* length(varstorage));
+end;
+
+constructor TXQVariableChangeLog.create();
+begin
+end;
+
+destructor TXQVariableChangeLog.destroy();
+begin
+  inherited destroy();
+end;
+
+function TXQVariableChangeLog.debugTextRepresentation: string;
+var i:longint;
+begin
+  if count = 0 then exit('');
+  result:=getName(0)+'='+get(0).debugAsStringWithTypeAnnotation();
+  for i:=1 to count - 1 do
+    result+=LineEnding+getName(i)+'='+get(i).debugAsStringWithTypeAnnotation();
+end;
+
+function TXQVariableChangeLog.clone: TXQVariableChangeLog;
+begin
+  result := TXQVariableChangeLog.create();
+  result.assign(self);
+end;
+
+procedure TXQVariableChangeLog.assign(from: TXQVariableChangeLog);
+begin
+  varstorage := from.varstorage;
+  setlength(varstorage, length(varstorage)); //detach
+  histories := from.histories;
+  setlength(histories, length(histories)); //detach
+  varCount := from.varCount;
+  historyCount := from.historyCount;
+end;
+
+function TXQVariableChangeLog.finalValues: TXQVariableChangeLog;
+var final: boolean;
+    i,j: integer;
+begin
+  Result := TXQVariableChangeLog.Create;
+  for i:=0 to count-1 do begin
+    final := true;
+    for j:=i+1 to count-1 do
+      if getName(i) = getName(j) then begin
+        final := false;
+        break;
+      end;
+    if not final then continue;
+    result.add(getName(i), get(i));
+  end;
+end;
+
+function TXQVariableChangeLog.collected: TXQVariableChangeLog;
+var i: integer;
+  oldid, j: Integer;
+  templist: TFPList; //list of sequences, so we do not need to cast ixqvalue -> txqvaluesequence
+begin
+  result := TXQVariableChangeLog.create();
+  templist := nil;
+  for i := 0 to count - 1 do begin
+    oldid := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
+    if oldid < 0 then begin
+      result.add(varstorage[i].name, varstorage[i].value, varstorage[i].namespaceURL);
+      if templist <> nil then templist.Add(nil);
+    end else begin
+      if templist = nil then begin
+        templist := TFPList.Create;
+        templist.Capacity := result.count;
+        for j := 0 to result.count - 1 do templist.Add(nil);
+      end;
+      if templist[oldid] = nil then begin
+        templist[oldid] := TXQValueSequence.create(result.varstorage[oldid].value);
+        result.varstorage[oldid].value := TXQValueSequence(templist[oldid]);
+      end;
+      TXQValueSequence(templist[oldid]).add(varstorage[i].value);
+    end;
+  end;
+  templist.free;
+end;
+
+function TXQVariableChangeLog.condensedCollected: TXQVariableChangeLog;
+var
+  temp: TXQVariableChangeLog;
+begin
+  temp := condensed;
+  result := temp.collected;
+  temp.free;
+end;
+
+procedure TXQVariableChangeLog.takeFrom(other: TXQVariableChangeLog);
+var
+  i: Integer;
+begin
+  reserve(varCount + other.count);
+  for i:=0 to other.count-1 do
+    varstorage[varCount+i] := other.varstorage[i];
+  inc(varCount, other.count);
+  other.clear;
+end;
+
+procedure deleteVar(self: TXQVariableChangeLog; i: integer);
+begin
+  with self do begin
+    varstorage[i].namespaceURL := ''; //free mem
+    varstorage[i].name := '';
+    varstorage[i].value := nil;
+    move(varstorage[i+1],varstorage[i], (varCount - 1 - i) * sizeof(varstorage[i]) );
+    FillChar(varstorage[varCount - 1], sizeof(varstorage[i]), 0);
+    dec(varCount);
+  end;
+end;
+
+function TXQVariableChangeLog.condensed: TXQVariableChangeLog;
+
+var
+  temp: IXQValue;
+  i, last: Integer;
+begin
+  result := TXQVariableChangeLog.create();
+  result.shared:=true;
+  SetLength(result.varstorage, varCount);
+  for i:=0 to varCount - 1 do begin
+    if varstorage[i].propertyChange then begin
+      last := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
+      if last >= 0 then begin
+        deleteVar(result, last);
+
+        result.varstorage[result.varCount] := varstorage[i];
+        //result.varstorage[result.varCount].name := varstorage[i].name; ???
+        result.varstorage[result.varCount].propertyChange:=false;
+        result.varCount += 1;
+        continue;
+      end;
+
+      if not parentLog.hasVariable(varstorage[i].name, temp, varstorage[i].namespaceURL) then
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but no variable of that name exists');
+      if temp.kind <> pvkObject then
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.toXQuery()+' is not an object ');
+    end;
+    result.varstorage[result.varCount] := varstorage[i];
+    result.varCount += 1;
+  end;
+end;
+
+function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable): boolean;
+begin
+  result := hasVariable(variable.value, variable.namespace);
+end;
+
+function TXQVariableChangeLog.hasVariable(const variable: string; const namespaceURL: string = ''): boolean;
+begin
+  if indexOf(variable, namespaceURL) >= 0 then result := true
+  else if parentLog <> nil then result := parentLog.hasVariable(variable, namespaceURL)
+  else result := false;
+end;
+
+function TXQVariableChangeLog.hasVariable(const variable: string; out value: IXQValue; const namespaceURL: string): boolean;
+var
+  i: Integer;
+begin
+  i := indexOf(variable, namespaceURL);
+  if i = -1 then
+    if parentLog <> nil then exit(parentLog.hasVariable(variable, value, namespaceURL))
+    else exit(false);
+  value := varstorage[i].value;
+  result := true;
+end;
+
+function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable; out value: IXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
+begin
+  result := hasVariable(variable.value, value, variable.namespace);
+end;
+
+
+
+procedure TXQEvaluationStack.push(const value: ixqvalue);
+begin
+  if fcount >= fcapacity then
+    reserve(fcount + 1);
+  PPointer(fbuffer)[fcount] := value;
+  value._AddRef;
+  fcount += 1;
+end;
+
+procedure TXQEvaluationStack.pop;
+begin
+  assert(fcount > 0);
+  fbuffer[fcount-1] := nil;
+  dec(fcount);
+end;
+
+procedure TXQEvaluationStack.popTo(newCount: integer);
+var
+  i: Integer;
+begin
+  assert(newCount <= fcount);
+  for i := newCount to fcount - 1 do
+    fbuffer[i]._Release;
+  FillChar(fbuffer[newCount], sizeof(fbuffer[newCount]) * (fcount - newCount), 0);
+  fcount := newCount;
+end;
+
+function TXQEvaluationStack.top(i: integer): IXQValue;
+begin
+  assert((i >= 0) and (count - i - 1 >= 0));
+  result := fbuffer[count - i - 1];
+end;
+
+function TXQEvaluationStack.topptr(i: integer): PIXQValue;
+begin
+  result := @fbuffer[count - i - 1];
+end;
+
+
+procedure TXQEvaluationStack.push(const name: TXQTermVariable; const v: ixqvalue);
+begin
+  {$ifdef TRACK_STACK_VARIABLE_NAMES}
+  if fcount >= length(debugNames) then
+   setlength(debugNames, length(debugNames) + 128);
+  debugNames[fcount] := name.value;
+  {$endif}
+  push(v);
+end;
+
+function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
+  procedure fail;
+  begin
+    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+  end;
+
+begin
+  result := top(i);
+  {$ifdef TRACK_STACK_VARIABLE_NAMES}
+  if not strEqual(debugNames[count - i - 1], name.value)
+  //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
+     then fail;
+
+  {$endif}
+end;
+
 
 procedure TXQBatchFunctionCall.init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue);
 var
@@ -4569,7 +5855,7 @@ begin
     f :=  functions[i];
     if (alocalname = f.name)
        and (length(f.parameters) = argcount)
-       and equalNamespaces(f.namespaceURL, anamespace) then
+       and (f.namespaceURL = anamespace) then
       exit(f);
   end;
   exit(nil);
@@ -5192,10 +6478,6 @@ begin
     exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));}
 end;
 
-function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
-begin
-  result := equalDeepAtomic(a.toValue, b.toValue, overrideCollation);
-end;
 
 class function TXQStaticContext.comparableTypes(const a, b: TXQValue): boolean;
 var
@@ -5221,185 +6503,6 @@ begin
   result := (ct <> nil) and (ct <> baseSchema.anyAtomicType) and (ct <> baseSchema.anySimpleType) and (ct <> baseSchema.anyType);;
 end;
 
-{ TXQTermModule }
-
-
-function TXQTermModule.evaluate(var context: TXQEvaluationContext): IXQValue;
-var
-  i: Integer;
-  staticContext: TXQStaticContext;
-begin
-//  if (context.temporaryVariables <> nil) then  we cannot free them here, because it fails when a query calls another module
-//    context.temporaryVariables.clear;
-  if context.globallyDeclaredVariables <> nil then
-    context.globallyDeclaredVariables.clear; //declared global variables
-
-  staticContext := context.staticContext;
-  if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
-    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if not staticContext.moduleContextItemDeclarations[i].isExternal then begin
-        context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
-        break;
-      end;
-    if context.SeqValue = nil then
-      if context.contextNode(false) <> nil then
-        context.setContextItem(xqvalue(context.contextNode()));
-    if context.SeqValue = nil then
-      for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-        if staticContext.moduleContextItemDeclarations[i].getExpression <> nil then begin
-          context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
-          break;
-       end;
-    if context.SeqValue = nil then begin
-      if assigned(staticContext.sender.OnDeclareExternalVariable) then
-        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
-      if context.SeqValue = nil then
-         raise EXQEvaluationException.create('XPDY0002', 'context item missing');
-       context.SeqLength := 1;
-       context.SeqIndex := 1;
-    end;
-
-    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
-        raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
-  end;
-  //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
-  for i := 0 to high(allVariables) do
-    if not context.globallyDeclaredVariables.hasVariable(allVariables[i].getVariable) then
-      context.globallyDeclaredVariables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
-
-  result := children[high(children)].evaluate(context);
-end;
-
-function TXQTermModule.getContextDependencies: TXQContextDependencies;
-begin
-  if (length(children) = 0) or (children[high(children)] = nil) then exit([]);
-  Result:=children[high(children)].getContextDependencies;
-end;
-
-{ TXQValueEnumerator }
-
-class procedure TXQValueEnumeratorPtrUnsafe.clear(out enum: TXQValueEnumeratorPtrUnsafe);
-begin
-  enum.fcurrent := nil;
-  enum.fsingleelement := nil;
-  enum.flast := nil;
-end;
-
-class procedure TXQValueEnumeratorPtrUnsafe.makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe);
-begin
-  enum.fsingleelement := v;
-  enum.flast :=  nil;
-  enum.fcurrent := nil;
-end;
-
-function TXQValueEnumeratorPtrUnsafe.MoveNextSingleElement: Boolean;
-begin
-  //this must only be called if fcurrent = flast.
-  //i.e. fsingleelement should only used if fcurrent = flast = nil.
-  result := (fcurrent = nil) and (fsingleelement <> nil);
-  if result then begin
-    fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
-    flast := @fsingleelement;
-  end;
-end;
-
-function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
-begin
-  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs many times
-  if result then
-    inc(fcurrent)
-  else
-    result := MoveNextSingleElement; //not inlined since it only occurs once
-end;
-
-function TXQValueEnumeratorPtrUnsafe.MoveMany(count: sizeint): Boolean;
-begin
-  result := true;
-  while count > 0 do begin
-    result := MoveNext;
-    if not result then exit;
-    dec(count);
-    if fcurrent + count > flast then begin
-      count -= (flast - fcurrent) div sizeof(IXQValue);
-      fcurrent := flast;
-    end else begin
-      fcurrent += count;
-      count := 0;
-    end;
-  end;
-end;
-
-procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue);
-var
-  size: SizeInt;
-  endtarget: Pointer;
-begin
-  while MoveNext do begin
-    size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
-    move(fcurrent^, target^, size  );
-    endtarget := pointer(target) + size;
-    while target < endtarget do begin
-      target^._AddRef;
-      inc(target);
-    end;
-    fcurrent := flast;
-  end;
-end;
-
-//The iterator will copy from the element after current
-//After the copying current will be the last copied element
-procedure TXQValueEnumeratorPtrUnsafe.CopyBlock(target: PIXQValue; count: SizeInt);
-var
-  size, maxsize: SizeInt;
-  endtarget: Pointer;
-begin
-  maxsize := count * sizeof(IXQValue);
-  while (maxsize > 0) and MoveNext  do begin
-    size := PtrInt(pointer(flast) - pointer(fcurrent)) + sizeof(IXQValue);
-    if size > maxsize then size := maxsize;
-    move(fcurrent^, target^, size  );
-    endtarget := pointer(target) + size;
-    while target < endtarget do begin
-      target^._AddRef;
-      inc(target);
-    end;
-    maxsize -= size;
-    fcurrent := pointer(fcurrent) + size - sizeof(IXQValue) ;
-  end;
-end;
-
-procedure TXQValueEnumeratorPtrUnsafe.CopyToList(list: TXQVList; count: SizeInt);
-begin
-  list.reserve(list.Count + count);
-  CopyBlock(@list.fbuffer[list.Count], count);
-  list.fcount += count;
-end;
-
-function TXQValueEnumeratorPtrUnsafe.GetEnumerator: TXQValueEnumeratorPtrUnsafe;
-begin
-  result := self;
-end;
-
-function TXQValueEnumerator.GetCurrent: IXQValue;
-begin
-  result := ptr.current^;
-end;
-
-class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
-begin
-  TXQValueEnumeratorPtrUnsafe.clear(enum.ptr);
-end;
-
-function TXQValueEnumerator.MoveNext: Boolean;
-begin
-  result := ptr.MoveNext;
-end;
-
-function TXQValueEnumerator.GetEnumerator: TXQValueEnumerator;
-begin
-  result := self;
-end;
 
 
 { TXQEvaluationContext }
@@ -5630,16 +6733,6 @@ begin
 end;
 
 
-{function xqvalue(v: TDateTime): IXQValue;
-begin
-  result := TXQValueDateTime.Create(v);
-end;}
-
-function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
-begin
-  result := nil;
-  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
-end;
 
 
 
@@ -5669,7 +6762,7 @@ end;
 
 //This disables exception safe reference counting
 //If an exception were to occur in any of the below functions, it will cause a memory leak. So this section has to be carefully watched
-{$IMPLICITEXCEPTIONS OFF}
+
 
 
 
@@ -5695,191 +6788,6 @@ begin
   end;
 end;
 
-function xqvalue: IXQValue;
-begin
-  result := TXQueryInternals.commonValuesUndefined;
-  //result := TXQValueUndefined.Create;
-end;
-
-function xqvalue(const v: Boolean): IXQValue;
-begin
-  case v of
-    true:  result := TXQueryInternals.commonValuesTrue;
-    false: result := TXQueryInternals.commonValuesFalse;
-  end;
-
-  //result := TXQValueBoolean.Create(v);
-end;
-
-function xqvalueTrue: IXQValue;
-begin
-  result := TXQueryInternals.commonValuesTrue;
-end;
-
-function xqvalueFalse: IXQValue;
-begin
-  result := TXQueryInternals.commonValuesFalse;
-end;
-
-function xqvalue(const v: Int64): IXQValue;
-begin
-  {case v.value of
-    0: result := commonValues[cvk0];
-    1: if v.sign then result := commonValues[cvkM1] else  result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;                                }
-  result := TXQValueInt64.Create(v);
-end;
-
-function xqvalue(v: Integer): IXQValue;
-begin
-  {case v of
-    0: result := commonValues[cvk0];
-    1: result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;}
-  result := xqvalue(int64(v));
-end;
-
-
-function xqvalue(v: xqfloat): IXQValue;
-begin
-  result := TXQValueFloat.Create(v);
-end;
-
-function xqvalue(const v: BigDecimal): IXQValue;
-begin
-  result := TXQValueDecimal.Create(v);
-end;
-
-function xqvalue(const v: string): IXQValue; inline;
-begin
-  {if v = '' then
-    result := commonValues[cvkEmptyString]
-   else}
-  result := TXQValueString.Create(v);
-end;
-
-function xqvalue(sl: TStringList): IXQValue;
-var
-  i: Integer;
-  list: TXQVList;
-begin
-  if sl.Count = 0 then exit(xqvalue());
-  if sl.Count = 1 then exit(xqvalue(sl[0]));
-
-  list := TXQVList.create(sl.Count);
-  for i:=0 to sl.Count - 1 do
-    list.add(xqvalue(sl[i]));
-  xqvalueSeqSqueezed(result, list)
-end;
-
-function xqvalue(const sl: array of string): IXQValue;
-var
-  resseq: TXQValueSequence;
-  i: Integer;
-begin
-  resseq := TXQValueSequence.create(length(sl));
-  for i := 0 to high(sl) do
-    resseq.add(TXQValueString.create(baseSchema.untypedAtomic, sl[i]));
-  result := resseq;
-  xqvalueSeqSqueeze(result);
-end;
-
-function xqvalue(const sl: array of IXQValue): IXQValue;
-var
-  resseq: TXQValueSequence;
-  i: Integer;
-begin
-  resseq := TXQValueSequence.create(length(sl));
-  for i := 0 to high(sl) do
-    resseq.add(sl[i]);
-  result := resseq;
-  xqvalueSeqSqueeze(result);
-end;
-
-function xqvalue(v: TTreeNode): IXQValue;
-begin
-  if v = nil then exit(xqvalue());
-  result := TXQValueNode.Create(v);
-end;
-
-procedure xqvalueSeqSqueeze(var v: IXQValue);
-begin
-  if (v.getSequenceCount > 1) or (v.kind <> pvkSequence) then exit;
-  v := v.get(1);
-end;
-
-procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList);
-begin
-  case l.Count of
-    0: result := xqvalue();
-    1: result := l[0];
-    else begin
-      result := TXQValueSequence.create(l);
-      exit;
-    end;
-  end;
-  l.free;
-end;
-
-procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
-begin
-  if result = nil then result := add
-  else begin
-    if seq = nil then begin
-      seq := TXQValueSequence.create(result);
-      result := seq;
-    end;
-    seq.add(add);
-  end;
-end;
-
-procedure xqvalueArray(var result: TXQVArray; a: array of IXQValue);
-var
-  i: Integer;
-begin
-  setlength(result, length(a));
-  for i := 0 to high(a) do Result[i] := a[i];
-end;
-
-
-
-
-
-// If the value is a sequence of exactly one element. That should not happen and this function should not be used.
-function xqvalueIsFakeSingleton(const v: IXQValue): boolean;
-begin
-  result := (v.kind = pvkSequence) and (v.getSequenceCount = 1) and (v.get(1) <> v)
-end;
-
-procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
-begin
-  PPointer(@dest)^ := PPointer(@source)^;
-end;
-
-procedure xqvalueVaporize(var dest: IXQValue); inline;
-begin
-  PPointer(@dest)^ := nil;
-end;
-
-procedure xqswap(var a, b: IXQValue); inline;
-var
-  t: Pointer;
-begin
-  t := PPointer(@a)^ ;
-  PPointer(@a)^ := PPointer(@b)^;
-  PPointer(@b)^ := t;
-end;
-
-function xqvalueDecimalEqualInt(const d: IXQValue; const index: integer): boolean;
-begin
-  result := d.toDecimal = index;
-end;
-
-
-
-{$IMPLICITEXCEPTIONS ON}
 
 
 
@@ -6261,841 +7169,9 @@ end;
 
 
 
-constructor TXQVList.create(capacity: integer);
-begin
-  reserve(capacity);
-  fcount := 0;
-end;
 
-constructor TXQVList.create(other: TXQVCustomList);
-begin
-  add(other);
-end;
 
-procedure TXQVList.insert(i: integer; value: IXQValue);
-var
- v: PIXQValue;
-begin
-  assert(value <> nil);
-  case value.kind of
-    pvkSequence: begin
-      for v in value.GetEnumeratorPtrUnsafe do begin
-        insertSingle(i, v^);
-        i+=1;
-      end;
-    end;
-    pvkUndefined: ;
-    else insertSingle(i, value);
-  end;
-end;
 
-procedure TXQVList.add(const value: IXQValue);
-var
- othercount: Integer;
- enumerator: TXQValueEnumeratorPtrUnsafe;
-begin
-  assert(value <> nil);
-  case value.kind of
-    pvkSequence: begin
-      othercount := value.getSequenceCount;
-      if othercount > 0 then begin
-        enumerator := value.GetEnumeratorPtrUnsafe;
-        reserve(fcount + othercount);
-        enumerator.copyBlock(@fbuffer[fcount]);
-        inc(fcount, othercount);
-      end;
-    end;
-    pvkUndefined: ;
-    else begin
-      if fcount = fcapacity then
-        reserve(fcount + 1);
-      PPointer(fbuffer)[fcount] := value;
-      value._AddRef;
-      fcount += 1;
-    end;
-  end;
-end;
-
-procedure TXQVList.addOrdered(const node: IXQValue);
-var
- a,b,m, cmp: Integer;
- s: PIXQValue;
- childnode: TTreeNode;
-begin
-  case node.kind of
-    pvkNode: begin
-      childnode:=node.toNode;
-      if (Count = 0) or (TTreeNode.compareInDocumentOrder(childnode, Items[count-1].toNode) > 0) then
-        add(node)
-      else if (TTreeNode.compareInDocumentOrder(childnode, Items[0].toNode) < 0) then
-        insertSingle(0, node)
-      else begin
-        a := 0;
-        b := count-1;
-        while a < b do begin
-          m := (a+b) div 2;
-          cmp:=TTreeNode.compareInDocumentOrder(childnode, Items[m].toNode);
-          if cmp <> 0 then begin
-            if cmp < 0 then b := m-1
-            else a := m + 1;
-          end else begin
-            a := m;
-            b := m;
-            break;
-          end;
-        end;
-        for m := b to a do begin
-          cmp:=TTreeNode.compareInDocumentOrder(childnode, Items[m].toNode);
-          if cmp <> 0 then begin
-            if cmp < 0 then begin insertSingle(m, node); exit; end
-            else begin insertSingle(m + 1, node); exit; end;
-          end else begin
-            if childnode <> Items[m].toNode then insertSingle(m, node); //safety check. cmp only returns 0 for identical nodes
-            exit;
-          end;
-        end;
-        raise EXQEvaluationException.Create('pxp:INTERNAL', 'binary insert failed');
-      end;
-    end;
-    pvkUndefined: ;
-    pvkSequence:
-      for s in node.GetEnumeratorPtrUnsafe do
-        addOrdered(s^); //TODO: optimize
-    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
-  end;
-end;
-
-procedure TXQVList.add(node: TTreeNode);
-var
-  temp: TXQValueNode; //faster than ixqvalue
-begin
-  if fcount = fcapacity then
-    reserve(fcount + 1);
-  temp := TXQValueNode.create(node);
-  PPointer(fbuffer)[fcount] := IXQValue(temp); //the cast on the left side avoids the fpc_assign call and implicit ref counting; the cast on the right side ensures we get the correct pointer without a temporary variable.
-  temp._AddRef;
-  fcount += 1;
-end;
-
-procedure TXQVList.add(list: TXQVCustomList);
-var
-  i: Integer;
-begin
-  for i := 0 to list.Count - 1 do list.fbuffer[i]._AddRef;
-  reserve(count + list.Count);
-  move(list.fbuffer[0], fbuffer[count], list.Count * sizeof(IXQValue));
-  fcount += list.Count;
-end;
-
-procedure TXQVList.addOrdered(list: TXQVList);
-var
-  i: Integer;
-begin
-  for i := 0 to list.Count - 1 do addOrdered(list.fbuffer[i]);
-end;
-
-function TXQVList.stringifyNodes: TXQVList;
-var
-  i: Integer;
-begin
-  result := TXQVList.create(Count);
-  for i := 0 to Count - 1 do
-    result.add(fbuffer[i].stringifyNodes);
-end;
-
-function TXQVList.hasNodes: boolean;
-var
-  i: Integer;
-begin
-  for i := 0 to Count - 1 do
-    if fbuffer[i].hasNodes then exit(true);
-  result := false;
-end;
-
-procedure TXQVCustomList.put(i: integer; const AValue: IXQValue); inline;
-begin
-  checkIndex(i);
-  fbuffer[i] := AValue;
-end;
-
-procedure TXQVCustomList.delete(i: integer);
-begin
-  checkIndex(i);
-  fbuffer[i] := nil;
-  if i <> fcount - 1 then begin
-    move(fbuffer[i+1], fbuffer[i], (fcount - i - 1) * sizeof(IXQValue));
-    FillChar(fbuffer[fcount-1], sizeof(fbuffer[fcount-1]), 0);
-  end;
-  fcount -= 1;
-  compress;
-end;
-
-procedure TXQVCustomList.addInArray(const value: IXQValue);
-begin
-  if fcount = fcapacity then
-    reserve(fcount + 1);
-  PPointer(fbuffer)[fcount] := value;
-  value._AddRef;
-  fcount += 1;
-end;
-
-function TXQVCustomList.get(i: integer): IXQValue;
-begin
-  checkIndex(i);
-  result := fbuffer[i];
-end;
-
-function TXQVCustomList.last: IXQValue;
-begin
-  checkIndex(0);
-  result := fbuffer[fcount-1];
-end;
-
-function TXQVCustomList.first: IXQValue;
-begin
-  checkIndex(0);
-  result := fbuffer[0];
-end;
-
-procedure TXQVCustomList.clear;
-var
-  i: Integer;
-begin
-  for i := 0 to fcount - 1 do
-    fbuffer[i]._Release;
-  fcount:=0;
-  setBufferSize(0);
-end;
-
-
-function compareXQInDocumentOrder(temp: tobject; p1,p2: pointer): integer;
-type PIXQValue = ^IXQValue;
-begin
-  ignore(temp);
-  result:=TTreeNode.compareInDocumentOrder(PIXQValue(p1)^.toNode,PIXQValue(p2)^.toNode);
-end;
-
-procedure TXQVCustomList.sortInDocumentOrderUnchecked;
-begin
-  if fcount < 2 then exit;
-  stableSort(@fbuffer[0], @fbuffer[fcount-1], sizeof(IXQValue), @compareXQInDocumentOrder);
-end;
-
-procedure TXQVCustomList.checkIndex(i: integer);
-  procedure error;
-  begin
-    raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
-  end;
-
-begin
-  if (i < 0) or (i >= fcount) then error;
-end;
-
-{$ImplicitExceptions off}
-
-procedure TXQVCustomList.reserve(cap: integer);
-var
-  oldcap: Integer;
-begin
-  if cap <= fcapacity then exit;
-
-  oldcap := fcapacity;
-  if cap < 4 then setBufferSize(4)
-  else if (cap < 1024) and (cap <= fcapacity * 2) then setBufferSize(fcapacity * 2)
-  else if (cap < 1024) then setBufferSize(cap)
-  else if cap <= fcapacity + 1024 then setBufferSize(fcapacity + 1024)
-  else setBufferSize(cap);
-
-  FillChar(fbuffer[oldcap], sizeof(IXQValue) * (fcapacity - oldcap), 0);
-end;
-
-procedure TXQVCustomList.compress;
-begin
-  if fcount <= fcapacity div 2 then setBufferSize(fcapacity div 2)
-  else if fcount <= fcapacity - 1024 then setBufferSize(fcapacity - 1024);
-end;
-
-procedure TXQVCustomList.setCount(c: integer);
-var
-  i: Integer;
-begin
-  reserve(c);
-  if c < fcount then begin
-    for i := c to fcount - 1 do
-      fbuffer[i]._Release;
-    FillChar(fbuffer[c], (fcount - c) * sizeof(IXQValue), 0);
-  end;
-  fcount:=c;
-end;
-
-procedure TXQVCustomList.setBufferSize(c: integer);
-begin
-  ReAllocMem(fbuffer, c * sizeof(IXQValue));
-  fcapacity := c;
-end;
-
-
-
-{$ImplicitExceptions on}
-
-destructor TXQVCustomList.Destroy;
-begin
-  clear;
-  inherited Destroy;
-end;
-
-procedure TXQVCustomList.insertSingle(i: integer; child: IXQValue);
-begin
-  reserve(fcount + 1);
-  if i <> fcount then begin
-    checkIndex(i);
-    move(fbuffer[i], fbuffer[i+1], (fcount - i) * sizeof(fbuffer[i]));
-    fillchar(fbuffer[i],sizeof(fbuffer[i]),0);
-  end;
-  fbuffer[i] := child;
-  fcount+=1;
-end;
-
-
-procedure TXQVCustomList.revert;
-var
- h: Integer;
- i: Integer;
-begin
-  if count=0 then exit;
-  h :=count-1;
-  for i:=0 to count div 2 - 1 do //carefully here. xqswap(a,a) causes a memory leak
-    xqswap(fbuffer[i], fbuffer[h-i]);
-end;
-
-procedure TXQVCustomList.sort(cmp: TPointerCompareFunction; data: TObject);
-begin
-  if count <= 1 then exit;
-  stableSort(@fbuffer[0], @fbuffer[count-1], sizeof(fbuffer[0]), cmp, data);
-end;
-
-
-
-{ TXQVariableStorage }
-
-procedure TXQVariableChangeLog.add(name: string; const value: IXQValue; const namespaceURL: string);
-begin
-  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
-
-  reserve(count + 1);
-
-  varstorage[count].namespaceURL := namespaceURL;
-  varstorage[count].name:=name;
-  varstorage[count].value:=value;
-  varstorage[count].propertyChange := false;
-
-  inc(varcount);
-end;
-
-procedure TXQVariableChangeLog.addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
-var
-  oldObj, newValue: IXQValue;
-begin
-  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
-  if len <= 0 then begin
-   add(variable, value, namespaceURL);
-   exit;
-  end;
-
-  if not hasVariable(variable, oldObj, namespaceURL) then
-    raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(props, len, '.')+')');
-
-
-  if not (oldObj is TXQValueObject) then begin
-    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
-    newValue := (oldObj as TXQValueJSONArray).setImmutable(props, len, value);
-  end else newValue := (oldObj as TXQValueObject).setImmutable(props, len, value);
-
-  reserve(count + 1);
-
-  varstorage[count].namespaceURL := namespaceURL;
-  varstorage[count].name:=variable;
-  varstorage[count].value:=newValue;
-  varstorage[count].propertyChange := true;
-
-  inc(varcount);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: string);
-begin
-  add(name, xqvalue(value), '');
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: string; const namespaceURL: string);
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: integer; const namespaceURL: string = '');
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: xqfloat; const namespaceURL: string = '');
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: bigdecimal; const namespaceURL: string = '');
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: boolean; const namespaceURL: string = '');
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: TDateTime; const namespaceURL: string = '');
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(const name: string; const value: TTreeNode; const namespaceURL: string = '');
-begin
-  add(name, xqvalue(value), namespaceURL);
-end;
-
-procedure TXQVariableChangeLog.add(variable: TXQTermVariable; const value: IXQValue);
-begin
-  add(variable.value, value, variable.namespace);
-end;
-
-function TXQVariableChangeLog.get(const name: string): IXQValue;
-begin
-  result := get(name, '');
-end;
-
-function TXQVariableChangeLog.get(const name: string; const namespaceURL: string): IXQValue;
-var i:integer;
-begin
-  i := indexOf(name, namespaceUrl);
-  if i = -1 then
-    if parentLog <> nil then exit(parentLog.get(name, namespaceURL))
-    else exit(xqvalue());
-  result := varstorage[i].value;
-end;
-
-
-function TXQVariableChangeLog.getString(const name: string): string;
-begin
-  result := get(name, '').toString;
-end;
-
-function TXQVariableChangeLog.isPropertyChange(i: integer): boolean;
-begin
-  result := varstorage[i].propertyChange;
-end;
-
-function TXQVariableChangeLog.indexOf(const name: string;  const namespaceURL: string): integer;
-var i:longint;
-begin
-  for i:=varCount - 1 downto 0 do
-    if (varstorage[i].name = name) and equalNamespaces(varstorage[i].namespaceURL, namespaceURL) then exit(i);
-  exit(-1);
-end;
-
-function TXQVariableChangeLog.getName(i: integer): string;
-begin
-  assert(i>=0); assert(i< count);
-  result := varstorage[i].name;
-end;
-
-function TXQVariableChangeLog.getNamespace(i: integer): string;
-begin
-  assert(i>=0); assert(i< count);
-  result := varstorage[i].namespaceURL;
-end;
-
-function TXQVariableChangeLog.get(i: integer): IXQValue; inline;
-begin
-  result := varstorage[i].value;
-end;
-
-function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
-var
-  i: Integer;
-  list: TXQVList;
-begin
-  result := xqvalue();
-  list := TXQVList.create();
-  for i:=0 to count - 1 do
-    if (varstorage[i].name = name) and (equalNamespaces(varstorage[i].namespaceURL, namespaceURL)) then
-      list.add(varstorage[i].value);
-  xqvalueSeqSqueezed(result, list)
-end;
-
-procedure TXQVariableChangeLog.clear;
-var
-  i: Integer;
-begin
-  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
-  if varCount > 256 then setlength(varstorage, 0)
-  else for i := 0 to varCount - 1 do
-    varstorage[i].value := nil; //free value to reduce memory usage
-  if historyCount > 256 then setlength(histories, 0);
-  varCount := 0;
-  historyCount := 0;
-end;
-
-procedure TXQVariableChangeLog.remove(const name: string; const namespace: string);
-var
-  i: Integer;
-begin
-  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'Readonly variable changelog modified');
-  for i := count - 1 downto 0 do begin
-    if not strEqual(varstorage[i].name, name) or not strEqual(varstorage[i].namespaceURL, namespace) then continue;
-    varstorage[i].name := '';
-    varstorage[i].namespaceURL := '';
-    varstorage[i].value := nil;
-    dec(varcount);
-    if i < varcount then begin
-      move(varstorage[i + 1], varstorage[i], sizeof(varstorage[i]) * (varcount - i));
-      FillChar(varstorage[varcount], sizeof(varstorage[count]), 0);
-    end;
-  end;
-end;
-
-function TXQVariableChangeLog.pushAll: integer;
-begin
-  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
-  if historyCount = length(histories) then
-    if length(histories) < 2 then SetLength(histories, 2)
-    else SetLength(histories, length(histories) * 2);
-  histories[historyCount] := varCount;
-  result := historyCount;
-  inc(historyCount);
-end;
-
-procedure TXQVariableChangeLog.popAll(level: integer = -1);
-var targetCount, targetHistoryCount, i: Integer;
-begin
-  if readonly then raise EXQEvaluationException.Create('pxp:INTERNAL', 'readonly variable change log modified');
-  if level < 0 then targetHistoryCount := historyCount + level
-  else targetHistoryCount := level;
-
-  if targetHistoryCount >= historyCount then exit;
-  if targetHistoryCount < 0 then
-      raise EXQEvaluationException.Create('pxp:INTERNAL', 'Nothing to pop');
-
-  targetCount := histories[targetHistoryCount];
-  historyCount := targetHistoryCount;
-  if targetCount < varCount then begin
-    for i := targetCount to varCount - 1 do varstorage[i].value := nil;
-    varCount := targetCount;
-  end;
-  if varCount < length(varstorage) shr 2 then SetLength(varstorage, varCount); //shrink
-end;
-
-procedure TXQVariableChangeLog.stringifyNodes;
-var
-  i: Integer;
-  pv: PIXQValue;
-  xhasNodes: Boolean;
-  list: TXQVList;
-begin
-  for i:=0 to count-1 do
-    case varstorage[i].value.kind of
-      pvkNode: varstorage[i].value := xqvalue(varstorage[i].value.toString);
-      pvkSequence: begin
-        xhasNodes := false;
-        for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
-          if pv^.kind = pvkNode then begin
-            xhasNodes := true;
-            break;
-          end;
-        if xhasNodes then begin
-          list := txqvlist.create(varstorage[i].value.getSequenceCount);
-          for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
-            if pv^.kind = pvkNode then list.add(xqvalue(pv^.toString))
-            else list.add(pv^);
-          varstorage[i].value := TXQValueSequence.create(list);
-        end;
-      end;
-    end
-end;
-
-function TXQVariableChangeLog.hasNodes: boolean;
-var i: integer;
-begin
-  for i:=varCount - 1 downto 0 do
-    if varstorage[i].value.hasNodes then exit(true);
-  result := false;
-end;
-
-procedure TXQVariableChangeLog.removeLast;
-begin
-  dec(varCount);
-  varstorage[varCount].value := nil;
-end;
-
-procedure TXQVariableChangeLog.pushOpenArray(const vs: array of IXQValue);
-var
-  i: Integer;
-begin
-  pushAll;
-  for i := 0 to high(vs) do
-    add('_'+IntToStr(i+1), vs[i]);
-end;
-
-procedure TXQVariableChangeLog.pushOpenArray(const untypedStrings: array of string);
-var
-  i: Integer;
-begin
-  pushAll;
-  for i := 0 to high(untypedStrings) do
-    add('_'+IntToStr(i+1), TXQValueString.create(baseSchema.untypedAtomic, untypedStrings[i]));
-end;
-
-procedure TXQVariableChangeLog.reserve(newcap: integer);
-begin
-  if newcap <= length(varstorage) then exit;
-  if newcap > 2 * length(varstorage) then SetLength(varstorage, newcap)
-  else SetLength(varstorage, 2* length(varstorage));
-end;
-
-constructor TXQVariableChangeLog.create();
-begin
-end;
-
-destructor TXQVariableChangeLog.destroy();
-begin
-  inherited destroy();
-end;
-
-function TXQVariableChangeLog.debugTextRepresentation: string;
-var i:longint;
-begin
-  if count = 0 then exit('');
-  result:=getName(0)+'='+get(0).debugAsStringWithTypeAnnotation();
-  for i:=1 to count - 1 do
-    result+=LineEnding+getName(i)+'='+get(i).debugAsStringWithTypeAnnotation();
-end;
-
-function TXQVariableChangeLog.clone: TXQVariableChangeLog;
-begin
-  result := TXQVariableChangeLog.create();
-  result.assign(self);
-end;
-
-procedure TXQVariableChangeLog.assign(from: TXQVariableChangeLog);
-begin
-  varstorage := from.varstorage;
-  setlength(varstorage, length(varstorage)); //detach
-  histories := from.histories;
-  setlength(histories, length(histories)); //detach
-  varCount := from.varCount;
-  historyCount := from.historyCount;
-end;
-
-function TXQVariableChangeLog.finalValues: TXQVariableChangeLog;
-var final: boolean;
-    i,j: integer;
-begin
-  Result := TXQVariableChangeLog.Create;
-  for i:=0 to count-1 do begin
-    final := true;
-    for j:=i+1 to count-1 do
-      if getName(i) = getName(j) then begin
-        final := false;
-        break;
-      end;
-    if not final then continue;
-    result.add(getName(i), get(i));
-  end;
-end;
-
-function TXQVariableChangeLog.collected: TXQVariableChangeLog;
-var i: integer;
-  oldid, j: Integer;
-  templist: TFPList; //list of sequences, so we do not need to cast ixqvalue -> txqvaluesequence
-begin
-  result := TXQVariableChangeLog.create();
-  templist := nil;
-  for i := 0 to count - 1 do begin
-    oldid := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
-    if oldid < 0 then begin
-      result.add(varstorage[i].name, varstorage[i].value, varstorage[i].namespaceURL);
-      if templist <> nil then templist.Add(nil);
-    end else begin
-      if templist = nil then begin
-        templist := TFPList.Create;
-        templist.Capacity := result.count;
-        for j := 0 to result.count - 1 do templist.Add(nil);
-      end;
-      if templist[oldid] = nil then begin
-        templist[oldid] := TXQValueSequence.create(result.varstorage[oldid].value);
-        result.varstorage[oldid].value := TXQValueSequence(templist[oldid]);
-      end;
-      TXQValueSequence(templist[oldid]).add(varstorage[i].value);
-    end;
-  end;
-  templist.free;
-end;
-
-function TXQVariableChangeLog.condensedCollected: TXQVariableChangeLog;
-var
-  temp: TXQVariableChangeLog;
-begin
-  temp := condensed;
-  result := temp.collected;
-  temp.free;
-end;
-
-procedure TXQVariableChangeLog.takeFrom(other: TXQVariableChangeLog);
-var
-  i: Integer;
-begin
-  reserve(varCount + other.count);
-  for i:=0 to other.count-1 do
-    varstorage[varCount+i] := other.varstorage[i];
-  inc(varCount, other.count);
-  other.clear;
-end;
-
-procedure deleteVar(self: TXQVariableChangeLog; i: integer);
-begin
-  with self do begin
-    varstorage[i].namespaceURL := ''; //free mem
-    varstorage[i].name := '';
-    varstorage[i].value := nil;
-    move(varstorage[i+1],varstorage[i], (varCount - 1 - i) * sizeof(varstorage[i]) );
-    FillChar(varstorage[varCount - 1], sizeof(varstorage[i]), 0);
-    dec(varCount);
-  end;
-end;
-
-function TXQVariableChangeLog.condensed: TXQVariableChangeLog;
-
-var
-  temp: IXQValue;
-  i, last: Integer;
-begin
-  result := TXQVariableChangeLog.create();
-  result.shared:=true;
-  SetLength(result.varstorage, varCount);
-  for i:=0 to varCount - 1 do begin
-    if varstorage[i].propertyChange then begin
-      last := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
-      if last >= 0 then begin
-        deleteVar(result, last);
-
-        result.varstorage[result.varCount] := varstorage[i];
-        //result.varstorage[result.varCount].name := varstorage[i].name; ???
-        result.varstorage[result.varCount].propertyChange:=false;
-        result.varCount += 1;
-        continue;
-      end;
-
-      if not parentLog.hasVariable(varstorage[i].name, temp, varstorage[i].namespaceURL) then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but no variable of that name exists');
-      if temp.kind <> pvkObject then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.toXQuery()+' is not an object ');
-    end;
-    result.varstorage[result.varCount] := varstorage[i];
-    result.varCount += 1;
-  end;
-end;
-
-function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable): boolean;
-begin
-  result := hasVariable(variable.value, variable.namespace);
-end;
-
-function TXQVariableChangeLog.hasVariable(const variable: string; const namespaceURL: string = ''): boolean;
-begin
-  if indexOf(variable, namespaceURL) >= 0 then result := true
-  else if parentLog <> nil then result := parentLog.hasVariable(variable, namespaceURL)
-  else result := false;
-end;
-
-function TXQVariableChangeLog.hasVariable(const variable: string; out value: IXQValue; const namespaceURL: string): boolean;
-var
-  i: Integer;
-begin
-  i := indexOf(variable, namespaceURL);
-  if i = -1 then
-    if parentLog <> nil then exit(parentLog.hasVariable(variable, value, namespaceURL))
-    else exit(false);
-  value := varstorage[i].value;
-  result := true;
-end;
-
-function TXQVariableChangeLog.hasVariable(const variable: TXQTermVariable; out value: IXQValue): boolean; //**< Returns if a variable with name @param(variable) exists, and if it does, returns its value in @param(value). @param(value) might be nil, and it returns the value directly, not a cloned value. Supports objects. (notice that the pointer points to an TXQValue, not an IXQValue, since latter could cause problems with uninitialized values. If you pass a pointer to a IXQValue, it will compile, but randomly crash)
-begin
-  result := hasVariable(variable.value, value, variable.namespace);
-end;
-
-
-procedure TXQEvaluationStack.push(const value: ixqvalue);
-begin
-  if fcount >= fcapacity then
-    reserve(fcount + 1);
-  PPointer(fbuffer)[fcount] := value;
-  value._AddRef;
-  fcount += 1;
-end;
-
-procedure TXQEvaluationStack.pop;
-begin
-  assert(fcount > 0);
-  fbuffer[fcount-1] := nil;
-  dec(fcount);
-end;
-
-procedure TXQEvaluationStack.popTo(newCount: integer);
-var
-  i: Integer;
-begin
-  assert(newCount <= fcount);
-  for i := newCount to fcount - 1 do
-    fbuffer[i]._Release;
-  FillChar(fbuffer[newCount], sizeof(fbuffer[newCount]) * (fcount - newCount), 0);
-  fcount := newCount;
-end;
-
-function TXQEvaluationStack.top(i: integer): IXQValue;
-begin
-  assert((i >= 0) and (count - i - 1 >= 0));
-  result := fbuffer[count - i - 1];
-end;
-
-function TXQEvaluationStack.topptr(i: integer): PIXQValue;
-begin
-  result := @fbuffer[count - i - 1];
-end;
-
-
-procedure TXQEvaluationStack.push(const name: TXQTermVariable; const v: ixqvalue);
-begin
-  {$ifdef TRACK_STACK_VARIABLE_NAMES}
-  if fcount >= length(debugNames) then
-   setlength(debugNames, length(debugNames) + 128);
-  debugNames[fcount] := name.value;
-  {$endif}
-  push(v);
-end;
-
-function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
-  procedure fail;
-  begin
-    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
-  end;
-
-begin
-  result := top(i);
-  {$ifdef TRACK_STACK_VARIABLE_NAMES}
-  if not strEqual(debugNames[count - i - 1], name.value)
-  //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
-     then fail;
-
-  {$endif}
-end;
 
 
 
@@ -8538,6 +8614,63 @@ begin
   if qmCheckOnSingleChild in command.matching then Include(options, xqpncCheckOnSingleChild);
 
   inherited init(contextNode, command.typ);
+end;
+
+
+{ TXQTermModule }
+
+
+function TXQTermModule.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  i: Integer;
+  staticContext: TXQStaticContext;
+begin
+//  if (context.temporaryVariables <> nil) then  we cannot free them here, because it fails when a query calls another module
+//    context.temporaryVariables.clear;
+  if context.globallyDeclaredVariables <> nil then
+    context.globallyDeclaredVariables.clear; //declared global variables
+
+  staticContext := context.staticContext;
+  if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
+    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+      if not staticContext.moduleContextItemDeclarations[i].isExternal then begin
+        context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
+        break;
+      end;
+    if context.SeqValue = nil then
+      if context.contextNode(false) <> nil then
+        context.setContextItem(xqvalue(context.contextNode()));
+    if context.SeqValue = nil then
+      for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+        if staticContext.moduleContextItemDeclarations[i].getExpression <> nil then begin
+          context.setContextItem(staticContext.moduleContextItemDeclarations[i].getExpression.evaluate(context));
+          break;
+       end;
+    if context.SeqValue = nil then begin
+      if assigned(staticContext.sender.OnDeclareExternalVariable) then
+        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
+      if context.SeqValue = nil then
+         raise EXQEvaluationException.create('XPDY0002', 'context item missing');
+       context.SeqLength := 1;
+       context.SeqIndex := 1;
+    end;
+
+    for i := 0 to high(staticContext.moduleContextItemDeclarations) do
+      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
+        raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
+  end;
+  //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
+  for i := 0 to high(allVariables) do
+    if not context.globallyDeclaredVariables.hasVariable(allVariables[i].getVariable) then
+      context.globallyDeclaredVariables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
+
+  result := children[high(children)].evaluate(context);
+end;
+
+function TXQTermModule.getContextDependencies: TXQContextDependencies;
+begin
+  if (length(children) = 0) or (children[high(children)] = nil) then exit([]);
+  Result:=children[high(children)].getContextDependencies;
 end;
 
 
