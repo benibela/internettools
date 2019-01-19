@@ -387,7 +387,7 @@ begin
   while pos <= length(regexpr) do begin
     c := regexpr[pos];
     case c of
-      '|', '?', '*', '+', '.': addc(c);
+      '|', '?', '*', '+', '.': {%H-}addc(c);
       '{': copyCurvy();
       '(': begin
         addc('(');

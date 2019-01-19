@@ -325,6 +325,11 @@ procedure strlTrimRight(var p: pansichar; var l: SizeInt; const trimCharacters: 
 //**It will move the pointer and change length, not modifying the memory pointed to
 procedure strlTrim(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
 
+//for internal use
+type TStrTrimProcedure = procedure (var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet);
+function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
+
+
 //**Removes all occurrences of trimCharacter from the left/right side of the string
 function strTrimLeft(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; {$IFDEF HASINLINE} inline; {$ENDIF}
 function strTrimRight(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; {$IFDEF HASINLINE} inline; {$ENDIF}
@@ -1678,8 +1683,6 @@ begin
   strlTrimLeft(p,l,trimCharacters);
   strlTrimRight(p,l,trimCharacters);
 end;
-
-type TStrTrimProcedure = procedure (var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet);
 
 function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
 var p: pansichar;

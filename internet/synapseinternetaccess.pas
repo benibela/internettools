@@ -273,7 +273,7 @@ defaultInternetAccessClass := TSynapseInternetAccess;
 
 
 {$if not (defined(WINDOWS) or defined(android))}
-InitCriticalSection(resolvConfCS);
+InitCriticalSection(resolvConfCS{%H-});
 {$endif}
 finalization
 
