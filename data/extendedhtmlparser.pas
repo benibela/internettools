@@ -1602,6 +1602,20 @@ var xpathText: TTreeNode;
   end;
 
   procedure HandleCommandRead;
+    procedure handleRegex(var value: IXQValue; const regex: string; submatch: integer);
+    var
+      matches: TWrappedRegExprMatchResults;
+      r: TWrappedRegExpr;
+    begin
+      try
+        r := wregexprParse(regex, [wrfIgnoreCase]);
+        matches := wregexprMatch(r, value.toString, false);
+        if matches.findNext then value := xqvalue(matches.getMatch(submatch))
+        else value := xqvalue('');
+      finally
+        wregexprFree(r);
+      end;
+    end;
   var
    value:IXQValue;
    oldvarcount: Integer;
@@ -1610,6 +1624,7 @@ var xpathText: TTreeNode;
    name: String;
    props: TStringArray;
    tempa: TXQVArray;
+
   begin
     attribs := templateStart.templateAttributes;
 
@@ -1617,10 +1632,8 @@ var xpathText: TTreeNode;
     value:=performPXPEvaluation(templateStart.source);
 
     regex := attribs.Values['regex'];
-    if regex<>'' then begin
-      xqvalueArray(tempa, [value, xqvalue(regex), xqvalue(StrToIntDef(templateStart.templateAttributes.Values['submatch'],0)), xqvalue('i')]);
-      value := xqFunctionExtract(length(tempa), @tempa[0]);
-    end;
+    if regex<>'' then
+      handleRegex(value, regex, StrToIntDef(templateStart.templateAttributes.Values['submatch'],0));
 
 
 

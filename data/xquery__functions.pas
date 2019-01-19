@@ -6172,6 +6172,116 @@ begin
   sortXQList(list, context, argc, args);
 end;
 
+function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr; overload;
+var
+  flags: TWrappedRegExprFlags;
+  c: Char;
+begin
+  flags := [];
+  if all <> nil then all^ := false;
+  if argc > flagsPos then begin
+    for c in argv[flagsPos].toString do
+      case c of
+      's': Include(flags, wrfSingleLine);
+      'm': Include(flags, wrfMultiLine);
+      'i': Include(flags, wrfIgnoreCase);
+      'x': Include(flags, wrfStripWhitespace);
+      'q': Include(flags, wrfQuote);
+      '!': include(flags, wrfSkipSyntaxNormalization);
+      else if (c = '*') and (all <> nil) then all^ := true
+      else raise EXQEvaluationException.create('FORX0001', 'Invalid flag ' + c + ' in ' + argv[flagsPos].toXQuery());
+      end;
+  end;
+
+  if toescape <> nil then toescape^ := wrfQuote in flags;
+
+  result := wregexprParse(argv[1].toString, flags);
+  if not allowEmptyMatch then begin
+    if result.
+      {$IF defined(USE_SOROKINS_REGEX)}Exec{$ELSEIF defined(USE_FLRE)}Test{$ENDIF}
+      ('') then begin
+        wregexprFree(result);
+        raise EXQEvaluationException.create('FORX0003', 'Regexp must not match the empty string: '+argv[1].toString);
+      end;
+  end;
+end;
+
+
+
+function xqFunctionReplace(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+ regEx: TWrappedRegExpr;
+ noescape: Boolean;
+ {$IFDEF USE_FLRE}replacer: TReplaceCallback;{$ENDIF}
+begin
+  {$IFDEF USE_FLRE}replacer := nil;{$ENDIF}
+  regEx:=wregexprParse(argc, argv, 3, false, @noescape);
+  try
+    try
+    {$IFDEF USE_SOROKINS_REGEX}
+    result := xqvalue(regEx.Replace(argv[0].toString, argv[2].toString, not noescape));
+    {$ENDIF}
+    {$IFDEF USE_FLRE}
+    replacer := TReplaceCallback.create(argv[2].toString, noescape);
+    result := xqvalue(regEx.UTF8ReplaceCallback(argv[0].toString, @replacer.callback));
+    {$ENDIF}
+    except
+      on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+    end;
+
+  finally
+    {$IFDEF USE_FLRE}replacer.Free;{$ENDIF}
+    wregexprFree(regEx);
+  end;
+end;
+
+
+function xqFunctionMatches(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+ regEx: TWrappedRegExpr;
+begin
+  regEx:=wregexprParse(argc, argv, 2, true);
+  try
+    result := xqvalue(wregexprMatches(regEx, argv[0].toString))
+  finally
+    wregexprFree(regEx);
+  end;
+end;
+
+function xqFunctionTokenize(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  regEx: TWrappedRegExpr;
+  input: String;
+  lastMatchEnd: Integer;
+  list: TXQVList;
+  matches: TWrappedRegExprMatchResults;
+begin
+  input := argv[0].toString;
+  if input = '' then
+    exit(xqvalue);
+
+  regex := wregexprParse(argc, argv, 2, false);
+  try
+    try
+      matches := wregexprMatch(regex, input, true);
+      if matches.findNext then begin
+        list := TXQVList.create(matches.countHint + 1);
+        lastMatchEnd := 1;
+        repeat
+          list.add(xqvalue(copy(input, lastMatchEnd, matches.getMatchStart(0) - lastMatchEnd)));
+          lastMatchEnd := matches.getMatchEnd(0);
+        until not matches.findNext;
+        list.add(xqvalue(strCopyFrom(input, lastMatchEnd)));
+        xqvalueSeqSqueezed(result, list);
+      end else result := xqvalue(input);
+    except
+      on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+    end;
+  finally
+    wregexprFree(regex);
+  end;
+end;
+
 function xqFunctionTokenize_1(argc: SizeInt; argv: PIXQValue): IXQValue;
 var input: string;
 begin
@@ -6180,6 +6290,122 @@ begin
   if input = '' then exit(xqvalue);
   result := xqvalue(strSplit(input, ' '));
 end;
+
+
+function xqFunctionAnalyze_String(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  input: String;
+  curPos: integer; //handled, excluding curPos
+  tempStr: string;
+
+  function nextBlock(till: Integer): string;
+  begin
+    if till < curPos then till := curPos;
+    result := xmlStrEscape(copy(input, curPos, till - curPos));
+    curPos := till;
+  end;
+
+  procedure openMatch(from: integer);
+  begin
+    if from > curPos then tempStr += '<non-match>' + nextBlock(from) + '</non-match>';;
+    tempStr += '<match>';
+  end;
+  procedure openGroup(id, from: integer);
+  begin
+    if from < curPos then exit;
+    tempStr += nextBlock(from) + '<group nr="'+IntToStr(id)+'">';
+  end;
+  procedure closeGroup(till: integer);
+  begin
+    if till < curPos then exit;
+    tempStr += nextBlock(till) + '</group>';
+  end;
+  procedure closeMatch(till: integer);
+  begin
+    tempStr += nextBlock(till) + '</match>';
+  end;
+
+var
+   regEx: TWrappedRegExpr;
+   matches: TWrappedRegExprMatchResults;
+   node: TTreeNode;
+   j: Integer;
+   nesting: TLongintArray;
+begin
+  input := argv[0].toString;
+  curPos := 1;
+  if input <> '' then begin
+    regex := wregexprParse(argc, argv, 2, false);
+    if (argc > 2) and strContains(argv[2].toString, 'q') then nesting := nil
+    else regexprGetGroupNesting(nesting, argv[1].toString);
+    try
+      try
+        matches := wregexprMatch(regex, input, true);
+        while matches.findNext do begin
+          openMatch(matches.getMatchStart(0));
+          for j := 0 to high(nesting) do
+            if nesting[j] > 0 then openGroup(nesting[j], matches.getMatchStart(nesting[j]))
+            else closeGroup(matches.getMatchEnd(-nesting[j]));
+          closeMatch(matches.getMatchEnd(0));
+        end;
+        if curPos <= length(input) then tempStr += '<non-match>' + xmlStrEscape(strCopyFrom(input, curPos)) + '</non-match>';
+      except
+        on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+      end;
+    finally
+      wregexprFree(regex);
+    end;
+  end else tempStr := '';
+  tempStr := '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions">' + tempStr + '</analyze-string-result>';
+
+
+  node := context.parseDoc(tempStr, '', 'text/xml');
+  if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+tempStr);
+
+  Result := xqvalue(node.getFirstChild());
+end;
+
+
+function xqFunctionExtract(argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+ regEx: TWrappedRegExpr;
+ matches: array of integer;
+ all: Boolean;
+ i: Integer;
+ input: string;
+ resseq: TXQValueSequence;
+ matchResults: TWrappedRegExprMatchResults;
+begin
+  input := argv[0].toString;
+  regEx := wregexprParse(argc,argv, 3, true, nil, @all);
+  //debugLogMatch
+  try
+    if argc < 3 then begin
+      SetLength(matches, 1);
+      matches[0] := 0;
+    end else begin
+      SetLength(matches, argv[2].getSequenceCount);
+      for i := 0 to high(matches) do matches[i] := argv[2].get(i+1).toInt64;
+    end;
+    resseq := TXQValueSequence.create();
+    result := resseq;
+    matchResults := wregexprMatch(regex, input, all);
+    while matchResults.findNext do begin
+      for i := 0 to high(matches) do
+        resseq.add(xqvalue(matchResults.getMatch(matches[i])));
+    end;
+    if resseq.getSequenceCount = 0 then
+      if not ( all or (length(matches) = 0) ) then begin
+        for i := 0 to high(matches) do
+          resseq.add(xqvalue(''));
+      end;
+    xqvalueSeqSqueeze(result);
+  finally
+    wregexprFree(regEx)
+  end;
+end;
+
+
 
 
 function arrayAsList(const a: IXQValue): TXQVList;

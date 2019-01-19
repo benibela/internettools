@@ -2,7 +2,7 @@ unit xquery__regex;
 
 
 {
-Copyright (C) 2008 - 2016 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2019 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -28,7 +28,7 @@ interface
 
 
 uses
-  Classes, SysUtils, xquery, bbutils
+  Classes, SysUtils, bbutils
     {$IFDEF USE_SOROKINS_REGEX},regexpr{$ENDIF} //Sorokins's regex library. Contained in fpc nowadays, or
     {$IFDEF USE_SOROKINS_DREGEX},dregexpr{$ENDIF}    //supplied in this unit
     {$IFDEF USE_FLRE},FLRE{$ENDIF} //FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
@@ -53,36 +53,56 @@ type TWrappedRegExpr = TFLRE;
 type TWrappedRegExprFlag  = (wrfSingleLine, wrfMultiLine, wrfIgnoreCase, // standard
                              wrfStripWhitespace, wrfQuote, wrfSkipSyntaxNormalization);
      TWrappedRegExprFlags = set of TWrappedRegExprFlag;
-
+     TWrappedRegExprMatchResults = record
+       input: string;
+       {$IFDEF USE_FLRE}
+       captures: TFLREMultiCaptures;
+       currentCapture: integer;
+       {$ELSE}
+       regexp: TWrappedRegExpr;
+       first, all: boolean;
+       {$ENDIF}
+       function getMatch(i: integer): string;
+       function getMatchStart(i: integer): integer;
+       function getMatchLength(i: integer): integer;
+       function getMatchEnd(i: integer): integer; //start + length
+       function countHint: integer;
+       function findNext: boolean; //this is like moveNext in an enumerator, i.e., always call it once
+     end;
 
 
 function regexprreencode(regexpr: string; flags: TWrappedRegExprFlags): string;
-
+procedure regexprGetGroupNesting(out result: TLongintArray; regexpr: string);
 
 
 function wregexprParseInternal(const pattern: string; flags: TWrappedRegExprFlags): TWrappedRegExpr;
 function wregexprParse(pattern: string; flags: TWrappedRegExprFlags): TWrappedRegExpr;
-function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr;
 function wregexprClone(regexpr: TWrappedRegExpr): TWrappedRegExpr;
 procedure wregexprFree(wregexp: TWrappedRegExpr);
 
 function wregexprMatches(regexpr: TWrappedRegExpr; input: string): Boolean; //might be removed in future
 function wregexprExtract(regexpr: TWrappedRegExpr; input: string; out matches: TWrappedMatchArray): boolean; //might be removed in future
+function wregexprMatch(wregexp: TWrappedRegExpr; input: string; matchAll: boolean): TWrappedRegExprMatchResults;
 
-//XQuery standard function
-function xqFunctionReplace(argc: SizeInt; argv: PIXQValue): IXQValue;
-function xqFunctionMatches(argc: SizeInt; argv: PIXQValue): IXQValue;
-function xqFunctionTokenize(argc: SizeInt; argv: PIXQValue): IXQValue;
-function xqFunctionAnalyze_String(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
-
-//My extension function
-function xqFunctionExtract(argc: SizeInt; argv: PIXQValue): IXQValue;
+{$IFDEF USE_FLRE}
+type
+TReplaceCallback = class
+  repin: string;
+  parsed: boolean;
+  repwith: array of record
+    literal: string;
+    capture: integer;
+  end;
+  constructor create(rep: string; noescape: boolean);
+  function callback(const Input:PFLRERawByteChar;const Captures:TFLRECaptures):TFLRERawByteString;
+end;
+{$endif}
 
 const UsingFLRE = {$IFDEF USE_FLRE}true{$ELSE}false{$endif} ;
 
 implementation
 
-uses math, simplehtmltreeparser;
+uses math, xquery.internals.common;
 
 {$IFDEF USE_FLRE_WITH_CACHE}
 var flreCache: TFLRECacheHashMap;
@@ -143,7 +163,7 @@ var pos: integer;
 
   procedure abort;
   begin
-    raise EXQEvaluationException.create('FORX0002', 'Invalid regexpr: '+regexpr+' after ' + copy(regexpr, 1, pos));
+    raiseXQEvaluationException('FORX0002', 'Invalid regexpr: '+regexpr+' after ' + copy(regexpr, 1, pos));
   end;
 
   function gotonextchar: char; inline;
@@ -593,43 +613,10 @@ begin
     end;
     {$endif}
   except
-    on e: EWrappedRegExpr do raise EXQEvaluationException.create('FORX0002', 'Regexp error '+e.Message+ ' in '+pattern);
+    on e: EWrappedRegExpr do raiseXQEvaluationException('FORX0002', 'Regexp error '+e.Message+ ' in '+pattern);
   end;
 end;
 
-function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr;
-var
-  flags: TWrappedRegExprFlags;
-  c: Char;
-begin
-  flags := [];
-  if all <> nil then all^ := false;
-  if argc > flagsPos then begin
-    for c in argv[flagsPos].toString do
-      case c of
-      's': Include(flags, wrfSingleLine);
-      'm': Include(flags, wrfMultiLine);
-      'i': Include(flags, wrfIgnoreCase);
-      'x': Include(flags, wrfStripWhitespace);
-      'q': Include(flags, wrfQuote);
-      '!': include(flags, wrfSkipSyntaxNormalization);
-      else if (c = '*') and (all <> nil) then all^ := true
-      else raise EXQEvaluationException.create('FORX0001', 'Invalid flag ' + c + ' in ' + argv[flagsPos].toXQuery());
-      end;
-  end;
-
-  if toescape <> nil then toescape^ := wrfQuote in flags;
-
-  result := wregexprParse(argv[1].toString, flags);
-  if not allowEmptyMatch then begin
-    if result.
-      {$IF defined(USE_SOROKINS_REGEX)}Exec{$ELSEIF defined(USE_FLRE)}Test{$ENDIF}
-      ('') then begin
-        wregexprFree(result);
-        raise EXQEvaluationException.create('FORX0003', 'Regexp must not match the empty string: '+argv[1].toString);
-      end;
-  end;
-end;
 
 function wregexprClone(regexpr: TWrappedRegExpr): TWrappedRegExpr;
 begin
@@ -655,7 +642,7 @@ begin
     result := regexpr.UTF8Find(input) > 0;
     {$ENDIF}
   except
-    on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+    on e: EWrappedRegExpr do raiseXQEvaluationException('FORX0002', e.Message);
   end;
 end;
 
@@ -681,8 +668,22 @@ begin
     else matches := extractions[0];
     {$ENDIF}
   except
-    on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
+    on e: EWrappedRegExpr do raiseXQEvaluationException('FORX0002', e.Message);
   end;
+end;
+
+function wregexprMatch(wregexp: TWrappedRegExpr; input: string; matchAll: boolean): TWrappedRegExprMatchResults;
+begin
+  result.input := input;
+  {$IFDEF USE_FLRE}
+  if matchAll then wregexp.UTF8MatchAll(input, result.captures)
+  else wregexp.UTF8MatchAll(input, result.captures, 1, 1);
+  result.currentCapture := -1;
+  {$ELSE}
+  result.regexp := wregexp;
+  result.first := true;
+  result.all := matchAll;
+  {$ENDIF}
 end;
 
 procedure wregexprFree(wregexp: TWrappedRegExpr);
@@ -694,21 +695,72 @@ begin
   {$endif}
 end;
 
+function TWrappedRegExprMatchResults.getMatch(i: integer): string;
+begin
+  {$IFDEF USE_FLRE}
+  if i < length(captures[currentCapture]) then
+    result := copy(input, captures[currentCapture][i].Start, captures[currentCapture][i].Length)
+   else
+    result := '';
+  {$ELSE}
+  result := regexp.Match[i];
+  {$ENDIF}
+end;
 
+function TWrappedRegExprMatchResults.getMatchStart(i: integer): integer;
+begin
+  {$IFDEF USE_FLRE}
+  if i < length(captures[currentCapture]) then
+    result := captures[currentCapture][i].Start
+   else
+    result := 1;
+  {$ELSE}
+  result := regexp.MatchPos[i];
+  {$ENDIF}
+end;
 
-{$IFDEF USE_FLRE}
-type TReplaceCallback = class
-  repin: string;
-  parsed: boolean;
-  repwith: array of record
-    literal: string;
-    capture: integer;
-  end;
-  constructor create(rep: string; noescape: boolean);
-  function callback(const Input:PFLRERawByteChar;const Captures:TFLRECaptures):TFLRERawByteString;
+function TWrappedRegExprMatchResults.getMatchLength(i: integer): integer;
+begin
+  {$IFDEF USE_FLRE}
+  if i < length(captures[currentCapture]) then
+    result := captures[currentCapture][i].Length
+   else
+    result := length(input)
+  {$ELSE}
+  result := regexp.MatchLen[i];
+  {$ENDIF}
+end;
+
+function TWrappedRegExprMatchResults.getMatchEnd(i: integer): integer;
+begin
+  result := getMatchStart(i) + getMatchLength(i);
+end;
+
+function TWrappedRegExprMatchResults.countHint: integer;
+begin
+  {$IFDEF USE_FLRE}
+  result := length(captures);
+  {$ELSE}
+  result := 1;
+  {$ENDIF}
+end;
+
+function TWrappedRegExprMatchResults.findNext: boolean;
+begin
+  {$IFDEF USE_FLRE}
+  inc(currentCapture);
+  result := currentCapture < length(captures);
+  {$ELSE}
+  if first then begin
+    result := regexp.exec(input);
+    first := false;
+  end else
+    result := all and regexp.execnext;
+  {$ENDIF}
 end;
 
 
+{$IFDEF USE_FLRE}
 constructor TReplaceCallback.create(rep: string; noescape: boolean);
 begin
   if noescape then begin
@@ -724,7 +776,7 @@ function TReplaceCallback.callback(const Input: PFLRERawByteChar; const Captures
 var pos: integer;
   procedure abort;
   begin
-    raise EXQEvaluationException.create('FORX0004', 'Invalid replacement: '+repin+' after ' + copy(repin, 1, pos));
+    raiseXQEvaluationException('FORX0004', 'Invalid replacement: '+repin+' after ' + copy(repin, 1, pos));
   end;
 var
   temp: RawByteString;
@@ -792,245 +844,6 @@ end;
 
 {$ENDIF}
 
-function xqFunctionReplace(argc: SizeInt; argv: PIXQValue): IXQValue;
-var
- regEx: TWrappedRegExpr;
- noescape: Boolean;
- {$IFDEF USE_FLRE}replacer: TReplaceCallback;{$ENDIF}
-begin
-  {$IFDEF USE_FLRE}replacer := nil;{$ENDIF}
-  regEx:=wregexprParse(argc, argv, 3, false, @noescape);
-  try
-    try
-    {$IFDEF USE_SOROKINS_REGEX}
-    result := xqvalue(regEx.Replace(argv[0].toString, argv[2].toString, not noescape));
-    {$ENDIF}
-    {$IFDEF USE_FLRE}
-    replacer := TReplaceCallback.create(argv[2].toString, noescape);
-    result := xqvalue(regEx.UTF8ReplaceCallback(argv[0].toString, @replacer.callback));
-    {$ENDIF}
-    except
-      on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-    end;
-
-  finally
-    {$IFDEF USE_FLRE}replacer.Free;{$ENDIF}
-    wregexprFree(regEx);
-  end;
-end;
-
-
-function xqFunctionMatches(argc: SizeInt; argv: PIXQValue): IXQValue;
-var
- regEx: TWrappedRegExpr;
-begin
-  regEx:=wregexprParse(argc, argv, 2, true);
-  try
-    result := xqvalue(wregexprMatches(regEx, argv[0].toString))
-  finally
-    wregexprFree(regEx);
-  end;
-end;
-
-function xqFunctionTokenize(argc: SizeInt; argv: PIXQValue): IXQValue;
-var
-  regEx: TWrappedRegExpr;
-  input: String;
-  {$IFDEF USE_SOROKINS_REGEX}
-  lastMatchEnd: Integer;
-  {$ENDIF}
-  {$IFDEF USE_FLRE}
-  i: Integer;
-  captures: TFLREMultiCaptures;
-  {$ENDIF}
-  list: TXQVList;
-begin
-  input := argv[0].toString;
-  if input = '' then
-    exit(xqvalue);
-
-  regex := wregexprParse(argc, argv, 2, false);
-  try
-    try
-      {$IFDEF USE_SOROKINS_REGEX}
-      if regEx.Exec(input) then begin
-        list := TXQVList.create();
-        lastMatchEnd := 1;
-        repeat
-          list.add(xqvalue(copy(input, lastMatchEnd, regEx.MatchPos[0] - lastMatchEnd)));
-          lastMatchEnd := regex.MatchPos[0] + regex.MatchLen[0];
-        until not regEx.ExecNext;
-        list.add(xqvalue(strCopyFrom(input, lastMatchEnd)));
-        xqvalueSeqSqueezed(result, list);
-      end else result := xqvalue(input);
-      {$ENDIF}
-      {$IFDEF USE_FLRE}
-      captures := nil;
-      regEx.UTF8MatchAll(input, captures);
-      if length(captures) = 0 then exit(xqvalue(input));
-      list := TXQVList.create(length(captures)+1);
-      list.add(xqvalue(copy(input, 1, captures[0][0].Start - 1)));
-      for i := 0 to high(captures) - 1 do
-        list.add(xqvalue(copy(input, captures[i][0].Start + captures[i][0].Length, captures[i+1][0].Start - captures[i][0].Start - captures[i][0].Length)));
-      list.add(xqvalue(strCopyFrom(input, captures[high(captures)][0].Start + captures[high(captures)][0].Length)));
-      xqvalueSeqSqueezed(result, list);
-      {$ENDIF}
-    except
-      on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-    end;
-  finally
-    wregexprFree(regex);
-  end;
-end;
-
-
-
-function xqFunctionAnalyze_String(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
-var
-  regEx: TWrappedRegExpr;
-  input: String;
-  {$IFDEF USE_FLRE}
-  i: Integer;
-  captures: TFLREMultiCaptures;
-  {$ENDIF}
-
-  curPos: integer; //handled, excluding curPos
-  tempStr: string;
-  node: TTreeNode;
-  j: Integer;
-  nesting: TLongintArray;
-
-  function nextBlock(till: Integer): string;
-  begin
-    if till < curPos then till := curPos;
-    result := xmlStrEscape(copy(input, curPos, till - curPos));
-    curPos := till;
-  end;
-
-  procedure openMatch(from: integer);
-  begin
-    if from > curPos then tempStr += '<non-match>' + nextBlock(from) + '</non-match>';;
-    tempStr += '<match>';
-  end;
-  procedure openGroup(id, from: integer);
-  begin
-    if from < curPos then exit;
-    tempStr += nextBlock(from) + '<group nr="'+IntToStr(id)+'">';
-  end;
-  procedure closeGroup(till: integer);
-  begin
-    if till < curPos then exit;
-    tempStr += nextBlock(till) + '</group>';
-  end;
-  procedure closeMatch(till: integer);
-  begin
-    tempStr += nextBlock(till) + '</match>';
-  end;
-
-begin
-  input := argv[0].toString;
-  curPos := 1;
-  if input <> '' then begin
-    regex := wregexprParse(argc, argv, 2, false);
-    if (argc > 2) and strContains(argv[2].toString, 'q') then nesting := nil
-    else regexprGetGroupNesting(nesting, argv[1].toString);
-    try
-      try
-        {$IFDEF USE_SOROKINS_REGEX}
-        if regEx.Exec(input) then
-          repeat
-            openMatch(regex.MatchPos[0]);
-            for j := 0 to high(nesting) do
-              if nesting[j] > 0 then openGroup(nesting[j], regex.MatchPos[nesting[j]])
-              else closeGroup(regex.MatchPos[-nesting[j]] + regex.MatchLen[-nesting[j]]);
-            closeMatch(regex.MatchPos[0] + regex.MatchLen[0]);
-          until not regEx.ExecNext;
-        {$ENDIF}
-        {$IFDEF USE_FLRE}
-        captures := nil;
-        regEx.UTF8MatchAll(input, captures);
-        for i := 0 to high(captures) do begin
-          openMatch(captures[i][0].Start);
-          for j := 0 to high(nesting) do
-            if nesting[j] > 0 then begin
-              if nesting[j] <= high(captures[i]) then openGroup(nesting[j], captures[i][nesting[j]].Start)
-              else openGroup(nesting[j], curPos);
-            end else
-              if -nesting[j] <= high(captures[i]) then closeGroup(captures[i][-nesting[j]].Start + captures[i][-nesting[j]].Length)
-              else closeGroup(curPos);
-          closeMatch(captures[i][0].Start + captures[i][0].Length);
-        end;
-        {$ENDIF}
-        if curPos <= length(input) then tempStr += '<non-match>' + xmlStrEscape(strCopyFrom(input, curPos)) + '</non-match>';
-      except
-        on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-      end;
-    finally
-      wregexprFree(regex);
-    end;
-  end else tempStr := '';
-  tempStr := '<analyze-string-result xmlns="http://www.w3.org/2005/xpath-functions">' + tempStr + '</analyze-string-result>';
-
-
-  node := context.parseDoc(tempStr, '', 'text/xml');
-  if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+tempStr);
-
-  Result := xqvalue(node.getFirstChild());
-end;
-
-
-function xqFunctionExtract(argc: SizeInt; argv: PIXQValue): IXQValue;
-var
- regEx: TWrappedRegExpr;
- matches: array of integer;
- all: Boolean;
- i: Integer;
- input: string;
- {$IFDEF USE_FLRE}
- captures: TFLREMultiCaptures;
- j: Integer;
- {$ENDIF}
- resseq: TXQValueSequence;
-begin
-  input := argv[0].toString;
-  regEx := wregexprParse(argc,argv, 3, true, nil, @all);
-  //debugLogMatch
-  try
-    if argc < 3 then begin
-      SetLength(matches, 1);
-      matches[0] := 0;
-    end else begin
-      SetLength(matches, argv[2].getSequenceCount);
-      for i := 0 to high(matches) do matches[i] := argv[2].get(i+1).toInt64;
-    end;
-    resseq := TXQValueSequence.create();
-    result := resseq;
-    {$IFDEF USE_SOROKINS_REGEX}
-    if regEx.Exec(input) then
-      repeat
-        for i := 0 to high(matches) do
-          resseq.add(xqvalue(regEx.Match[matches[i]]));
-      until not all or not regEx.ExecNext;
-    {$ENDIF}
-    {$IFDEF USE_FLRE}
-    captures := nil;
-    if not all then regex.UTF8MatchAll(input, captures, 1, 1)
-    else regex.UTF8MatchAll(input, captures);
-    for i := 0 to high(captures) do
-      for j := 0 to high(matches) do
-        if (matches[j] <= high(captures[i])) then resseq.add(xqvalue(copy(input, captures[i][matches[j]].Start, captures[i][matches[j]].Length)))
-        else resseq.add(xqvalue(''));
-    {$ENDIF}
-    if resseq.getSequenceCount = 0 then
-      if not ( all or (length(matches) = 0) ) then begin
-        for i := 0 to high(matches) do
-          resseq.add(xqvalue(''));
-      end;
-    xqvalueSeqSqueeze(result);
-  finally
-    wregexprFree(regEx)
-  end;
-end;
 
 {$IFDEF USE_FLRE_WITH_CACHE}
 

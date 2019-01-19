@@ -14,7 +14,7 @@
     </CompilerOptions>
     <Description Value="This package provides standard conformant XPath 2.0, XQuery 1.0 and XPath/XQuery 3.0 interpreters with extensions for - among others - JSONiq, pattern matching, CSS and HTML; as well as functions to perform HTTP/S requests on Windows/Linux/MacOSX/Android and an XSLT-inspired webscraping language"/>
     <License Value="GPLv3"/>
-    <Files Count="26">
+    <Files Count="27">
       <Item1>
         <Filename Value="data/bbutils.pas"/>
         <UnitName Value="bbutils"/>
@@ -119,6 +119,10 @@
         <Filename Value="internet/multipagetemplate.pas"/>
         <UnitName Value="multipagetemplate"/>
       </Item26>
+      <Item27>
+        <Filename Value="data/xquery.internals.common.pas"/>
+        <UnitName Value="xquery.internals.common"/>
+      </Item27>
     </Files>
     <RequiredPkgs Count="1">
       <Item1>

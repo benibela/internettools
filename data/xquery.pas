@@ -3068,7 +3068,7 @@ type TXQueryInternals = object
 end;
 
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, xquery__parse, bbutilsbeta;
+uses base64, jsonscanner, strutils, xquery__regex, xquery__parse, bbutilsbeta, xquery.internals.common;
 
 var
   XQFormats : TFormatSettings = (
@@ -8960,11 +8960,16 @@ end;
 
 
 
-
-
+procedure raiseXQEvaluationExceptionCallbackImpl(const code, message: string);
+begin
+  raise EXQEvaluationException.create(code, message);
+end;
 
 var xs: TXQNativeModule;
 initialization
+
+raiseXQEvaluationExceptionCallback := @raiseXQEvaluationExceptionCallbackImpl;
+
 assert(SizeOf(IXQValue) = sizeof(pointer));
 collations:=TStringList.Create;
 collations.OwnsObjects:=true;
