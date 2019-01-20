@@ -69,7 +69,7 @@ type
       description: string;
     end;
     procedure initFromTree(t: TTreeNode); override;
-    procedure perform(reader: TMultipageTemplateReader); override;
+    procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
 
@@ -308,7 +308,7 @@ type
 
 implementation
 
-uses bbutilsbeta, xquery_json;
+uses bbutilsbeta, xquery_json, xquery.namespaces;
 
 type
 
@@ -342,7 +342,7 @@ type
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   private
-    procedure onTransferReact(sender: TInternetAccess; var amethod: string; var aurl: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction);
+    procedure onTransferReact(sender: TInternetAccess; var {%H-}amethod: string; var {%H-}aurl: TDecodedUrl; var {%H-}data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction);
   end;
 
   TTemplateActionPattern = class(TTemplateAction)
@@ -387,7 +387,7 @@ type
   TTemplateActionChooseWhen = class(TTemplateAction)
     test: string;
     procedure initFromTree(t: TTreeNode); override;
-    procedure perform(reader: TMultipageTemplateReader); override;
+    procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
 
@@ -395,7 +395,7 @@ type
 
   TTemplateActionChooseOtherwise = class(TTemplateAction)
     procedure initFromTree(t: TTreeNode); override;
-    procedure perform(reader: TMultipageTemplateReader); override;
+    procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
   { TTemplateActionLoop }
@@ -427,7 +427,7 @@ type
   TTemplateActionCatch = class(TTemplateAction)
     errNamespaces, errCodes: TStringArray;
     procedure initFromTree(t: TTreeNode); override;
-    procedure perform(reader: TMultipageTemplateReader); override;
+    procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
     function checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
   end;

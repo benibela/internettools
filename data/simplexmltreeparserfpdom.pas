@@ -6,7 +6,7 @@
 unit simplexmltreeparserfpdom;
 
 {
-Copyright (C) 2008 - 2012 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2019 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -61,7 +61,7 @@ TTreeParserDOM = class(TTreeParserDOMBase)
 end;
 
 implementation
-uses bbutils;
+uses bbutils, xquery.namespaces;
 
 { TTreeParserDOM }
 
@@ -158,8 +158,8 @@ begin
 
   namespaces:= TNamespaceList.Create;
   doc := TTreeDocument.create(self);
-  doc.baseURI:=dom.baseURI;
-  doc.documentURI:=dom.baseURI;
+  doc.baseURI:=dom{%H-}.baseURI;
+  doc.documentURI:=dom{%H-}.baseURI;
   doc.document := doc;
 
   doc.reverse := TTreeNode.create(tetClose);

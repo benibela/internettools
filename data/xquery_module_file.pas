@@ -20,7 +20,7 @@ unit xquery_module_file;
 interface
 
 uses
-  simplehtmltreeparser;
+  simplehtmltreeparser, xquery.namespaces;
 
 
 //**Registers the module to the XQuery engine
@@ -32,6 +32,7 @@ implementation
 
 uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
   , internetaccess //it does not need internet access itself, just the URI encoding function there
+  , xquery.internals.common
   {$ifdef unix},BaseUnix{$endif}
   {$ifdef windows},windows{$endif}
     ;
