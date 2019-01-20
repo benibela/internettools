@@ -58,6 +58,7 @@ uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
+   xquery.namespaces,
    xquery__functions, xquery__parse //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
    ;
 

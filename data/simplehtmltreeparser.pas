@@ -30,37 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
-  Classes, SysUtils, simplehtmlparser, bbutils, contnrs,{$ifdef USE_FLRE}FLRE{$else}ghashmap{$endif};
+  Classes, SysUtils, simplehtmlparser, bbutils, contnrs, xquery.namespaces;
 
 type
-TXQHashKeyString = {$ifdef USE_FLRE}TFLRERawByteString{$else}RawByteString{$endif};
-{$ifndef USE_FLRE}TXQHash = record
-  class function hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt; static;
-end;{$endif}
-generic TXQHashmapStr<TValue> = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, TValue, TXQHash>{$endif})
-protected
-  function GetValue(const Key: TXQHashKeyString): TValue; inline;
-  procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
-public
-  procedure Add(const Key:TXQHashKeyString; const AValue:TValue); inline;
-  property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
-end;
-generic TXQHashmapStrOwning<TValue, TOwningList> = class(specialize TXQHashmapStr<TValue>)
-protected
-  owner: TOwningList;
-  procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
-public
-  constructor create;
-  destructor destroy; override;
-  procedure Add(const Key:TXQHashKeyString; const Value:TValue); inline;
-  property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
-end;
-generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TObjectList>);
-TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
-TXQHashmapStrOwningInterface = specialize TXQHashmapStrOwning<IUnknown, TInterfaceList>;
-
-
-
 //**The type of a tree element. <Open>, text, or </close>
 TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument,
                  tetInternalDoNotUseCDATAText, //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
@@ -78,70 +50,6 @@ TTreeDocument = class;
 
 TStringComparisonFunc = function (const a,b: string): boolean of object;
 
-TNamespace = class;
-
-//** Namespace interface, storing url and prefix. (Interface, so it is ref-counted)
-INamespace = interface
-['{5F6DF5F2-548C-4F13-9BEA-CE59EBAE4CAB}']
-  function getPrefix: string; //**< Returns the prefix
-  function getURL: string; //**< Returns the url
-  function serialize: string; //**< Returns a xmlns attribute declaring this namespace with url and prefix
-  function getSelf: TNamespace;
-  function equal(const ns: string): boolean;
-end;
-
-
-{ TNamespace }
-
-//** Class implementing the INamespace interface
-TNamespace = class(TInterfacedObject, INamespace)
-public
-  url: string;
-  prefix: string;
-  //** Creates a new namespace with url and prefix. (watch the argument order. It follows the XPath fn:QName function)
-  constructor create(const aurl: string; aprefix: string);
-
-  class function make(const aurl: string; const aprefix: string): TNamespace; static;
-  class function uniqueUrl(const aurl: string): string; static;
-  class procedure freeCache; static;
-
-  function getPrefix: string;
-  function getURL: string;
-  function serialize: string;
-  function getSelf: TNamespace;
-  function equal(const ns: string): boolean;
-  destructor Destroy; override;
-end;
-
-{ TNamespaceList }
-
-//** List of namespaces
-TNamespaceList = class(TInterfaceList)
-private
-  function getNamespace(const prefix: string): INamespace;
-  function getNamespace(i: integer): INamespace;
-  function hasNamespacePrefixBefore(const prefix: string; const c: integer): boolean;
-public
-  function hasNamespacePrefix(const prefix: string; out ns: INamespace): boolean;
-  function hasNamespacePrefix(const prefix: string): boolean;
-  function hasNamespace(const n: INamespace): boolean;
-
-  function lastIndexOfNamespacePrefix(const prefix: string): integer;
-
-  procedure add(const ns: TNamespace);
-  procedure add(const ns: INamespace);
-  procedure addIfNewPrefix(const ns: TNamespace);
-  procedure addIfNewPrefix(const ns: INamespace);
-  procedure addIfNewPrefixUrl(const ns: TNamespace);
-  procedure addIfNewPrefixUrl(const ns: INamespace);
-
-  procedure deleteFrom(i: integer);
-
-  function clone: TNamespaceList;
-
-  property namespaces[prefix: string]: INamespace read getNamespace;
-  property items[i: integer]: INamespace read getNamespace;
-end;
 
 TTreeNode = class;
 TTreeAttribute = class;
@@ -488,23 +396,10 @@ published
   property OwnedTrees: TList read FTrees;
 end;
 
-
-function xmlStrEscape(s: string; attrib: boolean = false):string;
-function xmlStrWhitespaceCollapse(const s: string):string;
-function htmlStrEscape(s: string; attrib: boolean = false; encoding: TSystemCodePage = CP_NONE):string;
-function strSplitOnAsciiWS(s: string): TStringArray; //splits on ascii whitespace as defined in HTML5 (note: #$C is WS in HTML but not in XML)
 function CSSHasHiddenStyle(const style: string): boolean;
 
-const XMLNamespaceUrl_XML = 'http://www.w3.org/XML/1998/namespace';
-      XMLNamespaceUrl_XMLNS = 'http://www.w3.org/2000/xmlns/';
 const TreeNodesWithChildren = [tetOpen, tetDocument];
 
-var
-   XMLNamespace_XMLNS, XMLNamespace_XML: INamespace;
-
-function equalNamespaces(const ans, bns: INamespace): boolean; inline;
-function equalNamespaces(const ans, bns: string): boolean; inline;
-function namespaceGetURL(const n: INamespace): string; inline;
 
 
 type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<- not used, might be used in future});
@@ -512,7 +407,6 @@ function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 function isInvalidUTF8(const s: string): boolean;
-function nodeNameHash(const s: RawByteString): cardinal;
 
 
 type HTMLNodeNameHashs = object
@@ -548,7 +442,7 @@ type HTMLNodeNameHashs = object
 end;
 
 implementation
-uses xquery;
+uses xquery, xquery.internals.common;
 
 type THTMLOmittedEndTagInfo = class
   siblings, parents, additionallyclosed: TStringArray;
@@ -575,37 +469,6 @@ begin
   exit(false);
 end;
 
-{$PUSH}{$RangeChecks off}{$OverflowChecks off}
-function nodeNameHash(const s: RawByteString): cardinal;
-var
-  p, last: PByte;
-begin
-  if s = '' then exit(1);
-  p := pbyte(pointer(s));
-  last := p + length(s);
-  result := 0;
-  while p < last do begin
-    if p^ < 128  then begin //give the same hash independent of latin1/utf8 encoding and collation
-      result := result + p^;
-      if (p^ >= ord('a')) and (p^ <= ord('z')) then result := result - ord('a') + ord('A');
-      result := result + (result shl 10);
-      result := result xor (result shr 6);
-    end;
-    inc(p);
-  end;
-
-  result := result + (result shl 3);
-  result := result xor (result shr 11);
-  result := result + (result shl 15);
-  //remember to update HTMLNodeNameHashs when changing anything here;
-end;
-function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
-var
-  i: Integer;
-begin
-  for i := 1 to length(s) do if s[i] >= #128 then exit(0);
-  result := nodeNameHash(s);
-end;
 
 procedure TTreeNodeEnumerator.init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
 begin
@@ -729,71 +592,9 @@ begin
   end;
 end;
 
-{$ifndef USE_FLRE}
-class function TXQHash.hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt;
-begin
-  result := nodeNameHash(a) and (n-1);
-end;
-{$endif}
-
-{$POP}
 
 
 
-function TXQHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
-begin
-  {$ifdef USE_FLRE}
-  result := TValue(pointer(inherited GetValue(key)));
-  {$else}
-  if not inherited GetValue(key, result) then result := default(TValue);
-  {$endif}
-end;
-
-procedure TXQHashmapStr.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
-begin
-  {$ifdef USE_FLRE}
-  inherited SetValue(key, TFLRECacheHashMapData(pointer(AValue)) );
-  {$else}
-  insert(key, AValue);
-  {$endif}
-end;
-
-procedure TXQHashmapStr.Add(const Key: TXQHashKeyString; const AValue: TValue);
-begin
-  {$ifdef USE_FLRE}
-  inherited Add(key, TFLRECacheHashMapData(pointer(AValue)));
-  {$else}
-  insert(key, AValue);
-  {$endif}
-end;
-
-procedure TXQHashmapStrOwning.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
-var
-  old: TValue;
-begin
-  old := GetValue(key);
-  if old = AValue then exit;
-  if old <> nil then owner.remove(old);
-  add(key, Avalue);
-end;
-
-constructor TXQHashmapStrOwning.create;
-begin
-  inherited;
-  owner := TOwningList.create;
-end;
-
-destructor TXQHashmapStrOwning.destroy;
-begin
-  owner.free;
-  inherited destroy;
-end;
-
-procedure TXQHashmapStrOwning.Add(const Key: TXQHashKeyString; const Value: TValue);
-begin
-  owner.add(value);
-  inherited add(key, value);
-end;
 
 constructor THTMLOmittedEndTagInfo.create(somesiblings, someparents: array of string);
 var
@@ -976,214 +777,6 @@ begin
   inherited Destroy;
 end;
 
-{ TNamespaceList }
-
-function TNamespaceList.getNamespace(const prefix: string): INamespace;
-begin
-  hasNamespacePrefix(prefix, result);
-end;
-
-function TNamespaceList.getNamespace(i: integer): INamespace;
-begin
-  result := INamespace(inherited get(i)) ;
-end;
-
-function TNamespaceList.hasNamespacePrefixBefore(const prefix: string; const c: integer): boolean;
-var
-  i: Integer;
-begin
-  for i := c - 1 downto 0 do
-    if (Items[i]).getPrefix = prefix then exit(true);
-  exit(false);
-end;
-
-function TNamespaceList.hasNamespacePrefix(const prefix: string; out ns: INamespace): boolean;
-var
-  i: Integer;
-begin
-  for i := Count - 1 downto 0 do
-    if (Items[i]).getPrefix = prefix then begin
-      ns := items[i];
-      exit(true);
-    end;
-  ns := nil;
-  exit(false);
-end;
-
-function TNamespaceList.hasNamespacePrefix(const prefix: string): boolean;
-var temp: INamespace;
-begin
-  result := hasNamespacePrefix(prefix, temp);
-end;
-
-function TNamespaceList.hasNamespace(const n: INamespace): boolean;
-var
-  temp: INamespace;
-begin
-  if not hasNamespacePrefix(n.getPrefix, temp) then exit(false);
-  if temp.getURL <> n.getURL then exit(false);
-  result := true;
-end;
-
-function TNamespaceList.lastIndexOfNamespacePrefix(const prefix: string): integer;
-var
-  i: Integer;
-begin
-  for i := Count - 1 downto 0 do
-    if (Items[i]).getPrefix = prefix then
-      exit(i);
-  exit(-1);
-end;
-
-procedure TNamespaceList.add(const ns: TNamespace);
-begin
-  inherited add(INamespace(ns)); //hide ancestor method to prevent crash when tnamespace is treated as inamespace instead being cast
-end;
-
-procedure TNamespaceList.add(const ns: INamespace);
-begin
-  inherited add(ns);
-end;
-
-procedure TNamespaceList.addIfNewPrefix(const ns: TNamespace);
-begin
-  addIfNewPrefix(INamespace(ns));
-end;
-
-procedure TNamespaceList.addIfNewPrefix(const ns: INamespace);
-var
-  temp: INamespace;
-begin
-  if (ns = nil) or (ns.getURL = XMLNamespaceUrl_XMLNS) or (ns.getURL = XMLNamespaceUrl_XML) then exit;
-  if not hasNamespacePrefix(ns.getPrefix, temp) then
-    add(ns);
-end;
-
-procedure TNamespaceList.addIfNewPrefixUrl(const ns: TNamespace);
-begin
-  addIfNewPrefixUrl(INamespace(ns));
-end;
-
-procedure TNamespaceList.addIfNewPrefixUrl(const ns: INamespace);
-var
-  temp: INamespace;
-begin
-  if (ns = nil) or (ns.getURL = XMLNamespaceUrl_XMLNS) or (ns.getURL = XMLNamespaceUrl_XML) then exit;
-  if not hasNamespacePrefix(ns.getPrefix, temp) then
-    add(ns)
-  else if temp.getURL <> ns.getURL then
-    add(ns);
-end;
-
-procedure TNamespaceList.deleteFrom(i: integer);
-begin
-  if i < 0 then i := 0;
-  while count > i do
-    delete(count - 1);
-end;
-
-
-function TNamespaceList.clone: TNamespaceList;
-var
-  i: Integer;
-begin
-  result := TNamespaceList.Create;
-  for i := 0 to count - 1 do
-    result.Add(items[i]);
-end;
-
-type TNamespaceCache = class
-  uniqueUrl: string;
-  prefixes: TXQHashmapStrOwningInterface;
-  constructor Create;
-  destructor Destroy; override;
-end;
-
-constructor TNamespaceCache.Create;
-begin
-  prefixes := TXQHashmapStrOwningInterface.Create;
-end;
-
-destructor TNamespaceCache.Destroy;
-begin
-  prefixes.free;
-  inherited Destroy;
-end;
-
-threadvar globalNamespaceCache: TXQHashmapStrOwningObject;
-
-function TNamespace.getSelf: TNamespace;
-begin
-  result := self;
-end;
-
-function TNamespace.equal(const ns: string): boolean;
-begin
-  result := strEqual(url, ns);
-end;
-
-constructor TNamespace.create(const aurl: string; aprefix: string);
-begin
-  url := aurl;
-  prefix := aprefix;
-end;
-
-function namespaceCache(const aurl: string): TNamespaceCache;
-begin
-  if globalNamespaceCache = nil then globalNamespaceCache := TXQHashmapStrOwningObject.Create();
-  result := TNamespaceCache(globalNamespaceCache[aurl]);
-  if result = nil then begin
-    result := TNamespaceCache.Create;
-    result.uniqueUrl := aurl;
-    globalNamespaceCache.Add(aurl, result);
-    //writeln(strFromPtr(pointer(aurl)), ' ',aurl);
-  end;
-end;
-
-class function TNamespace.make(const aurl: string; const aprefix: string): TNamespace;
-var cache : TNamespaceCache;
-  tempptr: Pointer;
-begin
-  cache := namespaceCache(aurl);
-  tempptr := pointer(cache.prefixes[aprefix]);
-  if tempptr = nil then begin
-    result := TNamespace.create(cache.uniqueUrl, aprefix);
-    cache.prefixes.Add(aprefix, result);
-  end else result := (IUnknown(tempptr) as INamespace).getSelf;
-end;
-
-class function TNamespace.uniqueUrl(const aurl: string): string;
-begin
-  result := namespaceCache(aurl).uniqueUrl;
-end;
-
-class procedure TNamespace.freeCache;
-begin
-  FreeAndNil(globalNamespaceCache);
-end;
-
-function TNamespace.getPrefix: string;
-begin
-  if self = nil then exit('');
-  result := prefix;
-end;
-
-function TNamespace.getURL: string;
-begin
-  if self = nil then exit('');
-  result := url;
-end;
-
-function TNamespace.serialize: string;
-begin
-  if prefix = '' then result := 'xmlns="'+xmlStrEscape(url, true)+'"'
-  else result := 'xmlns:'+prefix+'="'+xmlStrEscape(url, true)+'"'
-end;
-
-destructor TNamespace.Destroy;
-begin
-  inherited Destroy;
-end;
 
 { TTreeDocument }
 
@@ -3203,103 +2796,6 @@ begin
 end;
 
 
-function xmlStrEscape(s: string; attrib: boolean = false):string;
-var
-  i: Integer;
-  builder: TStrBuilder;
-
-begin
-  builder.init(@result, length(s));
-  i := 1;
-  while i <= length(s) do begin
-    case s[i] of
-      '<': builder.append('&lt;');
-      '>': builder.append('&gt;');
-      '&': builder.append('&amp;');
-      '''': builder.append('&apos;');
-      '"': builder.append('&quot;');
-      #13: builder.append('&#xD;');
-      #10: if attrib then builder.append('&#xA;') else builder.append(#10);
-      #9: if attrib then builder.append('&#x9;') else builder.append(#9);
-      #0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i]));
-      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then builder.append(#$C2) else begin
-        i+=1;
-        builder.appendhexentity(ord(s[i]));
-      end;
-      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then builder.append(#$E2) else begin
-        builder.append('&#x2028;');
-        i+=2;
-      end;
-      else builder.append(s[i]);
-    end;
-    i+=1;
-  end;
-  builder.final;
-end;
-
-function xmlStrWhitespaceCollapse(const s: string): string;
-begin
-  result := strTrimAndNormalize(s, [#9,#$A,#$D,' ']);
-end;
-
-function htmlStrEscape(s: string; attrib: boolean; encoding: TSystemCodePage): string;
-var
-  i: Integer;
-  builder: TStrBuilder;
-
-begin
-  builder.init(@result, length(s));
-  i := 1;
-  if attrib then begin
-    while i <= length(s) do begin
-      case s[i] of
-        '&': builder.append('&amp;');
-        '"': builder.append('&quot;');
-        #$A0: if encoding = CP_WINDOWS1252 then builder.append('&nbsp;') else builder.append(s[i]);
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.append('&nbsp;'); i+=1; end else builder.append(s[i]);
-        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i])); not needed?
-        else builder.append(s[i]);
-      end;
-      i+=1;
-    end
-  end else begin
-    while i <= length(s) do begin
-      case s[i] of
-        '&': builder.append('&amp;');
-        '<': builder.append('&lt;');
-        '>': builder.append('&gt;');
-        #$A0: if encoding = CP_WINDOWS1252 then builder.append('&nbsp;') else builder.append(s[i]);
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.append('&nbsp;'); i+=1; end  else builder.append(s[i]);
-        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i]));
-        else builder.append(s[i]);
-      end;
-      i+=1;
-    end;
-  end;
-  builder.final;
-end;
-
-function strSplitOnAsciiWS(s: string): TStringArray;
-begin
-  result := strSplit(strTrimAndNormalize(s, [#9,#$A,#$C,#$D,' ']), ' ');
-end;
-
-
-function equalNamespaces(const ans, bns: INamespace): boolean;
-begin
-  result := (ans = bns) or ((ans <> nil) and (bns <> nil) and strEqual(ans.getURL, bns.getURL));
-end;
-
-function equalNamespaces(const ans, bns: string): boolean;
-begin
-  result := strEqual(ans, bns);
-end;
-
-function namespaceGetURL(const n: INamespace): string;
-begin
-  if n = nil then result := ''
-  else result := n.getURL;
-end;
 
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 var
@@ -3358,9 +2854,6 @@ end;
 
 
 initialization
-  XMLNamespace_XML := TNamespace.Make(XMLNamespaceUrl_XML, 'xml');
-  XMLNamespace_XMLNS := TNamespace.Make(XMLNamespaceUrl_XMLNS, 'xmlns');
-
   assert(HTMLNodeNameHashs.noframes = nodeNameHash('noframes'));
 
   omittedEndTags:=THTMLOmittedEndTags.Create;

@@ -5,7 +5,7 @@ unit commontestutilsxquery;
 interface
 
 uses
-  Classes, SysUtils, xquery,math, commontestutils;
+  Classes, SysUtils, xquery, commontestutils;
 
 procedure test(const a: IXQValue; b: string; name: string = '');overload;
 implementation

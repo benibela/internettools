@@ -14,7 +14,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils;
+uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils, xquery.namespaces;
 
 
 type TXQueryEngineBreaker = class(TXQueryEngine)

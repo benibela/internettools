@@ -11,7 +11,7 @@ procedure unitTests(testerrors: boolean);
 
 implementation
 
-uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser, commontestutils;
+uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser, commontestutils, xquery.namespaces;
 
 type TXQueryEngineBreaker = class(TXQueryEngine)
 end;

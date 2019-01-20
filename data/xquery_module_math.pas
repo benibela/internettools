@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
-  Classes, SysUtils, simplehtmltreeparser, bigdecimalmath;
+  Classes, SysUtils, simplehtmltreeparser, bigdecimalmath, xquery.namespaces;
 
 
 //**Registers the module to the XQuery engine

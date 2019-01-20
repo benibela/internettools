@@ -30,6 +30,7 @@ interface
 uses
   Classes, SysUtils,simplehtmltreeparser,xquery,
    xquery__regex,
+  xquery.namespaces,
     bbutils;
 
 
@@ -763,7 +764,7 @@ const
 
 implementation
 
-uses math,strutils,bbutilsbeta;
+uses math,strutils,bbutilsbeta, xquery.internals.common;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchElementOpen;

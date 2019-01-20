@@ -31,7 +31,7 @@ uses
 function createXQParsingContext: TObject;
 
 implementation
-uses bbutils, simplehtmltreeparser, strutils, math, bbutilsbeta, xquery;
+uses bbutils, simplehtmltreeparser, strutils, math, bbutilsbeta, xquery, xquery.namespaces, xquery.internals.common;
 
 type
  TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow, xqstNoMultiples);

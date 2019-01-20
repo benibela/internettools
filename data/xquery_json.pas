@@ -48,7 +48,7 @@ uses
 
 implementation
 
-uses jsonscanner, simplehtmltreeparser, bbutils;
+uses jsonscanner, simplehtmltreeparser, bbutils, xquery.namespaces;
 
 
 function xqFunctionIsNull({%H-}argc: SizeInt; args: PIXQValue): IXQValue;

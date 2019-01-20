@@ -11,7 +11,7 @@ uses
 procedure unittests(testerrors: boolean);
 
 implementation
-uses bbutils, commontestutils;
+uses bbutils, commontestutils, xquery.namespaces;
 
 type
 
