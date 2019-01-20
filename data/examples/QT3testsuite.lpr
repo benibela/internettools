@@ -13,7 +13,7 @@ uses
   {$endif}
   Classes, sysutils, strutils, xquery, xquery_module_math,
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
-  bbutils, math, rcmdline, internetaccess, mockinternetaccess;
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common;
   { you can add units after this }
 type
 
