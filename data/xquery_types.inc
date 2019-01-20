@@ -371,18 +371,18 @@ begin
     pvkSequence: begin
       result := 'sequence: (';
       if TXQValueSequence(self).seq.Count > 0 then begin
-        result += TXQValueSequence(self).seq[0].debugAsStringWithTypeAnnotation(textOnly);
+        result += TXQValueSequence(self).seq[0].debugAsStringWithTypeAnnotation(textOnly){%H-};
         for i:=1 to TXQValueSequence(self).seq.Count-1 do
-          result += ', ' + (TXQValueSequence(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly);
+          result += ', ' + (TXQValueSequence(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly){%H-};
       end;
       result+=')';
     end;
     pvkArray      : begin
       result := 'array: [';
       if TXQValueSequence(self).seq.Count > 0 then begin
-        result += TXQValueSequence(self).seq[0].debugAsStringWithTypeAnnotation(textOnly);
+        result += TXQValueSequence(self).seq[0].debugAsStringWithTypeAnnotation(textOnly){%H-};
         for i:=1 to TXQValueSequence(self).seq.Count-1 do
-          result += ', ' + (TXQValueSequence(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly);
+          result += ', ' + (TXQValueSequence(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly){%H-};
       end;
       result+=']';
     end;
@@ -391,9 +391,9 @@ begin
       tempp := self.clone; //need temporary variable to keep the reference count > 0
       temp := tempp as TXQValueObject;
       if temp.values.count > 0 then begin
-        result += temp.values.getName(0)+': '+temp.values.get(0).debugAsStringWithTypeAnnotation(textOnly);
+        result += temp.values.getName(0)+': '+temp.values.get(0).debugAsStringWithTypeAnnotation(textOnly){%H-};
         for i:=1 to temp.values.count-1 do
-          result += ', '+temp.values.getName(i)+': '+temp.values.get(i).debugAsStringWithTypeAnnotation(textOnly);
+          result += ', '+temp.values.getName(i)+': '+temp.values.get(i).debugAsStringWithTypeAnnotation(textOnly){%H-};
       end;
       result += '}';
     end;
@@ -1001,7 +1001,7 @@ end;
 
 function TXQValueString.toRawBinary: string;
 begin
-  if instanceOf(baseSchema.hexBinary) then result := strDecodeHex(str)
+  if instanceOf(baseSchema.hexBinary) then result := str.decodeHex
   else if instanceOf(baseSchema.base64Binary) then begin
     if str = '' then exit('');
     result := base64.DecodeStringBase64(str)
@@ -1244,7 +1244,7 @@ class function TXQValueDateTime.tryCreateFromString(const s, format: string; dat
 var
   tempData: TXQValueDateTimeData;
   formats: TStringArray;
-  usedFormat: string;
+  usedFormat: string = '';
   i: Integer;
   duration: Boolean;
   j: Integer;
@@ -1775,7 +1775,7 @@ end;
 
 function TXQValueNode.toString: string;
 begin
-  result := treeElementAsString(node);
+  result := TXQueryInternals.treeElementAsString(node);
 end;
 
 function TXQValueNode.toDateTime: TDateTime;

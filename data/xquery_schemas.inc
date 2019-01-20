@@ -668,9 +668,9 @@ begin
         if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then
           outv^ := TXQValueString.create(self, v.toString)
         else if subType = xsstHexBinary then
-          outv^ := TXQValueString.create(self, strEncodeHex(base64.DecodeStringBase64(v.toString)))
+          outv^ := TXQValueString.create(self, base64.DecodeStringBase64(v.toString).encodeHex)
         else
-          outv^ := TXQValueString.create(self, base64.EncodeStringBase64(strDecodeHex(v.toString)))
+          outv^ := TXQValueString.create(self, base64.EncodeStringBase64(v.toString.decodeHex))
     end;
     xsstUrl: begin
       if not st.derivedFrom(schema.anyURI) then
@@ -864,8 +864,10 @@ end;
 function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 var
   tvd: TXQValueDateTimeData;
+  temp: TDateTimeParsingResult;
 begin
-  case TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd) of
+  temp := TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd);
+  case temp of
     dtprFailure: exit(xsceFORG0001);
     dtprFailureValueTooHigh: exit(xsceFODT0001);
     dtprFailureValueTooHigh2: exit(xsceFODT0002);

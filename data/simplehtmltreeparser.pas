@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
-  Classes, SysUtils, simplehtmlparser, bbutils, contnrs, xquery.namespaces;
+  Classes, SysUtils, simplehtmlparser, bbutils, xquery.namespaces;
 
 type
 //**The type of a tree element. <Open>, text, or </close>
@@ -222,7 +222,7 @@ TTreeNode = class
   procedure insertSurrounding(before, after: TTreeNode); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeNode); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
-  procedure addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil); inline;
+  procedure addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil);
   procedure addAttributes(const props: array of THTMLProperty);
   procedure addNamespaceDeclaration(n: INamespace; overridens: boolean );
   procedure addChild(child: TTreeNode);
@@ -467,6 +467,11 @@ var
 begin
   for i:=0 to high(a) do if striEqual(a[i], s) then exit(true);
   exit(false);
+end;
+
+function TTreeNode.hasChildren(): boolean;
+begin
+  result := getFirstChild <> nil;
 end;
 
 
@@ -1204,10 +1209,6 @@ begin
   if result.typ = tetClose then exit(nil);
 end;
 
-function TTreeNode.hasChildren(): boolean;
-begin
-  result := getFirstChild <> nil;
-end;
 
 function TTreeNode.getFirstChild(): TTreeNode;
 begin

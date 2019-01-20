@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="10"/>
+    <Version Value="11"/>
     <General>
       <Flags>
         <MainUnitHasCreateFormStatements Value="False"/>
@@ -83,15 +83,21 @@
     </BuildModes>
     <PublishOptions>
       <Version Value="2"/>
-      <IncludeFileFilter Value="*.(pas|pp|inc|lfm|lpr|lrs|lpi|lpk|sh|xml)"/>
-      <ExcludeFileFilter Value="*.(bak|ppu|o|so);*~;backup"/>
     </PublishOptions>
     <RunParams>
       <local>
-        <FormatVersion Value="1"/>
         <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set ModuleImport --test-case modules-simple"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default">
+          <local>
+            <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set ModuleImport --test-case modules-simple"/>
+            <WorkingDirectory Value="/home/benito/xxtest"/>
+          </local>
+        </Mode0>
+      </Modes>
     </RunParams>
     <RequiredPackages Count="1">
       <Item1>
@@ -178,7 +184,6 @@
         <IOChecks Value="True"/>
         <RangeChecks Value="True"/>
         <OverflowChecks Value="True"/>
-        <StackChecks Value="True"/>
       </Checks>
       <Optimizations>
         <OptimizationLevel Value="4"/>
@@ -196,7 +201,7 @@
     </Linking>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="17">
+    <Exceptions Count="18">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>
@@ -248,6 +253,9 @@
       <Item17>
         <Name Value="EDecodeHTMLEntitiesException"/>
       </Item17>
+      <Item18>
+        <Name Value="EAssertionFailed"/>
+      </Item18>
     </Exceptions>
   </Debugging>
 </CONFIG>

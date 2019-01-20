@@ -1,7 +1,7 @@
 unit xquery1_tests;
 
 {$mode objfpc}{$H+}
-
+{$WARN 5024 off : Parameter "$1" not used}
 interface
 
 uses
@@ -22,16 +22,17 @@ type
   ps: TXQueryEngine;
   constructor create;
   destructor Destroy; override;
-  procedure DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;  const variable: string; var value: IXQValue);
-  procedure DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;  const functionName: string; var value: TXQValueFunction);
-  procedure ImportModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
+  procedure DeclareExternalVariableEvent({%H-}sender: TObject; const {%H-}context: TXQStaticContext; const namespace: string;  const variable: string; var value: IXQValue);
+  procedure DeclareExternalFunctionEvent({%H-}sender: TObject; const {%H-}context: TXQStaticContext; const {%H-}namespace: string;  const functionName: string; var value: TXQValueFunction);
+  procedure ImportModule({%H-}sender: TObject; {%H-}context: TXQStaticContext; const namespace: string; const {%H-}at: array of string);
 end;
 
 
-function collection(fakeself, sender: TObject; const variable: string; var value: IXQValue): boolean;
+function collection({%H-}fakeself, {%H-}sender: TObject; const variable: string; var value: IXQValue): boolean;
 begin
   if variable = '' then
     value := xqvalue('foobar');
+  result := true;
 end;
 
 
@@ -42,11 +43,10 @@ var
   xml: TTreeParser;
 
   function performUnitTest(s1,s2,s3: string): string;
-  var rooted: Boolean;
   begin
     inc(globalTestCount);
     if s3 <> '' then xml.parseTree(s3);
-    ps.parseXQuery1(s1);
+    ps.parseQuery(s1, xqpmXQuery1);
   //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
   //    writeln(s1);
   //    writeln('??');
@@ -109,7 +109,7 @@ var
   var
     got: TXQContextDependencies;
   begin
-    got := ps.parseXQuery1(query).Term.getContextDependencies;
+    got := ps.parseQuery(query, xqpmXQuery1).Term.getContextDependencies;
     if got <> context then
       raise Exception.Create('Static context dependacy check failed, got: '+inttostr(integer(got)) +' expected: ' + inttostr(integer(context)));
   end;
@@ -117,7 +117,7 @@ var
   procedure mr(s1: string); //module register
   begin
     try
-      ps.registerModule(ps.parseXQuery1(s1));
+      ps.registerModule(ps.parseQuery(s1, xqpmXQuery1));
     except on e:exception do begin
       writeln('Error @ "',s1, '"');
       raise;
@@ -131,7 +131,7 @@ var
     got: string;
   begin
     if s3 <> '' then xml.parseTree(s3);
-    ps.parseXQuery1(s1);
+    ps.parseQuery(s1, xqpmXQuery1);
   //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
   //    writeln(s1);
   //    writeln('??');
@@ -177,8 +177,8 @@ var
     m(ns + 'serialize-json(test:project(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[{"x": 1}, {"x": 2, "y": 3}, "foobar", [1, 2344, 2], {}]');
     m(ns + 'serialize-json(let $o := { "Captain" : "Kirk", "First Officer" : "Spock", "Engineer" : "Scott" } return test:remove-keys($o, ("Captain", "First Officer")))', '{"Engineer": "Scott"}');
     m(ns + 'serialize-json(test:remove-keys(({ "a": 1}, {"b": 2}, {"a": 3, "b": 4}, 17), "a"))', '[{}, {"b": 2}, {"b": 4}, 17]');
-{    m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[1, 2, 3]');
-    m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[1, 2, 3]');}
+//    m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, {}), ("x",  "y", "z")))', '[1, 2, 3]');
+//    m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {}), ("x",  "y", "z")))', '[1, 2, 3]');}
     m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, {})))', '[1, 2, 3]');
     m(ns + 'serialize-json(test:values(({"x": 1}, {"x": 2, "y": 3}, "foobar", [1,2344,2], {})))', '[1, 2, 3]');
 

@@ -1100,9 +1100,9 @@ begin
   if argc = 1 then sep := args[0].toString else sep := '';
   if (context.SeqValue <> nil) and (context.SeqValue.kind = pvkNode) then begin
 //    raise EXQEvaluationException.Create('deep-text() needs a node, but context item is atomic value');
-    result := xqvalue(treeElementAsString(context.SeqValue.toNode,sep));
+    result := xqvalue(TXQueryInternals.treeElementAsString(context.SeqValue.toNode,sep));
   end else if context.ParentElement <> nil then //TODO: why doesn't it read textelement?
-    result := xqvalue(treeElementAsString(context.ParentElement,sep))
+    result := xqvalue(TXQueryInternals.treeElementAsString(context.ParentElement,sep))
   else result := xqvalue('');
 end;
 
@@ -2010,7 +2010,7 @@ var
   raw: RawByteString;
 begin
   //(binary, encoding?) => string
-  if args[0].typeAnnotation.derivedFrom(baseSchema.hexBinary) then raw := strDecodeHex(args[0].toString)
+  if args[0].typeAnnotation.derivedFrom(baseSchema.hexBinary) then raw := args[0].toString.decodeHex
   else if args[0].typeAnnotation.derivedFrom(baseSchema.base64Binary) then raw := base64.DecodeStringBase64(args[0].toString)
   else raise EXQEvaluationException.create('pxp:binary', 'Unknown binary type: '+args[0].typeAnnotation.name);
 
@@ -2021,12 +2021,12 @@ begin
 end;
 function xqFunctionString_To_hexBinary(argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  data: RawByteString;
+  data: String;
 begin
   //(string, encoding?) => binary
   data := args[0].toString;
   if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
-  result := TXQValueString.create(baseSchema.hexBinary, strEncodeHex(data));
+  result := TXQValueString.create(baseSchema.hexBinary, data.encodeHex);
 end;
 function xqFunctionString_To_base64Binary(argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -3101,7 +3101,7 @@ begin
   if argc = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collationOverride := nil;
   if args[0].kind <> pvkSequence then begin
-    if equal(args[0], args[1]) then result := xqvalue(1)
+    if {%H-}equal(args[0], args[1]) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
@@ -5814,7 +5814,7 @@ begin
   end;
 end;
 
-function xqFunctionApply(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionApply(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   pv: PIXQValue;
   stack: TXQEvaluationStack;
@@ -5858,7 +5858,7 @@ begin
   result := xqvalue(false);
 end;
 
-function xqFunctionDefault_Language(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionDefault_Language(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := TXQValueString.create(baseSchema.language, 'en');
 end;
@@ -6060,8 +6060,7 @@ begin
   temp := args[0].toString;
   p := pchar(temp);
 
-  fillchar(dt, sizeof(dt), 0);
-  dt.timezone:=0;
+  dt := default(TXQValueDateTimeData);
 
   skipWhitespace;
   if p^ in ['A'..'Z', 'a'..'z'] then begin
@@ -6418,12 +6417,12 @@ begin
   raise EXQEvaluationException.create('FOAY0001', 'Invalid index: ' + IntToStr(index + 1), nil, a);
 end;
 
-function xqFunctionArraySize(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArraySize({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
   result := xqvalue(arrayAsList(argv^).Count);
 end;
 
-function xqFunctionArrayGet(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayGet({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
   p: Int64;
@@ -6434,7 +6433,7 @@ begin
   result := list[p];
 end;
 
-function xqFunctionArrayPut(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayPut({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
   p: Int64;
@@ -6447,7 +6446,7 @@ begin
   result := TXQValueJSONArray.create(list);
 end;
 
-function xqFunctionArrayAppend(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayAppend({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list, list2: TXQVList;
 begin
@@ -6481,7 +6480,7 @@ begin
   result := TXQValueJSONArray.create(list);
 end;
 
-function xqFunctionArrayRemove(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
   iter: TXQValueEnumeratorPtrUnsafe;
@@ -6526,7 +6525,7 @@ begin
   result := TXQValueJSONArray.create(list);
 end;
 
-function xqFunctionArrayInsert_before(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayInsert_before({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
   list: TXQVList;
@@ -6544,7 +6543,7 @@ begin
   result := TXQValueJSONArray.create(list);
 end;
 
-function xqFunctionArrayHead(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayHead({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
 begin
@@ -6553,7 +6552,7 @@ begin
   result := a.seq[0];
 end;
 
-function xqFunctionArrayTail(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayTail({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
   list: TXQVList;
@@ -6568,7 +6567,7 @@ begin
   result := TXQValueJSONArray.create(list);
 end;
 
-function xqFunctionArrayReverse(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayReverse({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
 begin
@@ -6577,7 +6576,7 @@ begin
   result := TXQValueJSONArray.create(list);
 end;
 
-function xqFunctionArrayJoin(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayJoin({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
   pv: PIXQValue;
@@ -6590,7 +6589,7 @@ begin
 end;
 
 
-function xqFunctionArrayFor_each(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayFor_each(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
   a: TXQValueJSONArray;
@@ -6606,7 +6605,7 @@ begin
   f.done;
 end;
 
-function xqFunctionArrayFilter(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayFilter(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
   a: TXQValueJSONArray;
@@ -6623,7 +6622,7 @@ begin
   f.done;
 end;
 
-function xqFunctionArrayFold_left(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayFold_left(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
   f: TXQBatchFunctionCall;
@@ -6635,7 +6634,7 @@ begin
   f.done;
 end;
 
-function xqFunctionArrayFold_right(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayFold_right(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   f: TXQBatchFunctionCall;
   list: TXQVList;
@@ -6652,7 +6651,7 @@ begin
   f.done;
 end;
 
-function xqFunctionArrayFor_each_pair(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayFor_each_pair(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
   i: Integer;
@@ -6699,7 +6698,7 @@ begin
   end;
 end;
 
-function xqFunctionArrayFlatten(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionArrayFlatten({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
 begin
@@ -6743,12 +6742,12 @@ begin
   end;
 end;
 
-function xqFunctionMapSize(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapSize({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
   result := xqvalue((argv[0] as TXQValueObject).size);
 end;
 
-function xqFunctionMapKeys(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapKeys({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   keys: TStringList;
 begin
@@ -6758,12 +6757,12 @@ begin
   keys.free;
 end;
 
-function xqFunctionMapContains(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapContains({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
   result := xqvalue(argv[0].hasProperty(argv[1].toString, nil));
 end;
 
-function xqFunctionMapGet(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapGet({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
   result := xqvalue(argv[0].getProperty(argv[1].toString));
 end;
@@ -6787,7 +6786,7 @@ begin
   end;
 end;
 
-function xqFunctionMapFind(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapFind({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   l: TXQVList;
 begin
@@ -6796,12 +6795,12 @@ begin
   mapFind(l, argv[1].toString, argv[0]);
 end;
 
-function xqFunctionMapPut(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapPut({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
   result := (argv[0] as TXQValueObject).setImmutable(argv[1].toString, argv[2]);
 end;
 
-function xqFunctionMapEntry(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapEntry({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   obj: TXQValueObject;
 begin
@@ -6810,7 +6809,7 @@ begin
   result := obj;
 end;
 
-function xqFunctionMapRemove(argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   obj: TXQValueObject;
   pp: TXQProperty;
@@ -6836,7 +6835,7 @@ begin
   result := obj;
 end;
 
-function xqFunctionMapFor_Each(const context: TXQEvaluationContext; argc: SizeInt; argv: PIXQValue): IXQValue;
+function xqFunctionMapFor_Each(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var f: TXQBatchFunctionCall;
     l: TXQVList;
     pp: TXQProperty;
@@ -6862,7 +6861,7 @@ begin
   result := parser.parse(argc, args);
 end;
 
-function xqFunctionJSON_Doc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionJSON_Doc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   data: String;
   contenttype: string;

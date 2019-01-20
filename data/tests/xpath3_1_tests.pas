@@ -19,8 +19,6 @@ var
   count: integer;
   ps: TXQueryEngine;
   xml: TTreeParser;
-  j: Integer;
-  tt: String;
 
   function performUnitTest(s1,s2,s3: string): string;
   begin

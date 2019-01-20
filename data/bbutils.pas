@@ -158,7 +158,9 @@ type
   TCharSet = set of ansichar;
 {$ifdef FPC_HAS_CPSTRING}
   TBByStringHelper = Type Helper(TStringHelper) for AnsiString
-    function RemoveFromLeft(chopoff: SizeInt): String;
+      function EncodeHex: String; inline;
+      function DecodeHex: String; inline;
+      function RemoveFromLeft(chopoff: SizeInt): String;
   end;
 {$endif}
 
@@ -1248,6 +1250,17 @@ end;
 
 
 {$ifdef FPC_HAS_CPSTRING}
+
+function TBByStringHelper.EncodeHex: String;
+begin
+  result := {%H-}strEncodeHex(self);
+end;
+
+function TBByStringHelper.DecodeHex: String;
+begin
+  result := {%H-}strDecodeHex(self);
+end;
+
 function TBByStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
 begin
   result := self;
@@ -2925,7 +2938,7 @@ var
   pescape: PChar;
 begin
   if escape = '' then begin
-    result := strDecodeHex(s);
+    result := {%H-}strDecodeHex(s);
     exit;
   end;
   start := pos(escape, s);

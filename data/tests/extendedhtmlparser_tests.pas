@@ -127,7 +127,7 @@ var previoushtml, temp: string;
       got: String;
     begin
       inc(globalTestCount);
-      query := extParser.QueryEngine.parseXQuery1(template);
+      query := extParser.QueryEngine.parseQuery(template, xqpmXQuery1);
       query.getTerm.getContextDependencies;
       //if html <> '' then extParser.parseh;
       got := query.evaluate(extParser.HTMLTree).toString;
@@ -141,7 +141,7 @@ var previoushtml, temp: string;
       got: String;
     begin
       inc(globalTestCount);
-      query := extParser.QueryEngine.parseXQuery3(template);
+      query := extParser.QueryEngine.parseQuery(template, xqpmXQuery3_0);
       //if html <> '' then extParser.parseh;
       got := query.evaluate(extParser.HTMLTree).toString;
       if got <> expected then
@@ -158,7 +158,7 @@ var previoushtml, temp: string;
       inc(globalTestCount);
       err := '<no error>';
       try
-        query := extParser.QueryEngine.parseXQuery1(template);
+        query := extParser.QueryEngine.parseQuery(template, xqpmXQuery1);
         got := query.evaluate(extParser.HTMLTree).toString;
       except
         on e: EXQEvaluationException do err := e.namespace.getPrefix +':'+ e.errorCode;
@@ -1004,16 +1004,16 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
 
   extParser.parseTemplate('<a>{obj := {"a": .} }</a>');
   extParser.parseHTML('<a>1x</a>');
-  cmp(extParser.variables.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x}');
-  cmp(extParser.VariableChangeLogCondensed.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x}');
+  cmp(extParser.variables.Values['obj'].toXQuery(), '{"a": "<a>1x</a>"}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"a": "<a>1x</a>"}');
   extParser.parseTemplate('<a>{$obj.b := .}</a>');
   extParser.parseHTML('<a>2y</a>');
-  cmp(extParser.variables.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y}');
-  cmp(extParser.VariableChangeLogCondensed.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y}');
+  cmp(extParser.variables.Values['obj'].toXQuery(), '{"b": "<a>2y</a>", "a": "<a>1x</a>"}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"b": "<a>2y</a>", "a": "<a>1x</a>"}');
   extParser.parseTemplate('<a>{$obj.c := concat($obj.b, .)}</a>');
   extParser.parseHTML('<a>3z</a>');
-  cmp(extParser.variables.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y, c: string: 2y3z}');
-  cmp(extParser.VariableChangeLogCondensed.Values['obj'].debugAsStringWithTypeAnnotation(), 'object: {a: node(): 1x, b: node(): 2y, c: string: 2y3z}');
+  cmp(extParser.variables.Values['obj'].toXQuery(), '{"c": "2y3z", "b": "<a>2y</a>", "a": "<a>1x</a>"}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"c": "2y3z", "b": "<a>2y</a>", "a": "<a>1x</a>"}');
 
 
 

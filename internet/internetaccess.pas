@@ -21,7 +21,7 @@ unit internetaccess;
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}
-
+{$WARN 5043 off : Symbol "$1" is deprecated}
 interface
 
 uses

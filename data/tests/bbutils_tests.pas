@@ -3,7 +3,7 @@ unit bbutils_tests;
 {$IFDEF FPC}
 {$mode objfpc}{$H+}
 {$ENDIF}
-
+{$WARN 5066 off : Symbol "$1" is deprecated: "$2"}
 interface
 
 uses
@@ -782,7 +782,7 @@ begin
 
   if not strliequal(pansichar(''), '', 0) then raise Exception.Create('strliequal failed');
   if not strliequal(pansichar('abcd'), 'abc', 3) then raise Exception.Create('strliequal failed');
-  if strliequal(pansichar(''), 'a', 1) then raise Exception.Create('strliequal failed');
+  if {%H-}strliequal(pansichar(''), 'a', 1) then raise Exception.Create('strliequal failed');
   if strliequal(pansichar('abcd'), 'abcd', 3) then raise Exception.Create('strliequal failed');
 
   if strLengthUtf8('hallo') <> 5 then raise Exception.Create('strLengthUtf8 failed, 1');
@@ -1500,8 +1500,8 @@ procedure testStrResolveURI;
   function s2bs(const mode: integer; const s: string): string;
   begin
     case mode of
-      0: result := s;
       -1: result := StringReplace(s, '/', '\', [rfReplaceAll]);
+      else result := s;
     end;
   end;
 
@@ -1731,7 +1731,7 @@ begin
     case filePrefixMode of
       1: begin filePrefix := 'file:///'; resultFilePrefix := 'file:///' ; end;
       2: begin filePrefix := 'file://';  resultFilePrefix := 'file://' ; end;
-      3: begin filePrefix := '';         resultFilePrefix := '' ; end;
+      else begin filePrefix := '';         resultFilePrefix := '' ; end;
     end;
 
     for slashAbs := -1 to 0 do begin

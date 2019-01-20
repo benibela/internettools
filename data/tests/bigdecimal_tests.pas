@@ -1,7 +1,8 @@
 unit bigdecimal_tests;
 
 {$mode objfpc}{$H+}
-
+{$WARN 5066 off : Symbol "$1" is deprecated: "$2"}
+{$WARN 6018 off : Unreachable code}
 interface
 
 uses
@@ -106,10 +107,7 @@ var
   dbf: BigDecimal;
   ds: String;
   b0: BigDecimal;
-  ddd, ddd2: Double;
-  bd5: BigDecimal;
   bd2: BigDecimal;
-  s1, s2: single;
   b1e1000: BigDecimal;
   bn1e1000: BigDecimal;
   oldRandSeed: Cardinal;
@@ -314,8 +312,6 @@ begin
   test(TryStrToBigDecimal('.e2', nil) = false);
   test(TryStrToBigDecimal('18', nil) = TRUE);
   test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528'))) = double(StrToFloat('-3.40282346638528')));
-   e := BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'));
-  ddd := double(e);
   test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'))) = double(StrToFloat('-3.40282346638528E38')));
   test(single(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38')))) = single(double(StrToFloat('-3.40282346638528E38'))));
 
@@ -1011,7 +1007,7 @@ begin
   test(BigDecimalToStr(fastpower5to(-1)), '0.2');
   test(BigDecimalToStr(fastpower5to(-2)), '0.04');
   test(BigDecimalToStr(fastpower5to(-3)), '0.008');
-  bd5 := StrToBigDecimal('5');
+  //bd5 := StrToBigDecimal('5');
 
   testRoundInRange('1','2.5','3' ,'2');
   testRoundInRange('1','2.5','3.000000000000000000000000000001',  '3');
@@ -1140,7 +1136,7 @@ procedure floatToDecimalFuzzing;
   procedure checkSingleRoundTrip(const s: single);
   var
     temp: String;
-    tempcode: integer;
+    {%H-}tempcode: integer;
     sr: single;
   begin
     temp := BigDecimalToStr(FloatToBigDecimal(s, bdffShortest), bdfExponent);
@@ -1161,7 +1157,7 @@ procedure floatToDecimalFuzzing;
   procedure checkDoubleRoundTrip(const d: double);
   var
     temp: String;
-    tempcode: integer;
+    {%H-}tempcode: integer;
     dr: double;
   begin
     temp := BigDecimalToStr(FloatToBigDecimal(d, bdffShortest), bdfExponent);
@@ -1175,7 +1171,7 @@ procedure floatToDecimalFuzzing;
   procedure checkExtendedRoundTrip(const e: Extended);
   var
     temp: String;
-    tempcode: integer;
+    {%H-}tempcode: integer;
     er: extended;
   begin
     temp := BigDecimalToStr(FloatToBigDecimal(e, bdffShortest), bdfExponent);

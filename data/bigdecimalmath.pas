@@ -446,12 +446,12 @@ const BigDecimalDecimalSeparator = '.';
   end;
 
 var
-  lowskip: integer;
-  lowBinLength: Integer;
-  lowBin: BigDecimalBin;
+  lowskip: integer = 0;
+  lowBinLength: Integer = 0;
+  lowBin: BigDecimalBin = 0;
   displayed: PBigDecimal;
-  dotBinPos: Integer;
-  firstHigh: integer;
+  dotBinPos: Integer = 0;
+  firstHigh: integer = 0;
   procedure lowBinTrimTrailingZeros;
   begin
     while (lowBin mod 10 = 0) and (lowBinLength > 0) do begin
@@ -470,7 +470,7 @@ var
  end;
 
 var
-  skip: Integer;  //leading trimmed zeros
+  skip: Integer = 0;  //leading trimmed zeros
 
 
  procedure init;
@@ -645,6 +645,7 @@ begin
         (p+1)^ := BigDecimalDecimalSeparator;
         dec(p);
       end;
+      else exit('invalid'); //hides a warning
     end;
     if signed then begin p^ := '-'; dec(p); end;
     //safety check
@@ -1081,7 +1082,7 @@ begin
       bdmin := bdexact - bdexpfourth;
       bdmax := bdexact + bdexphalf;
     end;
-    QWord((_MANTISSA_IMPLICIT_BIT_ - 1) or _MANTISSA_IMPLICIT_BIT_):begin
+    QWord(QWord(_MANTISSA_IMPLICIT_BIT_ - 1) or _MANTISSA_IMPLICIT_BIT_):begin
       //if the float is 1.11111111111111 * 2^... the next higher one is at + 2^(exp+1)
       bdexphalf := fastpower2to(exponent - 1);
       bdexact := mantissa * bdexphalf;
@@ -1805,6 +1806,7 @@ begin
       else if toDigitInBin = 0 then increment := v.digits[exponentDelta - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
       else increment := v.digits[exponentDelta] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
     end;
+    else increment := false; //hides a warning
   end;
 
   if v.digits[high(v.digits) - highskip] = ELEMENT_OVERFLOW-1 then additionalBin := 1

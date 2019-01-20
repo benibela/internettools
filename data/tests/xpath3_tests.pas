@@ -26,7 +26,7 @@ var
   begin
     inc(globalTestCount);
     if s3 <> '' then xml.parseTree(s3);
-    ps.parseXPath3(s1);
+    ps.parseQuery(s1, xqpmXPath3_0);
     ps.LastQuery.getTerm.getContextDependencies;
     result := ps.evaluate(xml.getLastTree).toString;
   end;

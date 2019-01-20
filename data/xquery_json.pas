@@ -139,7 +139,7 @@ end;
 function xqFunctionJSON(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   parser: TXQJsonParser;
-  s, url, contenttype, data: String;
+  s, contenttype, data: String;
 begin
   parser.init;
   parser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];

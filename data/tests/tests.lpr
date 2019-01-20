@@ -1,7 +1,7 @@
 program tests;
 
 {$mode objfpc}{$H+}
-
+{$WARN 5023 off : Unit "$1" not used in $2}
 uses
   //bbheaptrc,
   //heaptrc,
@@ -41,7 +41,7 @@ begin
 
   xpath2_tests.unittests(testerrors);
   xquery1_tests.unittests(testerrors);
-  xpath3_tests.unittests(testerrors, false);
+  xpath3_tests.unittests(testerrors, false);//}
   xpath3_1_tests.unittests(testerrors);
   xquery3_tests.unittests(testerrors);
   extendedhtmlparser_tests.unitTests(testerrors);

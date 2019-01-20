@@ -1624,7 +1624,6 @@ var xpathText: TTreeNode;
    regex: String;
    name: String;
    props: TStringArray;
-   tempa: TXQVArray;
 
   begin
     attribs := templateStart.templateAttributes;

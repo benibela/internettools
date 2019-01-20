@@ -60,7 +60,7 @@ function xmlStrEscape(s: string; attrib: boolean = false):string;
 function xmlStrWhitespaceCollapse(const s: string):string;
 function htmlStrEscape(s: string; attrib: boolean = false; encoding: TSystemCodePage = CP_NONE):string;
 function strSplitOnAsciiWS(s: string): TStringArray;
-
+function urlHexDecode(s: string): string;
 
 
 function nodeNameHash(const s: RawByteString): cardinal;
@@ -214,6 +214,32 @@ function strSplitOnAsciiWS(s: string): TStringArray;
 begin
   result := strSplit(strTrimAndNormalize(s, [#9,#$A,#$C,#$D,' ']), ' ');
 end;
+
+function urlHexDecode(s: string): string;
+var
+  p: Integer;
+  i: Integer;
+begin
+  SetLength(result, length(s));
+  p := 1;
+  i := 1;
+  while i <= length(s) do begin
+    case s[i] of
+      '+': result[p] := ' ';
+      '%': if (i + 2 <= length(s)) and (s[i+1] in ['a'..'f','A'..'F','0'..'9']) and (s[i+2] in ['a'..'f','A'..'F','0'..'9']) then begin
+        result[p] := chr(StrToInt('$'+s[i+1]+s[i+2])); //todo: optimize
+        i+=2;
+      end else raiseXQEvaluationException('pxp:uri', 'Invalid input string at: '+copy(s,i,10))
+      else result[p] := s[i];
+    end;
+    i+=1;
+    p+=1;
+  end;
+  setlength(result, p-1);
+end;
+
+
+
 
 
 

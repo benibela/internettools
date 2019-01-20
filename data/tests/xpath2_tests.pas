@@ -3,6 +3,7 @@ unit xpath2_tests;
 {$mode objfpc}{$H+}
 
 {$ifndef cpuarm}{$define TEST_FLOAT}{$endif}
+{$WARN 6018 off : Unreachable code}
 interface
 
 uses
@@ -21,7 +22,7 @@ type TXQueryEngineBreaker = class(TXQueryEngine)
 end;
 
 
-function collection(fakeself, sender: TObject; const variable: string; var value: IXQValue): boolean;
+function collection({%H-}fakeself, {%H-}sender: TObject; const variable: string; var value: IXQValue): boolean;
 begin
   result := variable = '';
   if result then
@@ -51,7 +52,7 @@ var
       else context.RootElement:=nil;
       if s1 = '' then exit;
     end;
-    ps.parseXPath2(s1);
+    ps.parseQuery(s1, xqpmXPath2);
     if ps.LastQuery.getTerm <> nil then ps.LastQuery.getTerm.getContextDependencies;
 //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
     context.ParentElement := xml.getLastTree;
@@ -105,7 +106,7 @@ var
 
 //var  time: TDateTime;
 var tempb: Boolean;
-  tt: String;
+  tt: String = '';
   j, k: Integer;
   baseboundary: String;
   func: String;

@@ -457,14 +457,14 @@ type
 
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
-    function hasProperty(const name: string; value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function hasProperty(const {%H-}name: string; {%H-}value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
     function Size: SizeInt; virtual;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated;
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; virtual;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; {%H-}insertWhitespace: boolean = false; const {%H-}indent: string = ''): string; virtual;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
     function stringifyNodes: IXQValue; virtual;
     function hasNodes: boolean; virtual;
@@ -501,7 +501,7 @@ type
     function getSequenceCount: integer; override;
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; {%H-}insertWhitespace: boolean = false; const {%H-}indent: string = ''): string; override;
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
 
     function map(const q: string): IXQValue; override;
@@ -3061,8 +3061,6 @@ function isPosInf(const f: xqfloat): boolean;
 function isNegInf(const f: xqfloat): boolean;
 function isSignedXQFloat(const v: xqfloat): boolean;
 function isValidXMLCharacter(const codepoint: integer): boolean; inline;
-function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline; deprecated 'for internal use';
-function urlHexDecode(s: string): string; deprecated 'for internal use';
 procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
 procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
 procedure raiseFOTY0013TypeError(const v: IXQValue);
@@ -3078,7 +3076,8 @@ const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAt
 type TXQueryInternals = object
 //private
     class var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
-    class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); noreturn;
+    class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); static; noreturn;
+    class function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
 end;
 
 implementation
@@ -4435,7 +4434,7 @@ begin
   end;
 end;
 
-function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
+class function TXQueryInternals.treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
 begin
   if (node = nil) then exit('');
   case node.typ of
@@ -4496,28 +4495,6 @@ begin
 end;
 
 
-function urlHexDecode(s: string): string;
-var
-  p: Integer;
-  i: Integer;
-begin
-  SetLength(result, length(s));
-  p := 1;
-  i := 1;
-  while i <= length(s) do begin
-    case s[i] of
-      '+': result[p] := ' ';
-      '%': if (i + 2 <= length(s)) and (s[i+1] in ['a'..'f','A'..'F','0'..'9']) and (s[i+2] in ['a'..'f','A'..'F','0'..'9']) then begin
-        result[p] := chr(StrToInt('$'+s[i+1]+s[i+2])); //todo: optimize
-        i+=2;
-      end else raise EXQEvaluationException.Create('pxp:uri', 'Invalid input string at: '+copy(s,i,10))
-      else result[p] := s[i];
-    end;
-    i+=1;
-    p+=1;
-  end;
-  setlength(result, p-1);
-end;
 
 
 procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint);
@@ -5111,7 +5088,7 @@ begin
   if count = 0 then exit('');
   result:=getName(0)+'='+get(0).debugAsStringWithTypeAnnotation();
   for i:=1 to count - 1 do
-    result+=LineEnding+getName(i)+'='+get(i).debugAsStringWithTypeAnnotation();
+    result+=LineEnding+getName(i)+'='+get(i).debugAsStringWithTypeAnnotation(){%H-};
 end;
 
 function TXQVariableChangeLog.clone: TXQVariableChangeLog;
@@ -6698,7 +6675,7 @@ end;
 function TXQEvaluationContext.SeqValueAsString: string;
 begin
   if SeqValue <> nil then result := SeqValue.toString
-  else if ParentElement <> nil then result := treeElementAsString(ParentElement)
+  else if ParentElement <> nil then result := TXQueryInternals.treeElementAsString(ParentElement)
   else begin raiseXPDY0002ContextItemAbsent; result := ''; end;
 end;
 
