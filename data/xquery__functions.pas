@@ -6211,25 +6211,11 @@ function xqFunctionReplace(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
  regEx: TWrappedRegExpr;
  noescape: Boolean;
- {$IFDEF USE_FLRE}replacer: TReplaceCallback;{$ENDIF}
 begin
-  {$IFDEF USE_FLRE}replacer := nil;{$ENDIF}
   regEx:=wregexprParse(argc, argv, 3, false, @noescape);
   try
-    try
-    {$IFDEF USE_SOROKINS_REGEX}
-    result := xqvalue(regEx.Replace(argv[0].toString, argv[2].toString, not noescape));
-    {$ENDIF}
-    {$IFDEF USE_FLRE}
-    replacer := TReplaceCallback.create(argv[2].toString, noescape);
-    result := xqvalue(regEx.UTF8ReplaceCallback(argv[0].toString, @replacer.callback));
-    {$ENDIF}
-    except
-      on e: EWrappedRegExpr do raise EXQEvaluationException.Create('FORX0002', e.Message);
-    end;
-
+    result := xqvalue(wregexprReplaceAll(regex, argv[0].toString, argv[2].toString, noescape));
   finally
-    {$IFDEF USE_FLRE}replacer.Free;{$ENDIF}
     wregexprFree(regEx);
   end;
 end;

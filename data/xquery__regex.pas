@@ -82,21 +82,9 @@ procedure wregexprFree(wregexp: TWrappedRegExpr);
 
 function wregexprMatches(regexpr: TWrappedRegExpr; input: string): Boolean; //might be removed in future
 function wregexprExtract(regexpr: TWrappedRegExpr; input: string; out matches: TWrappedMatchArray): boolean; //might be removed in future
+function wregexprReplaceAll(regexpr: TWrappedRegExpr; input, replacement: string; noescape: boolean): string;
 function wregexprMatch(wregexp: TWrappedRegExpr; input: string; matchAll: boolean): TWrappedRegExprMatchResults;
 
-{$IFDEF USE_FLRE}
-type
-TReplaceCallback = class
-  repin: string;
-  parsed: boolean;
-  repwith: array of record
-    literal: string;
-    capture: integer;
-  end;
-  constructor create(rep: string; noescape: boolean);
-  function callback(const Input:PFLRERawByteChar;const Captures:TFLRECaptures):TFLRERawByteString;
-end;
-{$endif}
 
 const UsingFLRE = {$IFDEF USE_FLRE}true{$ELSE}false{$endif} ;
 
@@ -672,6 +660,44 @@ begin
   end;
 end;
 
+{$IFDEF USE_FLRE}
+type
+TReplaceCallback = class
+  repin: string;
+  parsed: boolean;
+  repwith: array of record
+    literal: string;
+    capture: integer;
+  end;
+  constructor create(rep: string; noescape: boolean);
+  function callback(const Input:PFLRERawByteChar;const Captures:TFLRECaptures):TFLRERawByteString;
+end;
+{$endif}
+
+
+function wregexprReplaceAll(regexpr: TWrappedRegExpr; input, replacement: string; noescape: boolean): string;
+{$IFDEF USE_FLRE}
+var
+   replacer: TReplaceCallback;
+{$ENDIF}
+begin
+  try
+    {$IFDEF USE_SOROKINS_REGEX}
+    result := regexpr.Replace(input, replacement, not noescape);
+    {$ENDIF}
+    {$IFDEF USE_FLRE}
+    replacer := TReplaceCallback.create(replacement, noescape);
+    try
+      result := regexpr.UTF8ReplaceCallback(input, @replacer.callback);
+    finally
+      replacer.free;
+    end;
+    {$ENDIF}
+  except
+    on e: EWrappedRegExpr do raiseXQEvaluationException('FORX0002', e.Message);
+  end;
+end;
+
 function wregexprMatch(wregexp: TWrappedRegExpr; input: string; matchAll: boolean): TWrappedRegExprMatchResults;
 begin
   result.input := input;
@@ -758,6 +784,7 @@ begin
     result := all and regexp.execnext;
   {$ENDIF}
 end;
+
 
 
 {$IFDEF USE_FLRE}
