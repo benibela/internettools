@@ -1988,6 +1988,8 @@ var
   s: String;
   v: TStringView;
   p: PChar;
+  i: Integer;
+  c: char;
 begin
   s := 'foobar'; p := pchar(s);
   v := s.unsafeView;
@@ -2002,6 +2004,11 @@ begin
   test(v.contains(''));
   test(v.find('') = p);
   test(not v.contains('x'));
+  i := 1;
+  for c in v do begin
+    test(c = s[i]);
+    inc(i);
+  end;
 
   test(v.viewFrom(p).ToString, 'foobar');
   test(v.viewBehind(p).ToString, 'oobar');
@@ -2057,6 +2064,7 @@ begin
   test(v.ToString, '');
   test(not v.contains('b'));
   test(not v.contains(#0));
+  for c in v do test(false);
 
   v := s.unsafeView;
   v.moveTo(@s[length(s)]);
@@ -2065,6 +2073,7 @@ begin
   v.moveTo(@s[length(s)] + 1);
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
+  for c in v do test(false);
 
   v := s.unsafeView;
   v.moveAfter(@s[length(s)-1]);

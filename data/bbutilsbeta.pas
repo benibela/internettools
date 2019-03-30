@@ -51,17 +51,28 @@ type
    function GetEnumerator: TCommonEnumerator;
  end;
 
+
   generic TArrayView<TElement> = object
     type PElement = ^TElement;
   protected
     procedure initStartCapped(oldstart, start, anend: pchar);
     procedure initEndCapped(start, newend, oldend: pchar);
+   type TArrayViewEnumerator = object
+    protected
+      data, dataend: pelement;
+      function first: TElement; inline;
+    public
+      function moveNext: boolean; inline;
+      property current: TElement read first;
+    end;
   public
     data, dataend: pelement;
     function length: SizeInt;
     function isEmpty: boolean; inline;
     function isInBounds(target: PElement): boolean; inline;
     function isOnBounds(target: PElement): boolean; inline;
+
+    function getEnumerator: TArrayViewEnumerator; inline;
 
     function moveBy(delta: SizeInt): boolean;
     procedure moveTo(target: PElement);
@@ -121,6 +132,7 @@ end;
 
 
 
+
 function TCommonEnumerator.GetCurrent: T;
 begin
   result := fget(fpos);
@@ -142,6 +154,26 @@ end;
 function TCommonEnumerator.GetEnumerator: TCommonEnumerator;
 begin
   result := self;
+end;
+
+
+
+
+
+
+
+
+
+
+function TArrayView.TArrayViewEnumerator.first: TElement;
+begin
+  result := data^;
+end;
+
+function TArrayView.TArrayViewEnumerator.moveNext: boolean;
+begin
+  inc(data);
+  result := data < dataend;
 end;
 
 
@@ -184,11 +216,19 @@ begin
   result := (data <= target) and (target <= dataend);
 end;
 
+
 function TArrayView.moveBy(delta: SizeInt): boolean;
 begin
   data := data + delta;
   result := data < dataend;
   if not result then data := dataend;
+end;
+
+
+function TArrayView.getEnumerator: TArrayViewEnumerator;
+begin
+  result.data := data - 1;
+  result.dataend := dataend;
 end;
 
 procedure TArrayView.moveTo(target: PElement);
