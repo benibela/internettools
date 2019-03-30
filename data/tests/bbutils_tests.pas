@@ -1992,7 +1992,7 @@ var
   c: char;
 begin
   s := 'foobar'; p := pchar(s);
-  v := s.unsafeView;
+  v.init(s);
   testbounds(v, p, 6);
   test(v.ToString, 'foobar');
   test(v.contains('foobar'));
@@ -2066,7 +2066,7 @@ begin
   test(not v.contains(#0));
   for c in v do test(false);
 
-  v := s.unsafeView;
+  v.init(s);
   v.moveTo(@s[length(s)]);
   testbounds(v, p + 5, 1);
   test(v.ToString, 'r');
@@ -2075,7 +2075,7 @@ begin
   test(v.ToString, '');
   for c in v do test(false);
 
-  v := s.unsafeView;
+  v.init(s);
   v.moveAfter(@s[length(s)-1]);
   testbounds(v, p + 5, 1);
   test(v.ToString, 'r');
@@ -2089,7 +2089,11 @@ begin
   v.cutBefore(p);
   test(v.ToString, '');
 
+  {$ifdef FPC_HAS_CPSTRING}
   v := s.unsafeView;
+  {$else}
+  v.init(s);
+  {$endif}
   testbounds(v, p, 6);
   test(v.ToString, 'foobar');
   test(v.cutBy(1));

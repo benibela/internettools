@@ -29,7 +29,11 @@ exception statement from your version.
 
 unit bbutilsbeta;
 
-{$mode objfpc}{$H+}{$ModeSwitch advancedrecords}{$ModeSwitch typehelpers}
+{$mode objfpc}{$H+}{$ModeSwitch advancedrecords}
+{$ifdef FPC_HAS_CPSTRING}
+{$define HAS_TYPEHELPERS}
+{$ModeSwitch typehelpers}
+{$endif}
 
 interface
 
@@ -115,9 +119,11 @@ type
   TStringView = object(TCharArrayView)
   end;
 
+  {$ifdef HAS_TYPEHELPERS}
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
   end;
+  {$endif}
 
 function objInheritsFrom(o: TObject; c: TClass): boolean; inline;
 
@@ -389,11 +395,11 @@ begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
 
-
+{$ifdef HAS_TYPEHELPERS}
 function TBB2StringHelper.unsafeView: TStringView;
 begin
   result.init(self);
 end;
-
+{$endif}
 
 end.
