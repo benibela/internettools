@@ -15,7 +15,7 @@ var setCodePageCanConvertEncodings: boolean = {$ifdef FPC_HAS_CPSTRING}true{$els
 
 implementation
 
-uses bbutils;
+uses bbutils, bbutilsbeta;
 
 
 
@@ -70,6 +70,7 @@ procedure testStrBuilder; forward;
 procedure testStrEntities; forward;
 procedure testStrConversions; forward;
 procedure testVariousStuff; forward;
+procedure testBeta; forward;
 
 {$IFDEF FPC}
 procedure intArrayUnitTests;
@@ -822,6 +823,7 @@ begin
   test(strCompareClever('a00b000c', 'a0b0000c'), 1);
 
   testVariousStuff;
+  testBeta;
 end;
 
 procedure testStrConversions;
@@ -1964,6 +1966,195 @@ begin
   end;
 end;
 
+
+procedure testbounds(const v: TCharArrayView; p: pchar; l: integer);
+begin
+  test(v.length, l);
+  test(v.isEmpty = (l = 0));
+  test(not v.isInBounds(p - 1));
+  test(v.isInBounds(p) = (l > 0) );
+  test(v.isInBounds(p + l - 1) = (l > 0) );
+  test(not v.isInBounds(p + l));
+  test(not v.isInBounds(p + l + 1));
+
+  test(not v.isOnBounds(p - 1));
+  test(v.isOnBounds(p));
+  test(v.isOnBounds(p + l - 1) = (l > 0));
+  test(v.isOnBounds(p + l));
+  test(not v.isOnBounds(p + l + 1));
+end;
+procedure testStringViews;
+var
+  s: String;
+  v: TStringView;
+  p: PChar;
+begin
+  s := 'foobar'; p := pchar(s);
+  v := s.unsafeView;
+  testbounds(v, p, 6);
+  test(v.ToString, 'foobar');
+  test(v.contains('foobar'));
+  test(v.contains('b'));
+  test(v.contains('r'));
+  test(v.contains('f'));
+  test(v.contains('foo'));
+  test(v.contains('bar'));
+  test(v.contains(''));
+  test(v.find('') = p);
+  test(not v.contains('x'));
+
+  test(v.viewFrom(p).ToString, 'foobar');
+  test(v.viewBehind(p).ToString, 'oobar');
+  test(v.viewFrom(p+4).ToString, 'ar');
+  test(v.viewBehind(p+4).ToString, 'r');
+  test(v.viewFrom(p+5).ToString, 'r');
+  test(v.viewBehind(p+5).ToString, '');
+  test(v.viewFrom(p+6).ToString, '');
+  test(v.viewBehind(p+6).ToString, '');
+
+  test(v.viewTo(p).ToString, 'f');
+  test(v.viewUntil(p).ToString, '');
+  test(v.viewTo(p+4).ToString, 'fooba');
+  test(v.viewUntil(p+4).ToString, 'foob');
+  test(v.viewTo(p+5).ToString, 'foobar');
+  test(v.viewUntil(p+5).ToString, 'fooba');
+  test(v.viewTo(p+6).ToString, 'foobar');
+  test(v.viewUntil(p+6).ToString, 'foobar');
+
+
+  test(v.moveBy(1));
+  testbounds(v, p + 1, 5);
+  test(v.ToString, 'oobar');
+  test(not v.contains('foobar'));
+  test(v.contains('b'));
+
+  v.moveTo(@s[4]);
+  testbounds(v, p + 3, 3);
+  test(v.ToString, 'bar');
+  test(not v.contains('foobar'));
+  test(v.contains('b'));
+
+  v.moveTo(@s[3]);
+  testbounds(v, p + 3, 3);
+  test(v.ToString, 'bar');
+
+  v.moveTo(@s[4]);
+  testbounds(v, p + 3, 3);
+  test(v.ToString, 'bar');
+
+
+  v.moveAfter(@s[4]);
+  testbounds(v, p + 4, 2);
+  test(v.ToString, 'ar');
+  test(v.contains('a'));
+  test(v.contains('r'));
+  test(not v.contains('b'));
+  test(not v.moveBy(2));
+  testbounds(v, p + 6, 0);
+  test(v.ToString, '');
+  test(not v.moveBy(2));
+  testbounds(v, p + 6, 0);
+  test(v.ToString, '');
+  test(not v.contains('b'));
+  test(not v.contains(#0));
+
+  v := s.unsafeView;
+  v.moveTo(@s[length(s)]);
+  testbounds(v, p + 5, 1);
+  test(v.ToString, 'r');
+  v.moveTo(@s[length(s)] + 1);
+  testbounds(v, p + 6, 0);
+  test(v.ToString, '');
+
+  v := s.unsafeView;
+  v.moveAfter(@s[length(s)-1]);
+  testbounds(v, p + 5, 1);
+  test(v.ToString, 'r');
+  v.moveAfter(@s[length(s)]);
+  testbounds(v, p + 6, 0);
+  test(v.ToString, '');
+  v.cutBy(1);
+  test(v.ToString, '');
+  v.cutAfter(p);
+  test(v.ToString, '');
+  v.cutBefore(p);
+  test(v.ToString, '');
+
+  v := s.unsafeView;
+  testbounds(v, p, 6);
+  test(v.ToString, 'foobar');
+  test(v.cutBy(1));
+  testbounds(v, p, 5);
+  test(v.ToString, 'fooba');
+  test(v.moveBy(1));
+  testbounds(v, p + 1, 4);
+  test(v.ToString, 'ooba');
+  v.cutAfter(@s[4]);
+  test(v.ToString, 'oob');
+  test(v.contains('b'));
+  test(v.contains('o'));
+  test(not v.contains(#0));
+  v.cutBefore(@s[4]);
+  test(v.ToString, 'oo');
+  test(not v.contains('b'));
+  test(v.contains('o'));
+  test(not v.contains(#0));
+
+  v.init(s);
+  testbounds(v, p, 6);
+  test(v.moveToFind('f'));
+  testbounds(v, p, 6);
+  test(v.moveAfterFind('f'));
+  testbounds(v, p + 1, 5);
+  test(v.moveToFind('o'));
+  testbounds(v, p + 1, 5);
+  test(v.moveAfterFind('o'));
+  testbounds(v, p + 2, 4);
+  test(v.moveToFind('o'));
+  testbounds(v, p + 2, 4);
+  test(v.moveAfterFind('o'));
+  testbounds(v, p + 3, 3);
+  test(not v.moveToFind('x'));
+  testbounds(v, p + 3, 3);
+  test(not v.moveAfterFind('x'));
+  testbounds(v, p + 3, 3);
+  test(v.moveToFind(''));
+  testbounds(v, p + 3, 3);
+  test(v.moveAfterFind(''));
+  testbounds(v, p + 3, 3);
+  test(v.moveToFind('r'));
+  testbounds(v, p + 5, 1);
+  test(v.ToString, 'r');
+  v.init(s);
+  test(v.moveAfterFind('r'));
+  testbounds(v, p + 6, 0);
+  test(v.ToString, '');
+
+  v.init(s);
+  testbounds(v, p, 6);
+  test(v.cutAfterFind('r'));
+  testbounds(v, p, 6);
+  test(v.cutBeforeFind('r'));
+  testbounds(v, p, 5);
+  test(v.cutAfterFind('b'));
+  testbounds(v, p, 4);
+  test(v.cutBeforeFind('b'));
+  testbounds(v, p, 3);
+  test(v.cutAfterFind('o'));
+  testbounds(v, p, 2);
+  test(v.cutBeforeFind('o'));
+  testbounds(v, p, 1);
+  test(v.cutAfterFind('f'));
+  testbounds(v, p, 1);
+  test(v.cutBeforeFind('f'));
+  testbounds(v, p, 0);
+
+end;
+
+procedure testBeta;
+begin
+  testStringViews;
+end;
 
 end.
 

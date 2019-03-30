@@ -157,10 +157,16 @@ type
 
   TCharSet = set of ansichar;
 {$ifdef FPC_HAS_CPSTRING}
-  TBByStringHelper = Type Helper(TStringHelper) for AnsiString
+  TBBStringHelper = Type Helper(TStringHelper) for AnsiString
       function EncodeHex: String; inline;
       function DecodeHex: String; inline;
       function RemoveFromLeft(chopoff: SizeInt): String;
+      {
+      function AfterOrEmpty(const sep: String): String; inline;
+      function AfterLastOrEmpty(const sep: String): String; inline;
+      function BeforeOrEmpty(const sep: String): String; inline;
+      function BeforeLastOrEmpty(const sep: String): String; inline;
+      }
   end;
 {$endif}
 
@@ -1249,24 +1255,6 @@ begin
 end;
 
 
-{$ifdef FPC_HAS_CPSTRING}
-
-function TBByStringHelper.EncodeHex: String;
-begin
-  result := {%H-}strEncodeHex(self);
-end;
-
-function TBByStringHelper.DecodeHex: String;
-begin
-  result := {%H-}strDecodeHex(self);
-end;
-
-function TBByStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
-begin
-  result := self;
-  delete(result, 1, chopoff);
-end;
-{$endif}
 
 
 function strEqual(const s1, s2: RawByteString): boolean;
@@ -5018,6 +5006,46 @@ begin
   builder.final;
 end;
 
+{$ifdef FPC_HAS_CPSTRING}
+
+function TBBStringHelper.EncodeHex: String;
+begin
+  result := strEncodeHex(self);
+end;
+
+function TBBStringHelper.DecodeHex: String;
+begin
+  result := strDecodeHex(self);
+end;
+
+function TBBStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
+begin
+  result := self;
+  delete(result, 1, chopoff);
+end;
+{
+
+function TBBStringHelper.AfterOrEmpty(const sep: String): String;
+begin
+  result := strAfter(self, sep);
+end;
+
+function TBBStringHelper.AfterLastOrEmpty(const sep: String): String;
+begin
+  result := strAfterLast(self, sep);
+end;
+
+function TBBStringHelper.BeforeOrEmpty(const sep: String): String;
+begin
+  result := strBefore(self, sep);
+end;
+
+function TBBStringHelper.BeforeLastOrEmpty(const sep: String): String;
+begin
+  result := strBeforeLast(self, sep);
+end;}
+
+{$endif}
 
 
 
