@@ -3344,6 +3344,9 @@ begin
   t('request-combine("http://www.abc.de/?x=y", "a=b").url', 'http://www.abc.de/?x=y&a=b');
   t('request-combine("http://www.abc.de?x=y", "a=b").url', 'http://www.abc.de?x=y&a=b'); //does this make sense ?
   t('request-combine("https://www.abc.de/y/?x=y", "a=b").url', 'https://www.abc.de/y/?x=y&a=b');
+  t('request-combine("http://www.abc.de/?x=y", "x=z").url', 'http://www.abc.de/?x=z');
+  t('request-combine("http://www.abc.de?x=y", "x=z").url', 'http://www.abc.de?x=z');
+  t('request-combine("https://www.abc.de/y/?x=y", "x=z").url', 'https://www.abc.de/y/?x=z');
 
   t('request-combine("", "a=b").url', '?a=b');
   t('request-combine("?", "a=b").url', '?a=b');
@@ -3357,6 +3360,7 @@ begin
   t('request-combine("/?x=y", "a=b").url', '/?x=y&a=b');
   t('request-combine("?x=y", "a=b").url', '?x=y&a=b');
   t('request-combine("/y/?x=y", "a=b").url', '/y/?x=y&a=b');
+  t('request-combine("/y/?x=y", "x=z").url', '/y/?x=z');
 
   t('serialize-json(request-decode("http://a/b/c"))', '{"url": "http://a/b/c", "protocol": "http", "host": "a"}');
   t('serialize-json(request-decode("http://a/b/c?x=y"))', '{"url": "http://a/b/c?x=y", "protocol": "http", "host": "a", "path": "b/c", "query": "x=y", "params": {"x": "y"}}');

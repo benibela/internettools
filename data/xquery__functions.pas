@@ -1599,6 +1599,9 @@ function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeI
       decoded: TDecodedUrl;
       excludedParts: TDecodedUrlParts;
       newEncoded: IXQValue;
+      oldUrlView: TStringView;
+      queryStart: PChar;
+      hadLinkTarget: Boolean;
 
   begin
     SetLength(temp, 3);
@@ -1613,16 +1616,19 @@ function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeI
       propName := 'url';
       temp[0] := obj.getProperty(propName);
       oldUrl := temp[0].toString;
-      if strContains(oldUrl, '?') and not strEndsWith(oldUrl, '?') and not strContains(oldUrl, '#') then prefix := ''
-      else begin
-        excludedParts := [dupParams, dupLinkTarget];
-        decoded := decodeURL(oldUrl, false);
-        if not strIsAbsoluteURI(oldUrl) then Include(excludedParts, dupProtocol)
-        else if (decoded.host <> '') and (decoded.path = '') then decoded.path := '/';
-        if decoded.params = '?' then decoded.params := ''; //check here, because uri-combine handles it wrong (turns '?' into '?=&')
-        temp[0] := xqvalue(decoded.params);
-        prefix := decoded.combinedExclude(excludedParts);
-        if not strBeginsWith(decoded.params, '?') then prefix += '?';
+      oldUrlView.init(oldUrl);
+      hadLinkTarget := oldUrlView.cutBeforeFind('#');
+      queryStart := oldUrlView.find('?');
+      if queryStart = nil then begin
+        if hadLinkTarget then prefix := oldUrlView.toString
+        else prefix := oldUrl;
+        oldUrlView.moveBy(length('https://'));
+        if strIsAbsoluteURI(oldUrl) and not oldUrlView.contains('/') then prefix += '/?'
+        else prefix += '?';
+        temp[0] := xqvalue('');
+      end else begin
+        prefix := oldUrlView.viewTo(queryStart).toString;
+        temp[0] := xqvalue(oldUrlView.viewBehind(queryStart).toString);
       end;
     end;
 
