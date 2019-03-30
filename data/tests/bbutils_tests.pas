@@ -1967,6 +1967,7 @@ begin
 end;
 
 
+{$ifdef FPC_HAS_CPSTRING}
 procedure testbounds(const v: TCharArrayView; p: pchar; l: integer);
 begin
   test(v.length, l);
@@ -2089,11 +2090,7 @@ begin
   v.cutBefore(p);
   test(v.ToString, '');
 
-  {$ifdef FPC_HAS_CPSTRING}
   v := s.unsafeView;
-  {$else}
-  v.init(s);
-  {$endif}
   testbounds(v, p, 6);
   test(v.ToString, 'foobar');
   test(v.cutBy(1));
@@ -2163,10 +2160,13 @@ begin
   testbounds(v, p, 0);
 
 end;
+{$endif}
 
 procedure testBeta;
 begin
+  {$ifdef FPC_HAS_CPSTRING}
   testStringViews;
+  {$endif}
 end;
 
 end.

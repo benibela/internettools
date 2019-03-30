@@ -56,6 +56,7 @@ type
  end;
 
 
+  {$ifdef HAS_TYPEHELPERS}
   generic TArrayView<TElement> = object
     type PElement = ^TElement;
   protected
@@ -119,7 +120,6 @@ type
   TStringView = object(TCharArrayView)
   end;
 
-  {$ifdef HAS_TYPEHELPERS}
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
   end;
@@ -170,6 +170,7 @@ end;
 
 
 
+{$ifdef HAS_TYPEHELPERS}
 
 function TArrayView.TArrayViewEnumerator.first: TElement;
 begin
@@ -395,7 +396,6 @@ begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
 
-{$ifdef HAS_TYPEHELPERS}
 function TBB2StringHelper.unsafeView: TStringView;
 begin
   result.init(self);
