@@ -486,7 +486,7 @@ constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
       else if objInheritsFrom(t, TXQTermNodeMatcher) or objInheritsFrom(t, TXQTermVariable) or objInheritsFrom(t, TXQTermEQNameToken) then
         exit(true)
       else if objInheritsFrom(t, TXQTermReadObjectProperty) or objInheritsFrom(t, TXQTermDynamicFunctionCall) then
-        t := TXQTermReadObjectProperty(t).children[0]
+        t := TXQTermWithChildren(t).children[0]
       else
         exit(false);
     end;
@@ -2801,7 +2801,7 @@ begin
       t := schema.findType(alocalname);
       if (t <> nil) and not (baseSchema.isAbstractType(t)) and not (baseSchema.isValidationOnlyType(t)) then begin
         akind:=xqfkTypeConstructor;
-        afunc := TXQAbstractFunctionInfo(TObject(t));
+        afunc := TXQAbstractFunctionInfo(pointer(t));
         exit(true)
       end;
     end;

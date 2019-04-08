@@ -136,7 +136,7 @@ end;
 
 function TNamespaceList.getNamespace(i: integer): INamespace;
 begin
-  result := INamespace(inherited get(i)) ;
+  result := INamespace(pointer(inherited get(i)));
 end;
 
 function TNamespaceList.hasNamespacePrefixBefore(const prefix: string; const c: integer): boolean;

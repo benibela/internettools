@@ -1138,12 +1138,12 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   q('declare namespace foo = "barbar"; for <x>{$foo:bar}</x> in <x>1</x> return $foo:bar', '1');
   q('declare namespace foo = "barbar"; let $bar := "huh?" return for <x>{$foo:bar}</x> in <x>1</x> return $bar', 'huh?');
   qf('declare namespace foo = "barbar"; for <x>{$foo:bar}</x> in <x>1</x> return $bar', 'err:XPST0008');
-  TXQueryEngineBreaker(extParser.QueryEngine).VariableChangelogUndefined.Clear ;//the previous tests are leaking. TODO
+//  TXQueryEngineBreaker(extParser.QueryEngine).VariableChangelogUndefined.Clear ;//the previous tests are leaking. TODO
   qf('declare namespace foo = "barbar"; for <x>{$bar}</x> in <x>1</x> return $foo:bar', 'err:XPST0008');
   q('declare namespace foo = "barbar"; typeswitch ( <x>1</x>) case <x>{$foo:bar}</x> return $foo:bar default return 1234', '1');
   q('declare namespace foo = "barbar"; let $bar := "huh?" return typeswitch (<x>1</x>) case <x>{$foo:bar}</x> return $bar default return 1234', 'huh?');
   qf('declare namespace foo = "barbar"; typeswitch(<x>1</x>) case <x>{$foo:bar}</x>  return $bar default return 1234', 'err:XPST0008');
-  TXQueryEngineBreaker(extParser.QueryEngine).VariableChangelogUndefined.Clear ;//the previous tests are leaking. TODO
+//  TXQueryEngineBreaker(extParser.QueryEngine).VariableChangelogUndefined.Clear ;//the previous tests are leaking. TODO
   qf('declare namespace foo = "barbar"; typeswitch(<x>1</x> ) case <x>{$bar}</x> return $foo:bar default return 1234', 'err:XPST0008');
 
   q3('(let $o := ":", $f := function(){ typeswitch (<x><a>1</a><a>2</a></x>) case <a>{$abc := (., $o)}</a>+ return join($abc) default return "oh?" } return $f) ()', '1 : 2 :');

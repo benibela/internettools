@@ -38,18 +38,13 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.common, xquery.namespaces, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
   {$IFDEF USE_THEO_UNICODE}unicodeinfo{$ENDIF} //from http://wiki.lazarus.freepascal.org/Theodp
 
   ;
-
-type TXQValueDateTimeBreaker= class(TXQValueDateTime) end;
-     TXQVListBreaker = class(TXQVList) end;
-     TXSTypeBreaker = class(TXSType) end;
-     TXQueryEngineBreaker = class(TXQueryEngine) end;
 
 //abstract functions
 function raisePlaceHolderError(const cxt: TXQEvaluationContext; const ta, tb: IXQValue; const name: string): IXQValue;
@@ -181,10 +176,10 @@ begin
        (not (a.typeAnnotation as TXSDateTimeType).isDuration and not (b.typeAnnotation as TXSDateTimeType).isDuration) then exit(xqvalue());
     if (b.typeAnnotation as TXSDateTimeType).isDuration then begin
       result := a.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(b.getInternalDateTimeData^);
+      (result.toValue as TXQValueDateTime).addDuration(b.getInternalDateTimeData^);
     end else begin
       result := b.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).addDuration(a.getInternalDateTimeData^);
+      (result.toValue as TXQValueDateTime).addDuration(a.getInternalDateTimeData^);
     end;
     exit;
   end;
@@ -222,10 +217,10 @@ begin
     xqtempdt.value.year:=0;
     xqtempdt.value.month:=0;
     xqtempdt.value.day := xqtempdt.value.initFromMicroSecondStampTimeOnly(abs(ai));
-    if ai < 0 then TXQValueDateTimeBreaker(xqtempdt).multiplyComponents(-1);
+    if ai < 0 then xqtempdt.multiplyComponents(-1);
   end else begin
     xqtempdt := TXQValueDateTime.create(a.typeAnnotation, a.getInternalDateTimeData^);
-    TXQValueDateTimeBreaker(xqtempdt).subtractDuration(b.getInternalDateTimeData^);
+    xqtempdt.subtractDuration(b.getInternalDateTimeData^);
   end;
   exit(xqtempdt);
 end;
@@ -276,10 +271,11 @@ var i, f,t: BigDecimal;
     len: BigDecimal;
     resseq: TXQValueSequence;
     idx: Integer;
-    resseqseq: TXQVListBreaker;
+    resseqseq: TXQVList;
     fsmall: integer;
     i64: int64;
     typ: TXSNumericType;
+    resbuffer: PIXQValue;
 begin
   ignore(cxt);
   if a.isUndefined or b.isUndefined then exit(xqvalue);
@@ -290,26 +286,27 @@ begin
   len := t - f + 1;
   if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
   resseq := TXQValueSequence.create(0);
-  resseqseq := TXQVListBreaker(resseq.seq);
-  resseqseq.setCount(BigDecimalToLongint(len));
+  resseqseq := resseq.seq;
+  resseqseq.Count := BigDecimalToLongint(len);
+  resbuffer := resseqseq.buffer;
   if isLongint(f) and isLongint(t) then begin
     fsmall := BigDecimalToLongint(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
-      resseqseq.fbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+fsmall);
+      resbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+fsmall);
   end else if isInt64(f) and isInt64(t) then begin
     i64 := BigDecimalToInt64(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
-      resseqseq.fbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+i64);
+      resbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+i64);
   end else begin
     idx := 0;
     i := f;
     typ := baseSchema.integer;
     while i < t do begin
-      resseqseq.fbuffer[idx] := typ.createValue(i);
+      resbuffer[idx] := typ.createValue(i);
       i += 1;
       idx+=1;
     end;
-    resseqseq.fbuffer[idx] := typ.createValue(t);
+    resbuffer[idx] := typ.createValue(t);
     assert(idx + 1 = len);
   end;
   result := resseq;
@@ -348,13 +345,13 @@ begin
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
     if bk <> pvkDateTime then begin
-      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (TXSTypeBreaker(baseSchema.double).tryCreateValue(b) <> xsceNoError) then exit(xqvalue);
+      if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(b) <> xsceNoError) then exit(xqvalue);
       result := a.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).multiplyComponents(b.toFloat);
+      (result.toValue as TXQValueDateTime).multiplyComponents(b.toFloat);
     end else begin
-      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (TXSTypeBreaker(baseSchema.double).tryCreateValue(a) <> xsceNoError) then exit(xqvalue);
+      if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(a) <> xsceNoError) then exit(xqvalue);
       result := b.clone;
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).multiplyComponents(a.toFloat);
+      (result.toValue as TXQValueDateTime).multiplyComponents(a.toFloat);
     end;
     exit;
   end;
@@ -421,8 +418,8 @@ begin
     end;
     f:= b.toFloat;
     result := a.clone;
-    if IsInfinite(f) then TXQValueDateTimeBreaker(result as TXQValueDateTime).multiplyComponents(0)
-    else TXQValueDateTimeBreaker(result as TXQValueDateTime).divideComponents(f);
+    if IsInfinite(f) then (result.toValue as TXQValueDateTime).multiplyComponents(0)
+    else (result.toValue as TXQValueDateTime).divideComponents(f);
     exit;
   end;
 
@@ -690,7 +687,7 @@ begin
           raise EXQEvaluationException.Create('XPTY0004', 'invalid node');
         result.add(x^);
       end;
-      TXQVListBreaker(result).sortInDocumentOrderUnchecked;
+      result.sortInDocumentOrderUncheckedH;
       for i:=result.Count-1 downto 1 do
         if result[i].toNode = result[i-1].toNode then
           result.Delete(i);
@@ -833,7 +830,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; argc: SizeInt; ar
     temp: TXQValue;
   begin
     if v.instanceOf(baseSchema.Double) then exit(v);
-    if TXSTypeBreaker(baseSchema.double).tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
+    if baseSchema.double.tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
     else exit(baseSchema.double.createValue(getNaN));
   end;
 begin
@@ -1157,8 +1154,8 @@ begin
   requiredArgCount(argc, 0, 0);
   if context.TextNode <> nil then begin
     engine := context.staticContext.sender;
-    if TXQueryEngineBreaker(engine).PatternMatcherTextStart = context.TextNode then begin //safety check, so it does not crash when there is an invalid pointer in textstart
-      exit(xqvalue(TTreeNode.innerTextRangeInternal(TXQueryEngineBreaker(engine).PatternMatcherTextStart, TXQueryEngineBreaker(engine).PatternMatcherTextEnd)));
+    if engine.getPatternMatcherTextStart = context.TextNode then begin //safety check, so it does not crash when there is an invalid pointer in textstart
+      exit(xqvalue(TTreeNode.innerTextRangeInternal(engine.getPatternMatcherTextStart, engine.getPatternMatcherTextEnd)));
     end;
     node := context.TextNode;
   end else if context.ParentElement <> nil then node := context.ParentElement
@@ -2374,7 +2371,7 @@ end;
 function xqFunctionGarbage_Collect(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context); ignore(args);
-  TXQueryEngineBreaker.freeCommonCaches;
+  TXQueryEngine.freeCommonCachesH;
   TNamespace.freeCache;
   result := xqvalue;
 end;
@@ -2400,7 +2397,7 @@ begin
       else raise EXQEvaluationException.create('PXP:EVAL','Invalid language');
     end;
   end;
-  term := TXQueryEngineBreaker(context.staticContext.sender).parseTerm(args[0].toString, model);
+  term := context.staticContext.sender.parseTermH(args[0].toString, model);
   try
     result := term.evaluate(PXQEvaluationContext(@context)^);
   finally
@@ -2629,7 +2626,7 @@ begin
   if xqv.isUndefined then exit(xqvalue);
   if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
   tempValue := xqv.getInternalDateTimeData^;
-  TXQValueDateTimeBreaker.setDayTime(tempValue, tempValue.toDayTime());
+  TXQValueDateTime.setDayTime(tempValue, tempValue.toDayTime());
   if (v <> 6) or (tempValue.microsecs = 0) then result := xqvalue(tempValue.values[v])
   else  result := xqvalue( tempValue.seconds + shifted10(bigdecimal(tempValue.microsecs), -6) );
 end;
@@ -2681,7 +2678,7 @@ begin
     resdt.value.timezone := tz
   else if resdt.value.timezone <> tz  then begin
     resdt.value.initFromMicroSecondStamp(resdt.value.toMicroSecondStamp() + tz * SCALE, tz);
-    TXQValueDateTimeBreaker(resdt).truncateRange();
+    resdt.truncateRangeH();
   end;
 end;
 
@@ -3017,10 +3014,10 @@ begin
   url := context.staticContext.resolveDocURI(url);
   if strBeginsWith(url, ':') then raise EXQEvaluationException.create('FODC0005', 'Invalid url: '+ url);
 
-  ExternalDocuments := TXQueryEngineBreaker(context.staticContext.sender).FExternalDocuments;
+  ExternalDocuments := context.staticContext.sender.ExternalDocuments;
   if ExternalDocuments = nil then begin
     ExternalDocuments := TStringList.Create;
-    TXQueryEngineBreaker(context.staticContext.sender).FExternalDocuments := ExternalDocuments;
+    context.staticContext.sender.ExternalDocuments := ExternalDocuments;
   end;
 
   if ExternalDocuments.IndexOf(url) >= 0 then
@@ -3451,7 +3448,7 @@ begin
       result := resdt;
       for pv in enumerable do begin
         if pv^.typeAnnotation = baseSchema.duration then raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
-        TXQValueDateTimeBreaker(resdt).addDuration(pv^.getInternalDateTimeData^);
+        resdt.addDuration(pv^.getInternalDateTimeData^);
       end;
     end;
     pvkInt64, pvkBigDecimal: begin
@@ -3527,7 +3524,7 @@ begin
   case getPromotedType(seq) of
     pvkDateTime: begin
       result := xqFunctionSum(argc, args);
-      TXQValueDateTimeBreaker(result as TXQValueDateTime).divideComponents(i);
+      (result.toValue as TXQValueDateTime).divideComponents(i);
     end;
     pvkInt64, pvkBigDecimal: begin
       tempd:=0;

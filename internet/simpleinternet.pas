@@ -134,6 +134,7 @@ implementation
 
 uses bbutils, extendedhtmlparser
      ,xquery_json //enable json as default
+     ,xquery.internals.protectionbreakers
 {$IFDEF USE_SYNAPSE_WRAPPER}
 , synapseinternetaccess
 {$ENDIF}
@@ -187,8 +188,6 @@ begin
   else result := '';
 end;
 
-type TXQueryEngineBreaker = class(TXQueryEngine)
-end;
 
 function process(data: string; query: string): xquery.IXQValue;
 var dataFileName: string;
@@ -241,7 +240,7 @@ begin
       lastQueryWasPXP := true;
       pxpParser := defaultQueryEngine;
       pxpparser.StaticContext.baseURI:=dataFileName;
-      TXQueryEngineBreaker(pxpParser).addAWeirdGlobalVariable('', 'json');
+      pxpParser.addAWeirdGlobalVariableH('', 'json');
       case querykind of
         ekXQuery1, ekXQuery3_0, ekXQuery3_1: begin
           pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQuery;

@@ -15,7 +15,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils, xquery.namespaces;
+uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils, xquery.namespaces, xquery.internals.protectionbreakers;
 
 
 type TXQueryEngineBreaker = class(TXQueryEngine)
@@ -4296,9 +4296,9 @@ begin
   test(ps.evaluateXPath2('2*.', xqvalue(7)).toString, '14', 'evaluateXPath2(ixqvalue) failed');
   test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
   test(TXQueryEngine.evaluateStaticXPath2('1 + 1 + 1').toString, '3', 'evaluateStaticXPath2 a failed');
-  test(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{$abc}{0}b')).evaluate().toString, 'aalphabet0b', 'xstring0');
-  test(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{1+2+3}b')).evaluate().toString, 'a6b', 'xstring1');
-  test(IXQuery(TXQueryEngineBreaker(ps).parseXStringNullTerminated('a{concat("x","y","z")}b')).evaluate().toString, 'axyzb', 'xstring2');
+  test(IXQuery(ps.parserEnclosedExpressionsString('a{$abc}{0}b')).evaluate().toString, 'aalphabet0b', 'xstring0');
+  test(IXQuery(ps.parserEnclosedExpressionsString('a{1+2+3}b')).evaluate().toString, 'a6b', 'xstring1');
+  test(IXQuery(ps.parserEnclosedExpressionsString('a{concat("x","y","z")}b')).evaluate().toString, 'axyzb', 'xstring2');
 
   for i := 1 to 5 do begin
     xqv := query('1 to $_1', [xqvalue(i)]);

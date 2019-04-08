@@ -74,9 +74,18 @@ var raiseXQEvaluationExceptionCallback: TRaiseXQEvaluationExceptionCallback = ni
 
 procedure raiseXQEvaluationException(const code, message: string); overload; noreturn;
 
+type xqfloat = double;
+function xqround(const f: xqfloat): Int64;
+
 implementation
 
-
+function xqround(const f: xqfloat): Int64;
+var tempf: xqfloat;
+begin
+  tempf := f + 0.5;
+  result := trunc(tempf);
+  if frac(tempf) < 0 then result -= 1;
+end;
 
 function TXQHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
 begin

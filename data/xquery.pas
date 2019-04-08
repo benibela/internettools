@@ -141,6 +141,9 @@ type
 
   TXQParsingModel = (xqpmXPath2, xqpmXQuery1, xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1);
   TXQParsingModels = set of TXQParsingModel;
+  TXQParsingModelsHelper = type helper for TXQParsingModels
+    function requiredModelToString: string;
+  end;
 
   //============================XQUERY CONTEXTS==========================
 
@@ -698,19 +701,17 @@ type
     class procedure setDateTime(const dateTime: TDateTime; out v: TXQValueDateTimeData); static;
 
     function clone: IXQValue; override;
-  protected
-    class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): TDateTimeParsingResult; static;
 
-    procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
-    procedure divideComponents(fac: xqfloat); //Multiply all components of value with fac
-    procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
-    procedure subtractDuration(D: TXQValueDateTimeData);
-    class procedure addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 
     //**A duration can be represented as an integer ("months" = 12 * year + months and "dayTime" = "dayTime" = time since midnight in microseconds)
     //**These set these values
     class procedure setMonths(var duration: TXQValueDateTimeData; m: integer; isDuration: boolean); static;
     class procedure setDayTime(var duration: TXQValueDateTimeData; dt: int64); static;
+  protected
+    class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): TDateTimeParsingResult; static;
+
+    class procedure addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
+
 
     procedure truncateRange();
 
@@ -1111,9 +1112,10 @@ type
     function createValue(const v: xqfloat): IXQValue;
     function createValue(const v: BigDecimal): IXQValue;
     function createValue(const v: String): IXQValue; inline;
-  protected
 
     function tryCreateValue(const v: IXQValue; outv: PXQValue = nil): TXSCastingError;
+  protected
+
     function tryCreateValue(v: string; outv: PXQValue = nil): TXSCastingError;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; virtual;
     function tryCreateValueInternal(const v: String; outv: PXQValue = nil): TXSCastingError; virtual;
@@ -2200,15 +2202,17 @@ type
     function visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
     function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
-    function getStaticContext: TXQStaticContext;
+    function getStaticContext: TXQStaticContext; inline;
 
     destructor Destroy; override;
   protected
     staticContext: TXQStaticContext;
-    staticContextShared: boolean;
     fterm: txqterm;
     function getTerm: TXQTerm;
     procedure setTerm(aterm: TXQTerm);
+  public
+    staticContextShared: boolean;
+    property Term: TXQTerm read getTerm write setTerm;
   end;
 
   //============================EXCEPTIONS/EVENTS==========================
@@ -2879,6 +2883,8 @@ type
   function findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQComplexFunctionInfo;
   function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQInterpretedFunctionInfo;
   function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
+
+  function findSimilarFunctionsDebug(searched: TList; const localname: string): string;
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
@@ -3151,6 +3157,14 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
+
+function TXQParsingModelsHelper.requiredModelToString: string;
+begin
+  if not (xqpmXPath3_0 in self) then result := ' requires XPath/XQuery 3.1'
+  else if not (xqpmXPath2 in self) then result := ' requires XPath/XQuery 3.0'
+  else result := '';
+end;
+
 {$ImplicitExceptions on}
 
 
@@ -4408,13 +4422,7 @@ begin
   result := PQWord(@v)^ shr 63 = 1;
 end;
 
-function xqround(const f: xqfloat): Int64;
-var tempf: xqfloat;
-begin
-  tempf := f + 0.5;
-  result := trunc(tempf);
-  if frac(tempf) < 0 then result -= 1;
-end;
+
 
 {function xqtruncdecimal(const f: Decimal): Decimal;
 begin
@@ -8932,6 +8940,57 @@ begin
    if result <> nil then exit;
   end;
   result := nil;
+end;
+
+function TXQNativeModule.findSimilarFunctionsDebug(searched: TList; const localname: string): string;
+  function strSimilar(const s, ref: string): boolean;
+  begin
+    result := strContains(s, ref) or strContains(ref, s)
+              or (strSimilarity(s, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
+  end;
+  function functionName(const name: string; const f: TXQAbstractFunctionInfo): string;
+  var
+    i, j: Integer;
+  begin
+    result := name + ' ' + '#' + IntToStr(f.minArgCount);
+    if f.minArgCount <> f.maxArgCount then result += '-' + IntToStr(f.maxArgCount);;
+    if length(f.versions) > 0 then begin
+      result += ':';
+      for i := 0 to high(f.versions) do begin
+        if i <> 0 then result += ';'#9;
+        result += '  (';
+        for j := 0 to high(f.versions[i].types) do begin
+          if j <> 0 then result += ', ';
+          if f.versions[i].types[j] <> nil then result += f.versions[i].types[j].serialize;
+        end;
+        result += ')';
+        if f.versions[i].returnType <> nil then result += ' as ' + f.versions[i].returnType.serialize;
+      end;
+    end;
+    result += LineEnding;
+  end;
+var moduleResult: String;
+  i: Integer;
+begin
+  result := '';
+  if searched.IndexOf(self) >= 0 then exit;
+  searched.Add(self);
+  moduleResult := '';
+  for  i := 0 to basicFunctions.Count - 1 do
+    if strSimilar(localname, basicFunctions[i]) then begin
+      moduleResult += '    ' + functionName(basicFunctions[i], TXQBasicFunctionInfo(basicFunctions.Objects[i]));
+    end;
+  for i := 0 to complexFunctions.Count - 1 do
+    if strSimilar(localname, complexFunctions[i]) then
+      moduleResult += '    ' + functionName(complexFunctions[i], TXQComplexFunctionInfo(complexFunctions.Objects[i]));
+  if moduleResult <> '' then begin
+    result += '  In module ' + namespaceGetURL(namespace);
+    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
+      result += acceptedModels.requiredModelToString;
+    result += ':'+LineEnding+moduleResult+LineEnding;
+  end;
+  for i := 0 to high(parents) do
+    result += parents[i].findSimilarFunctionsDebug(searched, localname);
 end;
 
 var globalTypeParsingContext: TXQAbstractParsingContext;

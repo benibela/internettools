@@ -185,9 +185,7 @@
         <RangeChecks Value="True"/>
         <OverflowChecks Value="True"/>
       </Checks>
-      <Optimizations>
-        <OptimizationLevel Value="4"/>
-      </Optimizations>
+      <VerifyObjMethodCallValidity Value="True"/>
     </CodeGeneration>
     <Linking>
       <Debugging>

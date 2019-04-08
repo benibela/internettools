@@ -198,8 +198,9 @@ end;
   class procedure detectCycle(start: TXQTerm; sc: TXQStaticContext); static;
 end;
 
- TXQueryBreaker = class(TXQuery) end;
- TXQueryEngineBreaker = class(TXQueryEngine) end;
+ TXQueryEngineBreaker = class(TXQueryEngine)
+   class function forceCast(p: TXQueryEngine): TXQueryEngineBreaker; inline; static;
+ end;
 
  TXQAnnotationsInClass = class
    annotations: TXQAnnotations;
@@ -227,16 +228,14 @@ begin
   end;
 end;
 
-function acceptedModelsToStr(models: TXQParsingModels): string;
-begin
-  if not (xqpmXPath3_0 in models) then result := ' requires XPath/XQuery 3.1'
-  else if not (xqpmXPath2 in models) then result := ' requires XPath/XQuery 3.0'
-  else result := 'Invalid parsing model';
-end;
-
 function createXQParsingContext: TObject;
 begin
   result := TXQParsingContext.create();
+end;
+
+class function TXQueryEngineBreaker.forceCast(p: TXQueryEngine): TXQueryEngineBreaker;
+begin
+  result := TXQueryEngineBreaker(pointer(p));
 end;
 
 function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
@@ -260,12 +259,12 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
     q := staticContext.findModule(v.namespace);
     if q <> nil then begin
-      declaration := TXQueryBreaker(q).staticContext.findVariableDeclaration(v);
+      declaration := q.getStaticContext.findVariableDeclaration(v);
       if declaration <> nil then begin
-        if (TXQueryBreaker(q).staticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
+        if (q.getStaticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
           raise EXQParsingException.create('XPST0008', 'Private variable '+v.ToString);
         replacement := TXQTermVariableGlobalImported.Create;
-        TXQTermVariableGlobalImported(replacement).staticContext := TXQueryBreaker(q).staticContext;
+        TXQTermVariableGlobalImported(replacement).staticContext := q.getStaticContext;
       end;
     end else if staticContext.isLibraryModule then begin raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString); exit; end
     else begin
@@ -279,7 +278,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       exit;
     end;
 
-    if TXQueryEngineBreaker(staticContext.sender).isAWeirdGlobalVariable(v.namespace, v.value) then begin
+    if TXQueryEngineBreaker.forceCast(staticContext.sender).isAWeirdGlobalVariable(v.namespace, v.value) then begin
       v.index := -2;
       exit;
     end;
@@ -431,8 +430,8 @@ begin
 
     q := curcontext.findModule(v.namespace);
     if q <> nil then begin
-      modu := TXQueryBreaker(q).getTerm as TXQTermModule;
-      goToNewContext(TXQueryBreaker(q).staticContext);
+      modu := q.Term as TXQTermModule;
+      goToNewContext(q.getStaticContext);
     end else begin
       modu := mainmodule;
       oldLastVarIndex := lastVariableIndex;
@@ -1130,8 +1129,8 @@ begin
         'function', '%': begin
           require3('function test');
           if word = '%' then begin
-            result.atomicTypeInfo := TXSType(TObject(TXQAnnotationsInClass.Create)); //we do not need them, only check if they are valid. but for that we need to know the namespaces
-            TXQAnnotationsInClass(TObject(result.atomicTypeInfo)).annotations := parseAnnotations;
+            result.atomicTypeInfo := TXSType(pointer(TXQAnnotationsInClass.Create)); //we do not need them, only check if they are valid. but for that we need to know the namespaces
+            TXQAnnotationsInClass(pointer(result.atomicTypeInfo)).annotations := parseAnnotations;
             expect('function');
           end;
           result.kind:=tikFunctionTest;
@@ -1239,7 +1238,7 @@ function TXQParsingContext.parseFlower(akind: string): TXQTermFlower;
 
   function parseFlowerVariable: TXQTermVariable;
   begin
-    result := TXQTermVariable(txqterm(parseVariable));
+    result := TXQTermVariable(pointer(parseVariable));
   end;
 
 var token: String;
@@ -1392,7 +1391,7 @@ var token: String;
       skipWhitespaceAndComment();
       if pos^ in ['a', ':'] then begin
         let := TXQTermFlowerLet.Create;
-        let.loopvar := TXQTermVariable(txqterm(group.vars[high(group.vars)]).clone);
+        let.loopvar := TXQTermVariable(pointer(txqterm(group.vars[high(group.vars)]).clone));
         if pos^ = 'a' then begin
           expect('as');
           //let.sequenceTyp := parseSequenceType([]);
@@ -1564,7 +1563,7 @@ begin
       if pos^ = '<' then begin
         clause.pattern := parsePatternMatcher();
       end else begin
-        if pos^ = '$' then begin clause.variable := {%H-}TXQTermVariable(parseVariable); expect('as'); end;
+        if pos^ = '$' then begin clause.variable := TXQTermVariable(pointer(parseVariable)); expect('as'); end;
         clause.typ := parseSequenceTypeUnion([]);
       end;
       expect('return');
@@ -1576,7 +1575,7 @@ begin
     skipWhitespaceAndComment();
     clause := TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
     result.push(clause);
-    if pos^ = '$' then clause.variable := {%H-}TXQTermVariable(parseVariable);
+    if pos^ = '$' then clause.variable := TXQTermVariable(pointer(parseVariable));
     expect('return');
     clause.expr := parse();
   except
@@ -2891,7 +2890,7 @@ var astroot: TXQTerm;
       raiseSyntaxError('Need whitespace after operator');
 
     if ([parsingModel]*opinfo.acceptedModels) = [] then
-      raiseSyntaxError(acceptedModelsToStr(opinfo.acceptedModels));
+      raiseSyntaxError(opinfo.acceptedModels.requiredModelToString);
 
     replace := ripBinOpApart(@astroot, opinfo.priority);
 
@@ -3130,7 +3129,7 @@ var
     if (visited.IndexOf(sc) >= 0) or (sc.importedModules = nil) then exit;
     visited.Add(sc);
    for i := 0 to sc.importedModules.Count - 1 do begin
-     sc2 := TXQueryBreaker(sc.importedModules.Objects[i]).staticContext;
+     sc2 := TXQuery(sc.importedModules.Objects[i]).getStaticContext;
      if length(sc2.moduleContextItemDeclarations) > 0 then begin
        oldlen := length(outsc.moduleContextItemDeclarations);
        SetLength(outsc.moduleContextItemDeclarations, oldlen + length(sc2.moduleContextItemDeclarations));
@@ -3156,7 +3155,7 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
     v := TXQTermVariable(d.variable);
     if sc.importedModules <> nil then begin
       for i := 0 to sc.importedModules.Count - 1 do begin
-        modu := TXQueryBreaker(sc.importedModules.Objects[i]).getTerm as TXQTermModule;
+        modu := TXQuery(sc.importedModules.Objects[i]).Term as TXQTermModule;
         if modu = module then continue;
         for j :=  0 to high( modu.children ) do
           if objInheritsFrom(modu.children[j], TXQTermDefineVariable)
@@ -3212,7 +3211,7 @@ begin
       raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and '+sc.functions[overriden].toXQuery());
     if sc.importedModules <> nil then
       for j := 0 to sc.importedModules.Count - 1 do begin
-        otherModule := TXQueryBreaker(sc.importedModules.Objects[j]).getTerm as TXQTermModule;
+        otherModule := TXQuery(sc.importedModules.Objects[j]).Term as TXQTermModule;
         if otherModule = module then continue;
         for k := 0 to high(otherModule.children)  do
           if objInheritsFrom(otherModule.children[k], TXQTermDefineFunction) then begin
@@ -3238,15 +3237,24 @@ begin
   finalizeContextItemTypes(sc);
 end;
 
+type TXQueryBreakerHelper = class(TXQuery)
+  class function PTerm(query: TXQuery): PXQTerm; static;
+end;
+
+class function TXQueryBreakerHelper.PTerm(query: TXQuery): PXQTerm;
+var broken: TXQueryBreakerHelper absolute query;
+begin
+  result := @broken.FTerm;
+end;
+
 function TXQParsingContext.parseModule(): TXQTerm;
 var
   pendings: TInterfaceList;
-  otherQuery: TXQueryBreaker;
+  otherQuery: TXQuery;
   i: Integer;
   hadPending: Boolean;
-  tempTerm: TXQTerm;
 begin
-  pendings := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
+  pendings := TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules;
   hadPending := pendings.Count > 0;
   result := parseModuleInternal();
   if result = nil then begin
@@ -3261,25 +3269,24 @@ begin
     if staticContext.isLibraryModule then TXQTermModule(result).push(TXQTermSequence.Create);
     initializeFunctions(TXQTermModule(result), tempContext);
   end;
-  TXQueryBreaker(thequery).setTerm(result); //after this point, the caller is responsible to free result on exceptions
+  thequery.Term := result; //after this point, the caller is responsible to free result on exceptions
 
   if hadPending then exit; //we cannot do anything, until the pending modules have been parsed
 
   for i := pendings.Count - 1 downto 0 do begin
-    otherQuery := TXQueryBreaker( IXQuery(pendings[i]) as txquery);
-    if otherQuery.getTerm = result then continue;
-    tempTerm := TXQueryBreaker(otherQuery).getterm;
-    finalResolving(tempTerm, otherQuery.staticContext, options);
-    finalizeFunctionsEvenMore(otherQuery.getTerm as TXQTermModule, otherQuery.staticContext, otherQuery.staticContextShared);
+    otherQuery := IXQuery(pointer(pendings[i])) as txquery;
+    if otherQuery.Term = result then continue;
+    finalResolving(TXQueryBreakerHelper.PTerm(otherQuery)^, otherQuery.getStaticContext, options);
+    finalizeFunctionsEvenMore(otherQuery.Term as TXQTermModule, otherQuery.getStaticContext, otherQuery.staticContextShared);
   end;
-  finalResolving(TXQueryBreaker(thequery).fterm, staticContext, options);
-  result := TXQueryBreaker(thequery).fterm;
+  finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options);
+  result := thequery.term;
   if objInheritsFrom(result, TXQTermModule) then
-    finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, TXQueryBreaker(thequery).staticContextShared);
+    finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, thequery.staticContextShared);
 
 
   for i := 0 to pendings.Count - 1 do
-    TXQueryEngineBreaker(staticContext.sender).fmodules.Add(pendings[i]);
+    TXQueryEngineBreaker.forceCast(staticContext.sender).fmodules.Add(pendings[i]);
   pendings.Clear;
 end;
 
@@ -3325,7 +3332,7 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
     varcount := ownvarcount;
     if staticContext.importedModules <> nil then
       for i := 0 to staticContext.importedModules.Count - 1 do begin
-        imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
+        imp := TXQuery(staticContext.importedModules.Objects[i]).Term as TXQTermModule;
         if (imp = nil) or (imp = m) then continue; //seems to happen with cycles. let's hope the main module still gets all the variables. todo? perhaps this helps to prevent duplicated variables? but we get duplicates anyways from different import paths to the same module. damnit
         varcount += length(imp.allVariables);
       end;
@@ -3334,7 +3341,7 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
     SetLength(m.allVariables, varcount);
     if staticContext.importedModules <> nil then
       for i := 0 to staticContext.importedModules.Count - 1 do begin
-        imp := (TXQueryBreaker(staticContext.importedModules.Objects[i]).fTerm as TXQTermModule);
+        imp := TXQuery(staticContext.importedModules.Objects[i]).Term as TXQTermModule;
         if (imp = nil) or (imp = m) then continue;
         for j := 0 to high(imp.allVariables) do begin
           m.allVariables[p] := imp.allVariables[j];
@@ -3353,18 +3360,18 @@ var
   pendingModules: TInterfaceList;
 begin
   thequery := aquery;
-  pendingModules := TXQueryEngineBreaker(staticContext.sender).FPendingModules;
+  pendingModules := TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules;
   oldPendingCount := pendingModules.Count;
   oldFunctionCount := length(staticContext.functions);
   tempContext := staticContext.sender.getEvaluationContext(staticContext);
   try
     if not onlySpecialString then begin
-      TXQueryBreaker(thequery).fterm := parseModule;
-      if objInheritsFrom(TXQueryBreaker(thequery).fterm, TXQTermModule) then
-        collectVariables(TXQTermModule(TXQueryBreaker(thequery).fterm));
+      thequery.term := parseModule;
+      if objInheritsFrom(thequery.term, TXQTermModule) then
+        collectVariables(TXQTermModule(thequery.term));
     end else begin
-      TXQueryBreaker(thequery).fterm := parseXString(true);
-      finalResolving(TXQueryBreaker(thequery).fterm, staticContext, options);
+      thequery.term := parseXString(true);
+      finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options);
     end;
   except
     //not sure if this is needed, but it seems reasonable
@@ -3375,11 +3382,12 @@ begin
       staticContext.associatedModules.Remove(thequery);
 
     //free query
-    TXQueryBreaker(thequery)._AddRef;
+    //thequeryinterface := thequery;  //this will automatically free the query later
+    IXQuery(thequery)._AddRef;
     if staticContext.sender.AutomaticallyRegisterParsedModules then
       pendingModules.Remove(IXQuery(thequery));
     while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
-    TXQueryBreaker(thequery)._Release; //use addref/release to free it, so it is freed regardless if it is used as class or interface reference
+    IXQuery(thequery)._Release;
 
     raise;
   end;
@@ -3423,9 +3431,9 @@ begin
       visitor.simpleTermVisit(@result, nil);
 
       //keep the known variables in the engine, so nested expression (patterns) can access each other variables
-      if TXQueryEngineBreaker(sc.sender).FParserVariableVisitor = nil then
-        TXQueryEngineBreaker(sc.sender).FParserVariableVisitor := TFinalVariableResolving.create;
-      varvisitor := TXQueryEngineBreaker(sc.sender).FParserVariableVisitor as TFinalVariableResolving;
+      if TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor = nil then
+        TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor := TFinalVariableResolving.create;
+      varvisitor := TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor as TFinalVariableResolving;
       varvisitor.staticContext := visitor.staticContext;
       varvisitor.resolveVariables(@result);
     except
@@ -3553,9 +3561,9 @@ var declarationDuplicateChecker: TStringList;
     if staticContext.importedModules = nil then
       staticContext.importedModules := TXQMapStringObject.Create;
     for i := 0 to staticContext.importedModules.Count -  1 do begin
-      if namespaceGetURL(TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace) = moduleURL then begin
+      if namespaceGetURL(TXQuery(staticContext.importedModules.Objects[i]).getStaticContext.moduleNamespace) = moduleURL then begin
         if i < oldImportedModulesCount then begin
-          if moduleName = '' then moduleName := TXQueryBreaker(staticContext.importedModules.Objects[i]).staticContext.moduleNamespace.getPrefix;
+          if moduleName = '' then moduleName := TXQuery(staticContext.importedModules.Objects[i]).getStaticContext.moduleNamespace.getPrefix;
           if moduleName <> staticContext.importedModules[i] then declareNamespace(moduleName, moduleURL);
           exit; //allow external imports in shared contexts
         end;
@@ -3577,7 +3585,7 @@ var declarationDuplicateChecker: TStringList;
         exit;
       end;
     end;
-    if moduleName = '' then moduleName := TXQueryBreaker(module).staticContext.moduleNamespace.getPrefix;
+    if moduleName = '' then moduleName := module.getStaticContext.moduleNamespace.getPrefix;
     staticContext.importedModules.AddObject(moduleName, module);
   end;
 
@@ -3797,7 +3805,7 @@ begin
           Assert(thequery <> nil);
           staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
           if staticContext.sender.AutomaticallyRegisterParsedModules then
-            TXQueryEngineBreaker(staticContext.sender).FPendingModules.Add(IXQuery(thequery));
+            TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules.Add(IXQuery(thequery));
         end;
         else expect('namespace');
       end;
@@ -4246,67 +4254,17 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   procedure lookupNamedFunction(var f: TXQTermNamedFunction);
     function suggestions(localname: string): string;
-    function strSimilar(const s, ref: string): boolean;
-    begin
-      result := strContains(s, ref) or strContains(ref, s)
-                or (strSimilarity(s, ref) <= min(5, min(length(s) div 2, length(ref) div 2)));
-    end;
-    function functionName(const name: string; const f: TXQAbstractFunctionInfo): string;
-    var
-      i, j: Integer;
-    begin
-      result := name + ' ' + '#' + IntToStr(f.minArgCount);
-      if f.minArgCount <> f.maxArgCount then result += '-' + IntToStr(f.maxArgCount);;
-      if length(f.versions) > 0 then begin
-        result += ':';
-        for i := 0 to high(f.versions) do begin
-          if i <> 0 then result += ';'#9;
-          result += '  (';
-          for j := 0 to high(f.versions[i].types) do begin
-            if j <> 0 then result += ', ';
-            if f.versions[i].types[j] <> nil then result += f.versions[i].types[j].serialize;
-          end;
-          result += ')';
-          if f.versions[i].returnType <> nil then result += ' as ' + f.versions[i].returnType.serialize;
-        end;
-      end;
-      result += LineEnding;
-    end;
-
-    var searched: TList;
-    procedure searchModule(module: TXQNativeModuleBreaker );
-    var moduleResult: String;
-      i: Integer;
-    begin
-      if searched.IndexOf(module) >= 0 then exit;
-      searched.Add(module);
-      moduleResult := '';
-      for  i := 0 to module.basicFunctions.Count - 1 do
-        if strSimilar(localname, module.basicFunctions[i]) then begin
-          moduleResult += '    ' + functionName(module.basicFunctions[i], TXQBasicFunctionInfo(module.basicFunctions.Objects[i]));
-        end;
-      for i := 0 to module.complexFunctions.Count - 1 do
-        if strSimilar(localname, module.complexFunctions[i]) then
-          moduleResult += '    ' + functionName(module.complexFunctions[i], TXQComplexFunctionInfo(module.complexFunctions.Objects[i]));
-      if moduleResult <> '' then begin
-        result += '  In module ' + namespaceGetURL(module.namespace);
-        if equalNamespaces(module.namespace, XMLNamespace_XPathFunctions) then
-          result += acceptedModelsToStr(module.acceptedModels);
-        result += ':'+LineEnding+moduleResult+LineEnding;
-      end;
-      for i := 0 to high(module.parents) do
-        searchModule(TXQNativeModuleBreaker(module.parents[i]));
-    end;
 
     var
       modules: TStringList;
       m: Integer;
+      searched: TList;
     begin
       result := '';
-      modules := TXQueryEngineBreaker(staticContext.sender).GetNativeModules;
+      modules := TXQueryEngineBreaker.forceCast(staticContext.sender).GetNativeModules;
       searched := TList.Create;
       for m := 0 to modules.count - 1 do
-        searchModule(TXQNativeModuleBreaker(modules.Objects[m]));
+        result += TXQNativeModule(modules.Objects[m]).findSimilarFunctionsDebug(searched, localname);
       searched.free;
       if result <> '' then result := LineEnding + LineEnding + 'Did you mean: '+LineEnding+ result;
     end;
@@ -4382,7 +4340,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         if schema <> nil then begin
           t := schema.findType(alocalname);
           if (t <> nil) and not (baseSchema.isAbstractType(t)) and not (baseSchema.isValidationOnlyType(t)) then begin
-            f.func :=  TXQAbstractFunctionInfo(TObject(t));
+            f.func :=  TXQAbstractFunctionInfo(pointer(t));
             f := f.convertToTypeConstructor;
             exit(true)
           end;
@@ -4425,9 +4383,9 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     lookupNamedFunction(f);
     result := f;
-    if (f.ClassType = TXQTermNamedFunction) and (f.func <> nil) then begin
+    if (result.ClassType = TXQTermNamedFunction) and (f.func <> nil) then begin
       if staticContext.strictTypeChecking then f.version := f.func.getVersion(length(f.children));
-    end else if (f.ClassType = TXQTermNamedFunctionTypeConstructor) and (length(f.children) = 1) then
+    end else if (result.ClassType = TXQTermNamedFunctionTypeConstructor) and (length(f.children) = 1) then
      result := staticallyCastQNameAndNotation(TXQTermNamedFunctionTypeConstructor(result), TXSType(TObject(f.func)), staticContext);
   end;
 
@@ -4619,7 +4577,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
       end;
     end;
     if c.implicitNamespaces <> nil then begin
-      staticContext.defaultElementTypeNamespace := INamespace(changedDefaultsTypeNamespaces.Last);
+      staticContext.defaultElementTypeNamespace := INamespace(pointer(changedDefaultsTypeNamespaces.Last));
       changedDefaultsTypeNamespaces.Delete(changedDefaultsTypeNamespaces.Count - 1);
 
       implicitNamespaceCountsLength -= 1;
@@ -4660,7 +4618,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
     if ((parent <> mainModule) or (mainModule = nil) or (mainModule.children[high(mainModule.children)] = f))
        and not objInheritsFrom(parent, TXQTermDefineFunction) and (staticContext.sender <> nil) then begin
       v := f.getVariable;
-      TXQueryEngineBreaker(staticContext.sender).addAWeirdGlobalVariable(v.namespace, v.value);
+      TXQueryEngineBreaker.forceCast(staticContext.sender).addAWeirdGlobalVariable(v.namespace, v.value);
     end;
   end;
 

@@ -1334,51 +1334,6 @@ begin
 end;
 
 
-procedure TXQValueDateTime.multiplyComponents(fac: xqfloat);
-begin
-  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + toXQuery())
-  else if IsInfinite(fac) then raise EXQEvaluationException.create('FODT0002', 'Cannot multiply INF * ' + toXQuery());
-       setMonths(value, integer(xqround(value.toMonths * fac)), true);
-  setDayTime(value, xqround(value.toDayTime * fac));
-  truncateRange();
-end;
-
-procedure TXQValueDateTime.divideComponents(fac: xqfloat);
-begin
-  if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + toXQuery())
-  else if fac = 0 then raise EXQEvaluationException.create('FODT0002', 'Cannot divide duration by zero: ' + toXQuery());
-  setMonths(value, integer(xqround(value.toMonths / fac)), true);
-  setDayTime(value, xqround(value.toDayTime / fac));
-  truncateRange();
-end;
-
-procedure TXQValueDateTime.addDuration(const D: TXQValueDateTimeData);
-var temp: TXQValueDateTimeData;
-begin
-  if (typeAnnotation as TXSDateTimeType).isDuration then begin
-    setMonths(value, value.toMonths + D.toMonths, true);
-    setDayTime(value, value.toDayTime + d.toDayTime);
-  end else begin
-    addDurationDToDateS(value, D, temp);
-    value := temp;
-  end;
-  truncateRange;
-end;
-
-procedure TXQValueDateTime.subtractDuration(D: TXQValueDateTimeData);
-var temp: TXQValueDateTimeData;
-  i: Integer;
-begin
-  if (typeAnnotation as TXSDateTimeType).isDuration then begin
-    setMonths(value, value.toMonths - D.toMonths, true);
-    setDayTime(value, value.toDayTime - d.toDayTime);
-  end else begin
-    for i := 1 to 7 do D.values[i] := -D.values[i];
-    addDurationDToDateS(value, D, temp);
-    value := temp;
-  end;
-  truncateRange;
-end;
 
 class procedure TXQValueDateTime.addDurationDToDateS(const S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
 begin

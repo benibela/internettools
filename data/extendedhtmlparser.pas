@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-{$mode objfpc}{$H+}
+{$mode objfpc}{$H+}{$ModeSwitch typehelpers}
 
 interface
 uses
@@ -764,7 +764,7 @@ const
 
 implementation
 
-uses math,strutils,bbutilsbeta, xquery.internals.common;
+uses math,strutils,bbutilsbeta, xquery.internals.common, xquery.internals.protectionbreakers;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchElementOpen;
@@ -977,16 +977,7 @@ begin
   end;
 end;
 
-type
 
-TXQueryEngineBreaker = class(TXQueryEngine)
-  function parserEnclosedExpressionsString(s: string): IXQuery;
-end;
-
-function TXQueryEngineBreaker.parserEnclosedExpressionsString(s: string): IXQuery;
-begin
-  result := parseXStringNullTerminated(s);
-end;
 
 procedure TTemplateElement.initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   function cachePXP(name: string): IXQuery;
@@ -1121,7 +1112,7 @@ begin
       if assigned(varname.Term) and varname.Term.InheritsFrom(TXQTermConstant) then begin
         temp := varname.evaluate(xqvalue('')).toString;
         if strContains(temp, '.') then temp := strBefore(temp, '.');
-        TXQueryEngineBreaker(parser.QueryEngine).addAWeirdGlobalVariable('', temp);
+        parser.QueryEngine.addAWeirdGlobalVariableH('', temp);
       end;
     end;
   end;
@@ -1175,7 +1166,7 @@ begin
   //        and if xquery is included in a pattern, the xquery shares the context of the pattern
   // but if we mix it, lastquery will still contain a reference to a static context that has expired. Which will crash when the query is freed (i.e. a new query is read)
   //using parseTerm avoids all that, since it does not keep a lastquery
-  result := TXQueryEngineBreaker(FQueryEngine).parseTerm(expression, xqpmXQuery3_1, context);
+  result := QueryEngine.parseTermH(expression, xqpmXQuery3_1, context);
 end;
 
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;
@@ -1540,18 +1531,18 @@ var xpathText: TTreeNode;
           FVariableLog.add(FUnnamedVariableName, read);
       end;
     var next: TTemplateElement;
+      textEnd: TTreeNode;
   begin
     if usePending then begin
       xpathText := pendingShortRead.xpathText;
-      TXQueryEngineBreaker(QueryEngine).PatternMatcherTextStart := pendingShortRead.xpathText;
-      if htmlStart = pendingShortRead.xpathText then TXQueryEngineBreaker(QueryEngine).PatternMatcherTextEnd := pendingShortRead.xpathText
-      else TXQueryEngineBreaker(QueryEngine).PatternMatcherTextEnd := htmlStart;
+      if htmlStart = pendingShortRead.xpathText then textEnd := pendingShortRead.xpathText
+      else textEnd := htmlStart;
+      QueryEngine.setPatternMatcherTextRange(pendingShortRead.xpathText, textEnd);
 
       doActualRead(pendingShortRead.read);
-      pendingShortRead.read := nil;
 
-      TXQueryEngineBreaker(QueryEngine).PatternMatcherTextStart := nil;
-      TXQueryEngineBreaker(QueryEngine).PatternMatcherTextEnd := nil;
+      pendingShortRead.read := nil;
+      QueryEngine.setPatternMatcherTextRange(nil, nil);
     end else begin
       if pendingShortRead.read <> nil then HandleCommandShortRead(true);
       next := templateStart.templateReverse.templateNext;
@@ -2355,7 +2346,7 @@ begin
       break;
     end;
   if standard then exit(str);
-  result := TXQueryEngineBreaker(fQueryEngine).parserEnclosedExpressionsString(str).evaluate().toString; //todo: somehow cache the parsed xquery
+  result := fQueryEngine.parserEnclosedExpressionsString(str).evaluate().toString; //todo: somehow cache the parsed xquery
 end;
 
 function THtmlTemplateParser.debugMatchings(const width: integer): string;
