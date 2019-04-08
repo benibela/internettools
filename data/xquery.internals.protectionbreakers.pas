@@ -27,7 +27,7 @@ interface
 
 uses xquery, simplehtmltreeparser, classes;
 
-type TXQValueDateTimeHelper = type helper for TXQValueDateTime
+type TXQValueDateTimeHelper = class helper for TXQValueDateTime
     procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure divideComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
@@ -35,12 +35,12 @@ type TXQValueDateTimeHelper = type helper for TXQValueDateTime
     procedure truncateRangeH();
   end;
 
-  TXQVListHelper = type helper for TXQVList
+  TXQVListHelper = class helper for TXQVList
     function Buffer: PIXQValue; inline;
     procedure sortInDocumentOrderUncheckedH; inline;
   end;
 
-  TXQueryEngineHelper = type helper for TXQueryEngine
+  TXQueryEngineHelper = class helper for TXQueryEngine
   private
     function GetExternalDocuments: TStringList;
     procedure SetExternalDocuments(AValue: TStringList);
