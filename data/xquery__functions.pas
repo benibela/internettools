@@ -1593,8 +1593,6 @@ function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeI
   function combineHttpEncoded(obj: TXQValueObject): IXQValue;
   var temp: TXQVArray;
       propName, oldUrl, prefix: String;
-      decoded: TDecodedUrl;
-      excludedParts: TDecodedUrlParts;
       newEncoded: IXQValue;
       oldUrlView: TStringView;
       queryStart: PChar;

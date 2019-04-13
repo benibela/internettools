@@ -63,14 +63,14 @@ generic TFastInterfaceList<IT> = class
 protected
   fcount, fcapacity: integer; // count
   fbuffer: PIT; // Backend storage
-  procedure raiseInvalidIndexError(i: integer); inline; //**< Range check
+  procedure raiseInvalidIndexError(i: integer);  //**< Raise an exception
   procedure checkIndex(i: integer); inline; //**< Range check
-  procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
-  procedure compress; //**< Deallocates memory by shorting list
-  procedure setCount(c: integer); //**< Forces a count
+  procedure reserve(cap: integer); //**< Allocates new memory if necessary
+  procedure compress; //**< Deallocates memory by shorting list if necessary
+  procedure setCount(c: integer); //**< Forces a count (elements are initialized with )
   procedure setBufferSize(c: integer);
   procedure insert(i: integer; child: IT);
-  procedure put(i: integer; const AValue: IT); inline; //**< Puts a IT to a node sequence
+  procedure put(i: integer; const AValue: IT); inline; //**< Replace the IT at position i
 public
   constructor create(capacity: integer = 0);
   destructor Destroy; override;
@@ -390,7 +390,7 @@ var
 begin
   reserve(fcount + other.Count);
   for i := 0 to other.Count - 1 do
-    add(other[i]);
+    add(other.fbuffer[i]);
 end;
 
 function TFastInterfaceList.get(i: integer): IT;

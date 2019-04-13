@@ -35,7 +35,7 @@ INamespace = interface
 ['{5F6DF5F2-548C-4F13-9BEA-CE59EBAE4CAB}']
   function getPrefix: string; //**< Returns the prefix
   function getURL: string; //**< Returns the url
-  function serialize: string; //**< Returns a xmlns attribute declaring this namespace with url and prefix
+  function serialize: string; //**< Returns an xmlns attribute declaring this namespace with url and prefix
   function getSelf: TNamespace;
   function equal(const ns: string): boolean;
 end;
