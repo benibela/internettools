@@ -58,7 +58,7 @@ uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
-   xquery.namespaces,
+   xquery.internals.common, xquery.namespaces,
    xquery__functions, xquery__parse //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
    ;
 
@@ -1326,41 +1326,23 @@ type
   { TXQVList }
 
   (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences *)
-  TXQVCustomList = class
+  TXQVCustomList = class(specialize TFastInterfaceList<IXQValue>)
   protected
-    fcount, fcapacity: integer; // count
-    fbuffer: PIXQValue; // Backend storage. Cannot use TFP/List because it stores interfaces, cannot use TInterfaceList because we need direct access to sort the interfaces
-                        // Can have higher capaacity than count.
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
-    procedure checkIndex(i: integer); inline; //**< Range check
-    procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
-    procedure compress; //**< Deallocates memory by shorting list
-    procedure setCount(c: integer); //**< Forces a count
-    procedure setBufferSize(c: integer); inline;
-    procedure insertSingle(i: integer; child: IXQValue); //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
-    procedure put(i: integer; const AValue: IXQValue); inline; //**< Puts a IXQValue to a node sequence
+    procedure insertSingle(i: integer; const child: IXQValue); inline; //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
   public
-    destructor Destroy; override;
-    procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
-    procedure addInArray(const value: IXQValue);
-    function get(i: integer): IXQValue; inline; //**< Gets a PXQValue from the list.
-    function last: IXQValue; //**< Last PXQValue from the list.
-    function first: IXQValue; //**< First PXQValue from the list.
-    procedure clear;
-    property items[i: integer]: IXQValue read get write put; default;
+    procedure addInArray(const value: IXQValue); inline;
 
     procedure revert; //**< Reverts the list
     procedure sort(cmp: TPointerCompareFunction; data: TObject = nil); //**< Sorts the list
-
-    property Count: integer read fcount write setCount;
   end;
 
   (*** @abstract(List of TXQValue-s). If a sequence is inserted/added, it is flattened, so only the contained items are added  *)
   TXQVList = class(TXQVCustomList)
     constructor create(capacity: integer = 0);
     constructor create(other: TXQVCustomList);
-    procedure insert(i: integer; value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure add(const value: IXQValue); //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure insert(i: integer; value: IXQValue); reintroduce; //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure add(const value: IXQValue); reintroduce; //**< Adds a IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addOrdered(const node: IXQValue); //**< Adds a IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(node: TTreeNode);
     procedure add(list: TXQVCustomList);
@@ -2215,6 +2197,8 @@ type
     property Term: TXQTerm read getTerm write setTerm;
   end;
 
+  TXQueryModuleList = specialize TFastInterfaceList<IXQuery>;
+
   //============================EXCEPTIONS/EVENTS==========================
 
   { EXQException }
@@ -2554,7 +2538,7 @@ public
   protected
     FExternalDocuments: TStringList;
     FInternalDocuments: TFPList;
-    FModules, FPendingModules: TInterfaceList; //internal used
+    FModules, FPendingModules: TXQueryModuleList; //internal used
     FParserVariableVisitor: TObject;
     VariableChangelogUndefined, FDefaultVariableHeap: TXQVariableChangeLog;
     FDefaultVariableStack: TXQEvaluationStack;
@@ -3087,7 +3071,7 @@ type TXQueryInternals = object
 end;
 
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta, xquery.internals.common;
+uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta;
 
 var
   XQFormats : TFormatSettings = (
@@ -3294,61 +3278,6 @@ end;
 
 
 
-procedure TXQVCustomList.checkIndex(i: integer);
-  procedure error;
-  begin
-    raise EXQEvaluationException.Create('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
-  end;
-
-begin
-  if (i < 0) or (i >= fcount) then error;
-end;
-
-
-procedure TXQVCustomList.put(i: integer; const AValue: IXQValue); inline;
-begin
-  checkIndex(i);
-  fbuffer[i] := AValue;
-end;
-
-procedure TXQVCustomList.delete(i: integer);
-begin
-  checkIndex(i);
-  fbuffer[i] := nil;
-  if i <> fcount - 1 then begin
-    move(fbuffer[i+1], fbuffer[i], (fcount - i - 1) * sizeof(IXQValue));
-    FillChar(fbuffer[fcount-1], sizeof(fbuffer[fcount-1]), 0);
-  end;
-  fcount -= 1;
-  compress;
-end;
-
-procedure TXQVCustomList.addInArray(const value: IXQValue);
-begin
-  if fcount = fcapacity then
-    reserve(fcount + 1);
-  PPointer(fbuffer)[fcount] := value;
-  value._AddRef;
-  fcount += 1;
-end;
-
-function TXQVCustomList.get(i: integer): IXQValue;
-begin
-  checkIndex(i);
-  result := fbuffer[i];
-end;
-
-function TXQVCustomList.last: IXQValue;
-begin
-  checkIndex(0);
-  result := fbuffer[fcount-1];
-end;
-
-function TXQVCustomList.first: IXQValue;
-begin
-  checkIndex(0);
-  result := fbuffer[0];
-end;
 
 
 
@@ -3366,82 +3295,16 @@ begin
   stableSort(@fbuffer[0], @fbuffer[fcount-1], sizeof(IXQValue), @compareXQInDocumentOrder);
 end;
 
-
-{$ImplicitExceptions off}
-
-procedure TXQVCustomList.setBufferSize(c: integer);
+procedure TXQVCustomList.insertSingle(i: integer; const child: IXQValue);
 begin
-  ReAllocMem(fbuffer, c * sizeof(IXQValue));
-  fcapacity := c;
+  insert(i, child);
 end;
 
-procedure TXQVCustomList.reserve(cap: integer);
-var
-  oldcap: Integer;
+procedure TXQVCustomList.addInArray(const value: IXQValue);
 begin
-  if cap <= fcapacity then exit;
-
-  oldcap := fcapacity;
-  if cap < 4 then setBufferSize(4)
-  else if (cap < 1024) and (cap <= fcapacity * 2) then setBufferSize(fcapacity * 2)
-  else if (cap < 1024) then setBufferSize(cap)
-  else if cap <= fcapacity + 1024 then setBufferSize(fcapacity + 1024)
-  else setBufferSize(cap);
-
-  FillChar(fbuffer[oldcap], sizeof(IXQValue) * (fcapacity - oldcap), 0);
+  add(value);
 end;
 
-procedure TXQVCustomList.compress;
-begin
-  if fcount <= fcapacity div 2 then setBufferSize(fcapacity div 2)
-  else if fcount <= fcapacity - 1024 then setBufferSize(fcapacity - 1024);
-end;
-
-procedure TXQVCustomList.setCount(c: integer);
-var
-  i: Integer;
-begin
-  reserve(c);
-  if c < fcount then begin
-    for i := c to fcount - 1 do
-      fbuffer[i]._Release;
-    FillChar(fbuffer[c], (fcount - c) * sizeof(IXQValue), 0);
-  end;
-  fcount:=c;
-end;
-
-
-
-
-{$ImplicitExceptions on}
-
-procedure TXQVCustomList.clear;
-var
-  i: Integer;
-begin
-  for i := 0 to fcount - 1 do
-    fbuffer[i]._Release;
-  fcount:=0;
-  setBufferSize(0);
-end;
-
-destructor TXQVCustomList.Destroy;
-begin
-  clear;
-  inherited Destroy;
-end;
-
-procedure TXQVCustomList.insertSingle(i: integer; child: IXQValue);
-begin
-  reserve(fcount + 1);
-  if i <> fcount then begin
-    checkIndex(i);
-    move(fbuffer[i], fbuffer[i+1], (fcount - i) * sizeof(fbuffer[i]));
-    fillchar(fbuffer[i],sizeof(fbuffer[i]),0);
-  end;
-  fbuffer[i] := child;
-  fcount+=1;
-end;
 
 
 procedure TXQVCustomList.revert;
@@ -7436,8 +7299,8 @@ begin
   StaticContext.jsonPXPExtensions:=true;
   FDefaultVariableStack := TXQEvaluationStack.create();
   FDefaultVariableHeap := TXQVariableChangeLog.create();
-  FModules := TInterfaceList.Create;
-  FPendingModules := TInterfaceList.Create;
+  FModules := TXQueryModuleList.Create;
+  FPendingModules := TXQueryModuleList.Create;
   inc(threadLocalCache.runningEngines);
   FCreationThread := GetThreadID;
 end;
@@ -7656,13 +7519,18 @@ end;
 function TXQueryEngine.findModule(const namespaceURL: string): TXQuery;
 var
   i: Integer;
+  tempModule: TXQuery;
 begin
-  for i := 0 to FModules.Count - 1 do
-    if (FModules.Items[i] as TXQuery).staticContext.moduleNamespace.getURL = namespaceURL then
-      exit((FModules.Items[i] as TXQuery));
-  for i := 0 to FPendingModules.Count - 1 do
-    if (FPendingModules.Items[i] as TXQuery).staticContext.moduleNamespace.getURL = namespaceURL then
-      exit((FPendingModules.Items[i] as TXQuery));
+  for i := 0 to FModules.Count - 1 do begin
+    tempModule := FModules.Items[i] as TXQuery;
+    if tempModule.staticContext.moduleNamespace.getURL = namespaceURL then
+      exit(tempModule);
+  end;
+  for i := 0 to FPendingModules.Count - 1 do begin
+    tempModule := FPendingModules.Items[i] as TXQuery;
+    if tempModule.staticContext.moduleNamespace.getURL = namespaceURL then
+      exit(tempModule);
+  end;
   exit(nil);
 end;
 

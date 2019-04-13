@@ -54,6 +54,37 @@ end;
 generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TObjectList>);
 TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
 
+//**a list to store interfaces, similar to TInterfaceList, but faster, because
+//**  (1) it assumes all added interfaces are non nil
+//**  (2) it is not thread safe
+//**  (3) it is generic, so you need no casting
+generic TFastInterfaceList<IT> = class
+  type PIT = ^IT;
+protected
+  fcount, fcapacity: integer; // count
+  fbuffer: PIT; // Backend storage
+  procedure raiseInvalidIndexError(i: integer); inline; //**< Range check
+  procedure checkIndex(i: integer); inline; //**< Range check
+  procedure reserve(cap: integer); //**< Allocates new memory with list if necessary
+  procedure compress; //**< Deallocates memory by shorting list
+  procedure setCount(c: integer); //**< Forces a count
+  procedure setBufferSize(c: integer);
+  procedure insert(i: integer; child: IT);
+  procedure put(i: integer; const AValue: IT); inline; //**< Puts a IT to a node sequence
+public
+  constructor create(capacity: integer = 0);
+  destructor Destroy; override;
+  procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
+  procedure remove(const value: IT);
+  procedure add(const value: IT);
+  procedure addAll(other: TFastInterfaceList);
+  function get(i: integer): IT; inline; //**< Gets an interface from the list.
+  function last: IT; //**< Last interface in the list.
+  function first: IT; //**< First interface in the list.
+  procedure clear;
+  property items[i: integer]: IT read get write put; default;
+  property Count: integer read fcount write setCount;
+end;
 
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
@@ -300,6 +331,172 @@ begin
   if Assigned(raiseXQEvaluationExceptionCallback) then raiseXQEvaluationExceptionCallback(code, message)
   else raise exception.Create(code + ': ' + message);
 end;
+
+
+
+
+
+
+procedure TFastInterfaceList.raiseInvalidIndexError(i: integer);
+begin
+  raiseXQEvaluationException('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
+end;
+
+procedure TFastInterfaceList.checkIndex(i: integer);
+begin
+  if (i < 0) or (i >= fcount) then raiseInvalidIndexError(i);
+end;
+
+
+procedure TFastInterfaceList.put(i: integer; const AValue: IT); inline;
+begin
+  checkIndex(i);
+  fbuffer[i] := AValue;
+end;
+
+procedure TFastInterfaceList.delete(i: integer);
+begin
+  checkIndex(i);
+  fbuffer[i] := nil;
+  if i <> fcount - 1 then begin
+    move(fbuffer[i+1], fbuffer[i], (fcount - i - 1) * sizeof(IT));
+    FillChar(fbuffer[fcount-1], sizeof(fbuffer[fcount-1]), 0);
+  end;
+  fcount -= 1;
+  compress;
+end;
+
+procedure TFastInterfaceList.remove(const value: IT);
+var
+  i: Integer;
+begin
+  for i := fcount - 1 downto 0 do
+    if fbuffer[i] = value then
+      delete(i);
+end;
+
+procedure TFastInterfaceList.add(const value: IT);
+begin
+  if fcount = fcapacity then
+    reserve(fcount + 1);
+  PPointer(fbuffer)[fcount] := value;
+  value._AddRef;
+  fcount += 1;
+end;
+
+procedure TFastInterfaceList.addAll(other: TFastInterfaceList);
+var
+  i: Integer;
+begin
+  reserve(fcount + other.Count);
+  for i := 0 to other.Count - 1 do
+    add(other[i]);
+end;
+
+function TFastInterfaceList.get(i: integer): IT;
+begin
+  checkIndex(i);
+  result := fbuffer[i];
+end;
+
+function TFastInterfaceList.last: IT;
+begin
+  checkIndex(0);
+  result := fbuffer[fcount-1];
+end;
+
+function TFastInterfaceList.first: IT;
+begin
+  checkIndex(0);
+  result := fbuffer[0];
+end;
+
+
+
+
+{$ImplicitExceptions off}
+
+procedure TFastInterfaceList.setBufferSize(c: integer);
+begin
+  ReAllocMem(fbuffer, c * sizeof(IT));
+  fcapacity := c;
+end;
+
+procedure TFastInterfaceList.reserve(cap: integer);
+var
+  oldcap: Integer;
+begin
+  if cap <= fcapacity then exit;
+
+  oldcap := fcapacity;
+  if cap < 4 then setBufferSize(4)
+  else if (cap < 1024) and (cap <= fcapacity * 2) then setBufferSize(fcapacity * 2)
+  else if (cap < 1024) then setBufferSize(cap)
+  else if cap <= fcapacity + 1024 then setBufferSize(fcapacity + 1024)
+  else setBufferSize(cap);
+
+  FillChar(fbuffer[oldcap], sizeof(IT) * (fcapacity - oldcap), 0);
+end;
+
+procedure TFastInterfaceList.compress;
+begin
+  if fcount <= fcapacity div 2 then setBufferSize(fcapacity div 2)
+  else if fcount <= fcapacity - 1024 then setBufferSize(fcapacity - 1024);
+end;
+
+procedure TFastInterfaceList.setCount(c: integer);
+var
+  i: Integer;
+begin
+  reserve(c);
+  if c < fcount then begin
+    for i := c to fcount - 1 do
+      fbuffer[i]._Release;
+    FillChar(fbuffer[c], (fcount - c) * sizeof(IT), 0);
+  end;
+  fcount:=c;
+end;
+
+
+
+
+{$ImplicitExceptions on}
+
+procedure TFastInterfaceList.clear;
+var
+  i: Integer;
+begin
+  for i := 0 to fcount - 1 do
+    fbuffer[i]._Release;
+  fcount:=0;
+  setBufferSize(0);
+end;
+
+destructor TFastInterfaceList.Destroy;
+begin
+  clear;
+  inherited Destroy;
+end;
+
+procedure TFastInterfaceList.insert(i: integer; child: IT);
+begin
+  reserve(fcount + 1);
+  if i <> fcount then begin
+    checkIndex(i);
+    move(fbuffer[i], fbuffer[i+1], (fcount - i) * sizeof(fbuffer[i]));
+    fillchar(fbuffer[i],sizeof(fbuffer[i]),0);
+  end;
+  fbuffer[i] := child;
+  fcount+=1;
+end;
+
+constructor TFastInterfaceList.create(capacity: integer);
+begin
+  reserve(capacity);
+  fcount := 0;
+end;
+
+
 
 end.
 

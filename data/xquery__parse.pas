@@ -162,7 +162,7 @@ end;
  TFinalNamespaceResolving = class(TXQTerm_Visitor)
    mainModule: TXQTermModule;
    staticContext: TXQStaticContext;
-   changedDefaultsTypeNamespaces: TInterfaceList;
+   changedDefaultsTypeNamespaces: TInterfaceList; //this cannot be a namespace list, since nil might be added
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: SizeInt;
    checker: TFlowerVariableChecker;
@@ -3249,7 +3249,7 @@ end;
 
 function TXQParsingContext.parseModule(): TXQTerm;
 var
-  pendings: TInterfaceList;
+  pendings: TXQueryModuleList;
   otherQuery: TXQuery;
   i: Integer;
   hadPending: Boolean;
@@ -3274,7 +3274,7 @@ begin
   if hadPending then exit; //we cannot do anything, until the pending modules have been parsed
 
   for i := pendings.Count - 1 downto 0 do begin
-    otherQuery := IXQuery(pointer(pendings[i])) as txquery;
+    otherQuery := pendings[i] as txquery;
     if otherQuery.Term = result then continue;
     finalResolving(TXQueryBreakerHelper.PTerm(otherQuery)^, otherQuery.getStaticContext, options);
     finalizeFunctionsEvenMore(otherQuery.Term as TXQTermModule, otherQuery.getStaticContext, otherQuery.staticContextShared);
@@ -3285,8 +3285,7 @@ begin
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, thequery.staticContextShared);
 
 
-  for i := 0 to pendings.Count - 1 do
-    TXQueryEngineBreaker.forceCast(staticContext.sender).fmodules.Add(pendings[i]);
+  TXQueryEngineBreaker.forceCast(staticContext.sender).fmodules.AddAll(pendings);
   pendings.Clear;
 end;
 
@@ -3357,7 +3356,7 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
 
 var
   oldPendingCount, oldFunctionCount, i: Integer;
-  pendingModules: TInterfaceList;
+  pendingModules: TXQueryModuleList;
 begin
   thequery := aquery;
   pendingModules := TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules;
@@ -3385,7 +3384,7 @@ begin
     //thequeryinterface := thequery;  //this will automatically free the query later
     IXQuery(thequery)._AddRef;
     if staticContext.sender.AutomaticallyRegisterParsedModules then
-      pendingModules.Remove(IXQuery(thequery));
+      pendingModules.Remove(thequery);
     while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
     IXQuery(thequery)._Release;
 
@@ -3805,7 +3804,7 @@ begin
           Assert(thequery <> nil);
           staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
           if staticContext.sender.AutomaticallyRegisterParsedModules then
-            TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules.Add(IXQuery(thequery));
+            TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules.Add(thequery);
         end;
         else expect('namespace');
       end;
@@ -4577,7 +4576,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
       end;
     end;
     if c.implicitNamespaces <> nil then begin
-      staticContext.defaultElementTypeNamespace := INamespace(pointer(changedDefaultsTypeNamespaces.Last));
+      staticContext.defaultElementTypeNamespace := changedDefaultsTypeNamespaces.Last as INamespace;
       changedDefaultsTypeNamespaces.Delete(changedDefaultsTypeNamespaces.Count - 1);
 
       implicitNamespaceCountsLength -= 1;
@@ -4670,7 +4669,7 @@ end;
 constructor TFinalNamespaceResolving.Create;
 begin
   inherited;
-  changedDefaultsTypeNamespaces := TNamespaceList.Create;
+  changedDefaultsTypeNamespaces := TInterfaceList.Create;
 end;
 
 destructor TFinalNamespaceResolving.Destroy;

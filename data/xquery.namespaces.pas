@@ -27,7 +27,6 @@ uses
   Classes, SysUtils, xquery.internals.common;
 
 type
-TXQHashmapStrOwningInterface = specialize TXQHashmapStrOwning<IUnknown, TInterfaceList>;
 
 TNamespace = class;
 
@@ -67,7 +66,7 @@ end;
 { TNamespaceList }
 
 //** List of namespaces
-TNamespaceList = class(TInterfaceList)
+TNamespaceList = class(specialize TFastInterfaceList<INamespace>)
 private
   function getNamespace(const prefix: string): INamespace;
   function getNamespace(i: integer): INamespace;
@@ -243,16 +242,18 @@ begin
     result.Add(items[i]);
 end;
 
-type TNamespaceCache = class
+type
+TXQHashmapStrOwningNamespace = specialize TXQHashmapStrOwning<INamespace, TNamespaceList>;
+TNamespaceCache = class
   uniqueUrl: string;
-  prefixes: TXQHashmapStrOwningInterface;
+  prefixes: TXQHashmapStrOwningNamespace;
   constructor Create;
   destructor Destroy; override;
 end;
 
 constructor TNamespaceCache.Create;
 begin
-  prefixes := TXQHashmapStrOwningInterface.Create;
+  prefixes := TXQHashmapStrOwningNamespace.Create;
 end;
 
 destructor TNamespaceCache.Destroy;
@@ -291,17 +292,19 @@ begin
   end;
 end;
 
+{$ImplicitExceptions off}
 class function TNamespace.make(const aurl: string; const aprefix: string): TNamespace;
 var cache : TNamespaceCache;
-  tempptr: Pointer;
+  old: INamespace;
 begin
   cache := namespaceCache(aurl);
-  tempptr := pointer(cache.prefixes[aprefix]);
-  if tempptr = nil then begin
+  old := cache.prefixes[aprefix];
+  if old = nil then begin
     result := TNamespace.create(cache.uniqueUrl, aprefix);
     cache.prefixes.Add(aprefix, result);
-  end else result := (IUnknown(tempptr) as INamespace).getSelf;
+  end else result := old.getSelf;
 end;
+{$ImplicitExceptions on}
 
 class function TNamespace.uniqueUrl(const aurl: string): string;
 begin
