@@ -36,7 +36,7 @@ interface
 
 uses
   Classes, SysUtils, internetAccess,
-  jni, LCLProc //if these units are not found, you need to add lcl (or perhaps lclbase) to the project requirements
+  jni //if these units are not found, you need to add lcl (or perhaps lclbase) to the project requirements
   ;
 
 type
