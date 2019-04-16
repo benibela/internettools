@@ -239,7 +239,7 @@ var
   f: TTreeNode;
   v: IXQValue;
 begin
-  for v in xq.parseXPath2('./*:*').evaluate(e) do begin
+  for v in xq.parseQuery('./*:*', xqpmXPath2).evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'all-of', 'any-of', 'not': begin
@@ -387,7 +387,7 @@ end;
 procedure THTMLLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
   function got: string;
   begin
-    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation(false)
+    if resultValue.error = '' then result := resultValue.value.toXQuery
     else result := resultValue.error;
   end;
 var
@@ -588,7 +588,7 @@ end;
 procedure TTextLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
   function got: string;
   begin
-    if resultValue.error = '' then result := resultValue.value.debugAsStringWithTypeAnnotation(false)
+    if resultValue.error = '' then result := resultValue.value.toXQuery
     else result := resultValue.error;
   end;
 begin
@@ -721,14 +721,6 @@ begin
   end;
 end;
 
-function xmlEqual(a, b: string): boolean;
-var tree1, tree2: TTreeNode;
-begin
-  try
-
-  except on e: ETreeParseException do result := false;
-  end;
-end;
 
 function killPrefixes(tn: TTreeNode; ns: TStringList; mustExist: boolean): boolean;
   function checkNode(n: TTreeNode): boolean;
@@ -984,7 +976,7 @@ end;
 function TTestCase.expectedPrettier: string;
 begin
   result := expected;
-  if strContains(result, '&lt;') then result := strDecodeHTMLEntities(result,eUTF8) + ' <!--unescaped--> ';
+  if strContains(result, '&lt;') then result := strDecodeHTMLEntities(result,CP_UTF8) + ' <!--unescaped--> ';
 end;
 
 constructor TTestCase.create(e: TTreeNode);
@@ -999,7 +991,7 @@ begin
 
   name := e['name'];
   coversName := e['covers'];
-  for v in xq.parseXPath2('./*:*').evaluate(e) do begin
+  for v in xq.parseQuery('./*:*', xqpmXPath2).evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'description', 'created', 'modified': ;
@@ -1137,7 +1129,7 @@ var
 begin
   for i := 0 to high(sl) do begin
     temp := strSplit(sl[i], '=');
-    TDependency.put(trim(temp[0]), trim(temp[1]), true);
+    TDependency.put(trim(temp[0]), trim(temp[1]), satisfied);
   end;
 end;
 
@@ -1266,7 +1258,7 @@ begin
 
   name := e['name'];
   coversName := e['covers'];
-  for v in xq.parseXPath2('./*:*').evaluate(e) do begin
+  for v in xq.parseQuery('./*:*', xqpmXPath2).evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'description': ;
@@ -1296,7 +1288,7 @@ var
   resultValue: TTestCaseResultValue;
 
 begin
-  fillchar(localResults, sizeof(localResults), 0);
+  localResults := default(TResultSet);
   for i := 0 to dependencies.Count - 1 do
     if not TDependency(dependencies[i]).isSatisfied then begin
       logger.skipTestSet(self);
@@ -1396,11 +1388,11 @@ var
 begin
   e := definition;
   definition := nil;
-  staticBaseUri := xq.parseXPath2('*:static-base-uri/@*:uri').evaluate(e).toString;
+  staticBaseUri := xq.parseQuery('*:static-base-uri/@*:uri', xqpmXPath2).evaluate(e).toString;
   if staticBaseUri = '' then staticBaseUri := e.getDocument().baseURI;
 
   collations := TStringList.Create;
-  for v in xq.parseXPath2('*:collation').evaluate(e) do begin
+  for v in xq.parseQuery('*:collation', xqpmXPath2).evaluate(e) do begin
     i := xqtsCollations.IndexOf(v.toNode['uri']);
     if (i < 0) and strBeginsWith(v.toNode['uri'], 'http://www.w3.org/2013/collation/UCA') then begin//todo: use a real collation
       xqtsCollations.AddObject(v.toNode['uri'], TXQCollationCodepoint.Create(v.toNode['uri']));
@@ -1413,7 +1405,7 @@ begin
   if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
     collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
 
-  u := xq.parseXPath2('*:param').evaluate(e);
+  u := xq.parseQuery('*:param', xqpmXPath2).evaluate(e);
   SetLength(params, u.getSequenceCount);
   for i := 0 to u.getSequenceCount -1  do begin
     n := u.get(i+1).toNode;
@@ -1423,7 +1415,7 @@ begin
       if n.getNamespaceURL(temps) <> '' then params[i].name := 'Q{' + n.getNamespaceURL(temps) + '}' + params[i].name
       else params[i].name := temps + ':' + params[i].name;
     end;
-    if n.hasAttribute('select') then params[i].value := xq.parseXQuery3(n['select']).evaluate()
+    if n.hasAttribute('select') then params[i].value := xq.parseQuery(n['select']).evaluate()
     else params[i].value := xqvalue();
     if n.hasAttribute('as') then if 'xs:'+params[i].value.typeAnnotation.name <> n['as'] then raise Exception.Create('Type mismatch in environment definition');
     if n.hasAttribute('source') then raise exception.Create('Unsupported environment param attribute');
@@ -1457,7 +1449,7 @@ begin
 
   {resource
      <xs:element ref="function-library"/>                     <xs:element ref="resource"/>}
-  for v in xq.parseXPath2('*:decimal-format').evaluate(e) do begin
+  for v in xq.parseQuery('*:decimal-format', xqpmXPath2).evaluate(e) do begin
     n := v.toNode;
     if n.attributes = nil then continue;
     if decimalFormats = nil then decimalFormats := TFPList.Create;
@@ -1641,7 +1633,7 @@ begin
     xq.ImplicitTimezoneInMinutes := GetLocalTimeOffset;
   end;
   basePath := strBeforeLast(cat.documentURI,'/');
-  for v in xq.parseXPath2('/*:catalog/*:*').evaluate(cat) do begin
+  for v in xq.parseQuery('/*:catalog/*:*', xqpmXPath2).evaluate(cat) do begin
     e :=  v.toNode;
     case e.value of
       'environment': //environments.AddObject(e['name'], TEnvironment.load(e));
@@ -1723,7 +1715,7 @@ var i: integer;
   j: LongInt;
 begin
   if s = '-' then s := strReadFromStdin;
-  SetLength(result, 0);
+  result := nil;
   if s = '' then exit;
 
   j := 0;

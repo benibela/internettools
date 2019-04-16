@@ -10,7 +10,8 @@ interface
 uses
   bbutils, extendedhtmlparser, simpleinternet, internetaccess, simplehtmlparser, simplehtmltreeparser, simplexmlparser, xquery, 
   synapseinternetaccess, w32internetaccess, simplexmltreeparserfpdom, xquery_json, mockinternetaccess, xquery__regex, xquery__parse, 
-  xquery_module_math, xquery__functions, multipagetemplate, xquery.internals.common, xquery.namespaces, LazarusPackageIntf;
+  xquery_module_math, xquery__functions, multipagetemplate, xquery.internals.common, xquery.namespaces, 
+  xquery.internals.protectionbreakers, xquery.internals.lclexcerpt, LazarusPackageIntf;
 
 implementation
 

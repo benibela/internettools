@@ -316,7 +316,7 @@ begin
   if argc = 3 then begin
     enc := strEncodingFromName(args[2].toString);
     if enc = CP_NONE then raise EXQEvaluationException.create(error_unknown_encoding, 'Unknown encoding: '+args[2].toString, XMLNamespace_Expath_File, args[2]);
-    data := strChangeEncoding(data, CP_UTF8, enc);
+    data := strConvert(data, CP_UTF8, enc);
   end;
   result := writeOrAppendSomething(args[0], append, data);
 end;
@@ -643,7 +643,7 @@ begin
   else begin
     enc := strEncodingFromName(args[1].toString);
     if enc = CP_NONE then raiseFileError(error_unknown_encoding, error_unknown_encoding, args[1]);
-    result := xqvalue(strChangeEncoding(data,  enc, CP_UTF8));
+    result := xqvalue(strConvert(data,  enc, CP_UTF8));
   end;
 end;
 
