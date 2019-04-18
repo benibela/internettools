@@ -66,7 +66,7 @@ begin
   if search.Attr and faDirectory <> 0 then begin
     checkResult(CreateDir(dest + current), current);
   end else
-    checkResult(CopyFile(source + current, dest + current), current);
+    checkResult(xquery.internals.lclexcerpt.CopyFile(source + current, dest + current), current);
   inherited;
 end;
 class procedure TDirCopier.checkResult(const res: boolean; const fn: string);
@@ -391,7 +391,7 @@ begin
       copier.startSearch(copier.source);
     end else begin
       if not FileOrDirectoryExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
-      TDirCopier.checkResult(CopyFile(source, dest), dest);
+      TDirCopier.checkResult(xquery.internals.lclexcerpt.CopyFile(source, dest), dest);
     end;
   except
     on EStreamError do TDirCopier.checkResult(false, dest);
