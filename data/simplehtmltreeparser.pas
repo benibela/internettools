@@ -1565,7 +1565,7 @@ begin
 end;
 
 function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): RawByteString;
-var builder: TStrBuilder;
+var builder: TXHTMLStrBuilder;
 var known: TNamespaceList;
   encoding: TSystemCodePage;
   function requireNamespace(n: INamespace): string;
@@ -1578,12 +1578,6 @@ var known: TNamespaceList;
   procedure inner(n: TTreeNode); forward;
 
   procedure outer(n: TTreeNode);
-    function attribEscape(const s: string): string; inline;
-    begin
-      if html then result := htmlStrEscape(s, true, encoding)
-      else result := xmlStrEscape(s, true);
-    end;
-
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
       i: Integer;
@@ -1594,7 +1588,7 @@ var known: TNamespaceList;
       tetText:
         if not html then append(xmlStrEscape(value))
         else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then append(value)
-        else append(htmlStrEscape(value, false, encoding));
+        else appendHTMLText(value);
       tetClose:  begin;
         append('</');
         append(getNodeName());
@@ -1650,7 +1644,8 @@ var known: TNamespaceList;
               append(' ');
               append(attrib.getNodeName());
               append('="');
-              append(attribEscape(attrib.realvalue));
+              if html then appendHTMLAttrib(attrib.realvalue)
+              else append(xmlStrEscape(attrib.realvalue, true));
               append('"');
             end;
 

@@ -114,6 +114,7 @@ var tempb: Boolean;
   xqv,xqw: IXQValue;
   randomboundary, bce1, bce2: String;
   iterator, iterator2: TXQValueEnumeratorPtrUnsafe;
+  nbsp: string;
 begin
   testid := 0;
 //  time := Now;
@@ -4206,13 +4207,14 @@ begin
   //did not work: &#252; is converted to &amp;#252???? t('outer-html(/)', '<html><head></head><body><div class="content"> <table><tbody><tr><td colspan="9">Ausweis gültig bis: 05.05.2013</td></tr></tbody></table> <font color="black"><br></font></body></html>', '<html><body><div class="content"><html><body> <table><tbody><tr><td colspan="9">Ausweis g&#252;ltig bis: 05.05.2013</td></tbody></table> </body></html><font color="black"><br></font>');
 
   xml.TargetEncoding:=CP_NONE;
+  nbsp := #$C2#$A0;
   t('outer-html(/)', '<html><head></head><body>&amp;auml;&amp;nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
   xml.TargetEncoding:=CP_UTF8;
-  t('outer-html(/)', '<html><head></head><body>ä&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
+  t('outer-html(/)', '<html><head></head><body>ä'+nbsp+'</body></html>', '<html>&auml;&nbsp;</html>');
   t('outer-html(/)', '<html><head><script>&nbsp&auml;&nbsp;</script></head><body></body></html>', '<html><script>&nbsp&auml;&nbsp;</script></html>');
   xml.TargetEncoding:=CP_WINDOWS1252;
-  t('outer-html(/)', '<html><head></head><body>'#228'&nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
-  t('outer-html(/)', '<html><head></head><body>&nbsp;'#228'&nbsp;</body></html>', '<html>&nbsp&auml;&nbsp;</html>');
+  t('outer-html(/)', '<html><head></head><body>'#228#$A0'</body></html>', '<html>&auml;&nbsp;</html>');
+  t('outer-html(/)', '<html><head></head><body>'#$A0#228#$A0'</body></html>', '<html>&nbsp&auml;&nbsp;</html>');
 
   xml.parsingModel:=pmStrict;
   xml.TargetEncoding:=CP_UTF8;

@@ -1771,7 +1771,7 @@ begin
   m('outer-xml(<style></style>)', '<style/>');
   m('outer-html(<style></style>)', '<style></style>');
   m('outer-xml(<foobar attrib="&lt;&gt;&amp;&quot;&apos;"/>)', '<foobar attrib="&lt;&gt;&amp;&quot;&apos;"/>');
-  m('outer-html(<foobar attrib="&lt;&gt;&amp;&quot;&apos;"/>)', '<foobar attrib="<>&amp;&quot;''"></foobar>');
+  m('outer-html(<foobar attrib="&lt;&gt;&amp;&quot;&apos;"/>)', '<foobar attrib="<>&amp;&quot;&apos;"></foobar>');
   m('outer-xml(<foobar>&lt;&gt;&amp;&quot;&apos;</foobar>)', '<foobar>&lt;&gt;&amp;&quot;&apos;</foobar>');
   m('outer-html(<foobar>&lt;&gt;&amp;&quot;&apos;</foobar>)', '<foobar>&lt;&gt;&amp;"''</foobar>');
 

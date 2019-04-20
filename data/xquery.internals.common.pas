@@ -86,10 +86,16 @@ public
   property Count: integer read fcount write setCount;
 end;
 
+type TXHTMLStrBuilder = object(TStrBuilder)
+  procedure appendHTMLText(inbuffer: pchar; len: SizeInt);
+  procedure appendHTMLAttrib(inbuffer: pchar; len: SizeInt);
+  procedure appendHTMLText(const s: string);
+  procedure appendHTMLAttrib(const s: string);
+end;
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
 function xmlStrWhitespaceCollapse(const s: string):string;
-function htmlStrEscape(s: string; attrib: boolean = false; encoding: TSystemCodePage = CP_NONE):string;
+function htmlStrEscape(s: string; attrib: boolean = false):string;
 function strSplitOnAsciiWS(s: string): TStringArray;
 function urlHexDecode(s: string): string;
 
@@ -117,6 +123,7 @@ begin
   result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
 end;
+
 
 function TXQHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
 begin
@@ -213,40 +220,59 @@ begin
   result := strTrimAndNormalize(s, [#9,#$A,#$D,' ']);
 end;
 
-function htmlStrEscape(s: string; attrib: boolean; encoding: TSystemCodePage): string;
+procedure TXHTMLStrBuilder.appendHTMLText(inbuffer: pchar; len: SizeInt);
+var
+  inbufferend: pchar;
+begin
+  inbufferend := inbuffer + len;
+  reserveadd(len);
+  while inbuffer < inbufferend do begin
+    case inbuffer^ of
+      '&': append('&amp;');
+      '<': append('&lt;');
+      '>': append('&gt;');
+      else append(inbuffer^);
+    end;
+    inc(inbuffer);
+  end;
+end;
+
+
+procedure TXHTMLStrBuilder.appendHTMLAttrib(inbuffer: pchar; len: SizeInt);
+var
+  inbufferend: pchar;
+begin
+  inbufferend := inbuffer + len;
+  reserveadd(len);
+  while inbuffer < inbufferend do begin
+    case inbuffer^ of
+      '&': append('&amp;');
+      '"': append('&quot;');
+      '''': append('&apos;');
+      else append(inbuffer^);
+    end;
+    inc(inbuffer);
+  end;
+end;
+
+procedure TXHTMLStrBuilder.appendHTMLText(const s: string);
+begin
+  appendHTMLText(pchar(pointer(s)), length(s));
+end;
+procedure TXHTMLStrBuilder.appendHTMLAttrib(const s: string);
+begin
+  appendHTMLAttrib(pchar(pointer(s)), length(s));
+end;
+
+function htmlStrEscape(s: string; attrib: boolean): string;
 var
   i: Integer;
-  builder: TStrBuilder;
+  builder: TXHTMLStrBuilder;
 
 begin
   builder.init(@result, length(s));
-  i := 1;
-  if attrib then begin
-    while i <= length(s) do begin
-      case s[i] of
-        '&': builder.append('&amp;');
-        '"': builder.append('&quot;');
-        #$A0: if encoding = CP_WINDOWS1252 then builder.append('&nbsp;') else builder.append(s[i]);
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.append('&nbsp;'); i+=1; end else builder.append(s[i]);
-        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i])); not needed?
-        else builder.append(s[i]);
-      end;
-      i+=1;
-    end
-  end else begin
-    while i <= length(s) do begin
-      case s[i] of
-        '&': builder.append('&amp;');
-        '<': builder.append('&lt;');
-        '>': builder.append('&gt;');
-        #$A0: if encoding = CP_WINDOWS1252 then builder.append('&nbsp;') else builder.append(s[i]);
-        #$C2: if (encoding = CP_UTF8) and (i+1 <= length(s)) and (s[i+1] = #$A0) then begin builder.append('&nbsp;'); i+=1; end  else builder.append(s[i]);
-        //#0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i]));
-        else builder.append(s[i]);
-      end;
-      i+=1;
-    end;
-  end;
+  if attrib then builder.appendHTMLAttrib(s)
+  else builder.appendHTMLText(s);
   builder.final;
 end;
 
