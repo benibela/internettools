@@ -273,7 +273,8 @@ begin
       end;
     end else b := args[1].toFloat;
     result := xqv(double(power(a, b)));
-    ClearExceptions(); //otherwise pow(-2.5, 3333) does not raise the exception here, but somewhere later
+    {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif} //otherwise pow(-2.5, 3333) does not raise the exception here, but somewhere later
+
   except
     on EOverflow do chooseInfinityOr0;
     on EDivByZero do chooseInfinityOr0;

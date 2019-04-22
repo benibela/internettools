@@ -487,7 +487,7 @@ begin
           if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
           else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
           else tempd := single(BigDecimalToExtended(temp));
-          ClearExceptions();
+          {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
           outv^ := TXQValueFloat.create(self, tempd);
         except
           on EOverflow do outv^ := TXQValueFloat.create(self, getPosInf);
