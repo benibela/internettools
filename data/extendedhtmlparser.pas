@@ -2017,8 +2017,7 @@ begin
 
   FQueryContext.RootElement := FHtmlTree;
   if FHtmlTree = nil then exit;
-  if assigned(FHtmlTree.document) and FHtmlTree.document.InheritsFrom(TTreeDocument) then
-    FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI; //todo: what was this for?
+  FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI; //todo: what was this for?
 
   if FTrimTextNodes = ttnWhenLoadingEmptyOnly then
     FHTML.removeEmptyTextNodes(true);

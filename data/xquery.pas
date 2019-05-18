@@ -2281,7 +2281,14 @@ type
   end;
 
 
-
+  type TXQTempTreeNodes = class(TTreeDocument)
+  private
+    tempnodes: TFPList;
+    function isHidden: boolean; override;
+  public
+    constructor create(); reintroduce;
+    destructor destroy; override;
+  end;
 
   //============================MAIN CLASS==========================
 
@@ -2537,7 +2544,7 @@ public
     FCreationThread: TThreadID;
   protected
     FExternalDocuments: TStringList;
-    FInternalDocuments: TFPList;
+    FInternalTempNodes: TXQTempTreeNodes;
     FModules, FPendingModules: TXQueryModuleList; //internal used
     FParserVariableVisitor: TObject;
     VariableChangelogUndefined, FDefaultVariableHeap: TXQVariableChangeLog;
@@ -3140,6 +3147,27 @@ begin
   t := PPointer(@a)^ ;
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
+end;
+
+function TXQTempTreeNodes.isHidden: boolean;
+begin
+  Result:=true;
+end;
+
+constructor TXQTempTreeNodes.create();
+begin
+  inherited create(nil);
+  tempnodes := TFPList.Create;
+end;
+
+destructor TXQTempTreeNodes.destroy;
+var
+  i: Integer;
+begin
+  for i:= 0 to tempnodes.count - 1 do
+    TTreeNode(tempnodes[i]).deleteAll();
+  tempnodes.free;
+  inherited destroy;
 end;
 
 function TXQParsingModelsHelper.requiredModelToString: string;
@@ -6455,7 +6483,7 @@ end;
 function TXQEvaluationContext.getRootHighest: TTreeNode;
 begin
   if (SeqValue <> nil) then begin
-    if (SeqValue.kind = pvkNode) then exit(SeqValue.toNode.document)
+    if (SeqValue.kind = pvkNode) then exit(SeqValue.toNode.getRootHighest())
     else raise EXQEvaluationException.Create('XPTY0004' {<- fn:root needs this}, 'Need context item that is a node to get root element');
   end;
   if ParentElement <> nil then exit(ParentElement.getRootHighest)
@@ -6521,7 +6549,7 @@ begin
     end else begin
       tempnode := contextNode(false);
       parser := nil;
-      if (tempnode <> nil) and objInheritsFrom(tempnode.document, TTreeDocument) then parser := tempnode.getDocument().getCreator;
+      if (tempnode <> nil) then parser := tempnode.getDocument().getCreator;
       if parser = nil then parser := defaultParser;
       if parser = nil then begin
         defaultParser := TTreeParser.Create;
@@ -7321,12 +7349,7 @@ begin
   FDefaultVariableStack.Free;
   DefaultParser.Free;
   clear;
-  if FInternalDocuments <> nil then begin;
-    for i:= 0 to FInternalDocuments.count - 1 do
-      TTreeNode(FInternalDocuments[i]).deleteAll();
-
-    FInternalDocuments.Free;
-  end;
+  FInternalTempNodes.free;
   FExternalDocuments.Free;
   GlobalNamespaces.free;
   FModules.Free;

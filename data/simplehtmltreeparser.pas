@@ -147,7 +147,7 @@ TTreeNode = class
   next: TTreeNode; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeNode; //**< previous element (self.next.previous = self)
   parent: TTreeNode;
-  document: TTreeNode;
+  root: TTreeNode;
   reverse: TTreeNode; //**<element paired by open/closing, or corresponding attributes
   namespace: INamespace; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
 
@@ -203,7 +203,6 @@ TTreeNode = class
   function getRootHighest(): TTreeNode;    //**< Returns the highest node ancestor
   function getRootElement(): TTreeNode;    //**< Returns the highest element node ancestor
   function getDocument(): TTreeDocument; //**< Returns the document node containing this node. Raises an exception if there is no associated document
-  function hasDocument(): boolean; //**< Returns if this node is contained in a document
   function getChildrenCount(types: TTreeNodeTypes): integer;
 
   function getNodeName(): string;        //**< Returns the name as namespaceprefix:name if a namespace exists, or name otherwise. Only attributes, elements and PIs have names.
@@ -279,7 +278,8 @@ protected
   FEncoding, FBaseEncoding: TSystemCodePage;
   FBaseURI, FDocumentURI: string;
   FCreator: TTreeParser;
-
+  FNodeClass: TTreeNodeClass;
+  function isHidden: boolean; virtual;
 public
   constructor create(creator: TTreeParser); reintroduce;
   property baseURI: string read FBaseURI write FBaseURI;
@@ -287,6 +287,7 @@ public
   property baseEncoding: TSystemCodePage read FBaseEncoding;
 
   function getCreator: TTreeParser;
+
 
   //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
   function getEncoding: TSystemCodePage;
@@ -785,16 +786,23 @@ end;
 
 { TTreeDocument }
 
+function TTreeDocument.isHidden: boolean;
+begin
+  result := false;
+end;
+
 constructor TTreeDocument.create(creator: TTreeParser);
 begin
   inherited create(tetDocument);
   FCreator := creator;
+  root := self;
 end;
 
 function TTreeDocument.getCreator: TTreeParser;
 begin
   result := FCreator;
 end;
+
 
 function TTreeDocument.getEncoding: TSystemCodePage;
 begin
@@ -1232,24 +1240,28 @@ end;
 function TTreeNode.getRootHighest(): TTreeNode;
 begin
   if self = nil then exit(nil);
-  result := document;
+  result := root;
+  if (root.typ = tetDocument) and TTreeDocument(root).isHidden then result := self;
 end;
 
 function TTreeNode.getRootElement(): TTreeNode;
 begin
-  result := document;
+  result := root;
   if (result = nil) or (result.typ = tetOpen) then exit;
+  if (root.typ = tetDocument) and TTreeDocument(root).isHidden then exit(self);
   exit(result.findChild(tetOpen,'',[tefoIgnoreText]));
 end;
 
 function TTreeNode.getDocument(): TTreeDocument;
-begin
-  result := document as TTreeDocument;
-end;
+  procedure raiseNoDocument;
+  begin
+    raise ETreeParseException.Create('No document for node');
+  end;
 
-function TTreeNode.hasDocument(): boolean;
 begin
-  result := assigned(document) and document.InheritsFrom(TTreeDocument);
+  if root.typ = tetDocument then result := TTreeDocument(root)
+  else if root.root.typ = tetDocument then result := TTreeDocument(root.root)
+  else raiseNoDocument();
 end;
 
 function TTreeNode.getChildrenCount(types: TTreeNodeTypes): integer;
@@ -1484,7 +1496,7 @@ begin
   attributes.add(aname, avalue, anamespace);
   attributes.Items[attributes.count - 1].parent := self;
   attributes.Items[attributes.count - 1].offset := offset + 1;
-  attributes.Items[attributes.count - 1].document := document;
+  attributes.Items[attributes.count - 1].root := root;
 end;
 
 procedure TTreeNode.addAttributes(const props: array of THTMLProperty);
@@ -1498,7 +1510,7 @@ begin
     attributes.add(strFromPchar(props[i].name, props[i].nameLen), strFromPchar(props[i].value, props[i].valueLen));
     attributes.Items[attributes.Count - 1].offset := offset + attributes.Count+1; //offset hack to sort attributes after their parent elements in result sequence
     attributes.Items[attributes.count - 1].parent := self;
-    attributes.Items[attributes.count - 1].document := document;
+    attributes.Items[attributes.count - 1].root := root;
   end;
 end;
 
@@ -1520,7 +1532,7 @@ var
   oldprev: TTreeNode;
 begin
   child.parent := self;
-  child.document := document;
+  child.root := root;
   oldprev := reverse.previous;
   oldprev.next := child;
   child.previous := oldprev;
@@ -1531,7 +1543,7 @@ begin
     reverse.previous := child.reverse;
     child.reverse.next := reverse;
     child.reverse.parent := self;
-    child.reverse.document := document;
+    child.reverse.root := root;
   end;
 end;
 
@@ -1686,7 +1698,7 @@ begin
   builder.init(@result);
   known := TNamespaceList.Create;
   encoding := CP_NONE;
-  if assigned(base.document) and base.document.InheritsFrom(TTreeDocument) then encoding := TTreeDocument(base.document).FEncoding;
+  if base.root.typ = tetDocument then encoding := base.getDocument().FEncoding;
   if nodeSelf then outer(base)
   else inner(base);
   known.free;
@@ -1908,7 +1920,7 @@ end;
 
 class function TTreeNode.compareInDocumentOrder(const a,b: TTreeNode): integer;
 begin
-  if a.document = b.document then begin
+  if (a.root = b.root) or (a.getDocument() = b.getDocument()) then begin
     result := a.offset - b.offset;
     if (result <> 0) or (a = b) then exit
     else begin
@@ -1916,7 +1928,7 @@ begin
       else exit(1);
     end;
   end;
-  if pointer(a.document) < pointer(b.document) then exit(-1)
+  if pointer(a.root) < pointer(b.root) then exit(-1)
   else exit(1);
 end;
 
@@ -2004,7 +2016,7 @@ begin
   result:=treeNodeClass.Create;
   result.typ := typ;
   result.value := s;
-  result.document := FCurrentTree;
+  result.root := FCurrentTree;
   FTemplateCount+=1;
 
   if offset > FCurrentElement.offset then result.offset :=  offset
@@ -2670,7 +2682,7 @@ begin
   FCurrentTree.typ := tetDocument;
   FCurrentTree.FBaseURI:=uri;
   FCurrentTree.FDocumentURI:=uri;
-  FCurrentTree.document := FCurrentTree;
+  FCurrentTree.root := FCurrentTree;
   FCurrentElement:=FCurrentTree;
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);

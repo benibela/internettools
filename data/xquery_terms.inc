@@ -3807,7 +3807,7 @@ var
       lastKid.next := kid;
       kid.previous := lastKid;
     end;
-    kid.document := root;
+    kid.root := root;
     kid.parent := tree;
     //kid.offset := baseOffset;
     //baseOffset += 1;
@@ -3878,7 +3878,7 @@ var
         tree.attributes.add(kid);
         //kid.offset:=baseOffset;
         kid.parent:=tree;
-        kid.document:=tree.document;
+        kid.root:=root;
         //baseOffset+=1;
 
         //errors need to be thrown after attribute has been added or we get memory leaks
@@ -3931,11 +3931,11 @@ var
       pvkNode: begin
         kid := v.toNode.clone;
         if root = tree then begin
-          if kid.getFirstChild() = nil then kid.document := root
+          if kid.getFirstChild() = nil then kid.root := root
           else begin
             temp := kid;
             while (temp <> nil) and (temp <> kid.reverse) do begin
-              temp.document := root;
+              temp.root := root;
               temp.offset := baseOffset;
               if (temp.next = nil) or (temp.next.offset <= temp.offset) then baseOffset+=1+temp.getAttributeCount()
               else baseOffset += temp.next.offset - temp.offset;
@@ -4107,15 +4107,20 @@ begin
 
   if (typ = tetDocument) then begin
     tree := TTreeDocument.create(nil);
+    //if root = nil then root := tree;
     TTreeDocument(tree).baseURI := context.staticContext.baseURI;
   end else if typ in  [tetAttribute, tetNamespace] then tree := TTreeAttribute.create('','')
   else tree := TTreeNode.create(typ);
-  if root = nil then root := tree;
-  tree.document := root;
-  if baseOffset = 0 then begin
-      if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot create new nodespxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
-    if context.staticContext.sender.FInternalDocuments = nil then context.staticContext.sender.FInternalDocuments := TFPList.Create;
-    context.staticContext.sender.FInternalDocuments.Add(tree);
+  if root = nil then begin
+    Assert(baseOffset = 0);
+    if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot create new nodespxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
+    if context.staticContext.sender.FInternalTempNodes = nil then context.staticContext.sender.FInternalTempNodes := TXQTempTreeNodes.Create;
+    context.staticContext.sender.FInternalTempNodes.tempnodes.Add(tree);
+    if typ <> tetDocument then tree.root := context.staticContext.sender.FInternalTempNodes;
+    //else tree.root := tree;
+    root := tree;
+  end else begin
+    tree.root := root;
   end;
   try
     tree.offset:=baseOffset;

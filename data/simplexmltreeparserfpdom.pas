@@ -118,7 +118,7 @@ var doc: TTreeDocument;
     nscount := namespaces.Count;
     if node is TDOMElement then begin
       new := TTreeNode.createElementPair(name(node));
-      new.document := parent.document; //if we do not set it now, further children do not know their document
+      new.root := parent.root; //if we do not set it now, further children do not know their document
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
           new.addAttribute(name(node.Attributes[i]), convert(node.Attributes[i].NodeValue));
@@ -139,6 +139,7 @@ var doc: TTreeDocument;
         new := TTreeNode.create(tetProcessingInstruction, convert(node.NodeName));
         new.addAttribute('', convert(node.NodeValue));
       end else exit;
+      //root is set below
     end;
 
     if node.NamespaceURI <> '' then
@@ -160,13 +161,13 @@ begin
   doc := TTreeDocument.create(self);
   doc.baseURI:=dom{%H-}.baseURI;
   doc.documentURI:=dom{%H-}.baseURI;
-  doc.document := doc;
+  doc.root := doc;
 
   doc.reverse := TTreeNode.create(tetClose);
   doc.reverse.reverse := doc;
   doc.next := doc.reverse;
   doc.next.previous := doc;
-  doc.reverse.document := doc;
+  doc.reverse.root := doc;
 
   if fragment then root := dom.FirstChild as TDOMNode_WithChildren
   else root := dom;

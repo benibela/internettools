@@ -1497,7 +1497,7 @@ var replaceNames, replaceValues: TStringArray;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      if form.hasDocument() and (form.getDocument() <> nil) then value := strResolveURI(value, form.getDocument().baseURI);
+      if (form.getDocument() <> nil) then value := strResolveURI(value, form.getDocument().baseURI);
       value := strResolveURI(value, context.staticContext.baseURI);
       {$ENDIF}
       resultobj.setMutable('url', value);
@@ -1869,7 +1869,7 @@ begin
   baseUri := '';
   if argc > 0 then
     for tempv in args[0] do
-      if (tempv.kind = pvkNode) and (tempv.toNode <> nil) and (tempv.toNode.hasDocument()) then begin
+      if (tempv.kind = pvkNode) and (tempv.toNode <> nil) and (tempv.toNode.getDocument().baseURI <> '') then begin
         baseUri := tempv.toNode.getDocument().baseURI;
         break;
       end;
@@ -3827,7 +3827,6 @@ begin
     else node := context.contextNode();
 
     if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
-    if not node.hasDocument then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
 
     node := node.getRootElement();
     if node = nil then exit(xqvalue());
@@ -3901,7 +3900,6 @@ begin
     else node := context.contextNode();
 
     if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
-    if not node.hasDocument then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
 
     node := node.getRootElement();
     if node = nil then exit;
