@@ -517,6 +517,7 @@ var
   basicAxis: TTreeNodeEnumeratorBasicAxis;
 begin
   start := contextnode;
+  endnode := nil;
   basicAxis := tneabNoAxis;
 
   if contextNode <> nil then
@@ -554,7 +555,6 @@ begin
           else start := start.next;
           while (start <> nil) and (start.typ = tetClose) do start := start.next;
           basicAxis := tneabFollowing;
-          endnode:=nil;
         end else start := nil;
 
       tneaDirectParent: begin
@@ -563,7 +563,6 @@ begin
       tneaAncestor, tneaSameOrAncestor: begin
         basicAxis := tneabParent;
         if axis = tneaAncestor then start := start.getParent();
-        endnode := nil;
       end;
 
       tneaPrecedingSibling:
