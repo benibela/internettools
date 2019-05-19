@@ -2553,11 +2553,9 @@ begin
   temp.fQueryEngine := context.sender;
   temp.FQueryContext.staticContext := context;
   temp.initializeCaches;
-  result := TXQTermPatternMatcher.Create;
-  result.node := temp.TemplateTree;
+  result := TXQTermPatternMatcher.Create(temp.TemplateTree);
   temp.GetTemplateRealVariableDefinitions(result.vars, result.hasDefaultVariable);
   result.contextDependancies := temp.GetTemplateContextDependencies - [xqcdFocusItem,xqcdFocusPosition,xqcdFocusLast]{<-focus is the matched document, not the outside document};
-  temp.FTemplate.OwnedTrees.Clear;
   temp.FQueryEngine := nil;
   temp.free;
 end;
@@ -2576,8 +2574,8 @@ begin
   temp.FQueryEngine := context.staticContext.sender;
   temp.FQueryContext := context;
   temp.ParsingExceptions := false;
-  temp.FTemplate.OwnedTrees.Add(template);
-  temp.FHTML.OwnedTrees.Add(data);
+  temp.FTemplate.addTree(template.getDocument());
+  temp.FHTML.addTree(data.getDocument());
   temp.FHtmlTree := data; //todo: why is that not read from fhtml?
   try
     temp.resetAttributeMatching;
@@ -2592,8 +2590,6 @@ begin
     end;
   finally
     context.staticContext.sender.VariableChangelog := queryVarLog;
-    temp.FTemplate.OwnedTrees.Clear;
-    temp.FHTML.OwnedTrees.Clear;
     temp.FQueryEngine := oldengine;
     temp.free;
   end;

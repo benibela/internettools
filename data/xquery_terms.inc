@@ -3423,11 +3423,24 @@ end;
 
 { TXQTermTemporaryNode }
 
+constructor TXQTermPatternMatcher.Create;
+begin
+  inherited
+end;
+
+constructor TXQTermPatternMatcher.Create(adoc: TTreeNode);
+begin
+  inherited create;
+  node := adoc;
+  adoc.getDocument().addRef;
+end;
+
 function TXQTermPatternMatcher.clone: TXQTerm;
 begin
   Result:=inherited clone;
   with TXQTermPatternMatcher(result) do begin
     node := self.node.clone;
+    node.getDocument().addRef;
     vars := self.vars;
     setlength(vars, length(vars));
     hasDefaultVariable := self.hasDefaultVariable;
@@ -3442,7 +3455,7 @@ end;
 
 destructor TXQTermPatternMatcher.destroy;
 begin
-  node.deleteAll();
+  if node <> nil then node.getDocument().release;
   inherited destroy;
 end;
 
@@ -3914,7 +3927,6 @@ var
         end;
         doc.next := doc.reverse;
         doc.reverse.previous := doc;
-        doc.deleteAll();
       end
       else raiseEvaluationError('pxp:INTERNAL', 'Unknown child node');
     end;
@@ -3930,19 +3942,6 @@ var
       pvkUndefined:;
       pvkNode: begin
         kid := v.toNode.clone;
-        if root = tree then begin
-          if kid.getFirstChild() = nil then kid.root := root
-          else begin
-            temp := kid;
-            while (temp <> nil) and (temp <> kid.reverse) do begin
-              temp.root := root;
-              temp.offset := baseOffset;
-              if (temp.next = nil) or (temp.next.offset <= temp.offset) then baseOffset+=1+temp.getAttributeCount()
-              else baseOffset += temp.next.offset - temp.offset;
-              temp := temp.next;
-            end;
-          end;
-        end;
         case kid.typ of
           tetOpen, tetDocument: begin
             if not context.staticContext.copyNamespacePreserve then begin
@@ -3956,6 +3955,21 @@ var
                 temp := temp.next;
               end;
             end;
+
+            temp := kid;
+            while (temp <> nil) and (temp <> kid.reverse) do begin
+              temp.root := root;
+              temp.offset := baseOffset;
+              if temp.attributes <> nil then
+                for i := 0 to temp.attributes.Count - 1 do begin
+                  temp.attributes.Items[i].root := root;
+                  temp.attributes.Items[i].offset := baseOffset + 1 + i;
+                end;
+              if (temp.next = nil) or (temp.next.offset <= temp.offset) then baseOffset+=1+temp.getAttributeCount()
+              else baseOffset += temp.next.offset - temp.offset;
+              temp := temp.next;
+            end;
+
             if v.toNode.parent <> nil then begin
               //copy namespaces of old parent
               tempNamespaces := TNamespaceList.Create;
@@ -3980,8 +3994,15 @@ var
                 end;
             end;
           end;
+          else begin
+            kid.root := root;
+            kid.offset := baseOffset;
+            inc(baseOffset)
+          end;
         end;
+        temp := kid;
         addNodeAsKid;
+        if temp.typ = tetDocument then temp.free;
       end;
       pvkSequence:
         for x in v.GetEnumeratorPtrUnsafe do
@@ -4107,21 +4128,25 @@ begin
 
   if (typ = tetDocument) then begin
     tree := TTreeDocument.create(nil);
+    root := tree;
     //if root = nil then root := tree;
     TTreeDocument(tree).baseURI := context.staticContext.baseURI;
-  end else if typ in  [tetAttribute, tetNamespace] then tree := TTreeAttribute.create('','')
-  else tree := TTreeNode.create(typ);
-  if root = nil then begin
-    Assert(baseOffset = 0);
-    if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot create new nodespxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
-    if context.staticContext.sender.FInternalTempNodes = nil then context.staticContext.sender.FInternalTempNodes := TXQTempTreeNodes.Create;
-    context.staticContext.sender.FInternalTempNodes.tempnodes.Add(tree);
-    if typ <> tetDocument then tree.root := context.staticContext.sender.FInternalTempNodes;
-    //else tree.root := tree;
-    root := tree;
   end else begin
-    tree.root := root;
+    if typ in  [tetAttribute, tetNamespace] then tree := TTreeAttribute.create('','')
+    else tree := TTreeNode.create(typ);
+    if root = nil then begin
+      Assert(baseOffset = 0);
+      if context.staticContext.temporaryNodes = nil then begin
+        context.staticContext.temporaryNodes := TXQTempTreeNodes.Create;
+        context.staticContext.temporaryNodes.addRef;
+      end;
+      context.staticContext.temporaryNodes.tempnodes.Add(tree);
+      tree.root := context.staticContext.temporaryNodes;
+      root := tree;
+    end else
+      tree.root := root;
   end;
+  result := xqvalue(tree);
   try
     tree.offset:=baseOffset;
     baseOffset+=1;
@@ -4220,7 +4245,6 @@ begin
       end
       else raiseEvaluationError('pxp:INTERNAL','Invalid type for constructor');
     end;
-    result := xqvalue(tree);
   finally
     if subcontext <> @context then begin
       subcontext^.namespaces.free;

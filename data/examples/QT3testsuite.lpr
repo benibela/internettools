@@ -883,11 +883,7 @@ begin
       result := tcrFail;
       node := res.toNode;
       if node <> nil then str := node.outerXML()
-      else begin
-        node := TTreeNode.create(tetText, res.toString);
-        str := node.outerXML();
-        node.free;
-      end;
+      else str := xmlStrEscape(res.toString);
       regex := wregexprParse(value, regexflags);
       try
         result := OK[wregexprMatches(regex, str)]
@@ -1365,6 +1361,7 @@ begin
     if ftree = nil then exit;
     if url <> '' then xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
     doc := ftree.getDocument(); //doc = ftree
+    doc.addRef;
     if not strContains(doc.documentURI, '://') then doc.documentURI := fileToUrl(doc.documentURI);
     if not strContains(doc.baseURI, '://') then doc.baseURI := doc.documentURI;
     if doc.documentURI <> '' then xq.ExternalDocumentsCacheInternal.AddObject(doc.documentURI, ftree);
@@ -1491,6 +1488,7 @@ begin
   result := TEnvironment.Create;
   with result do begin
     definition := e;
+    definition.getDocument().addRef;
     name := e['name'];
     ref := e['ref'];
 
@@ -1628,6 +1626,7 @@ var e: TTreeNode;
     cat: TTreeDocument;
 begin
   cat := tree.parseTreeFromFile(fn);
+  cat.addRef;
   if cat.getFirstChild().getAttribute('test-suite') = 'EXPATH' then begin
     registerModuleFile;
     xq.ImplicitTimezoneInMinutes := GetLocalTimeOffset;

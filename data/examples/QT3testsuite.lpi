@@ -88,14 +88,14 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --test-set=prod-cast --test-case=K2-SeqExprCast-215"/>
+        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases all --test-set=demos --test-case rayt"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --test-set=prod-cast --test-case=K2-SeqExprCast-215"/>
+            <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases all --test-set=demos --test-case rayt"/>
             <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
           </local>
         </Mode0>

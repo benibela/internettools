@@ -1702,11 +1702,34 @@ end;
 { TXQValueNode }
 
 {$ImplicitExceptions off}
+
+procedure TXQValueNode.setNode(AValue: TTreeNode);
+begin
+  if fnode=AValue then Exit;
+  if fnode <> nil then fnode.getDocument().release;
+  fnode:=AValue;
+  if fnode <> nil then fnode.getDocument().addRef;
+end;
+
+constructor TXQValueNode.create();
+begin
+  inherited create(baseSchema.node);
+end;
+
 constructor TXQValueNode.create(anode: TTreeNode);
 begin
   inherited create(baseSchema.node);
-  node := anode;
+  fnode := anode;
+  //assert((fnode <> nil) and (fnode.getDocument() <> nil));
+  fnode.getDocument().addRef;
 end;
+
+destructor TXQValueNode.destroy;
+begin
+  if fnode <> nil then fnode.getDocument().release;
+  inherited destroy;
+end;
+
 {$ImplicitExceptions on}
 
 class function TXQValueNode.classKind: TXQValueKind;

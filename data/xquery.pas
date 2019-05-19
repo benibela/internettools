@@ -145,6 +145,16 @@ type
     function requiredModelToString: string;
   end;
 
+  TXQTempTreeNodes = class(TTreeDocument)
+  private
+    tempnodes: TFPList;
+  protected
+    function isHidden: boolean; override;
+  public
+    constructor create(); reintroduce;
+    destructor destroy; override;
+  end;
+
   //============================XQUERY CONTEXTS==========================
 
 
@@ -206,6 +216,7 @@ type
     function retrieveFromFile(url: string; out contenttype: string; failErrCode: string): string;
   public
     //internally used
+    temporaryNodes: TXQTempTreeNodes;
     function ImplicitTimezoneInMinutes: integer; inline;
     function CurrentDateTime: TDateTime; inline;
     function findModule(const namespaceURL: string): TXQuery;
@@ -775,9 +786,15 @@ type
 
   //** Type for a node
   TXQValueNode = class (TXQValueJSONIQStructuredItem)
-    node: TTreeNode; //**< reference to a tree node in the html tree.@br Attention: this tree is shared, you don't have to free anything, but the pointer becomes invalid if the tree is free
+  private
+    fnode: TTreeNode;
+    procedure setNode(AValue: TTreeNode);
+  public
+    property node: TTreeNode read fnode write setNode ;
 
+    constructor create(); reintroduce; virtual;
     constructor create(anode: TTreeNode = nil); reintroduce; virtual;
+    destructor destroy; override;
 
     class function classKind: TXQValueKind; override;
 
@@ -1795,6 +1812,8 @@ type
     vars: array of TXQTermVariable;
     hasDefaultVariable: boolean;
     contextDependancies: TXQContextDependencies;
+    constructor Create;
+    constructor Create(adoc: TTreeNode);
     function clone: TXQTerm; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     destructor destroy; override;
@@ -2281,14 +2300,6 @@ type
   end;
 
 
-  type TXQTempTreeNodes = class(TTreeDocument)
-  private
-    tempnodes: TFPList;
-    function isHidden: boolean; override;
-  public
-    constructor create(); reintroduce;
-    destructor destroy; override;
-  end;
 
   //============================MAIN CLASS==========================
 
@@ -2544,7 +2555,6 @@ public
     FCreationThread: TThreadID;
   protected
     FExternalDocuments: TStringList;
-    FInternalTempNodes: TXQTempTreeNodes;
     FModules, FPendingModules: TXQueryModuleList; //internal used
     FParserVariableVisitor: TObject;
     VariableChangelogUndefined, FDefaultVariableHeap: TXQVariableChangeLog;
@@ -3165,7 +3175,7 @@ var
   i: Integer;
 begin
   for i:= 0 to tempnodes.count - 1 do
-    TTreeNode(tempnodes[i]).deleteAll();
+    TTreeNode(tempnodes[i]).freeAll();
   tempnodes.free;
   inherited destroy;
 end;
@@ -5890,6 +5900,9 @@ begin
       for i := 0 to decimalNumberFormats.Count - 1 do
         result.decimalNumberFormats.Add(TXQDecimalFormat(decimalNumberFormats[i]).clone);
     end;
+    if result.temporaryNodes <> nil then result.temporaryNodes.release;
+    result.temporaryNodes := temporaryNodes;
+    if temporaryNodes <> nil then temporaryNodes.addRef;
   end;
 end;
 
@@ -5913,6 +5926,7 @@ begin
     for i := 0 to decimalNumberFormats.Count - 1 do
       tobject(decimalNumberFormats[i]).free;
   decimalNumberFormats.free;
+  if temporaryNodes <> nil then temporaryNodes.release;
   inherited Destroy;
 end;
 
@@ -6608,10 +6622,14 @@ begin
   if fterm = nil then exit(xqvalue());
   stackSize := context.temporaryVariables.Count;
   try
-    if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not objInheritsFrom(fterm, TXQTermModule) then
-      exit(fterm.evaluate(context)); //fast track. also we want to use the functions declared in the old static context
-
-    context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
+    if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not objInheritsFrom(fterm, TXQTermModule) then begin
+      //fast track. also we want to use the functions declared in the old static context
+    end else
+      context.staticContext:=staticContext; //we need to use our own static context, or our own functions are inaccessible
+    if staticContext.temporaryNodes <> nil then begin
+      staticContext.temporaryNodes.release;
+      staticContext.temporaryNodes := nil;
+    end;
     result := fterm.evaluate(context);
   finally
     context.temporaryVariables.popTo(stackSize);
@@ -7339,17 +7357,13 @@ begin
 end;
 
 destructor TXQueryEngine.Destroy;
-var
-  i: Integer;
 begin
-  ;
   VariableChangelog.Free;
   VariableChangelogUndefined.free;
   FDefaultVariableHeap.Free;
   FDefaultVariableStack.Free;
   DefaultParser.Free;
   clear;
-  FInternalTempNodes.free;
   FExternalDocuments.Free;
   GlobalNamespaces.free;
   FModules.Free;

@@ -155,7 +155,7 @@ TTreeNode = class
 
 //otherwise use the functions
   //procedure deleteNext(); delete the next node (you have to delete the reverse tag manually)
-  procedure deleteAll(); //**< deletes the tree
+  procedure freeAll(); //**< deletes the tree
   procedure changeEncoding(from,toe: TSystemCodePage; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
@@ -275,6 +275,7 @@ end;
 
 TTreeDocument = class(TTreeNode)
 protected
+  FRefCount: Integer;
   FEncoding, FBaseEncoding: TSystemCodePage;
   FBaseURI, FDocumentURI: string;
   FCreator: TTreeParser;
@@ -295,6 +296,9 @@ public
   //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
   //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
   procedure setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
+
+  procedure addRef; inline;
+  procedure release; inline;
 
   destructor destroy; override;
 end;
@@ -326,7 +330,7 @@ protected
   FCurrentFile: RawByteString;
   FParsingModel: TParsingModel;
   FTrimText, FReadComments: boolean;
-  FTrees: TList;
+  FTrees: TFPList;
   FCurrentTree: TTreeDocument;
   FXmlHeaderEncoding: TSystemCodePage;
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
@@ -376,6 +380,7 @@ public
   function parseTreeFromFile(filename: string): TTreeDocument; virtual;
 
   function getLastTree: TTreeDocument; //**< Returns the last created tree
+  procedure addTree(t: TTreeDocument);
 
   procedure removeEmptyTextNodes(const whenTrimmed: boolean);
 published
@@ -393,8 +398,6 @@ published
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
   property TargetEncoding: TSystemCodePage read FTargetEncoding write FTargetEncoding;
-  //trees owned/created by this object (which will be destroyed, when it is freed) (mostly for internal use)
-  property OwnedTrees: TList read FTrees;
 end;
 
 function CSSHasHiddenStyle(const style: string): boolean;
@@ -817,8 +820,20 @@ begin
   FEncoding := new;
 end;
 
+procedure TTreeDocument.addRef; inline;
+begin
+  InterlockedIncrement(FRefCount);
+end;
+
+procedure TTreeDocument.release; inline;
+begin
+  if InterlockedDecrement(FRefCount) = 0 then
+    Free;
+end;
+
 destructor TTreeDocument.destroy;
 begin
+  if next <> nil then next.freeAll();
   inherited destroy;
 end;
 
@@ -834,10 +849,14 @@ begin
   temp.Free;
 end;}
 
-procedure TTreeNode.deleteAll();
+procedure TTreeNode.freeAll();
 var cur: TTreeNode;
   cnext: TTreeNode;
 begin
+  if typ = tetDocument then begin
+    free;
+    exit;
+  end;
   cur := self;
   while cur <> nil do begin
     cnext := cur.next;
@@ -1252,7 +1271,7 @@ begin
 end;
 
 function TTreeNode.getDocument(): TTreeDocument;
-  procedure raiseNoDocument;
+  procedure raiseNoDocument; noreturn;
   begin
     raise ETreeParseException.Create('No document for node');
   end;
@@ -2591,7 +2610,7 @@ begin
   FReadComments:=false;
   FReadProcessingInstructions:=false;
   FAutoDetectHTMLEncoding:=true;
-  FTrees := TList.Create;
+  FTrees := TFPList.Create;
 
   FCurrentNamespaceDefinitions := TList.Create;
   FCurrentNamespaces := TNamespaceList.Create;
@@ -2606,8 +2625,8 @@ end;
 
 destructor TTreeParser.destroy;
 begin
-  clearTrees;
   FElementStack.free;
+  clearTrees;
   ftrees.Free;
   FCurrentNamespaces.Free;
   FCurrentNamespaceDefinitions.Free;
@@ -2621,7 +2640,7 @@ var
   i: Integer;
 begin
   for i:=0 to FTrees.Count-1 do
-    TTreeDocument(FTrees[i]).deleteAll();
+    TTreeDocument(FTrees[i]).release();
   ftrees.Clear;
 end;
 
@@ -2713,6 +2732,8 @@ begin
   //close root element
   leaveTag(nil,0);
 
+  addTree(FCurrentTree);
+
   if FAutoDetectHTMLEncoding  then begin
     FCurrentTree.FEncoding:=CP_NONE;
     if (encBOM = CP_NONE) and (parsingModel = pmHTML) then
@@ -2750,7 +2771,6 @@ begin
 
   end;
 
-  FTrees.Add(FCurrentTree);
   result := FCurrentTree;
   FCurrentTree.FBaseEncoding := FCurrentTree.FEncoding;
   if FTargetEncoding <> CP_NONE then begin
@@ -2778,6 +2798,17 @@ function TTreeParser.getLastTree: TTreeDocument;
 begin
   if FTrees.Count = 0 then exit(nil);
   result := TTreeDocument(FTrees[FTrees.Count-1]);
+end;
+
+procedure TTreeParser.addTree(t: TTreeDocument);
+const MAX_TREES = 2;
+begin
+  while FTrees.Count >= MAX_TREES do begin
+    TTreeDocument(ftrees[0]).release;
+    ftrees.Delete(0);
+  end;
+  t.addRef;
+  ftrees.Add(t);
 end;
 
 procedure TTreeParser.removeEmptyTextNodes(const whenTrimmed: boolean);

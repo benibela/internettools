@@ -188,7 +188,7 @@ begin
     temp := temp.next;
   end;
 
-  FTrees.Add(doc);
+  addTree(doc);
   FCurrentTree := doc;
 
   namespaces.free;
