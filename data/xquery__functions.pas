@@ -3827,6 +3827,7 @@ begin
     else node := context.contextNode();
 
     if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
+    if not node.hasDocumentRoot then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
 
     node := node.getRootElement();
     if node = nil then exit(xqvalue());
@@ -3900,6 +3901,7 @@ begin
     else node := context.contextNode();
 
     if node = nil then raise EXQEvaluationException.Create('XPTY0004', 'Need (context) node for id searching');
+    if not node.hasDocumentRoot then raise EXQEvaluationException.create('FODC0001', 'Need node in document');
 
     node := node.getRootElement();
     if node = nil then exit;
