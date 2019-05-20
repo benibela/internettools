@@ -5,7 +5,7 @@
 }
 unit simplehtmltreeparser;
 {
-Copyright (C) 2008 - 2017 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2019 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -93,10 +93,10 @@ public
   property Current: TTreeAttribute read GetCurrent;
 end;
 
+TTreeNodeIntOffset = longint;
 
 //**@abstract A list of attributes.
 //**Currently this is a simple string list, and you can get the values with the values property. (with c++ I would have used map<string, string> but this doesn't exist in Pascal)
-
 TAttributeList = class(TStringList)
 public
   constructor Create;
@@ -105,10 +105,10 @@ public
   function getAttributeWithNSPrefix(const namespaceprefix, localname: string; const cmpFunction: TStringComparisonFunc): TTreeAttribute;
   function getValue(i: integer): string;
 
-  procedure add(const name, value: string; const namespace: INamespace = nil);
+  //procedure add(const name, value: string; const namespace: INamespace = nil);
   procedure add(att: TTreeNode);
 
-  function clone: TAttributeList;
+  function clone(targetDocument: TTreeDocument; root: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TAttributeList;
 
   function GetEnumerator: TAttributeEnumerator;
   destructor Destroy; override;
@@ -116,6 +116,7 @@ public
   property Items[i: integer]: TTreeAttribute read getAttribute;
   property Values[i: integer]: string read getValue;
 end;
+
 
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
@@ -151,7 +152,7 @@ TTreeNode = class
   reverse: TTreeNode; //**<element paired by open/closing, or corresponding attributes
   namespace: INamespace; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
 
-  offset: longint; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
+  offset: TTreeNodeIntOffset; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
 //otherwise use the functions
   //procedure deleteNext(); delete the next node (you have to delete the reverse tag manually)
@@ -222,7 +223,7 @@ TTreeNode = class
   procedure insertSurrounding(before, after: TTreeNode); //**< Surrounds self by before and after, i.e. inserts "before" directly before the element and "after" directly after its closing tag (slow)
   procedure insertSurrounding(basetag: TTreeNode); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
-  procedure addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil);
+  procedure addAttribute(const aname, avalue: string; const anamespace: INamespace = nil);
   procedure addAttributes(const props: array of THTMLProperty);
   procedure addNamespaceDeclaration(n: INamespace; overridens: boolean );
   procedure addChild(child: TTreeNode);
@@ -230,11 +231,11 @@ TTreeNode = class
   procedure removeElementFromDoubleLinkedList; //removes the element from the double linked list (only updates previous/next)
   function deleteElementFromDoubleLinkedList: TTreeNode; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
 
-  function clone: TTreeNode; virtual;
+  function clone(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode; virtual;
+  function clone(targetDocument: TTreeDocument): TTreeNode;
 protected
   function serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
   function serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
-  function cloneShallow(): TTreeNode;
   procedure assign(source: TTreeNode); virtual;
 
   procedure removeAndFreeNext(); //**< removes the next element (the one following self). (ATTENTION: looks like there is a memory leak for opened elements)
@@ -245,9 +246,8 @@ public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
   function toString(includeText: boolean; includeAttributes: array of string): string; reintroduce; //**< converts the element to a string (not recursive)
 
-  constructor create(); virtual;
-  constructor create(atyp: TTreeNodeType; avalue: string = ''); virtual;
-  class function createElementPair(const anodename: string): TTreeNode;
+  constructor Create;
+  procedure FreeInstance; override;
   destructor destroy();override;
   procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
@@ -266,10 +266,19 @@ TTreeAttribute = class(TTreeNode)
   realvalue: string;
   function isNamespaceNode: boolean;
   function toNamespace: INamespace;
-  constructor create(const aname, avalue: string; const anamespace: INamespace = nil); reintroduce;
 
   procedure setDataTypeHack(i: integer);
   function getDataTypeHack(): integer;
+end;
+
+TBlockAllocator = record
+  currentBuffer: PByte;
+  currentPos: SizeInt;
+  currentSize: SizeInt;
+  oldBuffers: TFPList;
+  procedure init(poolSize: SizeInt);
+  procedure done;
+  function take(size: SizeInt): PByte;
 end;
 
 { TTreeDocument }
@@ -281,6 +290,7 @@ protected
   FBaseURI, FDocumentURI: string;
   FCreator: TTreeParser;
   FNodeClass: TTreeNodeClass;
+  FBlocks: TBlockAllocator;
   function isHidden: boolean; virtual;
 public
   constructor create(creator: TTreeParser); reintroduce;
@@ -289,6 +299,12 @@ public
   property baseEncoding: TSystemCodePage read FBaseEncoding;
 
   function getCreator: TTreeParser;
+
+  function createNode: TTreeNode;
+  function createNode(atyp: TTreeNodeType; avalue: string = ''): TTreeNode;
+  function createAttribute(const aname, avalue: string; const anamespace: INamespace = nil): TTreeAttribute;
+  function createElementPair(const anodename: string): TTreeNode;
+  function clone: TTreeDocument; overload;
 
 
   //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
@@ -300,6 +316,8 @@ public
 
   procedure addRef; inline;
   procedure release; inline;
+
+  procedure FreeInstance; override;
 
   destructor destroy; override;
 end;
@@ -472,6 +490,35 @@ var
 begin
   for i:=0 to high(a) do if striEqual(a[i], s) then exit(true);
   exit(false);
+end;
+
+procedure TBlockAllocator.init(poolSize: SizeInt);
+begin
+  currentSize := poolSize;
+  currentPos := poolSize;
+  currentBuffer := nil;
+  oldBuffers := TFPList.Create;
+end;
+
+procedure TBlockAllocator.done;
+var
+  i: Integer;
+begin
+  if currentBuffer <> nil then FreeMemAndNil(currentBuffer);
+  for i := 0 to oldBuffers.Count - 1 do Freemem(oldBuffers[i]);
+  oldBuffers.free;
+end;
+
+function TBlockAllocator.take(size: SizeInt): PByte;
+begin
+  if currentPos + size >= currentSize then begin
+    if size >= currentSize then raise Exception.Create('pool overflow');
+    if currentBuffer <> nil then oldBuffers.Add(currentBuffer);
+    currentBuffer := GetMem(currentSize);
+    currentPos := 0;
+  end;
+  result := currentBuffer + currentPos;
+  currentPos += size;
 end;
 
 function TTreeNode.hasChildren(): boolean;
@@ -690,13 +737,6 @@ begin
   else result := TNamespace.Make(realvalue, value);
 end;
 
-constructor TTreeAttribute.create(const aname, avalue: string; const anamespace: INamespace = nil);
-begin
-  inherited create(tetAttribute, aname);
-  realvalue := avalue;
-  namespace := anamespace;
-end;
-
 var attributeDataTypeHackList1, attributeDataTypeHackList2: TAttributeList;
 
 procedure TTreeAttribute.setDataTypeHack(i: integer);
@@ -720,7 +760,7 @@ end;
 constructor TAttributeList.Create;
 begin
   inherited create;
-  OwnsObjects:=true;
+  OwnsObjects:=false;
 end;
 
 function TAttributeList.getAttribute(i: integer): TTreeAttribute;
@@ -754,23 +794,18 @@ begin
   result := TTreeAttribute(Objects[i]).value;
 end;
 
-procedure TAttributeList.add(const name, value: string; const namespace: INamespace = nil);
-begin
-  AddObject(name, TTreeAttribute.create(name, value, namespace));
-end;
-
 procedure TAttributeList.add(att: TTreeNode);
 begin
   AddObject(TTreeAttribute(att).value, att);
 end;
 
-function TAttributeList.clone: TAttributeList;
+function TAttributeList.clone(targetDocument: TTreeDocument; root: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TAttributeList;
 var
   i: Integer;
 begin
   result := TAttributeList.Create;
   for i:= 0 to count - 1 do
-    Result.add(items[i].clone);
+    Result.add(items[i].clone(targetDocument, root, newBaseOffset));
 end;
 
 
@@ -796,15 +831,85 @@ end;
 
 constructor TTreeDocument.create(creator: TTreeParser);
 begin
-  inherited create(tetDocument);
+  typ := tetDocument;
   FCreator := creator;
   root := self;
+  FBlocks.init(TTreeNode.InstanceSize * 200);
+  if creator <> nil then FNodeClass := creator.treeNodeClass;
+  if FNodeClass = nil then FNodeClass:=TTreeNode;
 end;
 
 function TTreeDocument.getCreator: TTreeParser;
 begin
   result := FCreator;
 end;
+
+function TTreeDocument.createNode: TTreeNode;
+begin
+  result := ttreenode(FBlocks.take(FNodeClass.InstanceSize));
+  result := TTreeNode(FNodeClass.InitInstance(result));
+end;
+
+function TTreeDocument.createNode(atyp: TTreeNodeType; avalue: string): TTreeNode;
+begin
+  case atyp of
+    tetAttribute, tetNamespace: begin
+      result := createAttribute(avalue, '');
+    end
+    else begin
+      result := createNode();
+      result.value := avalue;
+      if avalue <> '' then result.hash := nodeNameHash(avalue);
+    end;
+  end;
+  result.typ := atyp;
+end;
+
+function TTreeDocument.createAttribute(const aname, avalue: string; const anamespace: INamespace): TTreeAttribute;
+begin
+  result := TTreeAttribute(FBlocks.take(TTreeAttribute.InstanceSize));
+  result := TTreeAttribute(TTreeAttribute.InitInstance(result));
+  result.typ := tetAttribute;
+  result.value := aname;
+  if aname <> '' then result.hash := nodeNameHash(aname);
+  result.realvalue := avalue;
+  result.namespace := anamespace;
+end;
+
+function TTreeDocument.createElementPair(const anodename: string): TTreeNode;
+begin
+  result := createNode(tetOpen, anodename);
+  result.hash := nodeNameHash(anodename);
+  result.reverse := createNode(tetClose, anodename);
+  result.reverse.hash := nodeNameHash(anodename);
+  result.reverse.reverse := result;
+  result.next := Result.reverse;
+  result.reverse.previous := Result;
+end;
+
+function TTreeDocument.clone: TTreeDocument;
+var c: TTreeNode;
+  newOffset: TTreeNodeIntOffset;
+begin
+  result := TTreeDocument.create(FCreator);
+  result.FEncoding:=FEncoding;
+  result.FBaseEncoding:=FBaseEncoding;
+  result.FBaseURI:=FBaseURI;
+  result.FDocumentURI:=FDocumentURI;
+  result.FNodeClass:=FNodeClass;
+
+  //from createelementpair
+  result.reverse := result.createNode(tetClose);
+  result.reverse.reverse := result;
+  result.next := Result.reverse;
+  result.reverse.previous := Result;
+
+  //copy children
+  newOffset := 0;
+  for c in getEnumeratorChildren do
+    result.addChild(c.clone(result, result, newOffset));
+end;
+
 
 
 function TTreeDocument.getEncoding: TSystemCodePage;
@@ -832,23 +937,20 @@ begin
     Free;
 end;
 
+procedure TTreeDocument.FreeInstance;
+begin
+  CleanupInstance;
+  Freemem(self);
+end;
+
 destructor TTreeDocument.destroy;
 begin
   if next <> nil then next.freeAll();
+  FBlocks.done;
   inherited destroy;
 end;
 
 { TTreeNode }
-
-{procedure TTreeNode.deleteNext();
-var
-  temp: TTreeNode;
-begin
-  if next = nil then exit;
-  temp := next;
-  next := next.next;
-  temp.Free;
-end;}
 
 procedure TTreeNode.freeAll();
 var cur: TTreeNode;
@@ -1508,16 +1610,18 @@ procedure TTreeNode.insertSurrounding(basetag: TTreeNode);
 var closing: TTreeNode;
 begin
   if not (basetag.typ in TreeNodesWithChildren) then raise ETreeParseException.Create('Need an opening tag to surround another tag');
-  closing := TTreeNode(basetag.ClassType.Create);
+  closing :=  basetag.getDocument().createNode;
   closing.typ := tetClose;
   closing.value := basetag.value;
+  closing.hash := basetag.hash;
+  closing.root := basetag.root;
   insertSurrounding(basetag, closing);
 end;
 
-procedure TTreeNode.addAttribute(const aname, avalue: string; const anamespace: TNamespace = nil);
+procedure TTreeNode.addAttribute(const aname, avalue: string; const anamespace: INamespace = nil);
 begin
   if attributes = nil then attributes := TAttributeList.Create;
-  attributes.add(aname, avalue, anamespace);
+  attributes.AddObject(aname, getDocument().createAttribute(aname, avalue, anamespace));
   attributes.Items[attributes.count - 1].parent := self;
   attributes.Items[attributes.count - 1].offset := offset + 1;
   attributes.Items[attributes.count - 1].root := root;
@@ -1531,7 +1635,7 @@ begin
   if attributes = nil then attributes := TAttributeList.Create;
   attributes.Capacity:=attributes.count + length(props);
   for i := 0 to high(props) do begin
-    attributes.add(strFromPchar(props[i].name, props[i].nameLen), strFromPchar(props[i].value, props[i].valueLen));
+    addAttribute(strFromPchar(props[i].name, props[i].nameLen), strFromPchar(props[i].value, props[i].valueLen));
     attributes.Items[attributes.Count - 1].offset := offset + attributes.Count+1; //offset hack to sort attributes after their parent elements in result sequence
     attributes.Items[attributes.count - 1].parent := self;
     attributes.Items[attributes.count - 1].root := root;
@@ -1547,8 +1651,8 @@ begin
       if overridens then a.realvalue:=n.getURL;
       exit;
     end;
-  if n.getPrefix = '' then attributes.add('xmlns', n.getURL)
-  else attributes.add(n.getPrefix, n.getURL, XMLNamespace_XMLNS);
+  if n.getPrefix = '' then addAttribute('xmlns', n.getURL)
+  else addAttribute(n.getPrefix, n.getURL, XMLNamespace_XMLNS);
 end;
 
 procedure TTreeNode.addChild(child: TTreeNode);
@@ -1742,25 +1846,6 @@ begin
   result := serializationWrapper(self, nodeSelf, insertLineBreaks, true);
 end;
 
-function TTreeNode.cloneShallow(): TTreeNode;
-begin
-  case typ of
-    tetAttribute: begin
-      result := TTreeAttribute.create(value, TTreeAttribute(self).realvalue);
-    end;
-    tetDocument: begin
-      result := TTreeDocument.create(TTreeDocument(self).FCreator);
-      TTreeDocument(result).FEncoding:=TTreeDocument(self).FEncoding;
-      TTreeDocument(result).FBaseURI:=TTreeDocument(self).FBaseURI;
-      TTreeDocument(result).FDocumentURI:=TTreeDocument(self).FDocumentURI;
-    end
-    else begin
-      result := TTreeNode(newinstance);
-      result.create();
-    end;
-  end;
-  result.Assign(self);
-end;
 
 procedure TTreeNode.assign(source: TTreeNode);
 var
@@ -1782,37 +1867,62 @@ begin
 end;
 
 
-function TTreeNode.clone: TTreeNode;
+function TTreeNode.clone(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode;
+  function cloneShallow(t: TTreeNode): TTreeNode;
+  begin
+    result := targetDocument.createNode;
+    result.assign(t);
+    result.root := newRoot;
+    result.offset := newBaseOffset;
+    inc(newBaseOffset);
+  end;
 var
   kid: TTreeNode;
 begin
   case typ of
-    tetOpen, tetDocument: begin
-      result := cloneShallow;
-      result.reverse := reverse.cloneShallow;
+    tetOpen: begin
+      result := cloneShallow(self);
+      if attributes <> nil then result.attributes := attributes.clone(targetDocument, newRoot, newBaseOffset);
+      result.reverse := cloneShallow(reverse);
       result.reverse.reverse := result;
       result.next := result.reverse;
       result.reverse.previous := result;
 
       kid := getFirstChild();
       while kid <> nil do begin
-        result.addChild(kid.clone);
+        result.addChild(kid.clone(targetDocument, newRoot, newBaseOffset));
         kid := kid.getNextSibling();
       end;
-
-      if attributes <> nil then result.attributes := attributes.clone;
+    end;
+    tetText, tetComment: result := cloneShallow(self);
+    tetAttribute, tetNamespace: begin
+      result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue, namespace);
+      result.typ := typ;
+      result.root := newRoot;
+      result.offset := newBaseOffset;
+      inc(newBaseOffset);
     end;
     tetProcessingInstruction: begin
-      result := cloneShallow;
-      if attributes <> nil then attributes := attributes.clone;
+      result := cloneShallow(self);
+      if attributes <> nil then result.attributes := attributes.clone(targetDocument, newRoot, newBaseOffset);
     end;
-    tetText, tetComment, tetAttribute: result := cloneShallow;
+    tetDocument: exit( TTreeDocument(self).clone() );
     tetClose: raise ETreeParseException.Create('Cannot clone closing tag');
     else raise ETreeParseException.Create('Unknown tag');
   end;
   result.previous := nil;
-  if result.reverse <> nil then Result.reverse.next := nil
-  else result.next := next;
+  if result.reverse <> nil then begin
+    Result.reverse.next := nil;
+    result.reverse.offset := newBaseOffset;
+    inc(newBaseOffset);
+  end else result.next := next;
+end;
+
+function TTreeNode.clone(targetDocument: TTreeDocument): TTreeNode;
+var nbo: TTreeNodeIntOffset;
+begin
+  nbo := 0;
+  result := clone(targetDocument, targetDocument, nbo);
 end;
 
 procedure TTreeNode.removeAndFreeNext();
@@ -1909,27 +2019,17 @@ begin
   end;
 end;
 
-constructor TTreeNode.create();
+constructor TTreeNode.Create;
 begin
+  raise ETreeParseException.Create('TTreeNodes cannot be directly created');
 end;
 
-constructor TTreeNode.create(atyp: TTreeNodeType; avalue: string);
+procedure TTreeNode.FreeInstance;
 begin
-  self.typ := atyp;
-  self.value := avalue;
-  if avalue <> '' then self.hash := nodeNameHash(avalue);
+  CleanupInstance;
 end;
 
-class function TTreeNode.createElementPair(const anodename: string): TTreeNode;
-begin
-  result := TTreeNodeClass(ClassType).create(tetOpen, anodename);
-  result.hash := nodeNameHash(anodename);
-  result.reverse := TTreeNodeClass(ClassType).create(tetClose, anodename);
-  result.reverse.hash := nodeNameHash(anodename);
-  result.reverse.reverse := result;
-  result.next := Result.reverse;
-  result.reverse.previous := Result;
-end;
+
 
 destructor TTreeNode.destroy();
 begin
@@ -2037,7 +2137,7 @@ end;
 
 function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string; offset: SizeInt): TTreeNode;
 begin
-  result:=treeNodeClass.Create;
+  result:=FCurrentTree.createNode();
   result.typ := typ;
   result.value := s;
   result.root := FCurrentTree;

@@ -107,8 +107,7 @@ TTemplateElement=class(TTreeNode)
 
   procedure setTemplateAttribute(name, avalue: string);
 
-  constructor create; override;
-  constructor create(attyp: TTemplateElementType);
+  procedure init(attyp: TTemplateElementType);
   procedure postprocess(parser: THtmlTemplateParser);
   procedure assign(asource: TTreeNode); override;
   procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
@@ -836,12 +835,7 @@ begin
  templateAttributes.Values[name] := avalue;
 end;
 
-constructor TTemplateElement.create;
-begin
-
-end;
-
-constructor TTemplateElement.create(attyp: TTemplateElementType);
+procedure TTemplateElement.init(attyp: TTemplateElementType);
 begin
   templateType:=attyp;
   if attyp < firstRealTemplateType then raise ETemplateParseException.Create('invalid type');
@@ -890,12 +884,12 @@ begin
         templateAttributes.Add(attributes.Items[i].value+'='+attributes.Items[i].realvalue);
         attributes.Delete(i);
       end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
-        temp := TTemplateElement.createElementPair('s') as TTemplateElement;
+        temp := getDocument().createElementPair('s') as TTemplateElement;
         temp.namespace := TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't');
         temp.templateType:=tetCommandShortRead;
         temp.reverse.namespace := temp.namespace;
         temp.templateReverse.templateType:=tetIgnore;
-        temp.addChild(TTemplateElement.create());
+        temp.addChild(getDocument().createNode());
         temp.templateNext.typ := tetText;
         temp.templateNext.templateType := tetIgnore;
         rv := copy(rv, 2, length(rv) - 2);
@@ -2207,8 +2201,16 @@ begin
   result:=parseHTML(strLoadFromFile(htmlfilename),htmlfilename);
 end;
 
-procedure THtmlTemplateParser.parseTemplate(template: string;
-  templateName: string);
+procedure THtmlTemplateParser.parseTemplate(template: string; templateName: string);
+var templateDocument: TTreeDocument;
+
+function createTemplateElement(attyp: TTemplateElementType): TTemplateElement;
+begin
+  result := templateDocument.createNode as TTemplateElement;
+  result.init(attyp);
+  result.root := templateDocument;
+end;
+
 var el: TTemplateElement;
     defaultTextMatching: String;
     defaultCaseSensitive: string;
@@ -2219,7 +2221,8 @@ var el: TTemplateElement;
 begin
    //read template
   FTemplate.parseTree(template, templateName);
-  el := TTemplateElement(FTemplate.getLastTree.next);
+  templateDocument := FTemplate.getLastTree.getDocument();
+  el := TTemplateElement(templateDocument.next);
   while el <> nil do begin
     el.postprocess(self);
     if (el.typ = tetOpen) and (el.templateType = tetCommandShortRead) then
@@ -2229,14 +2232,10 @@ begin
   end;
 
 
-  //detect meta encoding (doesn't change encoding; just sets it, so we can convert from it to another one later)
-  el := TTemplateElement(FTemplate.getLastTree.next);
-
-
   defaultTextMatching := 'starts-with';
   defaultCaseSensitive := '';
 
-  el := TTemplateElement(FTemplate.getLastTree.next);
+  el := TTemplateElement(templateDocument.next);
   while el <> nil do begin
     if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
       if el.templateAttributes.Values['encoding'] <> '' then
@@ -2260,8 +2259,8 @@ begin
           temp.flags += [tefOptional];
         end;
         if (el.value <> '') and ((el.value[1] in ['*', '+']) or ((el.value[1] = '{') and wregexprExtract(FRepetitionRegEx, el.value, matches))) then begin
-          looper := TTemplateElement.create(tetCommandLoopOpen);
-          TTemplateElement(el.getPrevious()).insertSurrounding(looper, TTemplateElement.create(tetCommandLoopClose));
+          looper := createTemplateElement(tetCommandLoopOpen);
+          TTemplateElement(el.getPrevious()).insertSurrounding(looper, createTemplateElement(tetCommandLoopClose));
           if el.value[1] <> '{' then begin
             if el.value[1] = '+' then looper.setTemplateAttribute('min', '1');
             delete(el.value,1,1);
@@ -2276,7 +2275,7 @@ begin
         else if el.value[1] = '{' then begin
           el.value[1] := ' ';
           el.value[length(el.value)] := ' ';
-          el.insertSurrounding(TTemplateElement.create(tetCommandShortRead));
+          el.insertSurrounding(createTemplateElement(tetCommandShortRead));
           el.templateType := tetIgnore;
         end;
       end;

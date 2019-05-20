@@ -905,7 +905,7 @@ begin
   f('/<2', 'err:XPST0003', '<a>1</a>');
 
   t('element a {"b"}', 'b');
-  t('document { document { element a {"b"}}}', 'b');
+  t('document { document { element a {"b"}}}', 'b'); //if there is crash at deepNodeText that might be here
   t('outer-xml(<a xmlns="example">abc</a>)', '<a xmlns="example">abc</a>');
   t('outer-xml(<test:a xmlns:test="123">abc</test:a>)', '<test:a xmlns:test="123">abc</test:a>');
   m('declare namespace test = "foobar"; outer-xml(<test:a>abc</test:a>)', '<test:a xmlns:test="foobar">abc</test:a>');

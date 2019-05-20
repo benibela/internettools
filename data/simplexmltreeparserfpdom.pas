@@ -117,7 +117,7 @@ var doc: TTreeDocument;
   begin
     nscount := namespaces.Count;
     if node is TDOMElement then begin
-      new := TTreeNode.createElementPair(name(node));
+      new := doc.createElementPair(name(node));
       new.root := parent.root; //if we do not set it now, further children do not know their document
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
@@ -133,10 +133,11 @@ var doc: TTreeDocument;
       for i := 0 to node.ChildNodes.Count - 1 do
         importNode(new, node.ChildNodes[i]);
     end else begin
-      if (node is TDOMText) or (node is TDOMCDATASection) then new := TTreeNode.create(tetText, convert(node.NodeValue))
-      else if node is TDOMComment then new := TTreeNode.create(tetComment, convert(node.NodeValue))
+      if (node is TDOMText) or (node is TDOMCDATASection) then new := doc.createNode(tetText, convert(node.NodeValue))
+      else if node is TDOMComment then new := doc.createNode(tetComment, convert(node.NodeValue))
       else if node is TDOMProcessingInstruction then begin
-        new := TTreeNode.create(tetProcessingInstruction, convert(node.NodeName));
+        new := doc.createNode(tetProcessingInstruction, convert(node.NodeName));
+        new.root := doc; //for attribute
         new.addAttribute('', convert(node.NodeValue));
       end else exit;
       //root is set below
@@ -163,7 +164,7 @@ begin
   doc.documentURI:=dom{%H-}.baseURI;
   doc.root := doc;
 
-  doc.reverse := TTreeNode.create(tetClose);
+  doc.reverse := doc.createNode(tetClose);
   doc.reverse.reverse := doc;
   doc.next := doc.reverse;
   doc.next.previous := doc;

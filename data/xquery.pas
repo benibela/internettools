@@ -2112,7 +2112,7 @@ type
     implicitNamespaces: TNamespaceList;
     constructor create(atype: TTreeNodeType; aname: txqterm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
-    function evaluate(var context: TXQEvaluationContext; root: TTreeNode; var baseOffset: longint): IXQValue;
+    function evaluate(var context: TXQEvaluationContext; document: TTreeDocument; root: TTreeNode; var baseOffset: TTreeNodeIntOffset): IXQValue;
     function getContextDependencies: TXQContextDependencies; override;
     function isNamespaceConstructor: boolean;
     function clone: TXQTerm; override;

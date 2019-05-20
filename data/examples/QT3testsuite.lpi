@@ -88,14 +88,14 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases all --test-set=demos --test-case rayt"/>
+        <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases all --test-set=CompDocConstructor     --test-case Constr-docnode-nested-4"/>
         <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases all --test-set=demos --test-case rayt"/>
+            <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases all --test-set=CompDocConstructor     --test-case Constr-docnode-nested-4"/>
             <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
           </local>
         </Mode0>
