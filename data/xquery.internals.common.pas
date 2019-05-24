@@ -266,9 +266,7 @@ end;
 
 function htmlStrEscape(s: string; attrib: boolean): string;
 var
-  i: Integer;
   builder: TXHTMLStrBuilder;
-
 begin
   builder.init(@result, length(s));
   if attrib then builder.appendHTMLAttrib(s)

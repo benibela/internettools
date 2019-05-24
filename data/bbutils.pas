@@ -4623,7 +4623,7 @@ end;
 //TODO: make it iterative => merge the two functions
 procedure stableSortSD(a,b: PAnsiChar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
 const psize = sizeof(TSortData);
-var tempArray: array of TSortData;
+var tempArray: array of TSortData = nil;
     length:SizeInt;
 begin
   //calculate length and check if the input (size) is possible
