@@ -178,7 +178,7 @@ begin
             marker:=pos;
 
             inc(pos);
-            setlength(properties,0);
+            properties := nil;
             while (pos<=htmlEnd) and not (pos^ in (['/','>','?']+WHITE_SPACE)) do
               inc(pos);
             tempLen:=pos-marker;
@@ -280,13 +280,13 @@ end;
 function getProperty(propertyName: string; properties:THTMLProperties):string;
 var i:integer;
 begin
+  result:='';
   for i:=0 to high(properties) do
     if strliequal(properties[i].name,@propertyName[1],properties[i].nameLen,length(propertyName)) then begin
       setlength(result,properties[i].valueLen);
       move(properties[i].value[0],result[1],properties[i].valueLen);
       exit;
     end;
-  result:='';
 end;
 
 type TTempSearchClassText=class

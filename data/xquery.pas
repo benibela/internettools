@@ -2751,7 +2751,7 @@ type
 
     procedure addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
 
-  private
+  protected
     shared: boolean;
     varCount, historyCount: integer;
     varstorage: array of TXQVariable;

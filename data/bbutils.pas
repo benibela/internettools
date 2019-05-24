@@ -1885,6 +1885,7 @@ var
 begin
   p := pointer(s);
   len := length(s);
+  result := '';
   SetLength(result, len);
   q := pointer(result) + len;
   while len > 0 do begin
@@ -2555,6 +2556,7 @@ end;
 
 function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage): RawByteString;
 begin
+  result := '';
   setlength(result, strGetUnicodeCharacterUTFLength(character));
   strGetUnicodeCharacterUTF(character, @result[1]);
   case encoding of
@@ -2827,7 +2829,7 @@ begin
     $1FC7: special := $01C60006; //ῇ 1FC7; 1FC7; 0397 0342 0345; 0397 0342 0399;
     $1FF7: special := $01CC0006; //ῷ 1FF7; 1FF7; 03A9 0342 0345; 03A9 0342 0399;
   end;
-  if special <> 0 then begin setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
+  if special <> 0 then begin result := ''; setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
   else result := strGetUnicodeCharacter(CodePoint);
 end;
 
@@ -2866,7 +2868,7 @@ begin
     $1FCC: special := $004E0003; //ῌ 1FCC; 1FC3; 1FCC; 0397 0399;
     $1FFC: special := $00510003; //ῼ 1FFC; 1FF3; 1FFC; 03A9 0399;
   end;
-  if special <> 0 then begin setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
+  if special <> 0 then begin result := ''; setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
   else result := strGetUnicodeCharacter(CodePoint);
 end;
 
@@ -4660,8 +4662,8 @@ end;
 
 procedure stableSort(a,b: pointer; size: SizeInt;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
-var tempArray: array of pointer; //assuming sizeof(pointer) = sizeof(TSortData)
-    tempBackArray: array of SizeInt;
+var tempArray: array of pointer = nil; //assuming sizeof(pointer) = sizeof(TSortData)
+    tempBackArray: array of SizeInt = nil;
     i, length:SizeInt;
     data: TCompareFunctionWrapperData;
     tempData: pansichar;

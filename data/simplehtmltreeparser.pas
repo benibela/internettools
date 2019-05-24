@@ -314,8 +314,8 @@ public
   //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
   procedure setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
 
-  procedure addRef; inline;
-  procedure release; inline;
+  procedure addRef; //inline;
+  procedure release; //inline;
 
   procedure FreeInstance; override;
 

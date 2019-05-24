@@ -580,8 +580,8 @@ begin
 end;
 
 function TMIMEMultipartData.compose(out boundary: string; boundaryHint: string): string;
-var joinedHeaders: TStringArray;
-    encodedData: TStringArray;
+var joinedHeaders: TStringArray = nil;
+    encodedData: TStringArray = nil;
     i: Integer;
     ok: Boolean;
 begin
