@@ -1085,7 +1085,7 @@ end;
 
 procedure TTemplateAction.initFromTree(t: TTreeNode);
 begin
-
+  ignore(t);
 end;
 
 procedure TTemplateAction.addChildFromTree(t: TTreeNode);

@@ -1121,7 +1121,7 @@ begin
     temp := temp div ELEMENT_OVERFLOW;
     len += 1;
   end;
-  result := nil;
+  result.digits := nil;
   SetLength(result.digits, max(len, 1));
   
   if a <> low(Integer) then temp := abs(a)
@@ -1157,7 +1157,7 @@ begin
     temp := temp div ELEMENT_OVERFLOW;
     len += 1;
   end;
-  result := nil;
+  result.digits := nil;
   SetLength(result.digits, max(len, 1));
   
   if a <> low(Int64) then temp := abs(a)
@@ -1193,7 +1193,7 @@ begin
     temp := temp div ELEMENT_OVERFLOW;
     len += 1;
   end;
-  result := nil;
+  result.digits := nil;
   SetLength(result.digits, max(len, 1));
   
   

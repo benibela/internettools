@@ -1330,10 +1330,10 @@ var temp: IXQValue;
   sname: string;
   svalue: string;
 begin
-  setlength(names, 0);
-  setlength(values, 0);
-  SetLength(specialNames, 0);
-  SetLength(specialValues, 0);
+  names := nil;
+  values := nil;
+  specialNames := nil;
+  specialValues := nil;
   for v in value.GetEnumeratorPtrUnsafe do
     if v^ is TXQValueObject then begin
       if (v^ as TXQValueObject).prototype = nil then temp := v^
@@ -1527,7 +1527,7 @@ end;
 
 function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var names, values: array of TStringArray;
-    used: array of array of boolean;
+    used: array of array of boolean = nil;
     rep: Integer;
     res: String;
     cmp: TStringComparisonFunc;
@@ -1536,6 +1536,7 @@ var names, values: array of TStringArray;
     specialValues: TXQVArray;
     encoding: TSystemCodePage;
 begin
+  names := nil; values := nil;
   setlength(names, 2); setlength(values, 2);
   cmp := @context.staticContext.nodeCollation.equal; ignore(context);
   encoding := CP_UTF8;
@@ -1591,7 +1592,7 @@ end;
 
 function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
   function combineHttpEncoded(obj: TXQValueObject): IXQValue;
-  var temp: TXQVArray;
+  var temp: TXQVArray = nil;
       propName, oldUrl, prefix: String;
       newEncoded: IXQValue;
       oldUrlView: TStringView;
@@ -4858,6 +4859,7 @@ begin
     number -= aaa;
     inc(len);
   end;
+  result := '';
   SetLength(result, len);
   for i := 1 to len do begin
     divideModNoAlias(quotient, remainder, number, base, 0, [bddfFillIntegerPart, bddfNoFractionalPart]);
@@ -4883,7 +4885,7 @@ function formatUnicodeInteger(arabic, primaryFormat: string; family: integer): s
     separators: array of record
       pos: integer;
       sep: string;
-    end;
+    end = nil;
     sepcount: Integer;
     totalDigits: Integer;
     delta: Integer;
@@ -5185,7 +5187,7 @@ var
     modifier: char;
     format: string;
     minwidth, maxwidth: integer;
-  end;
+  end = nil;
   picturedlength: Integer;
   commapos: SizeInt;
   tempstrmin, tempstrmax: string;
@@ -5510,7 +5512,11 @@ begin
         if component = '' then begin
           if format = '' then format := '0';
           if pictured[i].modifier <> #0 then format += ';' + pictured[i].modifier else format += ';';
-          xqvalueArray(tempxqv, [xqvalue(number), xqvalue(format), xqvalue(lang)]);
+          tempxqv := nil;
+          SetLength(tempxqv, 3);
+          tempxqv[0] := xqvalue(number);
+          tempxqv[1] := xqvalue(format);
+          tempxqv[2] := xqvalue(lang);
           component := xqFunctionFormat_Integer(context, 3, @tempxqv[0]).toString;
         end;
       end;
@@ -6126,7 +6132,7 @@ procedure sortXQList(list: TXQVList; const context: TXQEvaluationContext; {%H-}a
 var
   sortContext: TSortingContext;
   keyfunc: TXQValueFunction;
-  tempArray: array of TXPair;
+  tempArray: array of TXPair = nil;
   count, i, stacksize: Integer;
   stack: TXQEvaluationStack;
 begin
@@ -6355,7 +6361,7 @@ end;
 function xqFunctionExtract(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
  regEx: TWrappedRegExpr;
- matches: array of integer;
+ matches: array of integer = nil;
  all: Boolean;
  i: Integer;
  input: string;
@@ -6473,7 +6479,7 @@ var
   iter: TXQValueEnumeratorPtrUnsafe;
   p: SizeInt;
   list: TXQVList;
-  indices: TSizeintArray;
+  indices: TSizeintArray = nil;
   i: SizeInt;
   pv: PIXQValue;
 begin
@@ -6800,7 +6806,7 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   obj: TXQValueObject;
   pp: TXQProperty;
-  keys: array of String;
+  keys: array of String = nil;
   i: Integer;
   pv: PIXQValue;
   keep: Boolean;

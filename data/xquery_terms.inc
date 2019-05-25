@@ -134,15 +134,6 @@ begin
   result := self;
 end;
 
-procedure TXQTermWithChildren.evaluateChildren(var context: TXQEvaluationContext; out results: TXQVArray);
-var
-  i: Integer;
-begin
-  setlength(results, length(children));
-  for i:=0 to high(children) do
-    results[i] := children[i].evaluate(context);
-end;
-
 function TXQTermWithChildren.getChildrenContextDependencies: TXQContextDependencies;
 var
   i: Integer;
@@ -1952,7 +1943,7 @@ var
   sortingCache: TFPList;
   finalResult: TXQValueSequence;
   currentTuple: TOrderedTuple;
-  counts: array of integer;
+  counts: array of integer = nil;
 
 
   procedure evaluateForLoop(const pos: Integer);
@@ -2288,8 +2279,8 @@ var
     lastTuple: TOrderedTuple;
     //Grouping collects for all tuples that have the same value in the grouping vars all values of the nonGroupingVars
     //We put these values for each nonGroupingVars in a tempList
-    tempLists: array of TXQVList;
-    nonGroupingVars: array of integer;
+    tempLists: array of TXQVList = nil;
+    nonGroupingVars: array of integer = nil;
 
     procedure closeGroupedTuple;
     var k: integer;
@@ -4420,7 +4411,7 @@ end;
 
 
 function makeNumberedVariable(i: integer; index: integer = -1): TXQTermVariable;
-var temp: string;
+var temp: string = '';
 begin
   SetLength(temp, sizeof(i)+1);
   temp[1] := '0';

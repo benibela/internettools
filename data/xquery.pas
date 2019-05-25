@@ -1584,7 +1584,6 @@ type
     procedure push(t: TXQTerm);
     function push(t: array of TXQTerm): TXQTerm;
   protected
-    procedure evaluateChildren(var context: TXQEvaluationContext; out results: TXQVArray);
     function getChildrenContextDependencies: TXQContextDependencies; virtual;
   public
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
@@ -2649,7 +2648,7 @@ public
   //** The point is that it only creates a sequence if there are multiple values, and it is especially fast, if you do not expect multiple values.
   procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQValueSequence; const add: IXQValue);
 
-  procedure xqvalueArray(var result: TXQVArray; a: array of IXQValue);
+
   //**Assigns source to dest without updating ref counts @br
   //**This can be much faster, but will cause a crash, unless the reference count is corrected later, e.g. by xqvalueVaporize on source or dest.
   procedure xqvalueMoveNoRefCount(const source: IXQValue; var dest: IXQValue ); inline;
@@ -3681,15 +3680,6 @@ begin
     seq.add(add);
   end;
 end;
-
-procedure xqvalueArray(var result: TXQVArray; a: array of IXQValue);
-var
-  i: Integer;
-begin
-  setlength(result, length(a));
-  for i := 0 to high(a) do Result[i] := a[i];
-end;
-
 
 
 
@@ -7571,12 +7561,6 @@ begin
   exit(nil);
 end;
 
-function recordClone(p: pointer; s: Integer): pointer;
-begin
-  result := getMem(s);
-  Move(p^, result^, s);
-end;
-
 class procedure TXQueryEngine.registerCollation(const collation: TXQCollation);
 begin
   collations.AddObject(collation.id, collation);
@@ -8035,11 +8019,6 @@ begin
     expect(',');
   end;
 end;
-
-
-{type TCompressedQuery = record
-  matching: TXQPathMatching;
-end;}
 
 
 class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);

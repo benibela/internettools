@@ -591,6 +591,7 @@ begin
       if from < 0 then raiseFileError(Error_Out_Of_Range, IntToStr(from) + ' < 0');
       if length = -1 then length := stream.Size - from;
       if length + from > stream.Size then raiseFileError(Error_Out_Of_Range, IntToStr(from)+' + ' +IntToStr(length) + ' > ' + IntToStr(stream.Size));
+      result := '';
       SetLength(result, length);
       stream.Position := from;
       if length > 0 then
@@ -712,22 +713,22 @@ begin
   result := xqvalue(TInternetAccess.urlEncodeData(path, ueXPathFromIRI) );
 end;
 
-function dir_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function dir_separator({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := xqvalue(DirectorySeparator);
 end;
 
-function line_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function line_separator({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := xqvalue(LineEnding);
 end;
 
-function path_separator({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function path_separator({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := xqvalue(PathSeparator);
 end;
 
-function temp_dir({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function temp_dir({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   result := xqvalue(GetTempDir());
 end;

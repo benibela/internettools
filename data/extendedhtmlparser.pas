@@ -1514,7 +1514,7 @@ var xpathText: TTreeNode;
     else templateStart := templateStart.templateReverse.templateNext;
   end;
 
-    procedure HandleCommandShortRead(usePending: boolean = false);
+  procedure HandleCommandShortRead(usePending: boolean = false);
       procedure doActualRead(templateElement: TTemplateElement);
       var varcount: integer;
         read: IXQValue;
@@ -1811,7 +1811,7 @@ var xpathText: TTreeNode;
   var outSiblingIndices: array of integer;
     childrenStart, lastHTMLStartMatch: TTreeNode;
     header, curChild: TTemplateElement;
-    counts: array of integer;
+    counts: array of integer = nil;
     minCounts, maxCounts, usedCounts: pinteger;
     count: Integer;
     remainingMinCount, firstActiveChild, i: integer;
@@ -1934,7 +1934,7 @@ begin
  // assert(templateStart <> templateEnd);
   level := FVariableLog.pushAll;
   xpathText := nil;
-  pendingShortRead.read := nil;
+  pendingShortRead.read := nil; //no need to initialize pendingShortRead.xpathText as it is set before pendingShortRead.read is set to non-null;
   switchCommandAccepted:=false;
   while (htmlStart <> nil) and
         (templateStart <> nil) and (templateStart <> templateEnd) and

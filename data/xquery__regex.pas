@@ -485,6 +485,7 @@ var
   end;
 
 begin
+  result := nil;
   SetLength(result, length(regexpr));
   groups := nil;
   reslen := 0;

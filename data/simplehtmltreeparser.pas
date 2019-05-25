@@ -926,12 +926,12 @@ begin
   FEncoding := new;
 end;
 
-procedure TTreeDocument.addRef; inline;
+procedure TTreeDocument.addRef;
 begin
   InterlockedIncrement(FRefCount);
 end;
 
-procedure TTreeDocument.release; inline;
+procedure TTreeDocument.release;
 begin
   if InterlockedDecrement(FRefCount) = 0 then
     Free;

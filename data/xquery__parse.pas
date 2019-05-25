@@ -4179,7 +4179,6 @@ begin
   inherited;
 end;
 
-type TXQNativeModuleBreaker = class(TXQNativeModule);
 
 function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
