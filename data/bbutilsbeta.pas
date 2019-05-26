@@ -123,6 +123,14 @@ type
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
   end;
+
+  TCriticalSectionHelper = type helper for TRTLCriticalSection
+    procedure init;
+    procedure enter;
+    procedure leave;
+    procedure done;
+  end;
+
   {$endif}
 
 function objInheritsFrom(o: TObject; c: TClass): boolean; inline;
@@ -134,6 +142,7 @@ function objInheritsFrom(o: TObject; c: TClass): boolean;
 begin
   result := assigned(o) and o.InheritsFrom(c);
 end;
+
 
 
 
@@ -400,6 +409,27 @@ function TBB2StringHelper.unsafeView: TStringView;
 begin
   result.init(self);
 end;
+
+procedure TCriticalSectionHelper.init;
+begin
+  InitCriticalSection(self);
+end;
+
+procedure TCriticalSectionHelper.enter;
+begin
+  EnterCriticalSection(self)
+end;
+
+procedure TCriticalSectionHelper.leave;
+begin
+  LeaveCriticalSection(self);
+end;
+
+procedure TCriticalSectionHelper.done;
+begin
+  DoneCriticalSection(self);
+end;
+
 {$endif}
 
 end.
