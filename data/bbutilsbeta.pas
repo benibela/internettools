@@ -124,7 +124,7 @@ type
     function unsafeView: TStringView;
   end;
 
-  TCriticalSectionHelper = type helper for TRTLCriticalSection
+  TCriticalSectionHelper = record helper for TRTLCriticalSection
     procedure init;
     procedure enter;
     procedure leave;
