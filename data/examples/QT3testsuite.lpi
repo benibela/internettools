@@ -117,6 +117,7 @@
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
       <OtherUnitFiles Value="U:\components\pascal\data;..\..\import\synapse;U:\components\pascal\internet;U:\components\lazarus\dialogs;U:\components\pascal\system;\home\benito\hg\programs\contests\euler\;\home\benito\hg\components\pascal\internet\;\home\benito\hg\components\lazarus\dialogs\;\home\benito\hg\components\pascal\system\;\home\benito\hg\components\pascal\import\regexpr\source\"/>
+      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       <SrcPath Value="\home\benito\hg\components\pascal\import\synapse\;..\..\import\synapse"/>
     </SearchPaths>
     <Parsing>

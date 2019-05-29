@@ -3838,14 +3838,14 @@ begin
     resseq := TXQValueSequence.create();
     result := resseq;
     while node <> nil do begin
-      if node.attributes <> nil then
-        for attrib in node.attributes do
-          if (not useTrueId and context.staticContext.nodeCollation.equal(attrib.value, 'id')) or
-             (useTrueId  and ((attrib.getDataTypeHack() = 1) or ((attrib.value = 'id') and equalNamespaces(attrib.namespace, XMLNamespace_XML) ) )) then
-            if isSearchedId(attrib.realvalue) then begin
-              resseq.add(xqvalue(node));
-              break;
-            end;
+      for attrib in node.getEnumeratorAttributes do begin
+        if (not useTrueId and context.staticContext.nodeCollation.equal(attrib.value, 'id')) or
+           (useTrueId  and ((attrib.getDataTypeHack() = 1) or ((attrib.value = 'id') and equalNamespaces(attrib.namespace, XMLNamespace_XML) ) )) then
+          if isSearchedId(attrib.realvalue) then begin
+            resseq.add(xqvalue(node));
+            break;
+          end;
+      end;
       node := node.next;
     end;
   finally
@@ -3913,13 +3913,13 @@ begin
     resseq := TXQValueSequence.create();
     result := resseq;
     while node <> nil do begin
-      if node.attributes <> nil then
-        for attrib in node.attributes do
-          if  attrib.getDataTypeHack() = 2 then
-            if matchesSearchedId(attrib.realvalue) then begin
-              resseq.add(xqvalue(node));
-              break;
-            end;
+      for attrib in node.getEnumeratorAttributes do begin
+        if  attrib.getDataTypeHack() = 2 then
+          if matchesSearchedId(attrib.realvalue) then begin
+            resseq.add(xqvalue(node));
+            break;
+          end;
+      end;
       node := node.next;
     end;
   finally

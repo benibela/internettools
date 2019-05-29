@@ -114,6 +114,7 @@ var doc: TTreeDocument;
     i: Integer;
     new: TTreeNode;
     nscount: Integer;
+    lastAttribute: TTreeAttribute;
   begin
     nscount := namespaces.Count;
     if node is TDOMElement then begin
@@ -121,12 +122,12 @@ var doc: TTreeDocument;
       new.root := parent.root; //if we do not set it now, further children do not know their document
       if node.HasAttributes then
         for i := 0 to node.Attributes.Length - 1 do begin
-          new.addAttribute(name(node.Attributes[i]), convert(node.Attributes[i].NodeValue));
+          lastAttribute := new.addAttribute(name(node.Attributes[i]), convert(node.Attributes[i].NodeValue));
           if (node.Attributes[i].NamespaceURI <> '') and (node.Attributes[i].NodeName <> 'xmlns') then
-            new.attributes.Items[new.attributes.count - 1].namespace := getNamespace(convert(node.Attributes[i].NamespaceURI), convert(node.Attributes[i].Prefix));
+            lastAttribute.namespace := getNamespace(convert(node.Attributes[i].NamespaceURI), convert(node.Attributes[i].Prefix));
           case TDOMAttr(node.Attributes[i]).DataType of
-          dtId:  new.attributes.Items[new.attributes.count - 1].setDataTypeHack(1);
-          dtIdRef, dtIdRefs: new.attributes.Items[new.attributes.count - 1].setDataTypeHack(2);
+          dtId:  lastAttribute.setDataTypeHack(1);
+          dtIdRef, dtIdRefs: lastAttribute.setDataTypeHack(2);
           end;
 
         end;
@@ -180,11 +181,9 @@ begin
   while temp <> nil do begin
     temp.offset := offset;
     offset += 1;
-    if temp.attributes <> nil then begin
-      for a in temp.attributes do begin
-        a.offset := offset;
-        offset += 1;
-      end;
+    for a in temp.getEnumeratorAttributes do begin
+      a.offset := offset;
+      offset += 1;
     end;
     temp := temp.next;
   end;

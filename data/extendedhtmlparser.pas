@@ -109,7 +109,7 @@ TTemplateElement=class(TTreeNode)
 
   procedure init(attyp: TTemplateElementType);
   procedure postprocess(parser: THtmlTemplateParser);
-  procedure assign(asource: TTreeNode); override;
+  procedure assignNoAttributes(asource: TTreeNode); override;
   procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   procedure freeCaches;
   destructor destroy;override;
@@ -864,46 +864,51 @@ procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
 var
  curChild: TTreeNode;
  temp: TTemplateElement;
- i: Integer;
  rv: String;
+ tempattrib, attrib: TTreeAttribute;
 begin
   //inherited initialized;
-  if attributes <> nil then
-    for i := attributes.Count - 1 downto 0 do
-      if attributes.Items[i].getNamespaceURL() = XMLNamespaceUrl_XMLNS then
-        attributes.delete(i);
+  attrib := attributes;
+  while attrib <> nil do begin
+    tempattrib := TTreeAttribute(attrib.next);
+    if attrib.getNamespaceURL() = XMLNamespaceUrl_XMLNS then
+      removeAttribute(attrib);
+    attrib := tempattrib;
+  end;
 
   templateType:=nodeToCommand(self);
 
-  if attributes <> nil then
-    for i := attributes.Count - 1 downto 0 do begin
-      rv := attributes.Items[i].realvalue;
-      if (templateType in [firstRealTemplateType..high(TTemplateElementType)] - [tetMatchElementOpen])
-         or (attributes.Items[i].getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin
-        if templateAttributes = nil then templateAttributes := tStringAttributeList.Create;
-        templateAttributes.Add(attributes.Items[i].value+'='+attributes.Items[i].realvalue);
-        attributes.Delete(i);
-      end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
-        temp := getDocument().createElementPair('s') as TTemplateElement;
-        temp.namespace := TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't');
-        temp.templateType:=tetCommandShortRead;
-        temp.reverse.namespace := temp.namespace;
-        temp.templateReverse.templateType:=tetIgnore;
-        temp.addChild(getDocument().createNode());
-        temp.templateNext.typ := tetText;
-        temp.templateNext.templateType := tetIgnore;
-        rv := copy(rv, 2, length(rv) - 2);
-        if isVariableName(rv) then temp.templateNext.value:= rv + ':= @'+attributes.Items[i].getNodeName()
-        else temp.templateNext.value:='@'+attributes.Items[i].getNodeName() + ' / (' + rv +')';
-        addChild(temp);
-        if templateAttributes = nil then templateAttributes := TStringAttributeList.Create;
-        //todo: optimize ?
-        if templateAttributes.Values['condition'] = '' then templateAttributes.Values['condition'] := 'exists(@'+attributes.Items[i].getNodeName()+')'
-        else templateAttributes.Values['condition'] := '(' + templateAttributes.Values['condition'] + ') and exists(@'+attributes.Items[i].getNodeName()+')';
-        //attributes.Delete(i); // Items[i].realvalue := '';
-        attributes.Delete(i); // Items[i].realvalue := '';
-      end;
+  attrib := attributes;
+  while attrib <> nil do begin
+    tempattrib := TTreeAttribute(attrib.next);
+    rv := attrib.realvalue;
+    if (templateType in [firstRealTemplateType..high(TTemplateElementType)] - [tetMatchElementOpen])
+       or (attrib.getNamespaceURL() = HTMLPARSER_NAMESPACE_URL) then begin
+      if templateAttributes = nil then templateAttributes := tStringAttributeList.Create;
+      templateAttributes.Add(attrib.value+'='+attrib.realvalue);
+      removeAttribute(attrib);
+    end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
+      temp := getDocument().createElementPair('s') as TTemplateElement;
+      temp.namespace := TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't');
+      temp.templateType:=tetCommandShortRead;
+      temp.reverse.namespace := temp.namespace;
+      temp.templateReverse.templateType:=tetIgnore;
+      temp.addChild(getDocument().createNode());
+      temp.templateNext.typ := tetText;
+      temp.templateNext.templateType := tetIgnore;
+      rv := copy(rv, 2, length(rv) - 2);
+      if isVariableName(rv) then temp.templateNext.value:= rv + ':= @'+attrib.getNodeName()
+      else temp.templateNext.value:='@'+attrib.getNodeName() + ' / (' + rv +')';
+      addChild(temp);
+      if templateAttributes = nil then templateAttributes := TStringAttributeList.Create;
+      //todo: optimize ?
+      if templateAttributes.Values['condition'] = '' then templateAttributes.Values['condition'] := 'exists(@'+attrib.getNodeName()+')'
+      else templateAttributes.Values['condition'] := '(' + templateAttributes.Values['condition'] + ') and exists(@'+attrib.getNodeName()+')';
+      //attributes.Delete(i); // Items[i].realvalue := '';
+      removeAttribute(attrib);
     end;
+    attrib := tempattrib;
+  end;
 
   if templateAttributes <> nil then
     if templateAttributes.Values['optional'] = 'true' then flags+=[tefOptional];
@@ -925,12 +930,12 @@ begin
   end;
 end;
 
-procedure TTemplateElement.assign(asource: TTreeNode);
+procedure TTemplateElement.assignNoAttributes(asource: TTreeNode);
 var
   s: TTemplateElement;
   i: Integer;
 begin
-  inherited assign(asource);
+  inherited assignNoAttributes(asource);
   if assigned(asource) and asource.InheritsFrom(TTemplateElement) then begin
     s := TTemplateElement(asource);
     templateType := s.templateType;
@@ -1363,7 +1368,7 @@ begin
   end;
   if (template.attributes = nil) and (template.templateAttributes = nil) then
     exit(true);
-  for attrib in template.attributes do begin
+  for attrib in template.getEnumeratorAttributes do begin
     name := attrib.value;
     if html.attributes = nil then exit(false);
     caseSensitive := FAttributeDefaultCaseSensitive;

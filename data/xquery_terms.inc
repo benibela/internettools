@@ -3852,7 +3852,7 @@ var
   var
     doc: TTreeNode;
     n: TTreeNode;
-    attrib: TTreeAttribute;
+    attrib: TTreeNode;
     i: Integer;
     namespaceIndex: Integer;
   begin
@@ -3881,8 +3881,7 @@ var
             end;
           end;
         end;
-        if tree.attributes = nil then tree.attributes := TAttributeList.Create;
-        tree.attributes.add(kid);
+        tree.addAttribute(TTreeAttribute(kid));
         //kid.offset:=baseOffset;
         kid.parent:=tree;
         kid.root:=root;
@@ -3891,17 +3890,19 @@ var
         if tree.typ = tetDocument then raiseTypeError0004('Document node must not contain attributes');
         if tree.getFirstChild() <> nil then
           raiseEvaluationError('XQTY0024', 'Attribute node after element node');
-        for i := 0 to tree.attributes.Count - 2 do
-          with tree.attributes.Items[i] do if (value = kid.value) and equalNamespaces(namespace, kid.namespace) then begin
-            if not equalNamespaces(namespace, XMLNamespace_XMLNS) then
-             raiseEvaluationError('XQDY0025', 'Duplicate attribute: '+kid.value)
-            else if (kid as TTreeAttribute).realvalue <> tree.attributes.Items[i].realvalue then
-             raiseEvaluationError('XQDY0102', 'Mismatched namespace: '+kid.value);
-          end;
-        if (kid as TTreeAttribute).isNamespaceNode then begin
+        for attrib in tree.getEnumeratorAttributes do begin
+          if attrib <> kid then
+            with attrib do if (value = kid.value) and equalNamespaces(namespace, kid.namespace) then begin
+              if not equalNamespaces(namespace, XMLNamespace_XMLNS) then
+               raiseEvaluationError('XQDY0025', 'Duplicate attribute: '+kid.value)
+              else if TTreeAttribute(kid).realvalue <> getStringValue() then
+               raiseEvaluationError('XQDY0102', 'Mismatched namespace: '+kid.value);
+            end;
+        end;
+        if TTreeAttribute(kid).isNamespaceNode then begin
           if (kid.value = '') and ((tree.namespace = nil) or (tree.namespace.getPrefix = '')) and (TTreeAttribute(kid).realvalue <> namespaceGetURL(tree.namespace)) then
             raiseEvaluationError('XQDY0102', 'Namespace override');
-          needNamespaceList.addIfNewPrefixUrl(TNamespace.make(TTreeAttribute(kid).realvalue, kid.value));
+          needNamespaceList.addIfNewPrefixUrl(TNamespace.make(kid.getStringValue(), kid.value));
         end;
       end;
       tetDocument: begin
@@ -3909,10 +3910,8 @@ var
         kid := kid.getFirstChild();
         while kid <> nil do begin
           n := kid.getNextSibling();
-          if doc.attributes <> nil then begin //a document should not have attributes, but when namespace overrides were added by addValue, they were added there
-            if kid.attributes = nil then kid.attributes := TAttributeList.Create;
-            for attrib in doc.attributes do kid.attributes.add(attrib.clone(document, root, baseOffset));
-          end;
+          for attrib in doc.getEnumeratorAttributes do
+            kid.addAttribute(TTreeAttribute(attrib.clone(document, root, baseOffset)));
           addKid;
           kid := n;
         end;
@@ -3927,6 +3926,7 @@ var
     procedure addClonedNodeAsKid(n: TTreeNode);
     var
       temp: TTreeNode;
+      attrib, tempattrib: TTreeAttribute;
       i: Integer;
       tempNamespaces: TNamespaceList;
     begin
@@ -3937,10 +3937,13 @@ var
             //remove old namespaces that are not used
             temp := kid;
             while (temp <> nil) and (temp <> kid.reverse) do begin
-              if temp.attributes <> nil then
-                for i := temp.attributes.Count - 1 downto 0 do
-                  if (temp.attributes.Items[i].isNamespaceNode) and not (temp.isNamespaceUsed(temp.attributes.Items[i].toNamespace)) then
-                    temp.attributes.Delete(i);
+              attrib := temp.attributes;
+              while attrib <> nil do begin
+                tempattrib := TTreeAttribute(attrib.next);
+                if (attrib.isNamespaceNode) and not (temp.isNamespaceUsed(attrib.toNamespace)) then
+                  temp.removeAttribute(attrib);
+                attrib := tempattrib;
+              end;
               temp := temp.next;
             end;
           end;
@@ -3963,7 +3966,6 @@ var
             //remove namespaces of new parent
             for i := 0 to subcontext^.namespaces.Count - 1 do
               if not kid.isNamespaceUsed(subcontext^.namespaces.items[i]) then begin
-                if kid.attributes = nil then kid.attributes := TAttributeList.Create;
                 if subcontext^.namespaces.items[i].getPrefix = '' then kid.addAttribute('xmlns', '')
                 else kid.addAttribute(subcontext^.namespaces.items[i].getPrefix, '', XMLNamespace_XMLNS);
               end;
@@ -4225,7 +4227,7 @@ begin
         if length(children) = 0 then tree.addAttribute('', '')
         else begin
           tree.addAttribute('', strTrimLeft(valueToString(children[0].evaluate(subcontext^)), WHITE_SPACE));
-          if strContains(tree.attributes.Items[0].realvalue, '?>') then
+          if strContains(tree.attributes.getStringValue(), '?>') then
             raiseEvaluationError('XQDY0026', '?> in PI content');
         end;
       end;

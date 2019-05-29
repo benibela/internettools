@@ -701,24 +701,35 @@ begin
 end;
 
 
-function attribcmp(List: TStringList; Index1, Index2: Integer): integer;
+function attribcmp(item1, item2: pointer): integer;
 var
   a,b: TTreeAttribute;
 begin
-  a := TAttributeList(list).Items[index1];
-  b := TAttributeList(list).Items[index2];
+  a := TTreeAttribute(item1);
+  b := TTreeAttribute(item2);
   result := CompareStr(a.value, b.value);
   if result = 0 then result := CompareStr(a.realvalue, b.realvalue);
 end;
 
 procedure sorttree(t: TTreeNode);
+var templist: tfplist;
+    a: TTreeAttribute;
+    i: integer;
 begin
+  templist := nil;
   while t <> nil do begin
     if t.attributes <> nil then begin
-      t.attributes.CustomSort(@attribcmp);
+      if not assigned(templist) then templist := tfplist.create else templist.clear;
+      for a in t.getEnumeratorAttributes do
+        templist.add(a);
+      templist.Sort(@attribcmp);
+      t.attributes := nil;
+      for i := 0 to templist.count - 1 do
+        t.addAttribute(ttreeattribute(templist.items[i]));
     end;
     t := t.next;
   end;
+  templist.free;
 end;
 
 
@@ -741,16 +752,17 @@ function killPrefixes(tn: TTreeNode; ns: TStringList; mustExist: boolean): boole
     end;
   end;
 var
-  i: Integer;
+  a, na: TTreeAttribute;
 begin
   result := true;
   while tn <> nil do begin
     if not checkNode(tn) then exit(false);
-    if tn.attributes <> nil then begin
-      for i := tn.attributes.Count - 1 downto 0 do begin
-        if tn.attributes.getAttribute(i).isNamespaceNode then tn.attributes.Delete(i)
-        else if not checkNode(tn.attributes.getAttribute(i)) then exit(false);
-      end;
+    a := tn.attributes;
+    while a <> nil do begin
+      na := TTreeAttribute(a.next);
+      if a.isNamespaceNode then tn.removeAttribute(a)
+      else if not checkNode(a) then exit(false);
+      a := na;
     end;
     tn := tn.next;
   end;
@@ -1452,9 +1464,8 @@ begin
     if decimalFormats = nil then decimalFormats := TFPList.Create;
     decimalformat := TXQDecimalFormat.Create;
     decimalFormats.add(decimalformat);
-    for i := 0 to n.attributes.Count - 1 do begin
+    for att in n.getEnumeratorAttributes do begin
       temp := 1;
-      att := n.attributes.getAttribute(i);
       if not att.isNamespaceNode then begin
         case att.value of
           'decimal-separator': decimalformat.formats.chars[xqdfpDecimalSeparator] := strDecodeUTF8Character(att.realvalue, temp);

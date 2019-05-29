@@ -8191,7 +8191,7 @@ var
   namespaceMatching: TXQNamespaceMode;
   tempList: TXQVList;
   pv: PIXQValue;
-  attrib: TTreeAttribute;
+  attrib: TTreeNode;
 
 
 
@@ -8245,17 +8245,15 @@ begin
         tneaAttribute: begin
           oldnode := n^.toNode;
           if oldnode = nil then raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery());
-          if (oldnode.attributes = nil) or (oldnode.typ = tetProcessingInstruction) { a pi node has attributes internally but they are accessible} then continue;
           if (namespaceMatching = xqnmPrefix) and (command.namespaceURLOrPrefix <> '')  then begin
             cachedNamespaceURL := oldnode.getNamespaceURL(command.namespaceURLOrPrefix);
             if cachedNamespaceURL = '' then continue;
           end;
 
-          for i := 0 to oldnode.attributes.Count - 1 do begin
-            attrib := oldnode.attributes.items[i];
+          for attrib in oldnode.getEnumeratorAttributes do begin
             if      (not (qmValue in command.matching) or ((attrib.hash = command.valueHash) and striEqual(attrib.value, command.value)))
                 and ((namespaceMatching = xqnmNone) or ( attrib.getNamespaceURL() = cachedNamespaceURL))
-                and not attrib.isNamespaceNode
+                and not TTreeAttribute(attrib).isNamespaceNode
                 then
                   newList.add(attrib);
           end;
