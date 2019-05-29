@@ -796,6 +796,7 @@ begin
     inc(pos);
     marker := pos;
     while not (pos^ in ['{', '}', #0]) do inc(pos);
+    if pos^ = #0 then raiseSyntaxError('Unexpected end');
     url := normalizeLineEnding(strFromPchar(marker, pos - marker));
     url := xmlStrWhitespaceCollapse(replaceEntitiesIfNeeded(url));
     if url = XMLNamespaceUrl_XMLNS then raiseParsingError('XQST0070', 'Invalid namespace ' + url);
@@ -804,7 +805,7 @@ begin
       inc(pos);
       localpart := '*';
     end else begin
-      if (pos^ in WHITE_SPACE + SYMBOLS - ['*']) then raiseParsingError('err:XPST0003', 'Q{..}localname must not be separated by whitespace');
+      if (pos^ in WHITE_SPACE + SYMBOLS - ['*']) then raiseSyntaxError('Q{..}localname must not be separated by whitespace');
       localpart := nextTokenNCName();
     end;
     result := xqnmURL;
@@ -820,7 +821,7 @@ begin
     prefix := '';
     if allowWildcards and (localpart = '*') then result := xqnmNone;
   end;
-  if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseParsingError('XPST0003', 'Expected QName, got wildcards: '+prefix+':'+localpart);
+  if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseSyntaxError('Expected QName, got wildcards: '+prefix+':'+localpart);
 end;
 
 function TXQParsingContext.parsePendingEQName(pending: TXQTermPendingEQNameTokenPending): TXQTermPendingEQNameToken;
