@@ -2804,6 +2804,7 @@ end;
 
 function TXQTermNamedFunction.convertToTypeConstructor: TXQTermNamedFunction;
 begin
+  if self is TXQTermNamedFunctionTypeConstructor then exit(self);
   result := TXQTermNamedFunctionTypeConstructor.Create;
   result.kind := xqfkTypeConstructor;
   result.func := func;
