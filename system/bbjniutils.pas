@@ -1010,7 +1010,7 @@ var i: SizeInt;
   begin
     pushUnicodeChar(strDecodeUTF8Character(s, i));
   end;
-
+var b1, b2: byte;
 
 begin
   setlength(res, length(s));
@@ -1028,9 +1028,11 @@ begin
       inc(p); inc(i);
     end;
     #$C0..#$C1: begin
-      if (i + 1 <= length(s)) and isContinuationByte(s[i+1]) then
-        pushUnicodeChar(((ord(s[i]) and not $C0) shl 6) or (ord(s[i+1]) and not $80))
-      else
+      if (i + 1 <= length(s)) and isContinuationByte(s[i+1]) then begin
+        b1 := ord(s[i]);
+        b2 := ord(s[i+1]);
+        pushUnicodeChar(((b1 and not $C0) shl 6) or (b2 and not $80))
+      end else
         pushError;
       inc(i,2);
     end;

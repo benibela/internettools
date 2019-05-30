@@ -446,7 +446,7 @@ function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer; overload; deprecated 'Use (pchar,pchar) overload or strIterator.'; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
 function strDecodeUTF8Character(var source: PChar; var remainingLength: SizeInt): integer; overload; deprecated 'Use (pchar,pchar) overload.'; //**< Returns the unicode code point of the utf-8 character starting at @code(source) and decrements @code(remainingLength) to the next utf-8 character. Returns a negative value if the character is invalid.
-function strDecodeUTF8Character(var source: pchar; afterlast: PChar): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(source). Returns a negative value if the character is invalid.
+function strDecodeUTF8Character(var currentpos: pchar; afterlast: PChar): integer; overload; //**< Returns the unicode code point of the utf-8 character starting at @code(source). Returns a negative value if the character is invalid.
 function strEncodingFromBOMRemove(var str:RawByteString):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
 {$ifdef HAS_CPSTRING}function strEncodingFromBOMRemove(var str:string):TSystemCodePage; inline;{$endif}
 
@@ -2585,67 +2585,75 @@ begin
   dec(remainingLength, source - temp);
 end;
 
-function strDecodeUTF8Character(var source: pchar; afterlast: PChar): integer;
+function strDecodeUTF8Character(var currentpos: pchar; afterlast: PChar): integer;
+const ERROR_INVALID_STARTING_BYTE = -1;
+      ERROR_TRUNCATED = -2;
+      ERROR_INVALID_CONTINUATION_BYTE = -3;
+var p: pchar;
+  b: byte;
+label ErrorTruncated, ErrorInvalidContinuationByte;
 begin
-  if source >= afterlast then exit(-2);
-  case ord(source^) of
-    $00..$7F: begin
-      result:=ord(source^);
-
-      inc(source);
-    end;
+  p := currentpos;
+  if p >= afterlast then goto ErrorTruncated;
+  b := ord(p^);
+  inc(p);
+  case b of
+    $00..$7F: result := b;
     $C2..$DF: begin
-      result:= (ord(source^) and not $C0) shl 6;
+      result:= (b and not $C0) shl 6;
 
-      inc(source);
-      if source >= afterlast then exit(-2); //all source >= afterlast checks could be removed, if we assume the string is 0-terminated
-      if (ord(source^) and $C0) <> $80 then exit(-3);
-      result := result or (ord(source^) and not $80);
+      if p >= afterlast then goto ErrorTruncated; //all source >= afterlast checks could be removed, if we assume the string is 0-terminated
+      b := ord(p^);
+      if (b and $C0) <> $80 then goto ErrorInvalidContinuationByte; //these gotos are always the same in every branch
+      result := result or (b and not $80);
 
-      inc(source);
+      inc(p);
     end;
     $E0..$EF: begin
-      result:=(ord(source^) and not $E0) shl 12;
+      result:=(b and not $E0) shl 12;
 
-      inc(source);
-      if source >= afterlast then exit(-2);
-      if (ord(source^) and $C0) <> $80 then exit(-3);
+      if p >= afterlast then goto ErrorTruncated;
+      b := ord(p^);
+      if (b and $C0) <> $80 then goto ErrorInvalidContinuationByte;
       case result of
-        {E}$0: if (source^ < #$A0) {or (source^ > #$BF)} then exit(-3);
-        {E}$D shl 12: if {(source^ < #$80) or} (source^ > #$9F) then exit(-3);
+        {E}$0: if (b < $A0) {or (b > #$BF)} then goto ErrorInvalidContinuationByte;
+        {E}$D shl 12: if {(b < #$80) or} (b > $9F) then goto ErrorInvalidContinuationByte;
       end;
-      result := result or ((ord(source^) and not $80) shl 6);
+      result := result or ((b and not $80) shl 6);
 
-      inc(source);
-      if source >= afterlast then exit(-2);
-      if (ord(source^) and $C0) <> $80 then exit(-3);
-      result := result or ((ord(source^) and not $80));
+      inc(p);
+      if p >= afterlast then goto ErrorTruncated;
+      b := ord(p^);
+      if (b and $C0) <> $80 then goto ErrorInvalidContinuationByte;
+      result := result or ((b and not $80));
 
-      inc(source);
+      inc(p);
     end;
     $F0..$F4: begin
-      result:=((ord(source^) and not $F0) shl 18);
+      result:=((b and not $F0) shl 18);
 
-      inc(source);
-      if source >= afterlast then exit(-2);
-      if (ord(source^) and $C0) <> $80 then exit(-3);
+      if p >= afterlast then goto ErrorTruncated;
+      b := ord(p^);
+      if (b and $C0) <> $80 then goto ErrorInvalidContinuationByte;
       case result of
-        {E}$0: if (source^ < #$90) {or (source^ > #$BF)} then exit(-3);
-        {E}$4 shl 18: if {(source^ < #$80) or} (source^ > #$8F) then exit(-3);
+        {E}$0: if (b < $90) {or (b > $BF)} then goto ErrorInvalidContinuationByte;
+        {E}$4 shl 18: if {(b < $80) or} (b > $8F) then goto ErrorInvalidContinuationByte;
       end;
-      result := result or ((ord(source^) and not $80) shl 12);
+      result := result or ((b and not $80) shl 12);
 
-      inc(source);
-      if source >= afterlast then exit(-2);
-      if (ord(source^) and $C0) <> $80 then exit(-3);
-      result := result or ((ord(source^) and not $80) shl 6);
+      inc(p);
+      if p >= afterlast then goto ErrorTruncated;
+      b := ord(p^);
+      if (b and $C0) <> $80 then goto ErrorInvalidContinuationByte;
+      result := result or ((b and not $80) shl 6);
 
-      inc(source);
-      if source >= afterlast then exit(-2);
-      if (ord(source^) and $C0) <> $80 then exit(-3);
-      result := result or ((ord(source^) and not $80));
+      inc(p);
+      if p >= afterlast then goto ErrorTruncated;
+      b := ord(p^);
+      if (b and $C0) <> $80 then goto ErrorInvalidContinuationByte;
+      result := result or ((b and not $80));
 
-      inc(source);
+      inc(p);
     end;
     (*
     $80..$BF //in multibyte character (should never appear)
@@ -2654,11 +2662,14 @@ begin
     $F8..$FB //"
     $FC..$FD //"
     $FE..$FF  //invalid*)
-    else begin
-      result:=-1;
-      inc(source);
-    end;
+    else result := ERROR_INVALID_STARTING_BYTE;
   end;
+
+  currentpos := p;
+  exit;
+
+  ErrorTruncated:               result := ERROR_TRUNCATED;                 currentpos := p; exit;
+  ErrorInvalidContinuationByte: result := ERROR_INVALID_CONTINUATION_BYTE; currentpos := p; exit;
 end;
 
 {$IFDEF fpc}
