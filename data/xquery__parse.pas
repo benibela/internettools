@@ -3131,7 +3131,7 @@ var
     visited.Add(sc);
    for i := 0 to sc.importedModules.Count - 1 do begin
      sc2 := TXQuery(sc.importedModules.Objects[i]).getStaticContext;
-     if length(sc2.moduleContextItemDeclarations) > 0 then begin
+     if (length(sc2.moduleContextItemDeclarations) > 0) and (sc2 <> outsc) then begin
        oldlen := length(outsc.moduleContextItemDeclarations);
        SetLength(outsc.moduleContextItemDeclarations, oldlen + length(sc2.moduleContextItemDeclarations));
        move(sc2.moduleContextItemDeclarations[0], outsc.moduleContextItemDeclarations[oldlen], length(sc2.moduleContextItemDeclarations) * sizeof(sc2.moduleContextItemDeclarations[0]));
