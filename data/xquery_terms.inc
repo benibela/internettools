@@ -4684,7 +4684,8 @@ begin
       for i := 0 to parameterCount - 1 do
         (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
       resulttype := functionReferenceGetResultType(f);
-      children[high(children)] := f.convertToTypeConstructor;
+      f := f.convertToTypeConstructor;
+      children[high(children)] := f;
     end;
 
     if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
