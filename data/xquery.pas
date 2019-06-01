@@ -2102,7 +2102,12 @@ type
     function clone: TXQTerm; override;
   end;
 
-  { TXQTermConstructor }
+  TXQTermConstructorState = record
+    document: TTreeDocument;
+    root: TTreeNode;
+    baseOffset: TTreeNodeIntOffset;
+    oldnamespacecount: Integer;
+  end;
 
   TXQTermConstructor = class(TXQTermWithChildren)
     typ: TTreeNodeType;
@@ -2111,7 +2116,7 @@ type
     implicitNamespaces: TNamespaceList;
     constructor create(atype: TTreeNodeType; aname: txqterm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
-    function evaluate(var context: TXQEvaluationContext; document: TTreeDocument; root: TTreeNode; var baseOffset: TTreeNodeIntOffset): IXQValue;
+    function evaluate(var context: TXQEvaluationContext; var state: TXQTermConstructorState): TTreeNode;
     function getContextDependencies: TXQContextDependencies; override;
     function isNamespaceConstructor: boolean;
     function clone: TXQTerm; override;
