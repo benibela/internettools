@@ -461,7 +461,7 @@ end;
 
 { TXQTermDefineVariable }
 
-constructor TXQTermDefineVariable.create(avarname: string; anamespace: INamespace);
+constructor TXQTermDefineVariable.create(avarname: string; anamespace: TNamespace);
 begin
   variable := TXQTermVariable.create(avarname, anamespace);
 end;
@@ -3465,7 +3465,7 @@ end;
 
 { TXQTermVariable }
 
-constructor TXQTermVariable.create(const avalue: string; const anamespace: INamespace);
+constructor TXQTermVariable.create(const avalue: string; const anamespace: TNamespace);
 begin
   value := avalue;
   namespace := namespaceGetURL(anamespace);
@@ -3937,6 +3937,7 @@ var
       attrib, tempattrib: TTreeAttribute;
       i: Integer;
       tempNamespaces: TNamespaceList;
+      tempNamespace: TNamespace;
     begin
       with state do
         kid := n.clone(document, root, baseOffset);
@@ -3949,8 +3950,13 @@ var
               attrib := temp.attributes;
               while attrib <> nil do begin
                 tempattrib := TTreeAttribute(attrib.next);
-                if (attrib.isNamespaceNode) and not (temp.isNamespaceUsed(attrib.toNamespace)) then
-                  temp.removeAttribute(attrib);
+                if (attrib.isNamespaceNode) then begin
+                  tempNamespace := attrib.toNamespaceObject;
+                  tempNamespace._AddRef;
+                  if not temp.isNamespaceUsed(tempNamespace) then
+                    temp.removeAttribute(attrib);
+                  tempNamespace._Release;
+                end;
                 attrib := tempattrib;
               end;
               temp := temp.next;

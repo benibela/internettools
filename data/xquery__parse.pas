@@ -162,7 +162,7 @@ end;
  TFinalNamespaceResolving = class(TXQTerm_Visitor)
    mainModule: TXQTermModule;
    staticContext: TXQStaticContext;
-   changedDefaultsTypeNamespaces: TInterfaceList; //this cannot be a namespace list, since nil might be added
+   changedDefaultsTypeNamespaces: TFPList; //this cannot be a namespace list, since nil might be added
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: SizeInt;
    checker: TFlowerVariableChecker;
@@ -224,7 +224,7 @@ begin
   for i := 0 to ns.Count - 1 do begin
     sc.namespaces.add(ns.namespaces[i]);
     if ns.namespaces[i].getPrefix = '' then
-      sc.defaultElementTypeNamespace := ns.namespaces[i];
+      TNamespace.assignRC(sc.defaultElementTypeNamespace, ns.namespaces[i]);
   end;
 end;
 
@@ -2438,7 +2438,7 @@ function staticallyCastQNameAndNotation(term: TXQTermWithChildren; typ: TXSType;
 
 var
   name: String;
-  namespace: INamespace;
+  namespace: TNamespace;
 begin
   result := term;
   if typ.storage = TXQValueQName then begin
@@ -3018,7 +3018,7 @@ end;
 var
   bop: TXQTermBinaryOp;
   name: String;
-  namespace: INamespace;
+  namespace: TNamespace;
   nf: TXQTermNamedFunction;
 begin
   if term is TXQTermBinaryOp then begin
@@ -3850,8 +3850,8 @@ begin
             'element', 'function': begin
               expect('namespace');
               checkForDuplicate('default '+token+' namespace', 'XQST0066');
-              if token = 'element' then staticContext.defaultElementTypeNamespace:=TNamespace.make(parseNamespaceURI('XQST0070',''), '')
-              else staticContext.defaultFunctionNamespace := TNamespace.make(parseNamespaceURI('XQST0070',''), '')
+              if token = 'element' then TNamespace.assignRC(staticContext.defaultElementTypeNamespace, TNamespace.make(parseNamespaceURI('XQST0070',''), ''))
+              else TNamespace.assignRC(staticContext.defaultFunctionNamespace, TNamespace.make(parseNamespaceURI('XQST0070',''), ''))
             end;
             'decimal-format': declareDecimalFormat();
             else raiseParsingError('XPST0003', 'Unknown default value');
@@ -4061,9 +4061,9 @@ begin
     3: begin
       with staticContext do begin
         collation := TXQueryEngine.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint','');
-        defaultFunctionNamespace:=XMLNamespace_XPathFunctions;
-        defaultElementTypeNamespace:=nil;
-        defaultTypeNamespace:=nil;
+        TNamespace.assignRC(defaultFunctionNamespace, XMLNamespace_XPathFunctions);
+        TNamespace.releaseIfNonNil(defaultElementTypeNamespace);
+        TNamespace.releaseIfNonNil(defaultTypeNamespace);
         stringEncoding:=CP_UTF8;
         strictTypeChecking:=true;
         useLocalNamespaces:=false;
@@ -4088,9 +4088,9 @@ begin
     'xidel', 'pxp', 'videlibri': begin
       with staticContext do begin
         collation := TXQueryEngine.getCollation('case-insensitive-clever','');
-        defaultFunctionNamespace:=XMLNamespace_MyExtensionsMerged;
-        defaultElementTypeNamespace:=nil;
-        defaultTypeNamespace:=XMLNamespace_XMLSchema;
+        TNamespace.assignRC(defaultFunctionNamespace, XMLNamespace_MyExtensionsMerged);
+        TNamespace.releaseIfNonNil(defaultElementTypeNamespace);
+        tnamespace.assignRC(defaultTypeNamespace, XMLNamespace_XMLSchema);
         stringEncoding:=CP_UTF8;
         strictTypeChecking:=false;
         useLocalNamespaces:=true;
@@ -4109,9 +4109,9 @@ begin
     'jsoniq': begin
       with staticContext do begin
         collation := TXQueryEngine.getCollation('http://www.w3.org/2005/xpath-functions/collation/codepoint','');
-        defaultFunctionNamespace:=XMLNamespace_XPathFunctions;
-        defaultElementTypeNamespace:=nil;
-        defaultTypeNamespace:=nil;
+        TNamespace.assignRC(defaultFunctionNamespace, XMLNamespace_XPathFunctions);
+        TNamespace.releaseIfNonNil(defaultElementTypeNamespace);
+        TNamespace.releaseIfNonNil(defaultTypeNamespace);
         stringEncoding:=CP_UTF8;
         strictTypeChecking:=true;
         useLocalNamespaces:=false;
@@ -4576,7 +4576,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
       end;
     end;
     if c.implicitNamespaces <> nil then begin
-      staticContext.defaultElementTypeNamespace := changedDefaultsTypeNamespaces.Last as INamespace;
+      TNamespace.assignRC(staticContext.defaultElementTypeNamespace, TNamespace(changedDefaultsTypeNamespaces.Last));
       changedDefaultsTypeNamespaces.Delete(changedDefaultsTypeNamespaces.Count - 1);
 
       implicitNamespaceCountsLength -= 1;
@@ -4669,7 +4669,7 @@ end;
 constructor TFinalNamespaceResolving.Create;
 begin
   inherited;
-  changedDefaultsTypeNamespaces := TInterfaceList.Create;
+  changedDefaultsTypeNamespaces := TFPList.Create;
 end;
 
 destructor TFinalNamespaceResolving.Destroy;

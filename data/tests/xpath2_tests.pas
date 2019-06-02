@@ -3967,9 +3967,9 @@ begin
   t('/r', 'test', '!<r xmlns="foobar">test</r>');
   ps.StaticContext.useLocalNamespaces:=false;
   t('/r', '', '');
-  ps.StaticContext.defaultElementTypeNamespace := TNamespace.create('foobar', '');
+  TNamespace.assignRC(ps.StaticContext.defaultElementTypeNamespace, TNamespace.create('foobar', ''));
   t('/r', 'test');
-  ps.StaticContext.defaultElementTypeNamespace := nil;
+  TNamespace.releaseIfNonNil(ps.StaticContext.defaultElementTypeNamespace);
 
   t('day-from-dateTime(())', '');
   t('doc(())', '');

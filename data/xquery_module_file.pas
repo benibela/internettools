@@ -27,7 +27,7 @@ uses
 procedure registerModuleFile;
 
 const XMLNamespaceURL_Expath_File = 'http://expath.org/ns/file';
-var XMLNamespace_Expath_File: INamespace;
+var XMLNamespace_Expath_File: TNamespace;
 implementation
 
 uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
@@ -739,7 +739,7 @@ procedure registerModuleFile;
 begin
   if Assigned(module) then exit;
 
-  module := TXQNativeModule.create(XMLNamespace_Expath_File);
+  module :=  TXQNativeModule.create(XMLNamespace_Expath_File);
   module.registerFunction('exists', @exists, ['($path as xs:string) as xs:boolean']);
   module.registerFunction('is-dir', @is_dir, ['($path as xs:string) as xs:boolean']);
   module.registerFunction('is-file', @is_file, ['($path as xs:string) as xs:boolean']);
@@ -787,9 +787,10 @@ end;
 
 
 initialization
-  XMLNamespace_Expath_File := TNamespace.make('http://expath.org/ns/file', 'file');
+  XMLNamespace_Expath_File := TNamespace.makeWithRC1('http://expath.org/ns/file', 'file');
 
 finalization
+  XMLNamespace_Expath_File._Release;
   module.free;
 
 end.

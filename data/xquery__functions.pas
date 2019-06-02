@@ -2887,7 +2887,7 @@ end;
 function xqFunctionNamespace_URI_For_Prefix({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: TNamespaceList;
-  tempns: INamespace;
+  tempns: TNamespace;
   prefix: String;
 begin
   prefix := args[0].toString;
@@ -5110,7 +5110,7 @@ end;
 
 function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string): boolean;
 var
-  namespace: INamespace;
+  namespace: TNamespace;
 begin
   namespaceURL := '';
   localpart := xmlStrWhitespaceCollapse(eqname);

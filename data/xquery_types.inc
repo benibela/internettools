@@ -1018,7 +1018,7 @@ begin
 
 end;
 
-constructor TXQValueQName.create(atypeAnnotation: TXSType; const ns: INamespace; const alocal: string);
+constructor TXQValueQName.create(atypeAnnotation: TXSType; const ns: TNamespace; const alocal: string);
 begin
   if ns = nil then create(atypeAnnotation, '', '', alocal)
   else create(atypeAnnotation, ns.getURL, ns.getPrefix, alocal);
@@ -1038,7 +1038,7 @@ begin
   else create(aurl, copy(aprefixedLocal, 1,i-1), strCopyFrom(aprefixedLocal,i+1));
 end;
 
-constructor TXQValueQName.create(const ns: INamespace; const alocal: string);
+constructor TXQValueQName.create(const ns: TNamespace; const alocal: string);
 begin
   if ns = nil then create(baseSchema.QName, '', '', alocal)
   else create(baseSchema.QName, ns.getURL, ns.getPrefix, alocal);

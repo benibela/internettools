@@ -174,8 +174,8 @@ type
     associatedModules: TFPList;
     importedModules: TXQMapStringObject; //**< All imported modules as (prefix, module: TXQuery) tuples
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
-    defaultFunctionNamespace: INamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
-    defaultElementTypeNamespace: INamespace; //**< Default element type namespace (default is empty)
+    defaultFunctionNamespace: TNamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
+    defaultElementTypeNamespace: TNamespace; //**< Default element type namespace (default is empty)
     decimalNumberFormats: TFPList;
 
     baseURI: string;              //**< Static base uri
@@ -188,7 +188,7 @@ type
     copyNamespacePreserve, copyNamespaceInherit: boolean;
 
     //extensions
-    defaultTypeNamespace: INamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
+    defaultTypeNamespace: TNamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
     stringEncoding: TSystemCodePage;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
@@ -205,10 +205,11 @@ type
     function clone(): TXQStaticContext; virtual;
     destructor Destroy; override;
     function findSchema(const namespace: string): TXSSchema;
-    function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
+    function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     function findNamespaceURLMandatory(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
+    procedure splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
     procedure splitRawQName(out namespace: string; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
     function resolveDocURI(url: string): string;
@@ -275,9 +276,10 @@ type
 
     staticContext: TXQStaticContext;
 
-    function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
+    function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
     procedure splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
+    procedure splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 
     function getRootHighest: TTreeNode;
 
@@ -668,10 +670,10 @@ type
     prefix, url, local: string;
 
     constructor create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);
-    constructor create(atypeAnnotation: TXSType; const ns: INamespace; const alocal: string);
+    constructor create(atypeAnnotation: TXSType; const ns: TNamespace; const alocal: string);
     constructor create(const aurl, aprefix, alocal: string);
     constructor create(const aurl, aprefixedLocal: string);
-    constructor create(const ns: INamespace; const alocal: string);
+    constructor create(const ns: TNamespace; const alocal: string);
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
     destructor Destroy; override;
 
@@ -1701,7 +1703,7 @@ type
     index: integer;
 
 //    constructor create(const avalue: string; staticContext: TXQStaticContext);
-    constructor create(const avalue: string; const anamespace: INamespace = nil);
+    constructor create(const avalue: string; const anamespace: TNamespace = nil);
     constructor create(const alocalname: string; const anamespace: string);
     function equalsVariable(v: TXQTermVariable): boolean;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
@@ -1728,7 +1730,7 @@ type
   TXQTermDefineVariable = class(TXQTermWithChildren)
     variable: TXQTerm;
     annotations: TXQAnnotations;
-    constructor create(avarname: string; anamespace: INamespace);
+    constructor create(avarname: string; anamespace: TNamespace);
     constructor create(vari: TXQTerm; value: TXQTerm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getClassicValue(var context: TXQEvaluationContext): IXQValue;
@@ -2594,7 +2596,7 @@ public
     //** Last parsed query
     property LastQuery: IXQuery read FLastQuery;
   //for internal use
-    function findNamespace(const nsprefix: string): INamespace;
+    function findNamespace(const nsprefix: string): TNamespace;
     class function findOperator(const pos: pchar): TXQOperatorInfo;
   end;
 
@@ -2863,10 +2865,10 @@ type
  {** A native XQuery module. Each native module has a certain namespace and declares functions, types and operators *}
  TXQNativeModule = class
   acceptedModels: TXQParsingModels;
-  namespace: INamespace;
+  namespace: TNamespace;
   parents: array of TXQNativeModule;
-  constructor create(const anamespace: INamespace; const aparentModule: array of TXQNativeModule);
-  constructor create(const anamespace: INamespace);
+  constructor create(const anamespace: TNamespace; const aparentModule: array of TXQNativeModule);
+  constructor create(const anamespace: TNamespace);
   destructor Destroy; override;
   //** Registers a function that does not depend on the context.
   //** TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
@@ -2994,7 +2996,7 @@ type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
 end;
 
 
-var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_XPathFunctionsMap, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: INamespace;
+var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_XPathFunctionsMap, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: TNamespace;
 
 
 function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
@@ -3127,7 +3129,7 @@ var
 
 
 
-function namespaceReverseLookup(const url: string): INamespace; forward;
+function namespaceReverseLookup(const url: string): TNamespace; forward;
 
 {$PUSH}{$HINTS OFF}
 procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); inline; begin end;
@@ -4267,10 +4269,10 @@ end;
 
 
 
-var   XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_XQuery: INamespace;
+var   XMLNamespace_XMLSchemaInstance, XMLNamespace_XQueryLocalFunctions, XMLNamespace_XQuery: TNamespace;
 
 
-function namespaceReverseLookup(const url: string): INamespace;
+function namespaceReverseLookup(const url: string): TNamespace;
 begin
   if url = XMLNamespaceURL_XPathFunctions then result := XMLNamespace_XPathFunctions
   else if url = XMLNamespaceURL_MyExtensionsNew then result := XMLNamespace_MyExtensionsNew
@@ -5876,9 +5878,9 @@ begin
     result.collation := collation;
     result.fnodeCollation := fnodeCollation;
     result.emptyorderspec := emptyorderspec;
-    result.defaultFunctionNamespace := defaultFunctionNamespace;
-    result.defaultElementTypeNamespace := defaultElementTypeNamespace;
-    result.defaultTypeNamespace := defaultTypeNamespace;
+    result.defaultFunctionNamespace := defaultFunctionNamespace; defaultFunctionNamespace._AddRefIfNonNil;
+    result.defaultElementTypeNamespace := defaultElementTypeNamespace; defaultElementTypeNamespace._AddRefIfNonNil;
+    result.defaultTypeNamespace := defaultTypeNamespace; defaultTypeNamespace._AddRefIfNonNil;
     result.baseuri := baseuri;
     result.constructionpreserve := constructionpreserve;
     result.ordering := ordering;
@@ -5921,6 +5923,9 @@ begin
       tobject(decimalNumberFormats[i]).free;
   decimalNumberFormats.free;
   if temporaryNodes <> nil then temporaryNodes.release;
+  defaultElementTypeNamespace._ReleaseIfNonNil;
+  defaultFunctionNamespace._ReleaseIfNonNil;
+  defaultTypeNamespace._ReleaseIfNonNil;
   inherited Destroy;
 end;
 
@@ -5936,13 +5941,13 @@ begin
   result := nil;
 end;
 
-function TXQStaticContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
+function TXQStaticContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 var
   i: Integer;
 begin
   result := nil;
   if (moduleNamespace <> nil) and (moduleNamespace.getPrefix = nsprefix) then
-    exit(moduleNamespace);
+    exit(moduleNamespace.getSelf);
   if (defaultElementTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType, xqdnkType]) and (defaultElementTypeNamespace.getPrefix = nsprefix) then
     exit(defaultElementTypeNamespace);
   if (defaultTypeNamespace <> nil) and (defaultNamespaceKind in [xqdnkAny, xqdnkType]) and (defaultTypeNamespace.getPrefix = nsprefix) then
@@ -5951,7 +5956,7 @@ begin
     exit;
   if importedModules <> nil then begin
     i := importedModules.IndexOf(nsprefix);
-    if i >= 0 then exit(TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace);
+    if i >= 0 then exit(TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace.getSelf);
   end;
   if (importedSchemas <> nil)  and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType,  xqdnkType]) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
     exit;
@@ -5972,7 +5977,7 @@ end;
 
 function TXQStaticContext.findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
 var
-  temp: INamespace;
+  temp: TNamespace;
 begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp <> nil then result := temp.getURL
@@ -5981,7 +5986,7 @@ end;
 
 function TXQStaticContext.findNamespaceURLMandatory(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
 var
-  temp: INamespace;
+  temp: TNamespace;
 begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp <> nil then result := temp.getURL
@@ -5996,9 +6001,15 @@ begin
   else namespace := findNamespace('', defaultNamespaceKind);
 end;
 
+procedure TXQStaticContext.splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
+begin
+  if system.pos(':', name) > 0 then namespace := findNamespace(strSplitGet(':', name), defaultNamespaceKind)
+  else namespace := findNamespace('', defaultNamespaceKind);
+end;
+
 procedure TXQStaticContext.splitRawQName(out namespace: string; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 var
-  temp: INamespace;
+  temp: TNamespace;
 begin
   splitRawQName(temp, name, defaultNamespaceKind);
   namespace := namespaceGetURL(temp);
@@ -6460,7 +6471,7 @@ end;
 
 { TXQEvaluationContext }
 
-function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): INamespace;
+function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 begin
   if ((defaultNamespaceKind in [xqdnkAny, xqdnkElementType]) or ((nsprefix <> '') and (defaultNamespaceKind <> xqdnkFunction))) {<- dynamic namespaces are only created from node constructors}
      and (namespaces <> nil) and namespaces.hasNamespacePrefix(nsprefix, Result) then exit;
@@ -6469,7 +6480,7 @@ end;
 
 function TXQEvaluationContext.findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
 var
-  temp: INamespace;
+  temp: TNamespace;
 begin
   temp := findNamespace(nsprefix, defaultNamespaceKind);
   if temp = nil then begin
@@ -6482,6 +6493,12 @@ end;
 
 procedure TXQEvaluationContext.splitRawQName(out namespace: INamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind
   );
+begin
+  if system.pos(':', name) > 0 then namespace := findNamespace(strSplitGet(':', name), defaultNamespaceKind)
+  else namespace := findNamespace('', defaultNamespaceKind);
+end;
+
+procedure TXQEvaluationContext.splitRawQName(out namespace: TNamespace; var name: string; const defaultNamespaceKind: TXQDefaultNamespaceKind);
 begin
   if system.pos(':', name) > 0 then namespace := findNamespace(strSplitGet(':', name), defaultNamespaceKind)
   else namespace := findNamespace('', defaultNamespaceKind);
@@ -7327,11 +7344,11 @@ begin
   //OnDefineVariable:= @VariableChangelog.defineVariable;
   GlobalNamespaces := TNamespaceList.Create;
   StaticContext := TXQStaticContext.Create;
-  StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged;
+  StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged; XMLNamespace_MyExtensionsMerged._AddRef;
   StaticContext.sender := self;
   StaticContext.collation := TXQCollation(collations.Objects[0]);
   StaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
-  StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
+  StaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema; XMLNamespace_XMLSchema._AddRef;
   StaticContext.copyNamespaceInherit:=true;
   StaticContext.copyNamespacePreserve:=true;
   StaticContext.stringEncoding:=CP_UTF8;
@@ -8189,7 +8206,7 @@ var
   n: PIXQValue;
   resultSeq: TXQValueSequence;
 
-  tempNamespace: INamespace;
+  tempNamespace: TNamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
   namespaceMatching: TXQNamespaceMode;
@@ -8432,7 +8449,7 @@ begin
     VariableChangelogUndefined.add(local, VariableChangelogUndefined.get(0), namespace  );
 end;
 
-function TXQueryEngine.findNamespace(const nsprefix: string): INamespace;
+function TXQueryEngine.findNamespace(const nsprefix: string): TNamespace;
 begin
   if (self <> nil) and (GlobalNamespaces <> nil) and (GlobalNamespaces.hasNamespacePrefix(nsprefix, result)) then exit;
   if GlobalStaticNamespaces.hasNamespacePrefix(nsprefix, result) then exit;
@@ -8616,11 +8633,12 @@ end;
 
 { TXQNativeModule }
 
-constructor TXQNativeModule.create(const anamespace: INamespace; const aparentModule: array of TXQNativeModule);
+constructor TXQNativeModule.create(const anamespace: TNamespace; const aparentModule: array of TXQNativeModule);
 var
   i: Integer;
 begin
   namespace := anamespace;
+  namespace._AddRef;
   basicFunctions:=TXQMapStringOwningObject.Create;
   complexFunctions:=TXQMapStringOwningObject.Create;
   interpretedFunctions:=TXQMapStringOwningObject.Create;
@@ -8635,7 +8653,7 @@ begin
   acceptedModels := [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1];
 end;
 
-constructor TXQNativeModule.create(const anamespace: INamespace);
+constructor TXQNativeModule.create(const anamespace: TNamespace);
 begin
   create(anamespace,[]);
 end;
@@ -8658,6 +8676,8 @@ begin
 
   i := nativeModules.IndexOf(namespace.getURL);
   if (i >= 0) and (nativeModules.Objects[i] = self) then nativeModules.Delete(i);
+
+  namespace._Release;
 
   inherited Destroy;
 end;
@@ -9104,16 +9124,16 @@ globalTypeParsingContext.staticContext := TXQStaticContext.Create;
 globalTypeParsingContext.options.AllowJSON:=true;
 //namespaces
 GlobalStaticNamespaces:=TNamespaceList.Create;
-XMLNamespace_XPathFunctions:=TNamespace.make(XMLNamespaceURL_XPathFunctions, 'fn');
-XMLnamespace_XPathFunctionsArray:=TNamespace.make(XMLNamespaceURL_XPathFunctionsArray, 'array');
-XMLnamespace_XPathFunctionsMap:=TNamespace.make(XMLNamespaceURL_XPathFunctionsMap, 'map');
-XMLNamespace_XMLSchema:=TNamespace.make(XMLNamespaceURL_XMLSchema, 'xs');
-XMLNamespace_XMLSchemaInstance:=TNamespace.make(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
-XMLNamespace_XQueryLocalFunctions:=TNamespace.make(XMLNamespaceURL_XQueryLocalFunctions, 'local');
-XMLNamespace_MyExtensionsMerged:=TNamespace.make(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
-XMLNamespace_MyExtensionsNew:=TNamespace.make(XMLNamespaceURL_MyExtensionsNew, 'x');
-XMLNamespace_MyExtensionOperators:=TNamespace.make(XMLNamespaceURL_MyExtensionOperators, 'op');
-XMLNamespace_XQuery := TNamespace.make(XMLNamespaceURL_XQuery, '');
+XMLNamespace_XPathFunctions:=TNamespace.makeWithRC1(XMLNamespaceURL_XPathFunctions, 'fn');
+XMLnamespace_XPathFunctionsArray:=TNamespace.makeWithRC1(XMLNamespaceURL_XPathFunctionsArray, 'array');
+XMLnamespace_XPathFunctionsMap:=TNamespace.makeWithRC1(XMLNamespaceURL_XPathFunctionsMap, 'map');
+XMLNamespace_XMLSchema:=TNamespace.makeWithRC1(XMLNamespaceURL_XMLSchema, 'xs');
+XMLNamespace_XMLSchemaInstance:=TNamespace.makeWithRC1(XMLNamespaceURL_XMLSchemaInstance, 'xsi');
+XMLNamespace_XQueryLocalFunctions:=TNamespace.makeWithRC1(XMLNamespaceURL_XQueryLocalFunctions, 'local');
+XMLNamespace_MyExtensionsMerged:=TNamespace.makeWithRC1(XMLNamespaceURL_MyExtensionsMerged, 'pxp');
+XMLNamespace_MyExtensionsNew:=TNamespace.makeWithRC1(XMLNamespaceURL_MyExtensionsNew, 'x');
+XMLNamespace_MyExtensionOperators:=TNamespace.makeWithRC1(XMLNamespaceURL_MyExtensionOperators, 'op');
+XMLNamespace_XQuery := TNamespace.makeWithRC1(XMLNamespaceURL_XQuery, '');
 
 
 TXQueryEngine.registerCollation(TXQCollationCodepointInsensitiveClever.Create('case-insensitive-clever')); //first is default
@@ -9127,10 +9147,10 @@ TXQueryEngine.registerCollation(TXQCollationCodepointLocalizedInsensitive.Create
 
 
 GlobalInterpretedNativeFunctionStaticContext:=TXQStaticContext.Create;
-GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged;
+GlobalInterpretedNativeFunctionStaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged; XMLNamespace_MyExtensionsMerged._AddRef;
 GlobalInterpretedNativeFunctionStaticContext.collation := TXQCollation(collations.Objects[0]);
 GlobalInterpretedNativeFunctionStaticContext.emptyOrderSpec:=xqeoEmptyGreatest;
-GlobalInterpretedNativeFunctionStaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema;
+GlobalInterpretedNativeFunctionStaticContext.defaultTypeNamespace := XMLNamespace_XMLSchema; XMLNamespace_XMLSchema._AddRef;
 GlobalInterpretedNativeFunctionStaticContext.copyNamespaceInherit:=true;
 GlobalInterpretedNativeFunctionStaticContext.copyNamespacePreserve:=true;
 GlobalInterpretedNativeFunctionStaticContext.stringEncoding:=CP_UTF8;
@@ -9141,7 +9161,7 @@ globalUnnamedVariable := TXQTermVariable.create('placeholder!',nil);
 //Constructors (xs: namespace, not fn:)
 xs := TXQNativeModule.Create(XMLNamespace_XMLSchema,[]);
 TXQueryEngine.registerNativeModule(xs);
-globalTypeParsingContext.staticContext.defaultElementTypeNamespace := xs.namespace;
+globalTypeParsingContext.staticContext.defaultElementTypeNamespace := xs.namespace; xs.namespace._AddRef;
 baseSchema := TJSONiqOverrideSchema.create;
 baseSchema.url:=XMLNamespace_XMLSchema.getURL;
 baseJSONiqSchema := TJSONiqAdditionSchema.create();
@@ -9184,5 +9204,17 @@ TXQueryInternals.commonValuesUndefined := nil;
 TXQueryInternals.commonValuesTrue := nil;
 TXQueryInternals.commonValuesFalse := nil;
 TXQueryEngine.freeCommonCaches;
+
+XMLNamespace_XPathFunctions._Release;
+XMLnamespace_XPathFunctionsArray._Release;
+XMLnamespace_XPathFunctionsMap._Release;
+XMLNamespace_XMLSchema._Release;
+XMLNamespace_XMLSchemaInstance._Release;
+XMLNamespace_XQueryLocalFunctions._Release;
+XMLNamespace_MyExtensionsMerged._Release;
+XMLNamespace_MyExtensionsNew._Release;
+XMLNamespace_MyExtensionOperators._Release;
+XMLNamespace_XQuery._Release;
+
 end.
 

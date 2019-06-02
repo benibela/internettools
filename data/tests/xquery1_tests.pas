@@ -1878,7 +1878,7 @@ begin
 
   m('declare default function namespace "http://www.w3.org/2005/xquery-local-functions"; declare function local:switch(){ 1 }; declare function function($i) { $i }; function(switch()) ', '1');
 
-  modu := TXQNativeModule.Create(TNamespace.create('http://benibela.de/native-test-module', 'xyz'));
+  modu := TXQNativeModule.Create(TNamespace.makeWithRC1('http://benibela.de/native-test-module', 'xyz'));
   TXQueryEngine.registerNativeModule(modu);
   modu.registerInterpretedFunction('test-context', '() as item()*', '. + 1');
 

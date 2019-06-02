@@ -1838,7 +1838,7 @@ begin
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
   xq.StaticContext.defaultFunctionNamespace := TNamespace.make(XMLNamespaceURL_XPathFunctions, 'fn');
-  xq.StaticContext.defaultTypeNamespace := nil;
+  TNamespace.releaseIfNonNil(xq.StaticContext.defaultTypeNamespace);
   xq.StaticContext.useLocalNamespaces:=false;
   xq.AutomaticallyRegisterParsedModules := true;
   baseSchema.version := xsd11;

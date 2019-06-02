@@ -778,7 +778,7 @@ end;
 
 function TXSQNameType.cast(const v: IXQValue; const context: TXQEvaluationContext): IXQValue;
 var
-  namespace: INamespace;
+  namespace: TNamespace;
   s: String;
 begin
   if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
@@ -793,7 +793,7 @@ end;
 
 function TXSQNameType.cast(const v: IXQValue; const context: TXQStaticContext): IXQValue;
 var
-  namespace: INamespace;
+  namespace: TNamespace;
   s: String;
 begin
   if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));

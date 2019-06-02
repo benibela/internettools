@@ -42,7 +42,7 @@ uses
 procedure registerModuleMath;
 
 const XMLNamespaceURL_Math = 'http://www.w3.org/2005/xpath-functions/math';
-var XMLNamespace_Math : INamespace;
+var XMLNamespace_Math : TNamespace;
 
 implementation
 
@@ -337,9 +337,10 @@ end;
 
 
 initialization
-  XMLNamespace_Math := TNamespace.make(XMLNamespaceURL_Math, 'math');
+  XMLNamespace_Math := TNamespace.makeWithRC1(XMLNamespaceURL_Math, 'math');
 
 finalization
+  XMLNamespace_Math._Release;
   module.free;
 
 end.

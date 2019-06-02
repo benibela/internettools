@@ -125,7 +125,7 @@ TTreeNode = class
   parent: TTreeNode;
   root: TTreeNode;
   reverse: TTreeNode; //**<element paired by open/closing, or corresponding attributes
-  namespace: INamespace; //**< Currently local namespace prefix. Might be changed to a pointer to a namespace map in future. (so use getNamespacePrefix and getNamespaceURL instead)
+  namespace: TNamespace; //**< Currently local namespace prefix. (use getNamespacePrefix and getNamespaceURL to access it)
 
   offset: TTreeNodeIntOffset; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
@@ -191,7 +191,7 @@ TTreeNode = class
   function getNamespaceURL(prefixOverride: string; cmpFunction: TStringComparisonFunc = nil): string; //**< Returns the url of a namespace prefix, defined in this element or one of his parents cmpFunction controls is used to compare the xmlns: attribute name the searched string. (can be used to switch between case/in/sensitive)
   procedure getOwnNamespaces(var list: TNamespaceList); //**< Returns all namespaces declared or used in this element and its attributes
   procedure getAllNamespaces(var list: TNamespaceList; first: boolean = true); //**< Returns all namespaces declared/used by this element and all ancestors
-  function isNamespaceUsed(const n: INamespace): boolean; //**< Tests if a namespace is used by this element or any child (same prefix + url)
+  function isNamespaceUsed(const n: TNamespace): boolean; //**< Tests if a namespace is used by this element or any child (same prefix + url)
 
   property defaultProperty[name: string]: string read getAttribute; default;
 
@@ -204,7 +204,7 @@ TTreeNode = class
   procedure addAttribute(a: TTreeAttribute);
   function addAttribute(const aname, avalue: string): TTreeAttribute;
   procedure addAttributes(const props: array of THTMLProperty);
-  procedure addNamespaceDeclaration(n: INamespace; overrides: boolean );
+  procedure addNamespaceDeclaration(n: TNamespace; overrides: boolean );
   procedure addChild(child: TTreeNode);
   procedure removeAttribute(a: TTreeAttribute);
 
@@ -247,7 +247,7 @@ TTreeNodeClass = class of TTreeNode;
 TTreeAttribute = class(TTreeNode)
   realvalue: string;
   function isNamespaceNode: boolean;
-  function toNamespace: INamespace;
+  function toNamespaceObject: TNamespace;
 
   procedure setDataTypeHack(i: integer);
   function getDataTypeHack(): integer;
@@ -290,7 +290,7 @@ public
   function clone: TTreeDocument; overload;
 
   function addNamespace(const url, prefix: string): TNamespace;
-  procedure addNamespace(const ns: INamespace);
+  procedure addNamespace(const ns: TNamespace);
 
   //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
   function getEncoding: TSystemCodePage;
@@ -355,7 +355,7 @@ protected
 
 private
   //in-scope namespaces
-  FCurrentNamespace: INamespace;
+  FCurrentNamespace: TNamespace;
   FCurrentNamespaces: TNamespaceList;
   FCurrentNamespaceDefinitions: TList;
   FCurrentAndPreviousNamespaces: TNamespaceList; //all namespaces encountered during parsing
@@ -364,7 +364,7 @@ private
   FBasicParsingState: TBasicParsingState; //similar to html 5. Only used when repair start tags is enabled
   FLastHead, flastbody, flasthtml: TTreeNode;
   procedure pushNamespace(const url, prefix: string);
-  function findNamespace(const prefix: string): INamespace;
+  function findNamespace(const prefix: string): TNamespace;
 
   function htmlTagWeight(s:string): integer;
   class function htmlElementChildless(const s:string): boolean; static;
@@ -723,7 +723,7 @@ begin
   result := ((namespace = nil) and (value = 'xmlns')) or ((namespace <> nil) and (namespace.getURL = XMLNamespaceUrl_XMLNS));
 end;
 
-function TTreeAttribute.toNamespace: INamespace;
+function TTreeAttribute.toNamespaceObject: TNamespace;
 begin
   if namespace = nil then result := TNamespace.Make(realvalue, '') //TODO: reuse
   else result := TNamespace.Make(realvalue, value);
@@ -844,7 +844,7 @@ begin
   addNamespace(result);
 end;
 
-procedure TTreeDocument.addNamespace(const ns: INamespace);
+procedure TTreeDocument.addNamespace(const ns: TNamespace);
 begin
   FNamespaces.addIfNewPrefixUrl(ns);
 end;
@@ -1428,24 +1428,38 @@ end;
 {$ImplicitExceptions on}
 
 procedure TTreeNode.getOwnNamespaces(var list: TNamespaceList);
+  procedure addTempNamespace(t: TNamespace);
+  begin
+    t._AddRef;
+    list.addIfNewPrefixUrl(t);
+    t._Release;
+  end;
+
 var attrib: TTreeAttribute;
 begin
   for attrib in getEnumeratorAttributes do
     if attrib.isNamespaceNode then
-      list.addIfNewPrefixUrl(attrib.toNamespace);
-  list.addIfNewPrefixUrl(namespace);
+      addTempNamespace(attrib.toNamespaceObject);
+  if namespace <> nil then
+    list.addIfNewPrefixUrl(namespace);
   for attrib in getEnumeratorAttributes do
-    if not attrib.isNamespaceNode then
+    if not attrib.isNamespaceNode and (attrib.namespace <> nil) then
       list.addIfNewPrefixUrl(attrib.namespace);
 end;
 
 procedure TTreeNode.getAllNamespaces(var list: TNamespaceList; first: boolean);
+  procedure addTempNamespace(t: TNamespace);
+  begin
+    t._AddRef;
+    list.addIfNewPrefix(t);
+    t._Release;
+  end;
 var attrib: TTreeAttribute;
 begin
   if first then getOwnNamespaces(list)
   else for attrib in getEnumeratorAttributes do
     if attrib.isNamespaceNode then
-      list.addIfNewPrefix(attrib.toNamespace);
+      addTempNamespace(attrib.toNamespaceObject);
     //list.addIfNewPrefix(namespace); //implicit namespaces of the ancestor are not in scope, see XQTS cbcl-directconelem-001
    { if attributes <> nil then
       for attrib in attributes do
@@ -1454,7 +1468,7 @@ begin
   if parent <> nil then parent.getAllNamespaces(list, false);
 end;
 
-function TTreeNode.isNamespaceUsed(const n: INamespace): boolean;
+function TTreeNode.isNamespaceUsed(const n: TNamespace): boolean;
 var attrib: TTreeAttribute;
   temp: TTreeNode;
 begin
@@ -1631,11 +1645,14 @@ begin
     addAttribute(doc.createAttribute(strFromPchar(props[i].name, props[i].nameLen), strFromPchar(props[i].value, props[i].valueLen)));
 end;
 
-procedure TTreeNode.addNamespaceDeclaration(n: INamespace; overrides: boolean );
+procedure TTreeNode.addNamespaceDeclaration(n: TNamespace; overrides: boolean );
 var a : TTreeAttribute;
 begin
   for a in getEnumeratorAttributes do
-    if (a.isNamespaceNode) and (a.toNamespace.getPrefix = n.getPrefix) then begin
+    if (a.isNamespaceNode) and (
+         ((a.namespace = nil) and (n.getPrefix = ''))
+         or ((a.namespace <> nil) and (n.getPrefix = a.value))
+      ) then begin
       if overrides then a.realvalue:=n.getURL;
       exit;
     end;
@@ -1694,7 +1711,7 @@ function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBrea
 var builder: TXHTMLStrBuilder;
 var known: TNamespaceList;
   encoding: TSystemCodePage;
-  function requireNamespace(n: INamespace): string;
+  function requireNamespace(n: TNamespace): string;
   begin //that function is useless the namespace should always be in known. But just for safety...
     if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
     known.add(n);
@@ -1707,7 +1724,7 @@ var known: TNamespaceList;
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
       i: Integer;
-      temp: INamespace;
+      temp: TNamespace;
   begin
     with n do with builder do
     case typ of
@@ -1885,7 +1902,7 @@ begin
     end;
     tetText, tetComment: result := cloneShallow(self);
     tetAttribute, tetNamespace: begin
-      targetDocument.addNamespace(namespace);
+      if namespace <> nil then targetDocument.addNamespace(namespace);
       result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue);
       result.namespace := namespace;
       result.typ := typ;
@@ -2605,7 +2622,7 @@ end;
 
 procedure TTreeParser.pushNamespace(const url, prefix: string);
 var
-  ns: INamespace;
+  ns: TNamespace;
   nsurl: string;
 begin
   nsurl := strConvert(url, FXmlHeaderEncoding, FTargetEncoding);
@@ -2619,7 +2636,7 @@ begin
   if prefix = '' then FCurrentNamespace := ns;
 end;
 
-function TTreeParser.findNamespace(const prefix: string): INamespace;
+function TTreeParser.findNamespace(const prefix: string): TNamespace;
 begin
   result := nil;
   if FCurrentNamespaces.hasNamespacePrefix(prefix, result) then exit;
@@ -3018,8 +3035,6 @@ initialization
 finalization
   FreeMem(attributeDataTypeHackList1);
   FreeMem(attributeDataTypeHackList2);
-  XMLNamespace_XML := nil;  //prevent heaptrc warning
-  XMLNamespace_XMLNS := nil;
   omittedEndTags.free;
   omittedStartTags.free;
   TNamespace.freeCache;

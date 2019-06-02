@@ -95,7 +95,7 @@ var doc: TTreeDocument;
     else widestringmanager.Unicode2AnsiMoveProc(PWideChar(u), result, TargetEncoding, length(u));
   end;
 
-  function getNamespace(const url, prefix: string): INamespace;
+  function getNamespace(const url, prefix: string): TNamespace;
   begin
     if namespaces.hasNamespacePrefix(prefix, result) then
       if result.getURL = url then exit;

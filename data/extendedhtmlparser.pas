@@ -2641,10 +2641,11 @@ module.registerFunction('match', 2, 2, @xqFunctionMatches, []);
 xquery.patternMatcherParse:=@patternMatcherParse;
 xquery.patternMatcherMatch:=@patternMatcherMatch;
 xquery.patternMatcherVisit:=@patternMatcherVisit;
-XMLNamespace_TemplateTemplate := TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template');
-XMLNamespace_TemplateTemplate._AddRef;
-XMLNamespace_TemplateT := TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't');
-XMLNamespace_TemplateT._AddRef;
+XMLNamespace_TemplateTemplate := TNamespace.makeWithRC1(HTMLPARSER_NAMESPACE_URL, 'template');
+XMLNamespace_TemplateT := TNamespace.makeWithRC1(HTMLPARSER_NAMESPACE_URL, 't');
+finalization
+XMLNamespace_TemplateTemplate._Release;
+XMLNamespace_TemplateT._Release;
 
 
 

@@ -57,12 +57,14 @@ TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
 type TFastInterfacedObject = class(TObject, IUnknown)
 protected
-   frefcount : longint;
-   function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  frefcount : longint;
+  function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
 public
-   function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-   function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-   property RefCount : longint read frefcount;
+  function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  procedure _AddRefIfNonNil; inline;
+  procedure _ReleaseIfNonNil; inline;
+  property RefCount : longint read frefcount;
 end;
 
 //**a list to store interfaces, similar to TInterfaceList, but faster, because
@@ -152,6 +154,16 @@ function TFastInterfacedObject._Release: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}s
 begin
   result := InterlockedDecrement(frefcount);
   if result = 0 then destroy;
+end;
+
+procedure TFastInterfacedObject._AddRefIfNonNil;
+begin
+  if self <> nil then _AddRef;
+end;
+
+procedure TFastInterfacedObject._ReleaseIfNonNil;
+begin
+  if self <> nil then _Release;
 end;
 
 
