@@ -179,11 +179,6 @@ begin
   end;
 end;
 
-procedure TXQValue.AfterConstruction;
-begin
-  //TInterfacedObject has a hack to allow the constructor to pass self as interface to non-const parameters.
-  //We do not do this, so this override disables it.
-end;
 
 procedure TXQValue.FreeInstance;
 var

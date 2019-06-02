@@ -3383,11 +3383,11 @@ begin
 
     //free query
     //thequeryinterface := thequery;  //this will automatically free the query later
-    IXQuery(thequery)._AddRef;
+    thequery._AddRef;
     if staticContext.sender.AutomaticallyRegisterParsedModules then
       pendingModules.Remove(thequery);
     while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
-    IXQuery(thequery)._Release;
+    thequery._Release;
 
     raise;
   end;

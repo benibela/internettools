@@ -54,9 +54,15 @@ end;
 generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TObjectList>);
 TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
 
-type TInterfacedObjectWithPublicRefCount = class(TInterfacedObject)
-  function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
-  function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+//** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
+type TFastInterfacedObject = class(TObject, IUnknown)
+protected
+   frefcount : longint;
+   function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+public
+   function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+   function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+   property RefCount : longint read frefcount;
 end;
 
 //**a list to store interfaces, similar to TInterfaceList, but faster, because
@@ -129,15 +135,25 @@ begin
   if frac(tempf) < 0 then result -= 1;
 end;
 
-function TInterfacedObjectWithPublicRefCount._AddRef: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+function TFastInterfacedObject.QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
 begin
-  inherited _AddRef;
+  if getinterface(iid,obj) then
+    result:=S_OK
+  else
+    result:=longint(E_NOINTERFACE);
 end;
 
-function TInterfacedObjectWithPublicRefCount._Release: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+function TFastInterfacedObject._AddRef: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
 begin
-  inherited _Release;
+  result := InterlockedIncrement(frefcount);
 end;
+
+function TFastInterfacedObject._Release: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+begin
+  result := InterlockedDecrement(frefcount);
+  if result = 0 then destroy;
+end;
+
 
 
 function TXQHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;

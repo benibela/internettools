@@ -890,9 +890,9 @@ begin
       removeAttribute(attrib);
     end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
       temp := getDocument().createElementPair('s') as TTemplateElement;
-      temp.fnamespace := XMLNamespace_TemplateT;
+      temp.namespace := XMLNamespace_TemplateT;
       temp.templateType:=tetCommandShortRead;
-      temp.reverse.fnamespace := temp.namespace;
+      temp.reverse.namespace := temp.namespace;
       temp.templateReverse.templateType:=tetIgnore;
       temp.addChild(getDocument().createNode());
       temp.templateNext.typ := tetText;

@@ -435,7 +435,7 @@ type
 
   See IXQValue for an actual description
   *)
-  TXQValue = class(TInterfacedObject, IXQValue)
+  TXQValue = class(TFastInterfacedObject, IXQValue)
   private
     ffreelist: TXQValue;
   public
@@ -444,7 +444,6 @@ type
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); virtual;
 
     class function newinstance : tobject;override;
-    procedure AfterConstruction; override;
     procedure FreeInstance;override;
 
     function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you cannot define class functions in the interface, but we need to do calculations with types itself)
@@ -2197,7 +2196,7 @@ type
 
   { TXQuery }
   //** An XPath/XQuery query. See IXQuery
-  TXQuery = class(TInterfacedObject, IXQuery)
+  TXQuery = class(TFastInterfacedObject, IXQuery)
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(var context: TXQEvaluationContext): IXQValue;
