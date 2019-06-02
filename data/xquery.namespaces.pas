@@ -44,7 +44,7 @@ end;
 { TNamespace }
 
 //** Class implementing the INamespace interface
-TNamespace = class(TInterfacedObject, INamespace)
+TNamespace = class(TInterfacedObjectWithPublicRefCount, INamespace)
 public
   url: string;
   prefix: string;

@@ -3785,8 +3785,8 @@ var
 begin
   with state do begin
     baseOffset := 0;
-    oldnamespacecount := 0;
-    if context.namespaces <> nil then oldnamespacecount := context.namespaces.Count;
+    olddocumentnamespacecount:= 0;
+    if context.namespaces <> nil then olddocumentnamespacecount := context.namespaces.Count;
     if (typ = tetDocument) then begin
       document := TTreeDocument.create(nil);
       root := document;
@@ -3807,7 +3807,7 @@ begin
         else result := xqvalue();
     finally
       if context.namespaces <> nil then
-        context.namespaces.deleteFrom(oldnamespacecount);
+        context.namespaces.deleteFrom(olddocumentnamespacecount);
     end;
   end;
 end;
@@ -3869,7 +3869,7 @@ var
       tetOpen, tetComment, tetText, tetProcessingInstruction:
         addKid;
       tetAttribute: begin
-        if (kid.namespace <> nil) and (kid.namespace.getPrefix <> '') then begin
+        if (kid.namespace <> nil) and (kid.namespace.getPrefix <> '') then begin //assume the document already knows the namespace, since the node is part of this document.
           //ensure that there is no conflict between new namespace nodes and default namespace nodes by renaming latter
           //todo: what happens if a later namespace node needs to override the new replacement namespace?
           if not TTreeAttribute(kid).isNamespaceNode then begin
@@ -3877,13 +3877,13 @@ var
             if (namespaceIndex < 0) or not equalNamespaces(context.namespaces.items[namespaceIndex], kid.namespace) then begin
               //if the namespace prefix is not already correctly bound, we need to add it. But if we have already a namespace for that prefix, we need use another prefix
               //Also this does not actually create namespace nodes. Real namespace nodes might be inherited by the children, but these implicit namespaces nodes must not.
-              if namespaceIndex >= 0 then kid.namespace := TNamespace.make(kid.namespace.getURL, chooseRandomPrefix());
+              if namespaceIndex >= 0 then kid.namespace := state.document.addNamespace(kid.namespace.getURL, chooseRandomPrefix());
               context.namespaces.add(kid.namespace)
             end;
           end else begin
             if (tree.namespace <> nil) and (tree.namespace.getPrefix = kid.value) and (tree.namespace.getURL <> TTreeAttribute(kid).realvalue) then begin
-              tree.namespace := TNamespace.make(tree.namespace.getURL, chooseRandomPrefix());
-              tree.addAttribute(tree.namespace.getPrefix, tree.namespace.getURL, XMLNamespace_XMLNS);
+              tree.namespace := state.document.addNamespace(tree.namespace.getURL, chooseRandomPrefix());
+              tree.addAttribute(tree.namespace.getPrefix, tree.namespace.getURL).namespace := XMLNamespace_XMLNS;
               needNamespaceList.add(tree.namespace);
             end;
           end;
@@ -3976,7 +3976,7 @@ var
             for i := 0 to context.namespaces.Count - 1 do
               if not kid.isNamespaceUsed(context.namespaces.items[i]) then begin
                 if context.namespaces.items[i].getPrefix = '' then kid.addAttribute('xmlns', '')
-                else kid.addAttribute(context.namespaces.items[i].getPrefix, '', XMLNamespace_XMLNS);
+                else kid.addAttribute(context.namespaces.items[i].getPrefix, '').namespace := XMLNamespace_XMLNS;
               end;
           end;
         end;
@@ -4053,21 +4053,57 @@ var
   procedure setTreeNodeNameFromTerm(t: TXQTerm; defkind: TXQDefaultNamespaceKind);
   //defkind is xqdnkUnknown for attributes, and xqdnkElementType for elements
 
+    procedure setNamespaceFromPrefix(const prefix: string);
+      procedure registerNamespace();
+      begin
+        state.document.addNamespace(tree.namespace);
+        if context.namespaces = nil then needNamespaceList;
+        context.namespaces.Add(tree.namespace);
+      end;
+    var
+      i: Integer;
+    begin
+      if (context.namespaces <> nil) and ((prefix <> '') or (defkind = xqdnkElementType)) then begin
+        i := context.namespaces.lastIndexOfNamespacePrefix(prefix);
+        if (i >= 0) then begin
+          tree.namespace := context.namespaces.items[i];
+          if i < state.olddocumentnamespacecount then registerNamespace(); //duplicate namespace if it is from another document
+          exit;
+        end;
+      end;
+      tree.namespace := context.staticContext.findNamespace(prefix, defkind);
+      if tree.namespace <> nil then registerNamespace();
+      // tree.namespace := context.findNamespace('', defkind)
+    end;
+
     procedure setTreeNodeNameFromQName(const url, aprefix, local: string; defkind: TXQDefaultNamespaceKind);
+
     var
       prefix: String;
     begin
       tree.value := local;
       prefix := aprefix;
-      if (url = '') and (prefix = '') then
+      if (prefix = '') and (url = '') then
         tree.namespace := nil //something weird happens, if there is a non-nil Q{} Qname. Children of this node that have an empty-prefix namespace inherit this non-nil non existing namespace, so copying and serializing them, duplicates there namespace declaration attribute
       else begin
-        tree.namespace := context.findNamespace(prefix, defkind);
-        if ((tree.namespace = nil) or (tree.namespace.getURL <> url))
-            and ((defkind = xqdnkElementType) or (url <> '')) then begin
+        setNamespaceFromPrefix(prefix);
+        {//find namespace from earlier tree construction
+        if (context.namespaces <> nil) and ((prefix <> '') or (defkind = xqdnkElementType)) then begin
+          i := context.namespaces.lastIndexOfNamespacePrefix(prefix);
+          if (i >= 0) then begin
+            tree.fnamespace := context.namespaces.items[i];
+            if tree.fnamespace.getURL = url then begin
+              if i < state.olddocumentnamespacecount then registerNamespace(); //duplicate namespace if it is from another document
+              exit;
+            end;
+          end;
+        end;
+        //new namespace
+        tree.fnamespace := context.staticContext.findNamespace(prefix, defkind);}
+        if (tree.namespace = nil) or (tree.namespace.getURL <> url) then begin//((defkind = xqdnkElementType) or (url <> '')) then begin
           if (prefix = '') and (url = XMLNamespaceUrl_XML) then prefix := 'xml';
           if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
-          tree.namespace := TNamespace.make(url, prefix);
+          tree.namespace := state.document.addNamespace(url, prefix);
           needNamespaceList.Add(tree.namespace);
         end;
       end;
@@ -4076,6 +4112,8 @@ var
     procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
     var
       vname: TXQValueQName;
+      sep: SizeInt;
+      temp: String;
     begin
       if (v.kind = pvkSequence) and (v.getSequenceCount = 1) then v := v.get(1);
       if (v.instanceOf(baseSchema.QName))  then begin
@@ -4083,14 +4121,19 @@ var
         setTreeNodeNameFromQName(vname.url, vname.prefix, vname.local, defkind);
       end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
         tree.value := v.toString;
-        if pos(':', tree.value) = 0 then tree.namespace := context.findNamespace('', defkind)
-        else begin
-          context.splitRawQName(tree.namespace, tree.value, defkind);
+        sep := pos(':', tree.value);
+        if sep = 0 then begin
+          if defkind = xqdnkElementType then setNamespaceFromPrefix('')
+          else tree.namespace := nil;
+        end else begin
+          temp := copy(tree.value, 1, sep - 1);
+          tree.value := copy(tree.value, sep + 1);
+          setNamespaceFromPrefix(temp);
           if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
         end;
       end else raiseEvaluationError('XPTY0004', 'Expected string value');
       if tree.namespace <> nil then
-        with tree.namespace as TNamespace do
+        with tree.namespace.getSelf do
           if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
             raiseEvaluationError(IfThen(tree.typ <> tetAttribute, 'XQDY0096', 'XQDY0044'), 'Invalid namespace: '+tree.namespace.serialize);
       if not baseSchema.isValidNCName(tree.value) then
@@ -4108,7 +4151,7 @@ var
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
   end;
 
-var i: integer;
+var i, oldnodenamespacecount: integer;
   nameValueEvaluated: IXQValue;
 begin
   with state do begin
@@ -4138,6 +4181,10 @@ begin
     end else tree.root := root;
     tree.offset := baseOffset;
     inc(baseOffset);
+
+    oldnodenamespacecount:= 0;
+    if context.namespaces <> nil then oldnodenamespacecount := context.namespaces.Count;
+
 
     case typ of
       tetAttribute, tetNamespace: begin
@@ -4181,10 +4228,10 @@ begin
             needNamespaceList.addIfNewPrefixUrl(tree.namespace);
         end;
 
-        if (root = tree) and (oldnamespacecount > 0)  then
+        if (root = tree) and (olddocumentnamespacecount > 0)  then
           //a newly constructed nodes has all current namespaces binding. But only necessary to add them to the root node, because otherwise they are inherited anyways
           //todo: does this work for document nodes?
-          for i := 0 to oldnamespacecount - 1 do
+          for i := 0 to olddocumentnamespacecount - 1 do
             tree.addNamespaceDeclaration(context.namespaces.items[i], false);
 
         for i:=0 to high(children) do begin
@@ -4231,6 +4278,8 @@ begin
       else raiseEvaluationError('pxp:INTERNAL','Invalid type for constructor');
     end;
   end;
+  if context.namespaces <> nil then
+    context.namespaces.deleteFrom(oldnodenamespacecount);
   result := tree;
 end;
 

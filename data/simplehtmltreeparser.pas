@@ -129,6 +129,7 @@ TTreeNode = class
 
   offset: TTreeNodeIntOffset; //**<count of characters in the document before this element (so document_pchar + offset begins with value)
 
+
 //otherwise use the functions
   //procedure deleteNext(); delete the next node (you have to delete the reverse tag manually)
   procedure freeAll(); //**< deletes the tree
@@ -201,7 +202,7 @@ TTreeNode = class
   procedure insertSurrounding(basetag: TTreeNode); //**< inserts basetag before the current tag, and creates a matching closing tag after the closing tag of self (slow)
 
   procedure addAttribute(a: TTreeAttribute);
-  function addAttribute(const aname, avalue: string; const anamespace: INamespace = nil): TTreeAttribute;
+  function addAttribute(const aname, avalue: string): TTreeAttribute;
   procedure addAttributes(const props: array of THTMLProperty);
   procedure addNamespaceDeclaration(n: INamespace; overrides: boolean );
   procedure addChild(child: TTreeNode);
@@ -272,6 +273,7 @@ protected
   FCreator: TTreeParser;
   FNodeClass: TTreeNodeClass;
   FBlocks: TBlockAllocator;
+  FNamespaces: TNamespaceList;
   function isHidden: boolean; virtual;
 public
   constructor create(creator: TTreeParser); reintroduce;
@@ -283,10 +285,12 @@ public
 
   function createNode: TTreeNode;
   function createNode(atyp: TTreeNodeType; avalue: string = ''): TTreeNode;
-  function createAttribute(const aname, avalue: string; const anamespace: INamespace = nil): TTreeAttribute;
+  function createAttribute(const aname, avalue: string): TTreeAttribute;
   function createElementPair(const anodename: string): TTreeNode;
   function clone: TTreeDocument; overload;
 
+  function addNamespace(const url, prefix: string): TNamespace;
+  procedure addNamespace(const ns: INamespace);
 
   //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
   function getEncoding: TSystemCodePage;
@@ -761,6 +765,7 @@ begin
   FBlocks.init(TTreeNode.InstanceSize * 200);
   if creator <> nil then FNodeClass := creator.treeNodeClass;
   if FNodeClass = nil then FNodeClass:=TTreeNode;
+  FNamespaces := TNamespaceList.create();
 end;
 
 function TTreeDocument.getCreator: TTreeParser;
@@ -789,7 +794,7 @@ begin
   result.typ := atyp;
 end;
 
-function TTreeDocument.createAttribute(const aname, avalue: string; const anamespace: INamespace): TTreeAttribute;
+function TTreeDocument.createAttribute(const aname, avalue: string): TTreeAttribute;
 begin
   result := TTreeAttribute(FBlocks.take(TTreeAttribute.InstanceSize));
   result := TTreeAttribute(TTreeAttribute.InitInstance(result));
@@ -797,7 +802,6 @@ begin
   result.value := aname;
   if aname <> '' then result.hash := nodeNameHash(aname);
   result.realvalue := avalue;
-  result.namespace := anamespace;
 end;
 
 function TTreeDocument.createElementPair(const anodename: string): TTreeNode;
@@ -832,6 +836,17 @@ begin
   newOffset := 0;
   for c in getEnumeratorChildren do
     result.addChild(c.clone(result, result, newOffset));
+end;
+
+function TTreeDocument.addNamespace(const url, prefix: string): TNamespace;
+begin
+  result := TNamespace.make(url, prefix);
+  addNamespace(result);
+end;
+
+procedure TTreeDocument.addNamespace(const ns: INamespace);
+begin
+  FNamespaces.addIfNewPrefixUrl(ns);
 end;
 
 
@@ -872,6 +887,7 @@ begin
   if next <> nil then next.freeAll();
   if attributes <> nil then FreeAndNil(attributes);
   FBlocks.done;
+  FNamespaces.Free;
   inherited destroy;
 end;
 
@@ -1202,7 +1218,7 @@ begin
     tetAttribute, tetNamespace: result := TTreeAttribute(self).realvalue;
     tetText, tetComment: result := value;
     tetProcessingInstruction: if attributes = nil then result := '' else result := attributes.getStringValue;
-    tetClose, tetInternalDoNotUseCDATAText: assert(false);
+    else{tetClose, tetInternalDoNotUseCDATAText:} assert(false);
   end;
 end;
 
@@ -1598,9 +1614,9 @@ begin
   end;
 end;
 
-function TTreeNode.addAttribute(const aname, avalue: string; const anamespace: INamespace): TTreeAttribute;
+function TTreeNode.addAttribute(const aname, avalue: string): TTreeAttribute;
 begin
-  result := getDocument().createAttribute(aname, avalue, anamespace);
+  result := getDocument().createAttribute(aname, avalue);
   addAttribute(result);
 end;
 
@@ -1624,7 +1640,7 @@ begin
       exit;
     end;
   if n.getPrefix = '' then addAttribute('xmlns', n.getURL)
-  else addAttribute(n.getPrefix, n.getURL, XMLNamespace_XMLNS);
+  else addAttribute(n.getPrefix, n.getURL).namespace := XMLNamespace_XMLNS;
 end;
 
 procedure TTreeNode.addChild(child: TTreeNode);
@@ -1842,6 +1858,7 @@ function TTreeNode.clone(targetDocument: TTreeDocument; newRoot: TTreeNode; var 
   begin
     result := targetDocument.createNode;
     result.assignNoAttributes(t);
+    if t.namespace <> nil then targetDocument.addNamespace(t.namespace);
     result.root := newRoot;
     result.offset := newBaseOffset;
     inc(newBaseOffset);
@@ -1868,7 +1885,9 @@ begin
     end;
     tetText, tetComment: result := cloneShallow(self);
     tetAttribute, tetNamespace: begin
-      result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue, namespace);
+      targetDocument.addNamespace(namespace);
+      result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue);
+      result.namespace := namespace;
       result.typ := typ;
       result.root := newRoot;
       result.offset := newBaseOffset;
@@ -2361,7 +2380,7 @@ begin
   if (pos(':', new.value) > 0) then begin
     new.namespace := findNamespace(strSplitGet(':', new.value))
   end else
-    new.namespace := FCurrentNamespace;;
+    new.namespace := FCurrentNamespace;
   if new.value = '' then
     if parsingModel = pmStrict then raise ETreeParseException.Create('Invalid node with empty name: '+strFromPchar(tagName, tagNameLen))
     else begin

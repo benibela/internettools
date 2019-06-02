@@ -99,7 +99,7 @@ var doc: TTreeDocument;
   begin
     if namespaces.hasNamespacePrefix(prefix, result) then
       if result.getURL = url then exit;
-    result := TNamespace.make(url, prefix);
+    result := doc.addNamespace(url, prefix);
     namespaces.add(result);
   end;
 

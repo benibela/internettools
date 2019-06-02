@@ -772,6 +772,7 @@ const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       COMMAND_CLOSED:array[firstRealTemplateType..high(TTemplateElementType)] of longint=(1, 2, 0,0,0,0,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2); //0: no children, 1: open, 2: close
       COMMAND_STR:array[firstRealTemplateType..high(TTemplateElementType)] of string=('element', 'element', 'match-text','meta','meta-attribute','read','s','loop','loop','if','if','else','else','switch','switch','switch-prioritized','switch-prioritized','siblings','siblings', 'siblings-header','siblings-header');
 
+var XMLNamespace_TemplateTemplate, XMLNamespace_TemplateT: TNamespace;
 
 { TTemplateElement }
 
@@ -889,9 +890,9 @@ begin
       removeAttribute(attrib);
     end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
       temp := getDocument().createElementPair('s') as TTemplateElement;
-      temp.namespace := TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't');
+      temp.fnamespace := XMLNamespace_TemplateT;
       temp.templateType:=tetCommandShortRead;
-      temp.reverse.namespace := temp.namespace;
+      temp.reverse.fnamespace := temp.namespace;
       temp.templateReverse.templateType:=tetIgnore;
       temp.addChild(getDocument().createNode());
       temp.templateNext.typ := tetText;
@@ -2640,6 +2641,12 @@ module.registerFunction('match', 2, 2, @xqFunctionMatches, []);
 xquery.patternMatcherParse:=@patternMatcherParse;
 xquery.patternMatcherMatch:=@patternMatcherMatch;
 xquery.patternMatcherVisit:=@patternMatcherVisit;
+XMLNamespace_TemplateTemplate := TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template');
+XMLNamespace_TemplateTemplate._AddRef;
+XMLNamespace_TemplateT := TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't');
+XMLNamespace_TemplateT._AddRef;
+
+
 
 end.
 

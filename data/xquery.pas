@@ -447,7 +447,7 @@ type
     procedure AfterConstruction; override;
     procedure FreeInstance;override;
 
-    function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you can't define class functions in the interface, but we need to do calculations with types itself)
+    function kind: TXQValueKind;  //**< Primary type of a value (actually just wraps classKind. Since you cannot define class functions in the interface, but we need to do calculations with types itself)
     function typeName: string;      //**< XPath type name (actually just wraps typeAnnotation.name)
     function typeAnnotation: TXSType; inline; //**< Returns the class underlying the interface
     //function schema: TXSSchema;
@@ -2106,7 +2106,7 @@ type
     document: TTreeDocument;
     root: TTreeNode;
     baseOffset: TTreeNodeIntOffset;
-    oldnamespacecount: Integer;
+    olddocumentnamespacecount: Integer;
   end;
 
   TXQTermConstructor = class(TXQTermWithChildren)

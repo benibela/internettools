@@ -54,6 +54,11 @@ end;
 generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TObjectList>);
 TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
 
+type TInterfacedObjectWithPublicRefCount = class(TInterfacedObject)
+  function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  function _Release : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+end;
+
 //**a list to store interfaces, similar to TInterfaceList, but faster, because
 //**  (1) it assumes all added interfaces are non nil
 //**  (2) it is not thread safe
@@ -122,6 +127,16 @@ begin
   tempf := f + 0.5;
   result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
+end;
+
+function TInterfacedObjectWithPublicRefCount._AddRef: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+begin
+  inherited _AddRef;
+end;
+
+function TInterfacedObjectWithPublicRefCount._Release: longint; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+begin
+  inherited _Release;
 end;
 
 

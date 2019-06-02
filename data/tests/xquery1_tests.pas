@@ -1236,6 +1236,8 @@ begin
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces preserve, no-inherit;    let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
   m('declare namespace a = "ANS"; declare namespace b = "BNS"; declare default element namespace "defNS"; declare copy-namespaces no-preserve, no-inherit; let $a := <a:xyz/>, $b := <foo b:def="123" xmlns="defNS" xmlns:b="BNS">{$a}</foo> return outer-xml($b / a:*)', '<a:xyz xmlns:a="ANS"/>');
 
+  m('<a xmlns:x="nx"><b xmlns:y="ny"/>{join(in-scope-prefixes(<e/>))}</a>', 'xml x');
+
   t('let $x := <a xmlns="foobar"><b>c</b></a> return outer-xml(<x>{$x}</x>)', '<x><a xmlns="foobar"><b>c</b></a></x>');
   t('let $x := <a xmlns="foobar"><b>c</b></a> return outer-xml(<x>{$x}</x> / *:a)', '<a xmlns="foobar"><b>c</b></a>');
   t('let $x := <a xmlns="foobar"><b>c</b></a> return outer-xml(<x>{$x}</x> / *:a / *:b)', '<b xmlns="foobar">c</b>');
