@@ -2703,6 +2703,10 @@ type
     procedure add(const name: string; const value: TTreeNode; const namespaceURL: string = ''); //**< Add a variable (@code(value) is converted to a IXQValue)
     procedure add(variable: TXQTermVariable; const value: IXQValue); inline; //**< Add a variable
 
+    procedure setOverride(const n,v: string);
+    procedure setOverride(const n: string; const v: ixqvalue);
+    procedure setOverride(const n: string; const v: ixqvalue; const namespaceURL: string);
+
     function get(const name: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
     function get(const name: string;  const namespaceURL: string): IXQValue; //**< Returns the value of the variable @code(name) @br The returned interface points to the same instance as the interface in the internal variable storage
 
@@ -4786,6 +4790,26 @@ end;
 procedure TXQVariableChangeLog.add(variable: TXQTermVariable; const value: IXQValue);
 begin
   add(variable.value, value, variable.namespace);
+end;
+
+procedure TXQVariableChangeLog.setOverride(const n,v: string);
+begin
+  setOverride(n, xqvalue(v), '');
+end;
+
+procedure TXQVariableChangeLog.setOverride(const n: string; const v: ixqvalue);
+begin
+  setOverride(n, v, '');
+end;
+
+procedure TXQVariableChangeLog.setOverride(const n: string; const v: ixqvalue; const namespaceURL: string);
+var
+  i: Integer;
+begin
+  i := indexOf(n, namespaceURL);
+  if i >= 0 then varstorage[i].value := v
+  else if (parentLog = nil) or parentLog.readonly then add(n, v, namespaceURL)
+  else parentLog.setOverride(n, v, namespaceURL)
 end;
 
 function TXQVariableChangeLog.get(const name: string): IXQValue;

@@ -1374,7 +1374,7 @@ end;
 
 procedure TMultipageTemplateReader.setVariable(name: string; value: IXQValue; namespace: string);
 begin
-  parser.variableChangeLog.add(name, value, namespace);
+  parser.variableChangeLog.setOverride(name, value, namespace);
 end;
 
 procedure TMultipageTemplateReader.setVariable(name: string; value: string; namespace: string);
