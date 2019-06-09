@@ -51,7 +51,7 @@ type
     children: array of TTemplateAction;
     procedure initFromTree(t: TTreeNode); virtual;
     procedure addChildrenFromTree(t: TTreeNode);
-    procedure perform(reader: TMultipageTemplateReader); virtual; abstract;
+    procedure perform(reader: TMultipageTemplateReader); virtual;
     function clone: TTemplateAction; virtual;
     procedure clear;
     destructor Destroy; override;
@@ -1160,6 +1160,11 @@ begin
     addChildFromTree(t);
     t := t.getNextSibling();
   end;
+end;
+
+procedure TTemplateAction.perform(reader: TMultipageTemplateReader);
+begin
+  ignore(reader);
 end;
 
 function TTemplateAction.clone: TTemplateAction;
