@@ -556,6 +556,47 @@ public
   procedure appendHexEntity(codepoint: integer);
   procedure chop(removedCount: SizeInt);
 end;
+
+type
+  generic TBaseArrayList<TElement> = object
+    type PElement = ^TElement;
+  private
+    function getCapacity: SizeInt; inline;
+  protected
+    FBuffer: array of TElement;
+    FCount: SizeInt;
+    procedure setCount(NewCount: SizeInt);
+    procedure checkIndex(AIndex : SizeInt); inline;
+  public
+    procedure addAll(other: TBaseArrayList);
+    procedure addAll(const other: array of TElement);
+    procedure add(const item: TElement);
+    procedure clear;
+    procedure delete(Index: SizeInt);
+    procedure exchange(Index1, Index2: SizeInt);
+    procedure expand;
+    property capacity: SizeInt read getCapacity write setCount;
+    property count: SizeInt read fcount write setCount;
+  end;
+
+  generic TCopyingArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
+    protected
+      function get(Index: SizeInt): TElement; inline;
+      procedure put(Index: SizeInt; const Item: TElement); inline;
+    public
+      property Items[Index: SizeInt]: TElement read get write put; default;
+  end;
+  TPointerArrayList = specialize TCopyingArrayList<pointer>;
+  TObjectArrayList = specialize TCopyingArrayList<TObject>;
+
+  generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
+    protected
+      function get(Index: SizeInt): PElement; inline;
+      procedure put(Index: SizeInt; Item: PElement); inline;
+    public
+      property Items[Index: SizeInt]: PElement read get write put; default;
+  end;
+
 {$endif}
 
 
@@ -790,6 +831,8 @@ TThreadedCall = class(TThread)
   procedure Execute; override;
   constructor create(aproc: TProcedureOfObject;isfinished: TNotifyEvent);
 end;
+
+
 
 procedure TThreadedCall.Execute;
 begin
@@ -1094,6 +1137,126 @@ begin
   while codepoint shr (4 * digits) > 0 do inc(digits);
   append(IntToHex(codepoint, digits));
 end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function TBaseArrayList.getCapacity: SizeInt;
+begin
+  result := length(FBuffer)
+end;
+
+procedure TBaseArrayList.setCount(NewCount: SizeInt);
+begin
+  SetLength(FBuffer, NewCount);
+  FCount := NewCount;
+end;
+
+procedure TBaseArrayList.checkIndex(AIndex: SizeInt);
+begin
+  if (AIndex < 0) or (AIndex >= FCount) then raise ERangeError.Create('Invalid array list index: ' + IntToStr(AIndex) + ', count: ' +IntToStr(FCount));
+end;
+
+procedure TBaseArrayList.addAll(other: TBaseArrayList);
+var
+  i: SizeInt;
+begin
+  for i := 0 to other.FCount - 1 do
+    add(other.FBuffer[i]);
+end;
+
+procedure TBaseArrayList.addAll(const other: array of TElement);
+var
+  i: SizeInt;
+begin
+  for i := 0 to high(other) do
+    add(other[i]);
+end;
+
+procedure TBaseArrayList.add(const item: TElement);
+begin
+  if FCount = capacity then expand;
+  fbuffer[fcount] := item;
+  inc(fcount);
+end;
+
+procedure TBaseArrayList.clear;
+begin
+  SetLength(FBuffer, 0);
+  FCount := 0;
+end;
+
+procedure TBaseArrayList.delete(Index: SizeInt);
+var
+  p: PElement;
+  moveCount: SizeInt;
+begin
+  checkIndex(index);
+  FBuffer[index] := Default(TElement);
+  moveCount := FCount - index - 1;
+  p := @fbuffer[index];
+  move((p + index)^, p, sizeof(TElement) * moveCount);
+  dec(fcount);
+  fillchar(fbuffer[fcount], sizeof(TElement), 0);
+end;
+
+procedure TBaseArrayList.exchange(Index1, Index2: SizeInt);
+var temp: TElement;
+begin
+  //checkIndex(index1);
+  //checkIndex(index2);
+  temp := FBuffer[index1];
+  FBuffer[index1] := FBuffer[index2];
+  FBuffer[index2] := temp;
+end;
+
+procedure TBaseArrayList.expand;
+var
+  cap: SizeInt;
+begin
+  cap := length(FBuffer);
+  if cap < 16 then SetLength(FBuffer, cap + 4)
+  else if cap < 1024 then SetLength(FBuffer, cap * 2)
+  else SetLength(FBuffer, cap + 512);
+end;
+
+function TRecordArrayList.get(Index: SizeInt): PElement;
+begin
+  //checkIndex(index);
+  result := @FBuffer[index];
+end;
+
+procedure TRecordArrayList.put(Index: SizeInt; Item: PElement);
+begin
+  //checkIndex(index);
+  FBuffer[index] := item^;
+end;
+
+function TCopyingArrayList.get(Index: SizeInt): TElement;
+begin
+  //checkIndex(index);
+  result := FBuffer[index];
+end;
+
+procedure TCopyingArrayList.put(Index: SizeInt; const Item: TElement);
+begin
+  //checkIndex(index);
+  FBuffer[index] := item;
+end;
+
+
+
 
 {$endif}
 
