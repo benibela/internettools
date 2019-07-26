@@ -426,6 +426,7 @@ end;
 
 procedure TFastInterfaceList.put(i: integer; const AValue: IT); inline;
 begin
+  assert(AValue <> nil);
   checkIndex(i);
   fbuffer[i] := AValue;
 end;
@@ -453,6 +454,7 @@ end;
 
 procedure TFastInterfaceList.add(const value: IT);
 begin
+  assert(value <> nil);
   if fcount = fcapacity then
     reserve(fcount + 1);
   PPointer(fbuffer)[fcount] := value;
@@ -546,8 +548,10 @@ procedure TFastInterfaceList.clear;
 var
   i: Integer;
 begin
-  for i := 0 to fcount - 1 do
+  for i := 0 to fcount - 1 do begin
+    assert(fbuffer[i] <> nil);
     fbuffer[i]._Release;
+  end;
   fcount:=0;
   setBufferSize(0);
 end;
@@ -560,6 +564,7 @@ end;
 
 procedure TFastInterfaceList.insert(i: integer; child: IT);
 begin
+  assert(child <> nil);
   reserve(fcount + 1);
   if i <> fcount then begin
     checkIndex(i);
