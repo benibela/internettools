@@ -307,6 +307,12 @@ public
   destructor destroy; override;
 end;
 
+TTreeDocumentOwnershipTracker = record
+  class procedure addref(d: TTreeDocument); static;
+  class procedure release(d: TTreeDocument); static;
+end;
+
+
 ETreeParseException = class(Exception);
 { TTreeParser }
 
@@ -475,6 +481,16 @@ var
 begin
   for i:=0 to high(a) do if striEqual(a[i], s) then exit(true);
   exit(false);
+end;
+
+class procedure TTreeDocumentOwnershipTracker.addref(d: TTreeDocument);
+begin
+  d.addRef;
+end;
+
+class procedure TTreeDocumentOwnershipTracker.release(d: TTreeDocument);
+begin
+  d.release;
 end;
 
 function TTreeAttributeEnumerator.GetCurrent: TTreeAttribute;

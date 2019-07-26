@@ -3793,11 +3793,7 @@ begin
       document.baseURI := context.staticContext.baseURI;
       result := xqvalue(root);
     end else begin
-      if context.staticContext.temporaryNodes = nil then begin
-        context.staticContext.temporaryNodes := TXQTempTreeNodes.Create;
-        context.staticContext.temporaryNodes.addRef;
-      end;
-      document := context.staticContext.temporaryNodes;
+      document := context.staticContext.needTemporaryNodes;
       root := nil;
     end;
     try

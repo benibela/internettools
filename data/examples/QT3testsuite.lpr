@@ -17,10 +17,6 @@ uses
   { you can add units after this }
 type
 
-{ TEnvironment }
-
- { TSource }
-
  TSource = class
    role: string; //. or $var or empty
    filename, url: string;
@@ -29,7 +25,7 @@ type
    class function createMultiple(const n: TTreeNode): TList;
    function tree: TTreeNode;
  private
-   ftree: TTreeNode;
+   ftree: TTreeDocument;
  end;
 
  TResource = class
@@ -217,6 +213,7 @@ end;
 
 var xq: TXQueryEngine;
   environments: TStringList;
+  treeCache: TXQHashmapStrOwningTreeDocument;
   xqtsCollations: TStringList;
   //cmd: TCommandLineReader;
   tree: TTreeParser;
@@ -1345,23 +1342,21 @@ function TSource.tree: TTreeNode;
   end;
 
 var
-  idx: Integer;
   doc: TTreeDocument;
 begin
   result := ftree;
   if ftree = nil then begin
-    if xq.ExternalDocumentsCacheInternal = nil then xq.ExternalDocumentsCacheInternal := TStringList.Create;
-    idx := xq.ExternalDocumentsCacheInternal.IndexOf('file://'+filename);
-    if idx >= 0 then begin
-      ftree := TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]);
-      if (url <> '') and (xq.ExternalDocumentsCacheInternal.IndexOf(url) < 0) then
-        xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
+    ftree := treeCache['file://'+filename];
+    if ftree <> nil then begin
+      ftree.getDocument().addRef;
+      if (url <> '') and (treeCache[url] = nil) then
+        treeCache[url] := ftree;
       exit(ftree);
     end;
     if url <> '' then begin
-      idx := xq.ExternalDocumentsCacheInternal.IndexOf(url);
-      if idx >= 0 then begin
-        ftree := TTreeNode(xq.ExternalDocumentsCacheInternal.Objects[idx]);
+      ftree := treeCache[url];
+      if ftree <> nil then begin
+        ftree.getDocument().addRef;
         exit(ftree);
       end;
     end;
@@ -1371,12 +1366,12 @@ begin
       on e: ETreeParseException do ftree := nil;
     end;
     if ftree = nil then exit;
-    if url <> '' then xq.ExternalDocumentsCacheInternal.AddObject(url, ftree);
+    if url <> '' then treeCache[url] := ftree;
     doc := ftree.getDocument(); //doc = ftree
     doc.addRef;
     if not strContains(doc.documentURI, '://') then doc.documentURI := fileToUrl(doc.documentURI);
     if not strContains(doc.baseURI, '://') then doc.baseURI := doc.documentURI;
-    if doc.documentURI <> '' then xq.ExternalDocumentsCacheInternal.AddObject(doc.documentURI, ftree);
+    if doc.documentURI <> '' then treeCache[doc.documentURI] := ftree;
     result := ftree
   end;
 end;
@@ -1672,6 +1667,7 @@ procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: 
     r: Pointer;
     ur, temp: String;
     i: integer;
+    s: TSource;
   begin
     ur := url.combined();
     if TEnvironment(e).resources <> nil then
@@ -1688,13 +1684,18 @@ procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: 
       searchURL(e.refed);
       if lastHTTPResultCode = 200 then exit;
     end;
-    if strBeginsWith(ur, 'http://www.w3.org/fots/') and (e.sources <> nil) then begin
-      for i := 0 to e.sources.Count - 1 do
-        if (TSource(e.sources[i]).role = '.') and (ur = TSource(e.sources[i]).tree.getDocument().documentURI) then begin
+    if strBeginsWith(ur, 'http://www.w3.org/') and (e.sources <> nil) then begin
+      for i := 0 to e.sources.Count - 1 do begin
+        s := TSource(e.sources[i]);
+        if (s.role = '.') and (
+            (ur = s.url) or
+            (ur = s.tree.getDocument().documentURI)
+            ) then begin
           lastHTTPResultCode := 200;
           temp := strLoadFromFile(TSource(e.sources[i]).filename);
           writeBlock(pchar(temp)^, length(temp));
         end;
+      end;
 
     end;
   end;
@@ -1750,6 +1751,7 @@ begin
 
   testsets := TList.Create;
   environments := TStringList.Create;
+  treeCache := TXQHashmapStrOwningTreeDocument.Create;
 
   clr := TCommandLineReader.create;
   clr.declareString('mode', 'Query mode (xquery1, xquery3, xpath2, xpath3)', 'xquery1');
@@ -1866,6 +1868,8 @@ begin
 
   end;}
   logger.endXQTS(totalResults);
+
+  treeCache.Free
 end.
 
 

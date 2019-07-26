@@ -2996,10 +2996,9 @@ end;
 function xqFunctionDoc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   url: String;
-  node: TTreeNode;
+  node: TTreeDocument;
   data: String;
   contenttype: string;
-  ExternalDocuments: TStringList;
 begin
   if args[0].isUndefined  then exit(xqvalue);
   url := args[0].toString;
@@ -3013,25 +3012,19 @@ begin
   url := context.staticContext.resolveDocURI(url);
   if strBeginsWith(url, ':') then raise EXQEvaluationException.create('FODC0005', 'Invalid url: '+ url);
 
-  ExternalDocuments := context.staticContext.sender.ExternalDocuments;
-  if ExternalDocuments = nil then begin
-    ExternalDocuments := TStringList.Create;
-    context.staticContext.sender.ExternalDocuments := ExternalDocuments;
-  end;
+  node := context.staticContext.needTemporaryNodes.documentCache[url];
+  if node = nil then begin
+    data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
-  if ExternalDocuments.IndexOf(url) >= 0 then
-    exit(xqvalue(TTreeNode(ExternalDocuments.Objects[ExternalDocuments.IndexOf(url)])));
+    try
+      node := context.parseDoc(data, url, contenttype);
+    except
+      on e: ETreeParseException do raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url + LineEnding+e.Message);
+    end;
 
-  data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
-
-  try
-    node := context.parseDoc(data, url, contenttype);
-  except
-    on e: ETreeParseException do raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url + LineEnding+e.Message);
+    context.staticContext.temporaryNodes.documentCache[url] := node;
   end;
   if node = nil then raise EXQEvaluationException.Create('FODC0002', 'Failed to parse document: '+url);
-
-  ExternalDocuments.AddObject(url, node);
 
   result := xqvalue(node);
 end;

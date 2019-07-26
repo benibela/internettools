@@ -41,9 +41,6 @@ type TXQValueDateTimeHelper = class helper for TXQValueDateTime
   end;
 
   TXQueryEngineHelper = class helper for TXQueryEngine
-  private
-    function GetExternalDocuments: TStringList;
-    procedure SetExternalDocuments(AValue: TStringList);
   public
     function getPatternMatcherTextStart: TTreeNode; inline;
     function getPatternMatcherTextEnd: TTreeNode; inline;
@@ -52,7 +49,6 @@ type TXQValueDateTimeHelper = class helper for TXQValueDateTime
     procedure addAWeirdGlobalVariableH(const namespace, local: string); inline;
     function parseTermH(const str:string; model: TXQParsingModel; context: TXQStaticContext = nil): TXQuery; inline;
     procedure setPatternMatcherTextRange(textStart, textEnd: TTreeNode);
-    property ExternalDocuments: TStringList read GetExternalDocuments write SetExternalDocuments;
   end;
 
 
@@ -60,16 +56,6 @@ type TXQValueDateTimeHelper = class helper for TXQValueDateTime
 implementation
 
 uses math, xquery.internals.common;
-
-function TXQueryEngineHelper.GetExternalDocuments: TStringList;
-begin
-  result := FExternalDocuments;
-end;
-
-procedure TXQueryEngineHelper.SetExternalDocuments(AValue: TStringList);
-begin
-  FExternalDocuments := AValue
-end;
 
 function TXQueryEngineHelper.getPatternMatcherTextStart: TTreeNode;
 begin

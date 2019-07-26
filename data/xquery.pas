@@ -145,14 +145,19 @@ type
     function requiredModelToString: string;
   end;
 
+  TXQHashmapStrOwningTreeDocument = specialize TXQHashmapStrOwning<TTreeDocument, TTreeDocumentOwnershipTracker>;
   TXQTempTreeNodes = class(TTreeDocument)
   private
     tempnodes: TFPList;
+    fdocumentCache: TXQHashmapStrOwningTreeDocument;
+    function GetDocumentCache(const url: string): TTreeDocument;
+    procedure SetDocumentCache(const url: string; AValue: TTreeDocument);
   protected
     function isHidden: boolean; override;
   public
     constructor create(); reintroduce;
     destructor destroy; override;
+    property documentCache[url: string]: TTreeDocument read GetdocumentCache write SetdocumentCache;
   end;
 
   //============================XQUERY CONTEXTS==========================
@@ -218,6 +223,7 @@ type
   public
     //internally used
     temporaryNodes: TXQTempTreeNodes;
+    function needTemporaryNodes: TXQTempTreeNodes;
     function ImplicitTimezoneInMinutes: integer; inline;
     function CurrentDateTime: TDateTime; inline;
     function findModule(const namespaceURL: string): TXQuery;
@@ -288,7 +294,7 @@ type
     function getGlobalVariable(const name: string; const namespaceURL: string): IXQValue;
     function getGlobalVariable(const v: TXQTermVariable): IXQValue; inline;
 
-    function parseDoc(const data, url, contenttype: string): TTreeNode; //for internal use
+    function parseDoc(const data, url, contenttype: string): TTreeDocument; //for internal use
 
     function SeqValueAsString: string;
     function contextNode(mustExists: boolean = true): TTreeNode;
@@ -1357,7 +1363,7 @@ type
 
   (*** @abstract(List of TXQValue-s). If a sequence is inserted/added, it is flattened, so only the contained items are added  *)
   TXQVList = class(TXQVCustomList)
-    constructor create(capacity: integer = 0);
+    constructor create(acapacity: integer = 0);
     constructor create(other: TXQVCustomList);
     procedure insert(i: integer; value: IXQValue); reintroduce; //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); reintroduce; //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
@@ -2559,7 +2565,6 @@ public
     FLastQuery: IXQuery;
     FCreationThread: TThreadID;
   protected
-    FExternalDocuments: TStringList;
     FModules, FPendingModules: TXQueryModuleList; //internal used
     FParserVariableVisitor: TObject;
     VariableChangelogUndefined, FDefaultVariableHeap: TXQVariableChangeLog;
@@ -2589,7 +2594,6 @@ public
 
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
-    property ExternalDocumentsCacheInternal: TStringList read FExternalDocuments write FExternalDocuments;
 
     function getEvaluationContext(staticContextOverride: TXQStaticContext = nil): TXQEvaluationContext;
 
@@ -3168,6 +3172,18 @@ begin
   PPointer(@b)^ := t;
 end;
 
+function TXQTempTreeNodes.GetDocumentCache(const url: string): TTreeDocument;
+begin
+  if fdocumentCache = nil then exit(nil);
+  result := fdocumentCache[url];
+end;
+
+procedure TXQTempTreeNodes.SetDocumentCache(const url: string; AValue: TTreeDocument);
+begin
+  if fdocumentCache = nil then fdocumentCache := TXQHashmapStrOwningTreeDocument.Create;
+  fdocumentCache[url] := AValue;
+end;
+
 function TXQTempTreeNodes.isHidden: boolean;
 begin
   Result:=true;
@@ -3186,6 +3202,7 @@ begin
   for i:= 0 to tempnodes.count - 1 do
     TTreeNode(tempnodes[i]).freeAll();
   tempnodes.free;
+  fdocumentCache.free;
   inherited destroy;
 end;
 
@@ -3372,9 +3389,9 @@ begin
 end;
 
 
-constructor TXQVList.create(capacity: integer);
+constructor TXQVList.create(acapacity: integer);
 begin
-  reserve(capacity);
+  reserve(acapacity);
   fcount := 0;
 end;
 
@@ -6073,6 +6090,15 @@ begin
   else result := retrieveFromURI('file://./' + url, contenttype, failErrCode);
 end;
 
+function TXQStaticContext.needTemporaryNodes: TXQTempTreeNodes;
+begin
+  if temporaryNodes = nil then begin
+    temporaryNodes := TXQTempTreeNodes.create();
+    temporaryNodes.addRef;
+  end;
+  result := temporaryNodes;
+end;
+
 function TXQStaticContext.ImplicitTimezoneInMinutes: integer;
 begin
   {$PUSH}{$Q-}{$R-}
@@ -6583,7 +6609,7 @@ begin
   result := nil;
 end;
 
-function TXQEvaluationContext.parseDoc(const data, url, contenttype: string): TTreeNode;
+function TXQEvaluationContext.parseDoc(const data, url, contenttype: string): TTreeDocument;
 var
   tempnode: TTreeNode;
   parser: TTreeParser;
@@ -7399,7 +7425,6 @@ begin
   FDefaultVariableStack.Free;
   DefaultParser.Free;
   clear;
-  FExternalDocuments.Free;
   GlobalNamespaces.free;
   FModules.Free;
   FPendingModules.Free;
