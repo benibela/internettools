@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 {$mode objfpc}{$H+}
-
+{$ModeSwitch advancedrecords}
 interface
 
 uses
@@ -314,12 +314,27 @@ begin
 end;
 
 type
-TXQHashmapStrOwningNamespace = specialize TXQHashmapStrOwning<INamespace, TNamespaceList>;
+INamespaceTracker = record
+  class procedure addref(const ns: INamespace); static;
+  class procedure release(const ns: INamespace); static;
+end;
+
+TXQHashmapStrOwningNamespace = specialize TXQHashmapStrOwning<INamespace, INamespaceTracker>;
 TNamespaceCache = class
   uniqueUrl: string;
   prefixes: TXQHashmapStrOwningNamespace;
   constructor Create;
   destructor Destroy; override;
+end;
+
+class procedure INamespaceTracker.addref(const ns: INamespace);
+begin
+  ns._AddRef;
+end;
+
+class procedure INamespaceTracker.release(const ns: INamespace);
+begin
+  ns._Release;
 end;
 
 constructor TNamespaceCache.Create;
@@ -358,7 +373,7 @@ begin
   if result = nil then begin
     result := TNamespaceCache.Create;
     result.uniqueUrl := aurl;
-    globalNamespaceCache.Add(aurl, result);
+    globalNamespaceCache[aurl] := result;
     //writeln(strFromPtr(pointer(aurl)), ' ',aurl);
   end;
 end;
@@ -372,7 +387,7 @@ begin
   old := cache.prefixes[aprefix];
   if old = nil then begin
     result := TNamespace.create(cache.uniqueUrl, aprefix);
-    cache.prefixes.Add(aprefix, result);
+    cache.prefixes[aprefix] := result;
   end else result := old.getSelf;
 end;
 

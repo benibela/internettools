@@ -33,7 +33,16 @@ type
 {$ifndef USE_FLRE}TXQHash = record
   class function hash(const a: TXQHashKeyString; n: SizeUInt): SizeUInt; static;
 end;{$endif}
-generic TXQHashmapStr<TValue> = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, TValue, TXQHash>{$endif})
+  TXQBaseHashmapStrPointer = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, pointer, TXQHash>{$endif})
+  protected
+    function GetPointer(const Key: TXQHashKeyString): pointer; inline;
+    procedure SetPointer(const Key: TXQHashKeyString; const AValue: pointer); inline;
+  end;
+  generic TXQBaseHashmapStr<TValue> = class(TXQBaseHashmapStrPointer)
+  protected
+    function GetValue(const Key: TXQHashKeyString): TValue; inline;
+  end;
+generic TXQHashmapStr<TValue> = class(specialize TXQBaseHashmapStr<TValue>)
 protected
   procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
 public
@@ -140,6 +149,17 @@ begin
   if frac(tempf) < 0 then result -= 1;
 end;
 
+class procedure TFreeObjectOnRelease.addRef(o: TObject);
+begin
+  //empty
+end;
+
+class procedure TFreeObjectOnRelease.release(o: TObject);
+begin
+  o.free;
+end;
+
+
 function TFastInterfacedObject.QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
 begin
   if getinterface(iid,obj) then
@@ -170,61 +190,77 @@ begin
 end;
 
 
-
-function TXQHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
+function TXQBaseHashmapStrPointer.GetPointer(const Key: TXQHashKeyString): pointer;
 begin
   {$ifdef USE_FLRE}
-  result := TValue(pointer(inherited GetValue(key)));
+  result := pointer(GetValue(key));
   {$else}
-  if not inherited GetValue(key, result) then result := default(TValue);
+  if not GetValue(key, result) then result := nil;
   {$endif}
+end;
+
+procedure TXQBaseHashmapStrPointer.SetPointer(const Key: TXQHashKeyString; const AValue: pointer);
+begin
+  {$ifdef USE_FLRE}
+  Add(key, TFLRECacheHashMapData(AValue));
+  {$else}
+  insert(key, AValue);
+  {$endif}
+end;
+
+
+function TXQBaseHashmapStr.GetValue(const Key: TXQHashKeyString): TValue;
+begin
+  result := TValue(GetPointer(key));
 end;
 
 procedure TXQHashmapStr.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
 begin
-  {$ifdef USE_FLRE}
-  inherited SetValue(key, TFLRECacheHashMapData(pointer(AValue)) );
-  {$else}
-  insert(key, AValue);
-  {$endif}
+  SetPointer(key, pointer(avalue));
 end;
 
 procedure TXQHashmapStr.Add(const Key: TXQHashKeyString; const AValue: TValue);
 begin
-  {$ifdef USE_FLRE}
-  inherited Add(key, TFLRECacheHashMapData(pointer(AValue)));
-  {$else}
-  insert(key, AValue);
-  {$endif}
+  SetPointer(key, pointer(avalue));
 end;
 
 procedure TXQHashmapStrOwning.SetValue(const Key: TXQHashKeyString; const AValue: TValue);
 var
-  old: TValue;
+  old: pointer;
 begin
-  old := GetValue(key);
-  if old = AValue then exit;
-  if old <> nil then owner.remove(old);
-  add(key, Avalue);
-end;
+  old := GetPointer(key);
+  if old = pointer(AValue) then exit;
+  if old <> nil then TOwnershipTracker.release(TValue(old));
 
-constructor TXQHashmapStrOwning.create;
-begin
-  inherited;
-  owner := TOwningList.create;
+
+  assert(avalue <> nil);
+  TOwnershipTracker.addRef(avalue);
+  SetPointer(key, pointer(avalue));
+
 end;
 
 destructor TXQHashmapStrOwning.destroy;
+{$ifdef USE_FLRE}
+var i: SizeInt;
+{$else}
+var it: TIterator;
+{$endif}
 begin
-  owner.free;
+  {$ifdef USE_FLRE}
+  for i := 0 to high(Entities) do
+    if (Entities[i].Key <> '') or (Entities[i].Value <> nil) then
+      TOwnershipTracker.Release(TValue(pointer(Entities[i].Value)));
+  {$else}
+  if not IsEmpty then begin
+    it := Iterator;
+    repeat
+      TOwnershipTracker.Release(TValue(it.GetValue));
+    until not it.Next;
+  end;
+  {$endif}
   inherited destroy;
 end;
 
-procedure TXQHashmapStrOwning.Add(const Key: TXQHashKeyString; const Value: TValue);
-begin
-  owner.add(value);
-  inherited add(key, value);
-end;
 
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
