@@ -35,23 +35,24 @@ type
 end;{$endif}
 generic TXQHashmapStr<TValue> = class({$ifdef USE_FLRE}TFLRECacheHashMap{$else}specialize THashmap<TXQHashKeyString, TValue, TXQHash>{$endif})
 protected
-  function GetValue(const Key: TXQHashKeyString): TValue; inline;
   procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
 public
   procedure Add(const Key:TXQHashKeyString; const AValue:TValue); inline;
   property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
 end;
-generic TXQHashmapStrOwning<TValue, TOwningList> = class(specialize TXQHashmapStr<TValue>)
+generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = class(specialize TXQBaseHashmapStr<TValue>)
 protected
-  owner: TOwningList;
   procedure SetValue(const Key: TXQHashKeyString; const AValue: TValue); inline;
 public
-  constructor create;
   destructor destroy; override;
-  procedure Add(const Key:TXQHashKeyString; const Value:TValue); inline;
+  //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
   property Values[const Key:TXQHashKeyString]: TValue read GetValue write SetValue; default;
 end;
-generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TObjectList>);
+TFreeObjectOnRelease = record
+  class procedure addRef(o: TObject); static;
+  class procedure release(o: TObject); static;
+end;
+generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TFreeObjectOnRelease>);
 TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
 
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
@@ -81,6 +82,7 @@ protected
   procedure reserve(cap: integer); //**< Allocates new memory if necessary
   procedure compress; //**< Deallocates memory by shorting list if necessary
   procedure setCount(c: integer); //**< Forces a count (elements are initialized with )
+  procedure setCapacity(AValue: integer);
   procedure setBufferSize(c: integer);
   procedure insert(i: integer; child: IT);
   procedure put(i: integer; const AValue: IT); inline; //**< Replace the IT at position i
@@ -97,6 +99,7 @@ public
   procedure clear;
   property items[i: integer]: IT read get write put; default;
   property Count: integer read fcount write setCount;
+  property Capacity: integer read fcapacity write setCapacity;
 end;
 
 type TXHTMLStrBuilder = object(TStrBuilder)
@@ -403,6 +406,12 @@ end;
 
 
 
+procedure TFastInterfaceList.setCapacity(AValue: integer);
+begin
+  if avalue > fcapacity then setBufferSize(AValue)
+  else if avalue < fcount then setCount(AValue)
+  else if avalue < fcapacity then setBufferSize(AValue);
+end;
 
 procedure TFastInterfaceList.raiseInvalidIndexError(i: integer);
 begin
@@ -484,25 +493,29 @@ end;
 {$ImplicitExceptions off}
 
 procedure TFastInterfaceList.setBufferSize(c: integer);
+var
+  oldcap: Integer;
 begin
+  oldcap := fcapacity;
   ReAllocMem(fbuffer, c * sizeof(IT));
   fcapacity := c;
+  if fcapacity > oldcap then
+    FillChar(fbuffer[oldcap], sizeof(IT) * (fcapacity - oldcap), 0);
 end;
 
 procedure TFastInterfaceList.reserve(cap: integer);
 var
-  oldcap: Integer;
+  newcap: Integer;
 begin
   if cap <= fcapacity then exit;
 
-  oldcap := fcapacity;
-  if cap < 4 then setBufferSize(4)
-  else if (cap < 1024) and (cap <= fcapacity * 2) then setBufferSize(fcapacity * 2)
-  else if (cap < 1024) then setBufferSize(cap)
-  else if cap <= fcapacity + 1024 then setBufferSize(fcapacity + 1024)
-  else setBufferSize(cap);
+  if cap < 4 then newcap := 4
+  else if (cap < 1024) and (cap <= fcapacity * 2) then newcap := fcapacity * 2
+  else if (cap < 1024) then newcap := cap
+  else if cap <= fcapacity + 1024 then newcap := fcapacity + 1024
+  else newcap := cap;
 
-  FillChar(fbuffer[oldcap], sizeof(IT) * (fcapacity - oldcap), 0);
+  setBufferSize(newcap);
 end;
 
 procedure TFastInterfaceList.compress;
