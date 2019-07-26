@@ -1276,7 +1276,7 @@ begin
   list.Capacity := length(children);
   result := TXQValueJSONArray.create(list);
   for i := 0 to high(children) do
-    list.add(children[i].evaluate(context));
+    list.addInArray(children[i].evaluate(context));
 end;
 
 function TXQTermArray3_1.getContextDependencies: TXQContextDependencies;
