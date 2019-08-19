@@ -1118,7 +1118,11 @@ begin
 
   if dependencyCacheTrue.IndexOf(typ+#0+value) >= 0 then isSatisfied := satisfied
   else if dependencyCacheFalse.IndexOf(typ+#0+value) >= 0 then isSatisfied := not satisfied
-  else raise exception.Create('invalid dependency: '+typ+' = '+value);
+  else begin
+    writeln(stderr, 'Unknown dependency: ' + typ+' = '+value);
+    isSatisfied := not satisfied
+    //raise exception.Create('invalid dependency: '+typ+' = '+value);
+  end;
 end;
 
 class procedure TDependency.put(atype, avalue: string; satisfied: boolean);
