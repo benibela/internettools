@@ -6171,6 +6171,15 @@ begin
   sortXQList(list, context, argc, args);
 end;
 
+function xqFunctionCollation_Key(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  collation: TXQCollation;
+begin
+  if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
+  else collation := context.staticContext.collation;
+  result := TXQValueString.create(baseSchema.base64Binary, TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString))))
+end;
+
 function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr; overload;
 var
   flags: TWrappedRegExprFlags;
@@ -7159,6 +7168,7 @@ begin
   fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1,['($input as xs:string?) as xs:string*']);
   fn3_1.registerFunction('trace', @xqFunctionTrace, ['($value as item()*) as item()*']);
   fn3_1.registerFunction('error', @xqFunctionError,['($error as xs:QName?) as none']);
+  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, ['($key as xs:string) as xs:base64Binary', '($key as xs:string, $collation as xs:string) as xs:base64Binary']);
 
   fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, ['($href as xs:string?) as item()?',  '($href as xs:string?, $options as map(*)) as item()?']);
   fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, ['($json-text as xs:string?) as item()?',  '($json-text as xs:string?, $options as map(*)) as item()?']);

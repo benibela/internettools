@@ -161,6 +161,9 @@ begin
 
   t('``[foobar`{1+2+3}``{"a","b","c"}`xyz`{}`]``', 'foobar6a b cxyz');
 
+  t('collation-key("abc0") ne collation-key("abc00")', 'true');
+  t('collation-key("a0c00") ne collation-key("a00c0")', 'true');
+  //t('collation-key("a0001") lt collation-key("a1")', 'true');
 
 
   writeln('XPath 3.1: ', count, ' completed');

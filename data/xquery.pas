@@ -2791,6 +2791,7 @@ TXQCollation = class
   function contains(const strToBeExaminated, searched: string): boolean; virtual;
   function startsWith(const strToBeExaminated, expectedStart: string): boolean; virtual;
   function endsWith(const strToBeExaminated, expectedEnd: string): boolean; virtual;
+  function key(s: string): string; virtual;
 protected
  function compare(a,b: pansichar; len: SizeInt): integer;
  function doCompare(a,b: pansichar; len: SizeInt): integer; virtual;
@@ -2803,9 +2804,11 @@ TXQCollationCodepoint = class(TXQCollation)
  function contains(const strToBeExaminated, searched: string): boolean; override;
  function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+ function key(s: string): string; override;
 end;
 TXQCollationCodepointClever = class(TXQCollationCodepoint)
  function doCompare(const a, b: string): integer; override;
+ function key(s: string): string; override;
 end;
 TXQCollationCodepointInsensitive = class(TXQCollation)
  function doCompare(const a, b: string): integer; override;
@@ -2814,9 +2817,11 @@ TXQCollationCodepointInsensitive = class(TXQCollation)
  function contains(const strToBeExaminated, searched: string): boolean; override;
  function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+ function key(s: string): string; override;
 end;
 TXQCollationCodepointInsensitiveClever = class(TXQCollationCodepointInsensitive)
  function doCompare(const a, b: string): integer; override;
+ function key(s: string): string; override;
 end;
 TXQCollationCodepointLocalized = class(TXQCollation)
  function doCompare(const a, b: string): integer; override;
@@ -7191,6 +7196,11 @@ begin
             and (compare(@strToBeExaminated[length(strToBeExaminated) - length(expectedEnd) + 1], @expectedEnd[1], length(expectedEnd)) = 0);
 end;
 
+function TXQCollation.key(s: string): string;
+begin
+  raiseXQEvaluationError('FOCH0004', 'Collation ' + id + ' cannot create collation keys.', nil);
+end;
+
 
 
 
@@ -9091,10 +9101,74 @@ begin
   result := strEndsWith(strToBeExaminated, expectedEnd);
 end;
 
+function TXQCollationCodepoint.key(s: string): string;
+begin
+  Result := s;
+end;
+
 function TXQCollationCodepointClever.doCompare(const a, b: string): integer;
 begin
   result := strCompareClever(a,b);
 end;
+
+function makeCleverKey(s: string): string;
+var sb: TStrBuilder;
+
+  procedure appendSize(s: SizeInt);
+  begin
+    s := NtoBE(s); //so byte wise comparison in string matches comparison of ints
+    sb.appendBuffer(s, sizeof(s));
+  end;
+
+var
+  p, e, start: PChar;
+  inDigits: boolean;
+  digitLengths: TSizeIntArrayList;
+
+  procedure endBlock;
+  var
+    blockLength: sizeint;
+  begin
+    if inDigits then begin
+      digitLengths.add(p - start);
+      while (start < p) and (start^ = '0') do
+        inc(start);
+    end;
+    blockLength := p - start;
+    if inDigits then appendSize(blockLength);
+    sb.append(start, blockLength);
+  end;
+
+var tl: SizeInt;
+begin
+  if s = '' then
+    exit('');
+  digitLengths.init;
+  sb.init(@result, length(s));
+  p := pchar(s);
+  e := p + length(s);
+  start := p;
+  inDigits := p^ in ['0'..'9'];
+  while p < e do begin
+    if inDigits <> (p^ in ['0'..'9']) then begin
+      endBlock;
+      start := p;
+      inDigits := p^ in ['0'..'9']
+    end;
+    inc(p);
+  end;
+  endBlock;
+  for tl in digitLengths do //since leading 0s are removed from numbers, we need to add something for them
+    appendSize(tl);
+  sb.final;
+end;
+
+
+function TXQCollationCodepointClever.key(s: string): string;
+begin
+  result := makeCleverKey(s);
+end;
+
 
 function TXQCollationCodepointInsensitive.doCompare(const a, b: string): integer;
 begin
@@ -9126,9 +9200,19 @@ begin
   result := striEndsWith(strToBeExaminated, expectedEnd);
 end;
 
+function TXQCollationCodepointInsensitive.key(s: string): string;
+begin
+  Result:=UpperCase(s);
+end;
+
 function TXQCollationCodepointInsensitiveClever.doCompare(const a, b: string): integer;
 begin
   result := striCompareClever(a,b);
+end;
+
+function TXQCollationCodepointInsensitiveClever.key(s: string): string;
+begin
+  result := makeCleverKey(UpperCase(s));
 end;
 
 function TXQCollationCodepointLocalizedInsensitive.doCompare(const a, b: string): integer;
