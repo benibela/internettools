@@ -568,6 +568,7 @@ type
     procedure setCount(NewCount: SizeInt);
     procedure checkIndex(AIndex : SizeInt); inline;
   public
+    procedure init;
     procedure addAll(other: TBaseArrayList);
     procedure addAll(const other: array of TElement);
     procedure add(const item: TElement);
@@ -580,14 +581,24 @@ type
   end;
 
   generic TCopyingArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
+    type TEnumerator = record
+    private
+      function GetCurrent: TElement;
+    public
+      fcurrent, fend: PElement;
+      function MoveNext: Boolean;
+      property current: TElement read GetCurrent;
+    end;
     protected
       function get(Index: SizeInt): TElement; inline;
       procedure put(Index: SizeInt; const Item: TElement); inline;
     public
+      function GetEnumerator: TEnumerator;
       property Items[Index: SizeInt]: TElement read get write put; default;
   end;
   TPointerArrayList = specialize TCopyingArrayList<pointer>;
   TObjectArrayList = specialize TCopyingArrayList<TObject>;
+  TSizeIntArrayList = specialize TCopyingArrayList<SizeInt>;
 
   generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
     protected
@@ -830,6 +841,17 @@ TThreadedCall = class(TThread)
   proc: TProcedureOfObject;
   procedure Execute; override;
   constructor create(aproc: TProcedureOfObject;isfinished: TNotifyEvent);
+end;
+
+function TCopyingArrayList.TEnumerator.GetCurrent: TElement;
+begin
+  result := fcurrent^;
+end;
+
+function TCopyingArrayList.TEnumerator.MoveNext: Boolean;
+begin
+  inc(fcurrent);
+  result := fcurrent < fend;
 end;
 
 
@@ -1168,6 +1190,12 @@ begin
   if (AIndex < 0) or (AIndex >= FCount) then raise ERangeError.Create('Invalid array list index: ' + IntToStr(AIndex) + ', count: ' +IntToStr(FCount));
 end;
 
+procedure TBaseArrayList.init;
+begin
+  FBuffer := nil;
+  FCount := 0;
+end;
+
 procedure TBaseArrayList.addAll(other: TBaseArrayList);
 var
   i: SizeInt;
@@ -1253,6 +1281,18 @@ procedure TCopyingArrayList.put(Index: SizeInt; const Item: TElement);
 begin
   //checkIndex(index);
   FBuffer[index] := item;
+end;
+
+function TCopyingArrayList.GetEnumerator: TEnumerator;
+begin
+  if fbuffer <> nil then begin
+    result.FCurrent := @FBuffer[0];
+    result.fend := result.fcurrent + fcount;
+    dec(result.fcurrent);
+  end else begin
+    result.fcurrent := nil;
+    result.fend := nil;
+  end
 end;
 
 
