@@ -1800,12 +1800,8 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in getEnumeratorAttributes do
             if not attrib.isNamespaceNode then begin
-              append(' ');
-              append(attrib.getNodeName());
-              append('="');
-              if html then appendHTMLAttrib(attrib.realvalue)
-              else append(xmlStrEscape(attrib.realvalue, true));
-              append('"');
+              if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
+              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
             end;
 
         if (n.next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin

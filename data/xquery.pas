@@ -268,7 +268,7 @@ type
   Stores information about the outside scope, needed for correct evaluation of an XQuery-expression
   *)
   TXQEvaluationContext = record
-    //important note to myself: when adding fields update getEvaluationContext
+    //important maintaining note: when adding fields update getEvaluationContext
     RootElement: TTreeNode;   //**< associated tree (returned by @code( / ) within an expression)
     ParentElement: TTreeNode; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
     TextNode: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
@@ -324,6 +324,21 @@ type
       //microsecs = fraction scaled by 1000000, timezone in minutes or high(integer) if absent
   end;
   PXQValueDateTimeData = ^TXQValueDateTimeData;
+
+  TXQSerializer = object(TJSONXHTMLStrBuilder)
+    nodeFormat: TTreeNodeSerialization;
+    insertWhitespace: boolean;
+    procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
+    procedure indent;
+    procedure appendIndent;
+    procedure unindent;
+  protected
+    indentCache: string;
+    indentLevel: integer;
+    sequenceTag: string;// = 'seq';
+    elementTag: string;// = 'e';
+    objectTag: string;// = 'object';
+  end;
 
   (***
   @abstract(Variant used in XQuery-expressions)
@@ -403,8 +418,10 @@ type
     function Size: SizeInt;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated 'use toXQuery'; //**< Returns the value of this value, annotated with its type (e.g. string: abc)
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false): string; //**< Returns a json representation of this value. Converting sequences to arrays and objects to objects
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
+    procedure jsonSerialize(var serializer: TXQSerializer);
+    procedure xmlSerialize(var serializer: TXQSerializer);
     function stringifyNodes: IXQValue; //preliminary
     function hasNodes: boolean;
 
@@ -433,7 +450,6 @@ type
     //**Same as toFloat, but throws an exception if the conversion is not invalid
     function toFloatChecked(scontext: TXQStaticContext): xqfloat;
   end;
-
 
 
   { TXQValue }
@@ -485,8 +501,10 @@ type
     function Size: SizeInt; virtual;
 
     function debugAsStringWithTypeAnnotation(textOnly: boolean = true): string; deprecated;
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; {%H-}insertWhitespace: boolean = false; const {%H-}indent: string = ''): string; virtual;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; virtual;
+    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false): string;
+    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
+    procedure jsonSerialize(var serializer: TXQSerializer); virtual;
+    procedure xmlSerialize(var serializer: TXQSerializer); virtual;
     function stringifyNodes: IXQValue; virtual;
     function hasNodes: boolean; virtual;
 
@@ -522,8 +540,8 @@ type
     function getSequenceCount: integer; override;
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; {%H-}insertWhitespace: boolean = false; const {%H-}indent: string = ''): string; override;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
 
     function map(const q: string): IXQValue; override;
     function map(const q: string; const vs: array of ixqvalue): IXQValue; override;
@@ -555,11 +573,9 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
   end;
 
-
-  { TXQValueInt65 }
 
   { TXQValueInt64 }
 
@@ -582,7 +598,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
 
     function clone: IXQValue; override;
   end;
@@ -610,7 +626,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
 
     function clone: IXQValue; override;
   end;
@@ -636,7 +652,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
 
     function clone: IXQValue; override;
   end;
@@ -773,8 +789,8 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -814,8 +830,8 @@ type
 
     function clone: IXQValue; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -904,8 +920,8 @@ type
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -936,8 +952,8 @@ type
 
     function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -955,8 +971,8 @@ type
 
     function toString: string; override;
 
-    function jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean = false; const indent: string = ''): string; override;
-    function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; override;
+    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
   end;
 
   { TXQValueFunction }
@@ -1324,8 +1340,6 @@ type
     procedure cacheDescendants;
     {$ifdef dumpFunctions}procedure logConstructorFunctions;{$endif}
   end;
-
-  { TJSSchema }
 
   { TJSONiqOverrideSchema }
 
@@ -2915,9 +2929,6 @@ protected
   {$endif}
 end;
 
-//**Returns a "..." string for use in json (internally used)
-function jsonStrEscape(s: string):string;
-
 
 //**Escapes for an URL (internally used)
 //function urlHexEncode(s: string; const safe: TCharSet = ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~']): string;
@@ -3175,6 +3186,34 @@ begin
   t := PPointer(@a)^ ;
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
+end;
+
+procedure TXQSerializer.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
+begin
+  inherited init(abuffer, basecapacity, aencoding);
+  nodeFormat := tnsText;
+  insertWhitespace := false;
+  indentCache := '  ';
+  indentLevel := 0;
+  sequenceTag :=  'seq';
+  elementTag := 'e';
+  objectTag := 'object';
+end;
+
+procedure TXQSerializer.indent;
+begin
+  inc(indentLevel);
+  while 2 * indentLevel > length(indentCache) do indentCache := indentCache + indentCache;
+end;
+
+procedure TXQSerializer.appendIndent;
+begin
+  append(pchar(indentCache), 2 * indentLevel);
+end;
+
+procedure TXQSerializer.unindent;
+begin
+  dec(indentLevel);
 end;
 
 function TXQTempTreeNodes.GetDocumentCache(const url: string): TTreeDocument;
@@ -4405,25 +4444,6 @@ begin
     else {if strliEqual(string(v.varstr), 'NaN') then }result:=getNaN;
 end;
 
-function jsonStrEscape(s: string):string;
-var
-  i: Integer;
-begin
-  if length(s) = 0 then exit('""');
-  result := '"';
-  for i:=1 to length(s) do begin
-    case s[i] of
-      #0..#8,#11,#12,#14..#31: result += '\u00'+IntToHex(ord(s[i]), 2);
-      #9: result += '\t';
-      #10: result += '\n';
-      #13: result += '\r';
-      '"': result += '\"';
-      '\': result += '\\';
-      else result += s[i];
-    end;
-  end;
-  result += '"';
-end;
 
 
 
@@ -7196,8 +7216,9 @@ begin
             and (compare(@strToBeExaminated[length(strToBeExaminated) - length(expectedEnd) + 1], @expectedEnd[1], length(expectedEnd)) = 0);
 end;
 
-function TXQCollation.key(s: string): string;
+function TXQCollation.key(s: string): string; noreturn;
 begin
+  ignore(s);
   raiseXQEvaluationError('FOCH0004', 'Collation ' + id + ' cannot create collation keys.', nil);
 end;
 

@@ -112,15 +112,40 @@ public
 end;
 
 type TXHTMLStrBuilder = object(TStrBuilder)
+  procedure appendHexEntity(codepoint: integer);
+
   procedure appendHTMLText(inbuffer: pchar; len: SizeInt);
   procedure appendHTMLAttrib(inbuffer: pchar; len: SizeInt);
   procedure appendHTMLText(const s: string);
   procedure appendHTMLAttrib(const s: string);
+  procedure appendHTMLElementAttribute(const name, value: string);
+
+  procedure appendXMLElementStartOpen(const name: string);
+  procedure appendXMLElementAttribute(const name, value: string);
+  procedure appendXMLElementStartClose(); inline;
+  procedure appendXMLElementStartTag(const name: string); //open and close
+  procedure appendXMLElementEndTag(const name: string);
+  procedure appendXMLEmptyElement(const name: string);
+  procedure appendXMLText(const s: string);
+  procedure appendXMLAttrib(const s: string);
+end;
+
+type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
+  procedure appendJSONObjectStart; inline;
+  procedure appendJSONObjectKeyColon(const key: string); inline;
+  procedure appendJSONObjectComma; inline;
+  procedure appendJSONObjectEnd; inline;
+  procedure appendJSONArrayStart; inline;
+  procedure appendJSONArrayComma; inline;
+  procedure appendJSONArrayEnd; inline;
+  procedure appendJSONString(const s: string);
 end;
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
 function xmlStrWhitespaceCollapse(const s: string):string;
 function htmlStrEscape(s: string; attrib: boolean = false):string;
+//**Returns a "..." string for use in json (internally used)
+function jsonStrEscape(s: string):string;
 function strSplitOnAsciiWS(s: string): TStringArray;
 function urlHexDecode(s: string): string;
 
@@ -147,6 +172,64 @@ begin
   tempf := f + 0.5;
   result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONObjectStart;
+begin
+  append('{');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONObjectKeyColon(const key: string);
+begin
+  appendJSONString(key);
+  append(': ');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONObjectComma;
+begin
+  append(', ');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONObjectEnd;
+begin
+  append('}');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONArrayStart;
+begin
+  append('[');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONArrayComma;
+begin
+  append(', ');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONArrayEnd;
+begin
+  append(']');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONString(const s: string);
+var
+  i: SizeInt;
+begin
+  append('"');
+  for i:=1 to length(s) do begin
+    case s[i] of
+      #0..#8,#11,#12,#14..#31: begin
+        append('\u00');
+        appendHexNumber(ord(s[i]), 2);
+      end;
+      #9: append('\t');
+      #10: append('\n');
+      #13: append('\r');
+      '"': append('\"');
+      '\': append('\\');
+      else append(s[i]);
+    end;
+  end;
+  append('"');
 end;
 
 class procedure TFreeObjectOnRelease.addRef(o: TObject);
@@ -265,41 +348,28 @@ end;
 
 function xmlStrEscape(s: string; attrib: boolean = false):string;
 var
-  i: Integer;
-  builder: TStrBuilder;
+  builder: TXHTMLStrBuilder;
 
 begin
   builder.init(@result, length(s));
-  i := 1;
-  while i <= length(s) do begin
-    case s[i] of
-      '<': builder.append('&lt;');
-      '>': builder.append('&gt;');
-      '&': builder.append('&amp;');
-      '''': builder.append('&apos;');
-      '"': builder.append('&quot;');
-      #13: builder.append('&#xD;');
-      #10: if attrib then builder.append('&#xA;') else builder.append(#10);
-      #9: if attrib then builder.append('&#x9;') else builder.append(#9);
-      #0..#8,#11,#12,#14..#$1F,#$7F: builder.appendhexentity(ord(s[i]));
-      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then builder.append(#$C2) else begin
-        i+=1;
-        builder.appendhexentity(ord(s[i]));
-      end;
-      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then builder.append(#$E2) else begin
-        builder.append('&#x2028;');
-        i+=2;
-      end;
-      else builder.append(s[i]);
-    end;
-    i+=1;
-  end;
+  if not attrib then builder.appendXMLText(s)
+  else builder.appendXMLAttrib(s);
   builder.final;
 end;
 
 function xmlStrWhitespaceCollapse(const s: string): string;
 begin
   result := strTrimAndNormalize(s, [#9,#$A,#$D,' ']);
+end;
+
+procedure TXHTMLStrBuilder.appendHexEntity(codepoint: integer);
+begin
+  append('&#x');
+  if codepoint <= $FF then begin
+    if codepoint > $F then append(charEncodeHexDigitUp( codepoint shr 4 ));
+    append(charEncodeHexDigitUp(  codepoint and $F ))
+  end else appendHexNumber(codepoint);
+  append(';');
 end;
 
 procedure TXHTMLStrBuilder.appendHTMLText(inbuffer: pchar; len: SizeInt);
@@ -346,6 +416,114 @@ begin
   appendHTMLAttrib(pchar(pointer(s)), length(s));
 end;
 
+procedure TXHTMLStrBuilder.appendHTMLElementAttribute(const name, value: string);
+begin
+  append(' ');
+  append(name);
+  append('="');
+  appendHTMLAttrib(value);
+  append('"');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLElementStartOpen(const name: string);
+begin
+  append('<');
+  append(name);
+end;
+
+procedure TXHTMLStrBuilder.appendXMLElementAttribute(const name, value: string);
+begin
+  append(' ');
+  append(name);
+  append('="');
+  appendXMLAttrib(value);
+  append('"');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLElementStartClose();
+begin
+  append('>');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLElementStartTag(const name: string);
+begin
+  appendXMLElementStartOpen(name);
+  append('>');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLElementEndTag(const name: string);
+begin
+  append('</');
+  append(name);
+  append('>');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLEmptyElement(const name: string);
+begin
+  appendXMLElementStartOpen(name);
+  append('/>');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLText(const s: string);
+var
+  i: SizeInt;
+begin
+  reserveadd(length(s));
+  i := 1;
+  while i <= length(s) do begin
+    case s[i] of
+      '<': append('&lt;');
+      '>': append('&gt;');
+      '&': append('&amp;');
+      '''': append('&apos;');
+      '"': append('&quot;');
+      #13: append('&#xD;');
+      #0..#8,#11,#12,#14..#$1F,#$7F: appendhexentity(ord(s[i]));
+      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then append(#$C2) else begin
+        i+=1;
+        appendhexentity(ord(s[i]));
+      end;
+      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then append(#$E2) else begin
+        append('&#x2028;');
+        i+=2;
+      end;
+      else append(s[i]);
+    end;
+    i+=1;
+  end;
+end;
+
+procedure TXHTMLStrBuilder.appendXMLAttrib(const s: string);
+var
+  i: SizeInt;
+begin
+  reserveadd(length(s));
+  i := 1;
+  while i <= length(s) do begin
+    case s[i] of
+      '<': append('&lt;');
+      '>': append('&gt;');
+      '&': append('&amp;');
+      '''': append('&apos;');
+      '"': append('&quot;');
+      #13: append('&#xD;');
+      #10: append('&#xA;');
+      #9: append('&#x9;');
+      #0..#8,#11,#12,#14..#$1F,#$7F: appendhexentity(ord(s[i]));
+      #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then append(#$C2) else begin
+        i+=1;
+        appendhexentity(ord(s[i]));
+      end;
+      #$E2: if (i + 2 > length(s)) or (s[i+1] <> #$80) or (s[i+2] <> #$A8) then append(#$E2) else begin
+        append('&#x2028;');
+        i+=2;
+      end;
+      else append(s[i]);
+    end;
+    i+=1;
+  end;
+end;
+
 function htmlStrEscape(s: string; attrib: boolean): string;
 var
   builder: TXHTMLStrBuilder;
@@ -353,6 +531,15 @@ begin
   builder.init(@result, length(s));
   if attrib then builder.appendHTMLAttrib(s)
   else builder.appendHTMLText(s);
+  builder.final;
+end;
+
+function jsonStrEscape(s: string): string;
+var
+  builder: TJSONXHTMLStrBuilder;
+begin
+  builder.init(@result, length(s) + 2);
+  builder.appendJSONString(s);
   builder.final;
 end;
 

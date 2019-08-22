@@ -33,16 +33,14 @@ begin
   TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
-function TXQValueUndefined.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueUndefined.jsonSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat);
-  Result:='null';
+  serializer.append('null');
 end;
 
-function TXQValueUndefined.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
+procedure TXQValueUndefined.xmlSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat); ignore(elementTag); ignore(objectTag);
-  Result:='<'+sequenceTag+'/>';
+  serializer.appendXMLEmptyElement(serializer.sequenceTag);
 end;
 
 function TXQValueUndefined.map(const q: string): IXQValue;
@@ -397,17 +395,38 @@ begin
   end;
 end;
 
-function TXQValue.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+function TXQValue.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean): string;
+var serializer: TXQSerializer;
 begin
-  ignore(nodeFormat);
-  result := jsonStrEscape(toString);
+  serializer.init(@result);
+  serializer.nodeFormat := nodeFormat;
+  serializer.insertWhitespace := insertWhitespace;
+  jsonSerialize(serializer);
+  serializer.final;
 end;
 
 function TXQValue.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
+var serializer: TXQSerializer;
 begin
-  ignore(nodeFormat); ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
-  result := xmlStrEscape(toString);
+  serializer.init(@result);
+  serializer.nodeFormat := nodeFormat;
+  serializer.sequenceTag := sequenceTag;
+  serializer.elementTag := elementTag;
+  serializer.objectTag := objectTag;
+  xmlSerialize(serializer);
+  serializer.final;
 end;
+
+procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
+begin
+  serializer.appendJSONString(toString);
+end;
+
+procedure TXQValue.xmlSerialize(var serializer: TXQSerializer);
+begin
+  serializer.appendXMLText(toString);
+end;
+
 
 function TXQValue.stringifyNodes: IXQValue;
 begin
@@ -639,10 +658,9 @@ begin
   result:=xqvalue(bool);
 end;
 
-function TXQValueBoolean.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueBoolean.jsonSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat);
-  if bool then result := 'true' else result := 'false';
+  if bool then serializer.append('true') else serializer.append('false');
 end;
 
 
@@ -713,10 +731,9 @@ begin
   result:=extended(value);
 end;
 
-function TXQValueInt64.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueInt64.jsonSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat);
-  Result:=IntToStr(value);
+  serializer.appendNumber(value);
 end;
 
 function TXQValueInt64.clone: IXQValue;
@@ -834,10 +851,9 @@ begin
   Result:=nan;
 end;
 
-function TXQValueFloat.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueFloat.jsonSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat);
-  Result:=toString;
+  serializer.append(toString);
 end;
 
 function TXQValueFloat.clone: IXQValue;
@@ -910,10 +926,9 @@ begin
  Result:= getNaN;
 end;
 
-function TXQValueDecimal.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueDecimal.jsonSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat);
-  result := toString;
+  serializer.append(toString);
 end;
 
 function TXQValueDecimal.clone: IXQValue;
@@ -1635,42 +1650,70 @@ begin
   result := seqr;
 end;
 
-function TXQValueSequence.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueSequence.jsonSerialize(var serializer: TXQSerializer);
 var
   i: Integer;
-  newindent: String;
+  ws: Boolean;
 begin
-  if seq.Count = 0 then exit('[]');
-  if seq.Count = 1 then exit(seq[0].jsonSerialize(nodeFormat));
-  if insertWhitespace and (seq.Count <= 8) then begin
-    insertWhitespace := false;
-    for i := 0 to seq.Count - 1 do
-      if seq[i].kind in [pvkObject,pvkArray] then begin insertWhitespace := true; break; end;
-  end;
-  if insertWhitespace then begin
-    newindent := indent + '  ';
-    result := '[' + LineEnding + newindent + seq[0].jsonSerialize(nodeFormat, insertWhitespace, newindent);
-    for i := 1 to seq.Count-1 do
-      result := result + ','+ LineEnding + newindent + seq[i].jsonSerialize(nodeFormat, insertWhitespace, newindent);
-    result += LineEnding + indent + ']';
-  end else begin
-    result := '[' + seq[0].jsonSerialize(nodeFormat);
-    for i := 1 to seq.Count-1 do
-      result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
-    result += ']';
+  case seq.Count of
+    0: begin
+      serializer.appendJSONArrayStart;
+      serializer.appendJSONArrayEnd;
+    end;
+    1: seq[0].jsonSerialize(serializer);
+    else begin
+      ws := serializer.insertWhitespace;
+      if ws and (seq.Count <= 8) then begin
+        ws := false;
+        for i := 0 to seq.Count - 1 do
+          if seq[i].kind in [pvkObject,pvkArray] then begin ws := true; break; end;
+      end;
+      with serializer do begin
+        appendJSONArrayStart;
+        if ws then begin
+          indent;
+          append(LineEnding);
+          appendIndent;
+          seq[0].jsonSerialize(serializer);
+          for i := 1 to seq.Count-1 do begin
+            append(',');
+            append(LineEnding);
+            appendIndent;
+            seq[i].jsonSerialize(serializer);
+          end;
+          unindent;
+        end else begin
+          seq[0].jsonSerialize(serializer);
+          for i := 1 to seq.Count-1 do begin
+            appendJSONArrayComma();
+            seq[i].jsonSerialize(serializer);
+          end;
+        end;
+        appendJSONArrayEnd;
+      end;
+    end;
   end;
 end;
 
-function TXQValueSequence.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
+procedure TXQValueSequence.xmlSerialize(var serializer: TXQSerializer);
 var
   i: Integer;
 begin
-  if seq.Count = 0 then exit('<'+sequenceTag+'/>');
-  result := '<'+sequenceTag+'>';
-  result += '<'+elementTag+'>' + seq[0].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
-  for i := 1 to seq.Count-1 do
-    result += '<'+elementTag+'>' + seq[i].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
-  result += '</'+sequenceTag+'>';
+  with serializer do
+    if seq.Count = 0 then
+      appendXMLEmptyElement(sequenceTag)
+     else begin
+       appendXMLElementStartTag(sequenceTag);
+       appendXMLElementStartTag(elementTag);
+       seq[0].xmlSerialize(serializer);
+       appendXMLElementEndTag(elementTag);
+       for i := 1 to seq.Count-1 do begin
+         appendXMLElementStartTag(elementTag);
+         seq[i].xmlSerialize(serializer);
+         appendXMLElementEndTag(elementTag);
+       end;
+       appendXMLElementEndTag(sequenceTag);
+     end;
 end;
 
 function TXQValueSequence.stringifyNodes: IXQValue;
@@ -1777,27 +1820,26 @@ begin
   result := TXQValueNode.Create(node);
 end;
 
-function TXQValueNode.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueNode.jsonSerialize(var serializer: TXQSerializer);
 begin
-  if node = nil then exit('null');
-  case nodeFormat of
-    tnsText: result := jsonStrEscape(toString);
-    tnsXML: result := jsonStrEscape(node.outerXML());
-    tnsHTML: result := jsonStrEscape(node.outerHTML());
-    else result := '';
-  end;
+  if node <> nil then begin
+    case serializer.nodeFormat of
+      tnsText: serializer.appendJSONString(toString);
+      tnsXML: serializer.appendJSONString(node.outerXML());
+      tnsHTML: serializer.appendJSONString(node.outerHTML());
+    end;
+  end else serializer.append('null');
 end;
 
-function TXQValueNode.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
+procedure TXQValueNode.xmlSerialize(var serializer: TXQSerializer);
 begin
-  ignore(sequenceTag); ignore(elementTag); ignore(objectTag);
-  if node = nil then exit('');
-  case nodeFormat of
-    tnsText: result := xmlStrEscape(toString);
-    tnsXML: result := xmlStrEscape(node.outerXML());
-    tnsHTML: result := xmlStrEscape(node.outerHTML());
-    else result := '';
-  end;
+  if node <> nil then begin
+    case serializer.nodeFormat of
+      tnsText: serializer.appendXMLText(toString);
+      tnsXML: serializer.appendXMLText(node.outerXML());
+      tnsHTML: serializer.appendXMLText(node.outerHTML());
+    end;
+  end
 end;
 
 function TXQValueNode.stringifyNodes: IXQValue;
@@ -2045,57 +2087,70 @@ begin
   result.prototype := self;
 end;
 
-function TXQValueObject.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueObject.jsonSerialize(var serializer: TXQSerializer);
 var
   prop: TXQProperty;
   first: Boolean;
-  newindent: String;
 begin
-  if insertWhitespace then begin
-    newindent := indent + '  ';
-    result := '{';
-    first := true;
-    for prop in getPropertyEnumerator do
-      if first then begin
-        result += LineEnding + newindent + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat, insertWhitespace, newindent);
-        first := false;
-      end else result += ',' + LineEnding + newindent + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat, insertWhitespace, newindent);
-    if first then result += '}'
-    else result += LineEnding + indent + '}';
-  end else begin
-    result := '{';
-    first := true;
-    for prop in getPropertyEnumerator do
-      if first then begin
-        result += jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
-        first := false;
-      end else result += ', ' + jsonStrEscape(prop.Name) + ': '+prop.Value.jsonSerialize(nodeFormat);
-    result += '}';
+  first := true;
+  with serializer do begin
+    appendJSONObjectStart;
+    if insertWhitespace then begin
+      indent;
+      for prop in getPropertyEnumerator do begin
+        if not first then append(',')
+        else first := false;
+        append(LineEnding);
+        appendIndent;
+        appendJSONObjectKeyColon(prop.Name);
+        prop.Value.jsonSerialize(serializer);
+      end;
+      if not first then begin
+        append(LineEnding);
+        appendIndent;
+      end;
+      unindent;
+    end else begin
+      first := true;
+      for prop in getPropertyEnumerator do begin
+        if not first then appendJSONObjectComma
+        else first := false;
+        appendJSONObjectKeyColon(prop.name);
+        prop.Value.jsonSerialize(serializer);
+      end;
+    end;
+    appendJSONObjectEnd;
   end;
 end;
 
-function TXQValueObject.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string): string;
+procedure TXQValueObject.xmlSerialize(var serializer: TXQSerializer);
 var
   first: Boolean;
   prop: TXQProperty;
   tempName: String;
 begin
   first := true;
-  for prop in getPropertyEnumerator do begin
-    if first then begin
-      result :=  '<'+objectTag+'>';
-      first := false;
+  with serializer do begin
+    for prop in getPropertyEnumerator do begin
+      if first then begin
+        appendXMLElementStartTag(objectTag);
+        first := false;
+      end;
+      tempName := prop.name;
+      if TXSSchema.isValidNCName(tempName) then
+        appendXMLElementStartTag(tempName)
+      else begin
+        appendXMLElementStartOpen('_');
+        appendXMLElementAttribute('key', tempName);
+        appendXMLElementStartClose();
+        tempName := '_';
+      end;
+      prop.Value.xmlSerialize(serializer);
+      appendXMLElementEndTag(tempName);
     end;
-    tempName := prop.name;
-    if TXSSchema.isValidNCName(tempName) then result += '<'+ tempName + '>'
-    else begin
-      result += '<_ key="'+xmlStrEscape(tempName, true) + '">';
-      tempName := '_';
-    end;
-    result += prop.Value.xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+tempName+'>';
+    if first then appendXMLEmptyElement(objectTag) //no properties
+    else appendXMLElementEndTag(objectTag);
   end;
-  if first then exit('<'+objectTag+'/>'); //no properties
-  result +=  '</'+objectTag+'>';
 end;
 
 function TXQValueObject.stringifyNodes: IXQValue;
@@ -2259,42 +2314,69 @@ begin
   if idx >= seq.Count then result.seq.add(newValue); //e.g. $a(1000) := ..
 end;
 
-function TXQValueJSONArray.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueJSONArray.jsonSerialize(var serializer: TXQSerializer);
 var
   i: Integer;
-  newindent: String;
+  ws: Boolean;
 begin
-  if seq.Count = 0 then exit('[]');
-  if insertWhitespace and (seq.Count <= 8)then begin
-    insertWhitespace := false;
-    for i := 0 to seq.Count - 1 do
-      if seq[i].kind in [pvkObject,pvkArray] then begin insertWhitespace := true; break; end;
-  end;
-  if insertWhitespace then begin
-    newindent := indent + '  ';
-    result := '[' + LineEnding + newindent + seq[0].jsonSerialize(nodeFormat, insertWhitespace, newindent);
-    for i := 1 to seq.Count-1 do
-      result := result + ','+ LineEnding + newindent + seq[i].jsonSerialize(nodeFormat, insertWhitespace, newindent);
-    result += LineEnding + indent + ']';
-  end else begin
-    result := '[' + seq[0].jsonSerialize(nodeFormat);
-    for i := 1 to seq.Count-1 do
-      result := result + ', ' + seq[i].jsonSerialize(nodeFormat);
-    result += ']';
+  case seq.Count of
+    0: begin
+      serializer.appendJSONArrayStart;
+      serializer.appendJSONArrayEnd;
+    end;
+    else begin
+      ws := serializer.insertWhitespace;
+      if ws and (seq.Count <= 8) then begin
+        ws := false;
+        for i := 0 to seq.Count - 1 do
+          if seq[i].kind in [pvkObject,pvkArray] then begin ws := true; break; end;
+      end;
+      with serializer do begin
+        appendJSONArrayStart;
+        if ws then begin
+          indent;
+          append(LineEnding);
+          appendIndent;
+          seq[0].jsonSerialize(serializer);
+          for i := 1 to seq.Count-1 do begin
+            append(',');
+            append(LineEnding);
+            appendIndent;
+            seq[i].jsonSerialize(serializer);
+          end;
+          unindent;
+        end else begin
+          seq[0].jsonSerialize(serializer);
+          for i := 1 to seq.Count-1 do begin
+            appendJSONArrayComma();
+            seq[i].jsonSerialize(serializer);
+          end;
+        end;
+        appendJSONArrayEnd;
+      end;
+    end;
   end;
 end;
 
-function TXQValueJSONArray.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string
-  ): string;
+procedure TXQValueJSONArray.xmlSerialize(var serializer: TXQSerializer);
 var
   i: Integer;
 begin
-  if seq.Count = 0 then exit('<'+sequenceTag+'/>');
-  result := '<'+sequenceTag+'>';
-  result += '<'+elementTag+'>' + seq[0].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
-  for i := 1 to seq.Count-1 do
-    result += '<'+elementTag+'>' + seq[i].xmlSerialize(nodeFormat,sequenceTag,elementTag,objectTag)+'</'+elementTag+'>';
-  result += '</'+sequenceTag+'>';
+  with serializer do
+    if seq.Count = 0 then
+      appendXMLEmptyElement(sequenceTag)
+     else begin
+       appendXMLElementStartTag(sequenceTag);
+       appendXMLElementStartTag(elementTag);
+       seq[0].xmlSerialize(serializer);
+       appendXMLElementEndTag(elementTag);
+       for i := 1 to seq.Count-1 do begin
+         appendXMLElementStartTag(elementTag);
+         seq[i].xmlSerialize(serializer);
+         appendXMLElementEndTag(elementTag);
+       end;
+       appendXMLElementEndTag(sequenceTag);
+     end;
 end;
 
 function TXQValueJSONArray.stringifyNodes: IXQValue;
@@ -2335,17 +2417,14 @@ begin
   result:='null';
 end;
 
-function TXQValueJSONNull.jsonSerialize(nodeFormat: TTreeNodeSerialization; insertWhitespace: boolean; const indent: string): string;
+procedure TXQValueJSONNull.jsonSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat);
-  Result:='null';
+  serializer.append('null');
 end;
 
-function TXQValueJSONNull.xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string; elementTag: string; objectTag: string
-  ): string;
+procedure TXQValueJSONNull.xmlSerialize(var serializer: TXQSerializer);
 begin
-  ignore(nodeFormat); ignore(elementTag); ignore(objectTag);
-  Result:='<'+sequenceTag+'/>';
+  serializer.appendXMLEmptyElement(serializer.sequenceTag);
 end;
 
 
