@@ -1146,10 +1146,15 @@ end;
 
 procedure TStrBuilder.appendHexNumber(number: integer);
 var
-  digits: Integer;
+  digits, tempnumber: Integer;
 begin
-  digits := 1;
-  while number shr (4 * digits) > 0 do inc(digits);
+  assert(number >= 0);
+  tempnumber := number;
+  digits := 0;
+  while tempnumber > 0 do begin
+    inc(digits);
+    tempnumber := tempnumber shr 4;
+  end;
   appendHexNumber(number, digits);
 end;
 

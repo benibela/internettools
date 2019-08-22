@@ -1932,6 +1932,12 @@ begin
   test(buffer, 'x0-10-7888889223372036854775807-9223372036854775808');
 
   sb.clear;
+  sb.appendHexNumber(MaxInt);
+  sb.final;
+  test(buffer, '7FFFFFFF');
+
+
+  sb.clear;
   for i := 0 to 10 do begin
     sb.appendHexNumber(1,i);
     sb.appendHexNumber($789A,i);
