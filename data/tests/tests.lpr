@@ -10,7 +10,7 @@ uses
   xpath2_tests, extendedhtmlparser_tests, bbutils_tests,  sysutils, xquery1_tests,
 
   simplehtmltreeparser, xquery, internetaccess_tests, xpath3_tests, xquery3_tests, bigdecimal_tests, parsertests, simpleinternet_tests,
-commontestutils, extendedhtmlparser, xpath3_1_tests;
+commontestutils, extendedhtmlparser, xpath3_1_tests, xquery_serialization_tests;
 
 var
   start: TDateTime;
@@ -32,6 +32,7 @@ begin
   //bigdecimal_tests.unittests;
   bbutils.registerFallbackUnicodeConversion; //that seems to be more stable across platforms. I think I saw some systems where unicode 10ffff was converted to latin1 '?' and others where it was '??'
   bbutils_tests.unitTests;
+  xquery_serialization_tests.unittests();
 
   internetaccess_tests.unittests;
   for e in commonEncodings do begin
