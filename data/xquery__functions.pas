@@ -6177,7 +6177,7 @@ var
 begin
   if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
-  result := TXQValueString.create(baseSchema.base64Binary, TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString))))
+  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString)))
 end;
 
 function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr; overload;
