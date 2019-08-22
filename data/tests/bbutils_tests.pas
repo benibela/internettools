@@ -1855,17 +1855,17 @@ begin
   test(sb.isEmpty);
   sb.append(tempAlpha);
   test(not sb.isEmpty);
-  sb.appendHexEntity(1);
+  sb.appendHexNumber(1);
   test(not sb.isEmpty);
   sb.final;
-  test(buffer, tempAlpha + '&#x1;');
-  sb.appendHexEntity(10);
-  sb.appendHexEntity($10);
-  sb.appendHexEntity($100);
-  sb.appendHexEntity($FFFF);
-  sb.appendHexEntity($3ABCD);
+  test(buffer, tempAlpha + '1');
+  sb.appendHexNumber(10);
+  sb.appendHexNumber($10);
+  sb.appendHexNumber($100);
+  sb.appendHexNumber($FFFF);
+  sb.appendHexNumber($3ABCD);
   sb.final;
-  test(buffer, tempAlpha + '&#x1;&#xA;&#x10;&#x100;&#xFFFF;&#x3ABCD;');
+  test(buffer, tempAlpha + '1A10100FFFF3ABCD');
 
   sb.init(@buffer, 1);
   sb.append(tempAlpha);
@@ -1922,6 +1922,22 @@ begin
   sb.final;
   test(buffer, 'x');
 
+  sb.appendNumber(0);
+  sb.appendNumber(-10);
+  sb.appendNumber(-7);
+  sb.appendNumber(88888);
+  sb.appendNumber($7fffffffffffffff);
+  sb.appendNumber(-$8000000000000000);
+  sb.final;
+  test(buffer, 'x0-10-7888889223372036854775807-9223372036854775808');
+
+  sb.clear;
+  for i := 0 to 10 do begin
+    sb.appendHexNumber(1,i);
+    sb.appendHexNumber($789A,i);
+  end;
+  sb.final;
+  test(buffer, '1789A1789A01789A001789A0001789A000010789A00000100789A0000001000789A000000010000789A00000000100000789A0000000001000000789A');
 end;
 
 procedure testStrEntities;

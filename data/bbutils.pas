@@ -193,6 +193,7 @@ procedure threadedCall(proc: TProcedure; isfinished: TProcedureOfObject);overloa
 function charDecodeDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
 //Converts 0..9A..Fa..f to a corresponding integer digit
 function charDecodeHexDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
+function charEncodeHexDigitUp(digit: integer): char;
 
 //------------------------------Stringfunctions--------------------------
 //All of them start with 'str' or 'widestr' so can find them easily
@@ -538,7 +539,6 @@ protected
   procedure appendWithEncodingConversion(const s: RawByteString);
   procedure appendCodePointToUtf8String(const codepoint: integer); inline;
   procedure appendCodePointWithEncodingConversion(const codepoint: integer);
-  procedure appendHexNumber(codepoint: integer);
   procedure appendRaw(const s: RawByteString); inline;
 public
   buffer: pstring;
@@ -553,7 +553,9 @@ public
   procedure appendCodePoint(const codepoint: integer);
   procedure append(const p: pchar; const l: SizeInt);
   procedure appendBuffer(const block; l: LongInt);
-  procedure appendHexEntity(codepoint: integer);
+  procedure appendHexNumber(number: integer);
+  procedure appendHexNumber(number, digits: integer);
+  procedure appendNumber(number: Int64);
   procedure chop(removedCount: SizeInt);
 end;
 
@@ -1135,15 +1137,6 @@ begin
 end;
 
 
-procedure TStrBuilder.appendHexEntity(codepoint: integer);
-begin
-  append('&#x');
-  if codepoint <= $FF then begin
-    if codepoint > $F then append(charEncodeHexDigitUp( codepoint shr 4 ));
-    append(charEncodeHexDigitUp(  codepoint and $F ))
-  end else appendHexNumber(codepoint);
-  append(';');
-end;
 
 procedure TStrBuilder.chop(removedCount: SizeInt);
 begin
@@ -1151,13 +1144,38 @@ begin
   if next < pointer(buffer^) then next := pointer(buffer^);
 end;
 
-procedure TStrBuilder.appendHexNumber(codepoint: integer);
+procedure TStrBuilder.appendHexNumber(number: integer);
 var
   digits: Integer;
 begin
   digits := 1;
-  while codepoint shr (4 * digits) > 0 do inc(digits);
-  append(IntToHex(codepoint, digits));
+  while number shr (4 * digits) > 0 do inc(digits);
+  appendHexNumber(number, digits);
+end;
+
+procedure TStrBuilder.appendHexNumber(number, digits: integer);
+var
+  i: Integer;
+  e: pchar;
+begin
+  assert(number >= 0);
+  if digits <= 0 then digits := 1;
+  while (digits < sizeof(integer)*2) and (number shr (4 * digits) > 0) do inc(digits);
+  reserveadd(digits);
+  e := next + digits - 1;
+  for i := 1 to digits do begin
+    e^ := charEncodeHexDigitUp(number and $F);
+    dec(e);
+    number := number shr 4;
+  end;
+  next := next + digits;
+end;
+
+procedure TStrBuilder.appendNumber(number: Int64);
+var s: shortstring;
+begin
+  Str(number, s);
+  append(@s[1], length(s));
 end;
 
 
