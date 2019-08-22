@@ -3785,7 +3785,7 @@ var
 begin
   with state do begin
     baseOffset := 0;
-    olddocumentnamespacecount:= 0;
+    olddocumentnamespacecount:= -1;
     if context.namespaces <> nil then olddocumentnamespacecount := context.namespaces.Count;
     if (typ = tetDocument) then begin
       document := TTreeDocument.create(nil);
@@ -3803,7 +3803,8 @@ begin
         else result := xqvalue();
     finally
       if context.namespaces <> nil then
-        context.namespaces.deleteFrom(olddocumentnamespacecount);
+        if olddocumentnamespacecount = -1 then FreeAndNil(context.namespaces)
+        else context.namespaces.deleteFrom(olddocumentnamespacecount);
     end;
   end;
 end;
