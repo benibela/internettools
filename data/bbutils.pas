@@ -562,10 +562,11 @@ end;
 type
   generic TBaseArrayList<TElement> = object
     type PElement = ^TElement;
+         TArrayBuffer = array of TElement;
   private
     function getCapacity: SizeInt; inline;
   protected
-    FBuffer: array of TElement;
+    FBuffer: TArrayBuffer;
     FCount: SizeInt;
     procedure setCount(NewCount: SizeInt);
     procedure checkIndex(AIndex : SizeInt); inline;
@@ -578,6 +579,7 @@ type
     procedure delete(Index: SizeInt);
     procedure exchange(Index1, Index2: SizeInt);
     procedure expand;
+    function toSharedArray: TArrayBuffer;
     property capacity: SizeInt read getCapacity write setCount;
     property count: SizeInt read fcount write setCount;
   end;
@@ -594,18 +596,25 @@ type
     protected
       function get(Index: SizeInt): TElement; inline;
       procedure put(Index: SizeInt; const Item: TElement); inline;
+      function first: TElement;
+      function last: TElement;
     public
       function GetEnumerator: TEnumerator;
       property Items[Index: SizeInt]: TElement read get write put; default;
   end;
+  generic TCopyingPtrArrayList<TElement> = object(specialize TCopyingArrayList<TElement>)
+  end;
   TPointerArrayList = specialize TCopyingArrayList<pointer>;
   TObjectArrayList = specialize TCopyingArrayList<TObject>;
   TSizeIntArrayList = specialize TCopyingArrayList<SizeInt>;
+  TStringArrayList = specialize TCopyingArrayList<String>;
 
   generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
     protected
       function get(Index: SizeInt): PElement; inline;
       procedure put(Index: SizeInt; Item: PElement); inline;
+      function first: PElement;
+      function last: PElement;
     public
       property Items[Index: SizeInt]: PElement read get write put; default;
   end;
@@ -1282,6 +1291,12 @@ begin
   else SetLength(FBuffer, cap + 512);
 end;
 
+function TBaseArrayList.toSharedArray: TArrayBuffer;
+begin
+  SetLength(FBuffer, fcount);
+  result := fbuffer;
+end;
+
 function TRecordArrayList.get(Index: SizeInt): PElement;
 begin
   //checkIndex(index);
@@ -1294,6 +1309,16 @@ begin
   FBuffer[index] := item^;
 end;
 
+function TRecordArrayList.first: PElement;
+begin
+  result := @FBuffer[0];
+end;
+
+function TRecordArrayList.last: PElement;
+begin
+  result := @FBuffer[fcount - 1];
+end;
+
 function TCopyingArrayList.get(Index: SizeInt): TElement;
 begin
   //checkIndex(index);
@@ -1304,6 +1329,16 @@ procedure TCopyingArrayList.put(Index: SizeInt; const Item: TElement);
 begin
   //checkIndex(index);
   FBuffer[index] := item;
+end;
+
+function TCopyingArrayList.first: TElement;
+begin
+  result := FBuffer[0];
+end;
+
+function TCopyingArrayList.last: TElement;
+begin
+  result := FBuffer[fcount - 1];
 end;
 
 function TCopyingArrayList.GetEnumerator: TEnumerator;
