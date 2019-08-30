@@ -1666,14 +1666,14 @@ var i: integer;
   clr: TCommandLineReader;
 
 procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
+var ur: string;
   procedure searchURL(e: TEnvironment);
   var
     r: Pointer;
-    ur, temp: String;
+    temp: String;
     i: integer;
     s: TSource;
   begin
-    ur := url.combined();
     if TEnvironment(e).resources <> nil then
       for r in TEnvironment(e).resources do
         if TResource(r).uri = ur then begin
@@ -1688,30 +1688,41 @@ procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: 
       searchURL(e.refed);
       if lastHTTPResultCode = 200 then exit;
     end;
-    if strBeginsWith(ur, 'http://www.w3.org/') and (e.sources <> nil) then begin
-      for i := 0 to e.sources.Count - 1 do begin
-        s := TSource(e.sources[i]);
-        if (s.role = '.') and (
-            (ur = s.url) or
-            (ur = s.tree.getDocument().documentURI)
-            ) then begin
-          lastHTTPResultCode := 200;
-          temp := strLoadFromFile(TSource(e.sources[i]).filename);
-          writeBlock(pchar(temp)^, length(temp));
+    if strBeginsWith(ur, 'http://www.w3.org/') then begin
+      if (e.sources <> nil) then begin
+        for i := 0 to e.sources.Count - 1 do begin
+          s := TSource(e.sources[i]);
+          if (s.role = '.') and (
+              (ur = s.url) or
+              (ur = s.tree.getDocument().documentURI)
+              ) then begin
+            lastHTTPResultCode := 200;
+            temp := strLoadFromFile(TSource(e.sources[i]).filename);
+            writeBlock(pchar(temp)^, length(temp));
+          end;
         end;
       end;
-
     end;
   end;
 
 var
   e: Pointer;
+  temp: String;
 begin
+  ur := url.combined();
   lastHTTPResultCode := 400;
 
   for e in currentTest.environments do begin
     searchURL(TEnvironment(e));
     if lastHTTPResultCode <> 400 then exit;
+  end;
+  if strBeginsWith(ur, 'http://www.w3.org/fots/') then begin
+    delete(ur, 1, length('http://www.w3.org/fots/'));
+    if FileExists(ur) then begin
+      lastHTTPResultCode := 200;
+      temp := strLoadFromFile(ur);
+      writeBlock(pchar(temp)^, length(temp));
+    end;
   end;
 end;
 
