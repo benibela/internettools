@@ -131,13 +131,17 @@ type TXHTMLStrBuilder = object(TStrBuilder)
 end;
 
 type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
+  procedure appendJSONEmptyObject; inline;
   procedure appendJSONObjectStart; inline;
   procedure appendJSONObjectKeyColon(const key: string); inline;
   procedure appendJSONObjectComma; inline;
   procedure appendJSONObjectEnd; inline;
+
+  procedure appendJSONEmptyArray; inline;
   procedure appendJSONArrayStart; inline;
   procedure appendJSONArrayComma; inline;
   procedure appendJSONArrayEnd; inline;
+
   procedure appendJSONString(const s: string);
 end;
 
@@ -174,6 +178,11 @@ begin
   if frac(tempf) < 0 then result -= 1;
 end;
 
+procedure TJSONXHTMLStrBuilder.appendJSONEmptyObject;
+begin
+  append('{}')
+end;
+
 procedure TJSONXHTMLStrBuilder.appendJSONObjectStart;
 begin
   append('{');
@@ -193,6 +202,11 @@ end;
 procedure TJSONXHTMLStrBuilder.appendJSONObjectEnd;
 begin
   append('}');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONEmptyArray;
+begin
+  append('[]')
 end;
 
 procedure TJSONXHTMLStrBuilder.appendJSONArrayStart;

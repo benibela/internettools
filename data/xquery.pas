@@ -325,13 +325,22 @@ type
   end;
   PXQValueDateTimeData = ^TXQValueDateTimeData;
 
+  TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
-    insertWhitespace: boolean;
+    insertWhitespace: TXQSerializerInsertWhitespace;
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
     procedure indent;
     procedure appendIndent;
     procedure unindent;
+
+    procedure appendJSONArrayStart;
+    procedure appendJSONArrayComma;
+    procedure appendJSONArrayEnd;
+    procedure appendJSONObjectStart;
+    procedure appendJSONObjectComma;
+    procedure appendJSONObjectEnd;
+
   protected
     indentCache: string;
     indentLevel: integer;
@@ -3192,7 +3201,7 @@ procedure TXQSerializer.init(abuffer: pstring; basecapacity: SizeInt; aencoding:
 begin
   inherited init(abuffer, basecapacity, aencoding);
   nodeFormat := tnsText;
-  insertWhitespace := false;
+  insertWhitespace := xqsiwConservative;
   indentCache := '  ';
   indentLevel := 0;
   sequenceTag :=  'seq';
@@ -3214,6 +3223,72 @@ end;
 procedure TXQSerializer.unindent;
 begin
   dec(indentLevel);
+end;
+
+procedure TXQSerializer.appendJSONArrayStart;
+begin
+  inherited appendJSONArrayStart;
+  case insertWhitespace of
+    xqsiwIndent: begin
+      indent;
+      append(LineEnding);
+      appendIndent;
+    end;
+  end;
+end;
+
+procedure TXQSerializer.appendJSONArrayComma;
+begin
+  case insertWhitespace of
+    xqsiwConservative: append(', ');
+    xqsiwIndent: begin
+      append(',');
+      append(LineEnding);
+      appendIndent;
+    end;
+    xqsiwNever: append(',');
+  end;
+end;
+
+procedure TXQSerializer.appendJSONArrayEnd;
+begin
+  case insertWhitespace of
+    xqsiwIndent: begin
+      unindent;
+      append(LineEnding);
+      appendIndent;
+    end;
+  end;
+  inherited appendJSONArrayEnd;
+end;
+
+procedure TXQSerializer.appendJSONObjectStart;
+begin
+  inherited appendJSONObjectStart;
+  case insertWhitespace of
+    xqsiwIndent: begin
+      indent;
+      append(LineEnding);
+      appendIndent;
+    end;
+  end;
+end;
+
+procedure TXQSerializer.appendJSONObjectComma;
+begin
+  appendJSONArrayComma
+end;
+
+procedure TXQSerializer.appendJSONObjectEnd;
+begin
+  case insertWhitespace of
+    xqsiwIndent: begin
+      unindent;
+      append(LineEnding);
+      appendIndent;
+    end;
+  end;
+  inherited appendJSONObjectEnd;
 end;
 
 function TXQTempTreeNodes.GetDocumentCache(const url: string): TTreeDocument;

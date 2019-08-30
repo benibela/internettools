@@ -400,7 +400,8 @@ var serializer: TXQSerializer;
 begin
   serializer.init(@result);
   serializer.nodeFormat := nodeFormat;
-  serializer.insertWhitespace := insertWhitespace;
+  if insertWhitespace then serializer.insertWhitespace := xqsiwIndent
+  else serializer.insertWhitespace := xqsiwConservative;
   jsonSerialize(serializer);
   serializer.final;
 end;
@@ -1653,44 +1654,31 @@ end;
 procedure TXQValueSequence.jsonSerialize(var serializer: TXQSerializer);
 var
   i: Integer;
-  ws: Boolean;
+  ws: TXQSerializerInsertWhitespace;
 begin
   case seq.Count of
-    0: begin
-      serializer.appendJSONArrayStart;
-      serializer.appendJSONArrayEnd;
-    end;
+    0: serializer.appendJSONEmptyArray;
     1: seq[0].jsonSerialize(serializer);
     else begin
       ws := serializer.insertWhitespace;
-      if ws and (seq.Count <= 8) then begin
-        ws := false;
+      if (ws = xqsiwIndent) and (seq.Count <= 8) then begin
+        serializer.insertWhitespace := xqsiwConservative;
         for i := 0 to seq.Count - 1 do
-          if seq[i].kind in [pvkObject,pvkArray] then begin ws := true; break; end;
+          if seq[i].kind in [pvkObject,pvkArray] then begin
+            serializer.insertWhitespace := xqsiwIndent;
+            break;
+          end;
       end;
       with serializer do begin
         appendJSONArrayStart;
-        if ws then begin
-          indent;
-          append(LineEnding);
-          appendIndent;
-          seq[0].jsonSerialize(serializer);
-          for i := 1 to seq.Count-1 do begin
-            append(',');
-            append(LineEnding);
-            appendIndent;
-            seq[i].jsonSerialize(serializer);
-          end;
-          unindent;
-        end else begin
-          seq[0].jsonSerialize(serializer);
-          for i := 1 to seq.Count-1 do begin
-            appendJSONArrayComma();
-            seq[i].jsonSerialize(serializer);
-          end;
+        seq[0].jsonSerialize(serializer);
+        for i := 1 to seq.Count-1 do begin
+          appendJSONArrayComma();
+          seq[i].jsonSerialize(serializer);
         end;
         appendJSONArrayEnd;
       end;
+      serializer.insertWhitespace := ws;
     end;
   end;
 end;
@@ -2094,32 +2082,17 @@ var
 begin
   first := true;
   with serializer do begin
-    appendJSONObjectStart;
-    if insertWhitespace then begin
-      indent;
-      for prop in getPropertyEnumerator do begin
-        if not first then append(',')
-        else first := false;
-        append(LineEnding);
-        appendIndent;
-        appendJSONObjectKeyColon(prop.Name);
-        prop.Value.jsonSerialize(serializer);
+    for prop in getPropertyEnumerator do begin
+      if not first then appendJSONObjectComma
+      else begin
+        first := false;
+        appendJSONObjectStart;
       end;
-      if not first then begin
-        append(LineEnding);
-        appendIndent;
-      end;
-      unindent;
-    end else begin
-      first := true;
-      for prop in getPropertyEnumerator do begin
-        if not first then appendJSONObjectComma
-        else first := false;
-        appendJSONObjectKeyColon(prop.name);
-        prop.Value.jsonSerialize(serializer);
-      end;
+      appendJSONObjectKeyColon(prop.Name);
+      prop.Value.jsonSerialize(serializer);
     end;
-    appendJSONObjectEnd;
+    if not first then appendJSONObjectEnd
+    else appendJSONEmptyObject;
   end;
 end;
 
@@ -2317,43 +2290,30 @@ end;
 procedure TXQValueJSONArray.jsonSerialize(var serializer: TXQSerializer);
 var
   i: Integer;
-  ws: Boolean;
+  ws: TXQSerializerInsertWhitespace;
 begin
   case seq.Count of
-    0: begin
-      serializer.appendJSONArrayStart;
-      serializer.appendJSONArrayEnd;
-    end;
+    0: serializer.appendJSONEmptyArray;
     else begin
       ws := serializer.insertWhitespace;
-      if ws and (seq.Count <= 8) then begin
-        ws := false;
+      if (ws = xqsiwIndent) and (seq.Count <= 8) then begin
+        serializer.insertWhitespace := xqsiwConservative;
         for i := 0 to seq.Count - 1 do
-          if seq[i].kind in [pvkObject,pvkArray] then begin ws := true; break; end;
+          if seq[i].kind in [pvkObject,pvkArray] then begin
+            serializer.insertWhitespace := xqsiwIndent;
+            break;
+          end;
       end;
       with serializer do begin
         appendJSONArrayStart;
-        if ws then begin
-          indent;
-          append(LineEnding);
-          appendIndent;
-          seq[0].jsonSerialize(serializer);
-          for i := 1 to seq.Count-1 do begin
-            append(',');
-            append(LineEnding);
-            appendIndent;
-            seq[i].jsonSerialize(serializer);
-          end;
-          unindent;
-        end else begin
-          seq[0].jsonSerialize(serializer);
-          for i := 1 to seq.Count-1 do begin
-            appendJSONArrayComma();
-            seq[i].jsonSerialize(serializer);
-          end;
+        seq[0].jsonSerialize(serializer);
+        for i := 1 to seq.Count-1 do begin
+          appendJSONArrayComma();
+          seq[i].jsonSerialize(serializer);
         end;
         appendJSONArrayEnd;
       end;
+      serializer.insertWhitespace := ws;
     end;
   end;
 end;
