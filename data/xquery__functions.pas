@@ -4242,9 +4242,11 @@ type TSerializationParams = record
   omitXmlDeclaration: boolean;
   standalone: string;
   itemSeparator: string;
+  indent: TXQSerializerInsertWhitespace;
   procedure setDefault;
   procedure setFromNode(paramNode: TTreeNode);
   procedure setFromMap(const v: IXQValue);
+  procedure setFromXQValue(const v: IXQValue);
 end;
 
 procedure TSerializationParams.setDefault;
@@ -4259,6 +4261,7 @@ begin
   omitXmlDeclaration := true;
   standalone := 'omit';
   itemSeparator := isAbsentMarker;
+  indent := xqsiwConservative;
 end;
 
 procedure TSerializationParams.setFromNode(paramNode: TTreeNode);
@@ -4292,7 +4295,8 @@ begin
          'escape-uri-attributes': ;//todo
          'html-version':   htmlVersion := paramNode.getAttribute('value');
          'include-content-type': ;//todo
-         'indent': ;//todo
+         'indent': if tobool(paramNode.getAttribute('value')) then indent := xqsiwIndent
+                   else indent := xqsiwNever;
          'item-separator': itemSeparator := paramNode.getAttribute('value');
          //'json-node-output-method': todo 3.1
          'media-type': ;//todo
@@ -4349,7 +4353,8 @@ begin
       'escape-uri-attributes': valueBool(); //todo
       'html-version': if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64) else raiseInvalidParameter;
       'include-content-type': valueBool(); //todo
-      'indent': valueBool(); //todo
+      'indent': if valueBool() then indent := xqsiwIndent
+                else indent := xqsiwNever;
       'item-separator': itemSeparator := valueString();
       'json-node-output-method': ; //todo
       'media-type': valueString(); //todo
@@ -4362,6 +4367,15 @@ begin
       'use-character-maps': ; //todo
       'version': version := valueString();
     end;
+  end;
+end;
+
+procedure TSerializationParams.setFromXQValue(const v: IXQValue);
+begin
+  case v.kind of
+    pvkObject: setFromMap(v);
+    pvkNode: setFromNode(v.toNode);
+    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node');
   end;
 end;
 
@@ -4390,13 +4404,7 @@ begin
   //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
   arg := args[0];
   params.setDefault;
-  if argc = 2 then
-    case args[1].kind of
-      pvkObject: params.setFromMap(args[1]);
-      pvkNode: params.setFromNode(args[1].toNode);
-      else if args[1].getSequenceCount > 0 then raiseXPTY0004TypeError(args[1], 'serialize params must be map() or node');
-    end;
-
+  if argc = 2 then params.setFromXQValue(args[1]);
   firstElement := nil;
   for v in arg.GetEnumeratorPtrUnsafe do with params do begin
     n := v^.toNode;
@@ -4479,6 +4487,28 @@ begin
   end;
   result := xqvalue(strres);
 end;
+
+function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;
+var serializer: TXQSerializer;
+    res: string;
+  procedure setParams;
+  var p: TSerializationParams;
+  begin
+    p.setDefault;
+    p.setFromXQValue(args[1]);
+    serializer.insertWhitespace := p.indent;
+  end;
+
+begin
+  serializer.init(@res);
+  serializer.nodeFormat := tnsXML;
+  serializer.insertWhitespace := xqsiwConservative;
+  if argc = 2 then setParams;
+  args[0].jsonSerialize(serializer);
+  serializer.final;
+  result := xqvalue(res);
+end;
+
 
 function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -6964,6 +6994,9 @@ begin
   '             ) else . )');
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
+
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string', '($arg as item()*, $params as item()?) as xs:string']);
+
 
   //standard functions
   fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);

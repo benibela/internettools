@@ -108,13 +108,7 @@ begin
   result := parser.parse(argc, args);
 end;
 
-function xqFunctionSerialize_Json({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var
-  a: IXQValue;
-begin
-  a := args[0];
-  result := xqvalue(a.jsonSerialize(tnsXML));
-end;
+
 
 function xqFunctionJSON_Doc(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -226,7 +220,6 @@ initialization
 
   pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
   pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*', '($arg as xs:string, $options as object()) as item()*'], [xqcdContextOther]);
-  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string']);
 
 
 
