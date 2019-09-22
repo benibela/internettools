@@ -18,9 +18,6 @@ implementation
 uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils, xquery.namespaces, xquery.internals.protectionbreakers;
 
 
-type TXQueryEngineBreaker = class(TXQueryEngine)
-end;
-
 
 function collection({%H-}fakeself, {%H-}sender: TObject; const variable: string; var value: IXQValue): boolean;
 begin

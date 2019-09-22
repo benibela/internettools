@@ -13,9 +13,7 @@ implementation
 
 uses extendedhtmlparser, xquery, bbutils, simplehtmltreeparser, commontestutils, xquery.namespaces;
 
-type TXQueryEngineBreaker = class(TXQueryEngine)
-end;
-  Latin1String = {$ifdef FPC_HAS_CPSTRING}type ansistring(CP_LATIN1){$else}ansistring{$endif};
+type Latin1String = {$ifdef FPC_HAS_CPSTRING}type ansistring(CP_LATIN1){$else}ansistring{$endif};
 
 procedure unitTests(testerrors: boolean);
 //test all possible (4*2) white space config options

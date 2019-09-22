@@ -3122,7 +3122,7 @@ type TXQueryInternals = object
 //private
     class var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
     class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); static; noreturn;
-    class function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; inline;
+    class function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; static; inline;
 end;
 
 implementation
