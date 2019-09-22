@@ -7291,10 +7291,11 @@ begin
             and (compare(@strToBeExaminated[length(strToBeExaminated) - length(expectedEnd) + 1], @expectedEnd[1], length(expectedEnd)) = 0);
 end;
 
-function TXQCollation.key(s: string): string; noreturn;
+function TXQCollation.key(s: string): string;
 begin
   ignore(s);
   raiseXQEvaluationError('FOCH0004', 'Collation ' + id + ' cannot create collation keys.', nil);
+  result := '';
 end;
 
 
