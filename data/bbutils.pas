@@ -3430,7 +3430,7 @@ end;
 function strLoadFromFile(filename: string): string;
 var f:TFileStream;
 begin
-  f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmOpenRead);
+  f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmOpenRead or fmShareDenyWrite);
   result := '';
   SetLength(result,f.Size);
   if f.size>0 then
