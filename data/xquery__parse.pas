@@ -557,12 +557,37 @@ begin
   end;
 end;
 
+procedure strCountLinesBeforePos(const s: string; pos: pchar; out lines: SizeInt; out lineStart: pchar);
+var view: TStringView;
+begin
+  view.init(s);
+  lines := 0;
+  while (view.data <= pos) do begin
+    lineStart := view.data;
+    inc(lines);
+    if not view.moveAfterLineBreak then break;
+  end;
+end;
 
 procedure TXQParsingContext.raiseParsingError(errcode, s: string);
+var lines, i: SizeInt;
+    lineStart: pchar;
+    view: TCharArrayView;
+    line, msg: String;
 begin
-  if (pos < @str[1]) then pos := @str[1]; //make sure pos points to str
-  if (pos > @str[length(str)]) then pos := @str[length(str)];
-  raise EXQParsingException.Create(errcode, s+#13#10'in: '+strslice(@str[1],pos-1)+' [<- error occurs before here] '+strslice(pos,@str[length(str)]));
+  strCountLinesBeforePos(str, pos, lines, lineStart);
+  view := str.unsafeView.viewFrom(lineStart);
+  if view.findLineBreak <> nil then view := view.viewUntil(view.findLineBreak);
+  line := view.ToString;
+
+  msg := s + LineEnding + 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
+  line := copy(line, 1, pos - lineStart - 1);
+  for i := 1 to length(line) do
+    if line[i] <> #9 then line[i] := ' ';
+  msg += line + '/|\'+LineEnding;
+  msg += line + ' --- error occurs before here';
+
+  raise EXQParsingException.Create(errcode, msg);
 end;
 
 procedure TXQParsingContext.raiseSyntaxError(s: string);
