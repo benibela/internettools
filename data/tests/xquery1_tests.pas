@@ -216,6 +216,7 @@ begin
   t('''&quot;''',                 '"',                        '');
   t('"x&quot;y"',                   'x"y',                        '');
   t('''x&quot;y''',                 'x"y',                        '');
+  t('"&#9;"',                   #9);
 
   t('"Ben &amp; Jerry&apos;s"', 'Ben & Jerry''s');
   t('"&#8364;99.50"', '€99.50'); //assuming utf 8 encoding

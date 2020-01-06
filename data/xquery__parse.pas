@@ -2148,7 +2148,7 @@ begin
       'quot': result += '"';
       'apos': result += '''';
       else begin
-        if (length(temp) <= 2) or (temp[1] <> '#')  then raiseSyntaxError('Invalid entity');
+        if (length(temp) <= 1) or (temp[1] <> '#')  then raiseSyntaxError('Invalid entity');
         case temp[2] of
           'x': begin
             base := 16;
