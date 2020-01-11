@@ -132,6 +132,9 @@ type
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
   end;
+  TBBPcharHelper = type helper for pchar
+    function nilToLast: pchar;
+  end;
 
   TCriticalSectionHelper = record helper for TRTLCriticalSection
     procedure init;
@@ -151,6 +154,7 @@ function objInheritsFrom(o: TObject; c: TClass): boolean;
 begin
   result := assigned(o) and o.InheritsFrom(c);
 end;
+
 
 
 
@@ -447,6 +451,13 @@ function TBB2StringHelper.unsafeView: TStringView;
 begin
   result.init(self);
 end;
+
+function TBBPcharHelper.nilToLast: pchar;
+begin
+  if self = nil then result := pchar(high(PtrUInt))
+  else result := self;
+end;
+
 
 procedure TCriticalSectionHelper.init;
 begin
