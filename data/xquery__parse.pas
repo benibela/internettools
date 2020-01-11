@@ -577,7 +577,7 @@ var lines, i: SizeInt;
 begin
   strCountLinesBeforePos(str, pos, lines, lineStart);
   view := str.unsafeView.viewFrom(lineStart);
-  if view.findLineBreak <> nil then view := view.viewUntil(view.findLineBreak);
+  view := view.viewUntil(view.findLineBreak.nilToLast);
   line := view.ToString;
 
   msg := s + LineEnding + 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
