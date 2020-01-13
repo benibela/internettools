@@ -930,7 +930,7 @@ begin
     nextValue;
     t := nextToken();
   end;
-  if t <> closingChar then raiseParsingError('XPST0003', 'Expected closing parenthesis: '+ closingChar);
+  if t <> closingChar then raiseSyntaxError('Expected closing parenthesis: '+ closingChar);
   if partialApplications > 0 then begin
     df := TXQTermDefineFunction.create;
     if objInheritsFrom(result, TXQTermNamedFunction) then df.kind := xqtdfStaticPartialApplication
@@ -978,7 +978,7 @@ procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQP
     'namespace-node': result := [qmAttribute];
     'schema-attribute': result := [qmAttribute,qmSchemaFail];
     'schema-element': result := [qmElement,qmSchemaFail];
-    else begin raiseParsingError('XPST0003', 'Unknown element test: '+select); result := []; end;
+    else begin raiseSyntaxError('Unknown element test: '+select); result := []; end;
     end;
   end;
 
@@ -1335,7 +1335,7 @@ var token: String;
          if (parsingModel = xqpmXPath2) then raiseInvalidModel('let is not supported in XPath 2.0');
       end;
       'for': isfor:=true;
-      else begin raiseParsingError('XPST0003', 'Invalid flower: '+token); isfor := false; end;
+      else begin raiseSyntaxError('Invalid flower: '+token); isfor := false; end;
     end;
     skipWhitespaceAndComment();
     if pos^ in ['s', 't'] then begin
@@ -1597,7 +1597,7 @@ begin
       word := nextToken();
     end;
 
-    if word <> 'default' then raiseParsingError('XPST0003', 'expected "default" clause');
+    if word <> 'default' then raiseSyntaxError('expected "default" clause');
     skipWhitespaceAndComment();
     clause := TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
     result.push(clause);
@@ -1840,7 +1840,7 @@ begin
       parseCommonContent(result, '<', not lastWasCData);
       lastWasCData := false;
 
-      if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+      if pos^ = #0 then raiseSyntaxError('Unexpected end');
       if pos^ = '<' then begin
         pos += 1;
         case pos^ of
@@ -1860,17 +1860,17 @@ begin
             pos += length('![CDATA[');
             marker := pos;
             while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
-            if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+            if pos^ = #0 then raiseSyntaxError('Unexpected end');
             result.push(TXQTermConstant.create(strFromPchar(marker, pos - marker)));
             pos+=3;
           end else if strBeginsWith(pos, '!--') then result.push(parseCommentConstructor)
-          else raiseParsingError('XPST0003', 'Invalid character combination after <!');
+          else raiseSyntaxError('Invalid character combination after <!');
           '?': result.push(parsePIConstructor);
           else result.push(parseDirectConstructor());
         end;
       end;
     end;
-    raiseParsingError('XPST0003', 'Unexpected end (probably missing closing tag for <'+result.nameValue.debugTermToString +'>');
+    raiseSyntaxError('Unexpected end (probably missing closing tag for <'+result.nameValue.debugTermToString +'>');
 
   except
     result.free;
@@ -1967,7 +1967,7 @@ begin
   //just ignore it
   while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
     pos += 1;
-  if pos^ = #0 then raiseParsingError('XPST0003', 'Unexpected end');
+  if pos^ = #0 then raiseSyntaxError('Unexpected end');
   pos += 2;
   skipWhitespaceAndComment();
   if (pos^ = '(') and ((pos+1)^ = '#') then begin
@@ -2077,7 +2077,7 @@ begin
     while nextToken(true) <> ')' do begin
       result.push(parseDefineVariable);
       skipWhitespaceAndComment();
-      if not (pos^ in [',', ')']) then raiseParsingError('XPST0003', 'Missing , or )');
+      if not (pos^ in [',', ')']) then raiseSyntaxError('Missing , or )');
       if pos^ = ',' then pos+=1;
     end;
     pos+=1;
@@ -2220,7 +2220,7 @@ end;
 function TXQParsingContext.parseString: string;
 begin
   skipWhitespaceAndComment();
-  if not (pos^ in ['''', '"']) then raiseParsingError('XPST0003', 'Expected string');
+  if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected string');
   result := parseString(nextToken());
 end;
 
@@ -2605,7 +2605,7 @@ begin
         '.': exit(TXQTermContextItem.Create);
         '..': exit(TXQTermNodeMatcher.Create(xqnmdParent));
         else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermConstant.createNumber(word))
-        else raiseParsingError('XPST0003', 'Unknown term: '+word);
+        else raiseSyntaxError('Unknown term: '+word);
       end;
     end;
 
@@ -2616,7 +2616,7 @@ begin
     end;
 
     '{': begin
-      if not options.AllowJSON then raiseParsingError('XPST0003', 'Unexpected {. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like object) ');
+      if not options.AllowJSON then raiseSyntaxError('Unexpected {. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like object) ');
       inc(pos);
       exit(parseJSONLikeObjectConstructor);
     end;
@@ -2634,7 +2634,7 @@ begin
       exit(parseFunctionDeclaration(annotations, true));
     end;
     'x': if ((pos+1)^ in ['"', '''']) then begin
-      if not options.AllowExtendedStrings then raiseParsingError('err:XPST0003', 'Extended string syntax was disabled');
+      if not options.AllowExtendedStrings then raiseSyntaxError('Extended string syntax was disabled');
       inc(pos);
       exit(parseXString());
     end;
@@ -2682,7 +2682,7 @@ begin
             end;
             exit;
           end;
-          if axis <> '' then raiseParsingError('XPST0003', 'Not an kind/node test');
+          if axis <> '' then raiseSyntaxError('Not an kind/node test');
         end;
         result := createFunctionCall(namespaceURL, namespacePrefix, word, namespaceMode);
         result := parseFunctionCall(TXQTermNamedFunction(result));
@@ -2741,7 +2741,7 @@ begin
       end;
 
     if (word = '') or (word[1] in [',', ';', ':', ')', ']', '}']) then //todo: check if valid xml node name
-      raiseParsingError('XPST0003', 'Unexpected character: ' + word);
+      raiseSyntaxError('Unexpected character: ' + word);
 
     //if (not staticContext.useLocalNamespaces) and (namespacePrefix <> '*') and ((namespacePrefix <> '') or (word <> '*'))  then
     //  namespaceURL := staticContext.findNamespaceURL(namespacePrefix, xqdnkElementType);
@@ -2947,7 +2947,7 @@ var astroot: TXQTerm;
          else begin
            word := nextToken();
            for prop in strSplit(word, '.') do begin
-             if prop = '' then raiseParsingError('XPST0003', 'Unexpected ..');
+             if prop = '' then raiseSyntaxError('Unexpected ..');
              replace^ := TXQTermReadObjectProperty.Create(prop).push([replace^]);
            end;
            needDynamicCall:=strEndsWith(word, '.');
@@ -2958,7 +2958,7 @@ var astroot: TXQTerm;
              raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
          end;
      end else begin
-       raiseParsingError('XPST0003', 'Unexpected .');
+       raiseSyntaxError('Unexpected .');
      end;
   end;
 var
@@ -3020,7 +3020,7 @@ begin
             expect(word);
             parseDotOperator;
           end else
-            raiseParsingError('XPST0003', 'Unknown or unexpected operator: '+word+ ' (possible missing comma , or closing parentheses)}] )' );
+            raiseSyntaxError('Unknown or unexpected operator: '+word+ ' (possible missing comma , or closing parentheses)}] )' );
         end;
       end;
     end;
@@ -3531,7 +3531,7 @@ var declarationDuplicateChecker: TStringList;
         url := parseNamespaceURI('', 'XQST0057');
       end
       else begin
-        if (url = '') or not (url[1] in ['''', '"']) then raiseParsingError('XPST0003', 'Invalid schema import');
+        if (url = '') or not (url[1] in ['''', '"']) then raiseSyntaxError('Invalid schema import');
         url := copy(url, 2, length(url) - 2 );
         prefix:=':::'; //no prefix given
       end;
@@ -3651,7 +3651,7 @@ var declarationDuplicateChecker: TStringList;
         SetLength(vari.annotations, length(vari.annotations)+1);
         vari.annotations[high(vari.annotations)].name := TXQEQName.create(XMLNamespaceURL_MyExtensionsNew, 'external');
       end;
-      else raiseParsingError('XPST0003', 'Invalid variable declaration');
+      else raiseSyntaxError('Invalid variable declaration');
     end;
     if contextItem and (vari.getExpression <> nil) and staticContext.isLibraryModule then
       raiseParsingError('XQST0113', 'Cannot set context item in library module');
@@ -3854,7 +3854,7 @@ begin
           case nextToken() of
             'preserve': staticContext.StripBoundarySpace:=false;
             'strip': staticContext.StripBoundarySpace:=true;
-            else raiseParsingError('XPST0003', 'unknown boundary-space declaration');
+            else raiseSyntaxError('unknown boundary-space declaration');
           end;
         end;
         'default': begin
@@ -3879,7 +3879,7 @@ begin
               else TNamespace.assignRC(staticContext.defaultFunctionNamespace, TNamespace.make(parseNamespaceURI('XQST0070',''), ''))
             end;
             'decimal-format': declareDecimalFormat();
-            else raiseParsingError('XPST0003', 'Unknown default value');
+            else raiseSyntaxError('Unknown default value');
           end;
         end;
         'base-uri': begin
@@ -3891,7 +3891,7 @@ begin
           case nextToken() of
             'strip': staticContext.constructionPreserve := false;
             'preserve': staticContext.constructionPreserve := true
-            else raiseParsingError('XPST0003', 'invalid construction declaration');
+            else raiseSyntaxError('invalid construction declaration');
           end;
         end;
         'ordering': begin
@@ -3899,7 +3899,7 @@ begin
           case nextToken() of
             'unordered': staticContext.ordering:=false;
             'ordered': staticContext.ordering:=true;
-            else raiseParsingError('XPST0003', 'invalid ordering mode');
+            else raiseSyntaxError('invalid ordering mode');
           end;
         end;
         'copy-namespaces': begin
@@ -3907,13 +3907,13 @@ begin
           case nextToken() of
              'preserve': staticContext.copyNamespacePreserve:=true;
              'no-preserve': staticContext.copyNamespacePreserve:=false;
-             else raiseParsingError('XPST0003', 'Invalid copy-namespace');
+             else raiseSyntaxError('Invalid copy-namespace');
            end;
            expect(',');
            case nextToken() of
              'inherit': staticContext.copyNamespaceInherit:=true;
              'no-inherit': staticContext.copyNamespaceInherit:=false;
-             else raiseParsingError('XPST0003', 'Invalid copy-namespace');
+             else raiseSyntaxError('Invalid copy-namespace');
            end;
          end;
         'decimal-format': declareDecimalFormat(parseEQName);
@@ -3954,7 +3954,7 @@ begin
               requireModule;
               TXQTermModule(result).push(parseFunctionDeclaration(annotations));
             end;
-            else raiseParsingError('XPST0003', 'Only variables and functions can have annotations');
+            else raiseSyntaxError('Only variables and functions can have annotations');
           end;
         end;
         'option': begin
@@ -4016,7 +4016,7 @@ begin
     else if staticContext.moduleNamespace = nil then begin //main module
         TXQTermModule(result).push(parsePrimaryLevel);
         if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
-          raiseParsingError('XPST0003', 'A main module must have a query body, it cannot only declare functions/variables (add ; ())');
+          raiseSyntaxError('A main module must have a query body, it cannot only declare functions/variables (add ; ())');
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
     declarationDuplicateChecker.free;
   except
@@ -4199,7 +4199,7 @@ begin
   t := txqterm(v^);
   if (t <> nil) and (t.InheritsFrom(TXQTermPendingEQNameToken)) then begin
     pending := TXQTermPendingEQNameToken(t);
-    if pending.pending <> xqptVariable then raiseParsingError('XPST0003', 'Internal error 20160101181238b');
+    if pending.pending <> xqptVariable then raiseSyntaxError('Internal error 20160101181238b');
     v^ := TXQTermVariable(pending.resolveAndFree(staticContext));
   end;
   inherited;
