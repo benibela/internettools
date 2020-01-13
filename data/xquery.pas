@@ -2270,7 +2270,9 @@ type
 
   //**Exception raised during the parsing of an expression
   EXQParsingException = class(EXQException)
+    next: EXQParsingException;
     constructor create(aerrcode, amessage: string; anamespace: INamespace = nil);
+    destructor Destroy; override;
   end;
 
   //**Exception raised during the evaluation of an expression
@@ -4329,6 +4331,12 @@ end;
 constructor EXQParsingException.create(aerrcode, amessage: string; anamespace: INamespace);
 begin
   inherited;
+end;
+
+destructor EXQParsingException.Destroy;
+begin
+  next.free;
+  inherited Destroy;
 end;
 
 

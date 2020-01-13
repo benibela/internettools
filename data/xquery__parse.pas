@@ -56,8 +56,12 @@ TXQParsingContext = class(TXQAbstractParsingContext)
 protected
   thequery: TXQuery;
   tempcontext: TXQEvaluationContext;
+  pendingException, pendingExceptionLast: EXQParsingException;
+  lastErrorPos: pchar;
   procedure raiseParsingError(errcode, s: string);
   procedure raiseSyntaxError(s: string);
+  procedure raiseParsingErrorFatal(errcode, s: string);
+  procedure raiseSyntaxErrorFatal(s: string);
   procedure raiseInvalidModel(s: string);
 
   procedure requireXQuery(s: string = '');
@@ -255,7 +259,8 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       v.index := overridenVariables.count - v.index - 1;
       exit;
     end;
-    if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then raise EXQParsingException.create('XPST0008', 'Self-Dependancy: '+v.ToString);
+    if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then
+      raise EXQParsingException.create('XPST0008', 'Self-Dependancy: '+v.ToString);
 
     q := staticContext.findModule(v.namespace);
     if q <> nil then begin
@@ -575,6 +580,8 @@ var lines, i: SizeInt;
     view: TCharArrayView;
     line, msg: String;
 begin
+  if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
+
   strCountLinesBeforePos(str, pos, lines, lineStart);
   view := str.unsafeView.viewFrom(lineStart);
   view := view.viewUntil(view.findLineBreak.nilToLast);
@@ -587,13 +594,32 @@ begin
   msg += line + '/|\'+LineEnding;
   msg += line + ' --- error occurs before here';
 
-  raise EXQParsingException.Create(errcode, msg);
+  if pendingException = nil then begin
+    pendingException := EXQParsingException.Create(errcode, msg);
+    pendingExceptionLast := pendingException;
+  end else begin
+    pendingExceptionLast.next := EXQParsingException.Create(errcode, msg);
+    pendingExceptionLast := pendingExceptionLast.next;
+  end;
+  lastErrorPos := pos;
 end;
 
 procedure TXQParsingContext.raiseSyntaxError(s: string);
 begin
   raiseParsingError('XPST0003', s);
 end;
+
+procedure TXQParsingContext.raiseParsingErrorFatal(errcode, s: string);
+begin
+  raiseParsingError(errcode, s);
+  raise pendingException;
+end;
+
+procedure TXQParsingContext.raiseSyntaxErrorFatal(s: string);
+begin
+  raiseParsingErrorFatal('XPST0003', s);
+end;
+
 
 procedure TXQParsingContext.raiseInvalidModel(s: string);
 begin
@@ -693,7 +719,7 @@ begin
       nestene+=1;
     end else pos+=1;
   end;
-  raiseSyntaxError('Never ending comment')
+  raiseSyntaxErrorFatal('Never ending comment')
 end;
 
 procedure TXQParsingContext.skipWhitespaceAndComment();
@@ -706,21 +732,33 @@ begin
 end;
 
 procedure TXQParsingContext.expect(c: char);
+  procedure error;
+  begin
+    raiseSyntaxError('"'+c+'"'+' expected, but "'+nextToken()+'" found');
+    while (pos^ <> c) and (pos^ <> #0) do pos += 1;
+  end;
+
 begin
   skipWhitespaceAndComment;
-    if pos^ <> c then
-      raiseSyntaxError('"'+c+'"'+' expected, but "'+nextToken()+'" found');
-    pos+=1;
+  if pos^ = c then pos += 1
+  else error();
 end;
 
 procedure TXQParsingContext.expect(s: string);
+  procedure error;
+  begin
+    raiseSyntaxError('"'+ s+'" expected, but "'+nextToken()+'" found');
+  end;
+
 var
    i: Integer;
 begin
   skipWhitespaceAndComment;
   for i:=1 to length(s) do begin
-    if pos^ <> s[i] then
-      raiseSyntaxError('"'+ s+'" expected, but "'+nextToken()+'" found');
+    if pos^ <> s[i] then begin
+      error;
+      exit;
+    end;
     pos+=1;
   end;
 end;
@@ -744,7 +782,7 @@ begin
           if ((pos+1)^ <> start^) then break
           else pos+=1;
       until pos^ in [#0];
-      if pos^ = #0 then raiseSyntaxError('Unclosed string');
+      if pos^ = #0 then raiseSyntaxErrorFatal('Unclosed string');
       pos+=1;
     end;
     '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', '@', '$', '%', '-': begin//SYMBOLS+START_SYMBOLS - [:-]
@@ -821,7 +859,7 @@ begin
     inc(pos);
     marker := pos;
     while not (pos^ in ['{', '}', #0]) do inc(pos);
-    if pos^ = #0 then raiseSyntaxError('Unexpected end');
+    if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
     url := normalizeLineEnding(strFromPchar(marker, pos - marker));
     url := xmlStrWhitespaceCollapse(replaceEntitiesIfNeeded(url));
     if url = XMLNamespaceUrl_XMLNS then raiseParsingError('XQST0070', 'Invalid namespace ' + url);
@@ -1194,7 +1232,7 @@ begin
          schema := staticContext.findSchema(nsurl);
          result.atomicTypeInfo := nil;
          if schema <> nil then result.atomicTypeInfo := schema.findType(word);
-         if result.atomicTypeInfo = nil then raiseParsingError('XPST0051', 'Unknown type: '+word);
+         if result.atomicTypeInfo = nil then raiseParsingErrorFatal('XPST0051', 'Unknown type: '+word);
        end;
     end;
 
@@ -1243,7 +1281,7 @@ var
   curpos: PChar;
   temp: TXQTermConstructor;
 begin
-  if patternMatcherParse = nil then raiseParsingError('pxp:PATT0', 'No pattern matcher loaded ()');
+  if patternMatcherParse = nil then raiseParsingErrorFatal('pxp:PATT0', 'No pattern matcher loaded ()');
   curpos := pos;
   expect('<');
   temp := parseDirectConstructor;
@@ -1561,7 +1599,7 @@ begin
       expect('in'); result.push(parse());
       word := nextToken();
     end;
-    Assert(word = 'satisfies');
+    if (word <> 'satisfies') then raiseSyntaxError('Expected satisfies');
     result.push(parse());
   except
     result.free;
@@ -1675,7 +1713,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
         continue;
       end;
 
-      if pos^ = #0 then raiseSyntaxError('Unexpected end');
+      if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
 
       if not atBoundary or (pos^ in ['}', '&']) or strBeginsWith(pos, '<![') or not strIsWhitespace(marker, pos - marker) then begin
         pushElementContent(normalizeLineEnding(strFromPchar(marker, pos - marker)));
@@ -1711,7 +1749,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
         '&': begin
           marker := pos;
           while not (pos^ in [#0, ';']) do pos += 1;
-          if pos^ = #0 then raiseSyntaxError('Unexpected end');
+          if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
           pos += 1;
           pushElementContent(replaceEntitiesAlways(strFromPchar(marker, pos - marker)));
           atBoundary:=false;
@@ -1734,7 +1772,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do pos+=1;
     result.push(TXQTermConstant.create(xqvalue(strFromPchar(marker, pos - marker))));
-    if pos^ = #0 then raiseSyntaxError('Unexpected end');
+    if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
     expect('?>');
   end;
 
@@ -1745,7 +1783,7 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
     expect('--');
     marker := pos;
     while (pos^ <> #0) and ((pos^ <> '-') or ((pos+1)^ <> '-')) do pos+=1;
-    if pos^ = #0 then raiseSyntaxError('Unexpected end');
+    if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
     result := TXQTermConstructor.create(tetComment, TXQTermConstant.create(strFromPchar(marker, pos - marker)));
     expect('-->');
   end;
@@ -1776,7 +1814,8 @@ var
     if result.implicitNamespaces = nil then result.implicitNamespaces := TNamespaceList.Create
     else if result.implicitNamespaces.hasNamespacePrefix(prefix) then raiseParsingError('XQST0071', 'Duplicate namespace declaration');
     url := '';
-    if length(attribute.children) > 0 then url := (attribute.children[0] as TXQTermConstant).value.toString;
+    if (length(attribute.children) > 0) and (attribute.children[0] is TXQTermConstant) then
+      url := TXQTermConstant(attribute.children[0]).value.toString;
     url := xmlStrWhitespaceCollapse(url); //do this now or later?
     if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
       raiseParsingError('XQST0070', 'Invalid namespace declaration');
@@ -1826,7 +1865,7 @@ begin
       hadWhitespace := pos^ in [#$20,#9,#$D,#$A];
       skipWhitespace();
     end;
-    if pos^ = #0 then raiseSyntaxError('Attribute expected');
+    if pos^ = #0 then raiseSyntaxErrorFatal('Attribute expected');
     if pos^ = '/' then begin
       expect('/');
       if pos^ <> '>' then raiseSyntaxError('Need >');
@@ -1840,7 +1879,7 @@ begin
       parseCommonContent(result, '<', not lastWasCData);
       lastWasCData := false;
 
-      if pos^ = #0 then raiseSyntaxError('Unexpected end');
+      if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
       if pos^ = '<' then begin
         pos += 1;
         case pos^ of
@@ -1860,7 +1899,7 @@ begin
             pos += length('![CDATA[');
             marker := pos;
             while (pos^ <> #0) and not strBeginsWith(pos, ']]>') do pos+=1;
-            if pos^ = #0 then raiseSyntaxError('Unexpected end');
+            if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
             result.push(TXQTermConstant.create(strFromPchar(marker, pos - marker)));
             pos+=3;
           end else if strBeginsWith(pos, '!--') then result.push(parseCommentConstructor)
@@ -1870,7 +1909,7 @@ begin
         end;
       end;
     end;
-    raiseSyntaxError('Unexpected end (probably missing closing tag for <'+result.nameValue.debugTermToString +'>');
+    raiseSyntaxErrorFatal('Unexpected end (probably missing closing tag for <'+result.nameValue.debugTermToString +'>');
 
   except
     result.free;
@@ -1967,7 +2006,7 @@ begin
   //just ignore it
   while (pos^ <> #0) and ((pos^ <> '#') or ((pos+1)^ <> ')')) do
     pos += 1;
-  if pos^ = #0 then raiseSyntaxError('Unexpected end');
+  if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected end');
   pos += 2;
   skipWhitespaceAndComment();
   if (pos^ = '(') and ((pos+1)^ = '#') then begin
@@ -1997,7 +2036,7 @@ var
 begin
   if objInheritsFrom(t, TXQTermVariable) then pname := @TXQTermVariable(t).value
   else if objInheritsFrom(t, TXQTermPendingEQNameToken) then pname := @TXQTermPendingEQNameToken(t).localpart
-  else begin raiseSyntaxError('Internal error 201601102252'); exit(nil); end;
+  else begin raiseSyntaxErrorFatal('Internal error 201601102252'); exit(nil); end;
   if not strContains(pname^, '.') then exit(t);
   name := pname^;
   pname^ := strSplitGet('.', name);
@@ -2173,27 +2212,30 @@ begin
       'quot': result += '"';
       'apos': result += '''';
       else begin
-        if (length(temp) <= 1) or (temp[1] <> '#')  then raiseSyntaxError('Invalid entity');
-        case temp[2] of
-          'x': begin
-            base := 16;
-            code := 0;
+        if (length(temp) <= 1) or (temp[1] <> '#') then raiseSyntaxError('Invalid entity')
+        else begin
+          case temp[2] of
+            'x': begin
+              base := 16;
+              code := 0;
+              if length(temp) <= 2 then raiseSyntaxError('Invalid entity');
+            end;
+            '0'..'9': begin
+              base := 10;
+              code := charDecodeDigit(temp[2]);
+            end
+            else begin raiseSyntaxError('Invalid entity'); base := 0; code := 0;end;
           end;
-          '0'..'9': begin
-            base := 10;
-            code := charDecodeDigit(temp[2]);
-          end
-          else begin raiseSyntaxError('Invalid entity'); base := 0; code := 0;end;
+          for i := 3 to length(temp) do begin
+            if (temp[i] in ['0'..'9'])
+               or ((base = 16) and (temp[i] in ['a'..'f','A'..'F'])) then
+                 code := code * base + charDecodeHexDigit(temp[i])
+            else begin raiseSyntaxError('Invalid entity'); break; end;
+            if code > $10FFFF then code :=  $10FFFF + 1; //overflow, but keep checking if the chars are valid
+          end;
+          if (code <= 0) or (code > $10FFFF) then raiseParsingError('XQST0090', 'Invalid entity value')
+          else result += strGetUnicodeCharacter(code, staticContext.stringEncoding)
         end;
-        for i := 3 to length(temp) do begin
-          if (temp[i] in ['0'..'9'])
-             or ((base = 16) and (temp[i] in ['a'..'f','A'..'F'])) then
-               code := code * base + charDecodeHexDigit(temp[i])
-          else raiseSyntaxError('Invalid entity');
-          if code > $10FFFF then code :=  $10FFFF + 1; //overflow, but keep checking if the chars are valid
-        end;
-        if (code <= 0) or (code > $10FFFF) then raiseParsingError('XQST0090', 'Invalid entity value');
-        result += strGetUnicodeCharacter(code, staticContext.stringEncoding)
       end;
     end;
     p := n + 1;
@@ -2220,8 +2262,8 @@ end;
 function TXQParsingContext.parseString: string;
 begin
   skipWhitespaceAndComment();
-  if not (pos^ in ['''', '"']) then raiseSyntaxError('Expected string');
-  result := parseString(nextToken());
+  if (pos^ in ['''', '"']) then result := parseString(nextToken())
+  else raiseSyntaxError('Expected string');
 end;
 
 function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
@@ -2556,7 +2598,7 @@ var
     if operatorMode then begin
       result := TXQTermDynamicFunctionCall.create(result, parseValue());
       if objInheritsFrom(TXQTermDynamicFunctionCall(result).children[1], TXQTermNodeMatcher) then begin
-        result.free;
+        FreeAndNil(result);
         raiseParsingError('pxp:XPST0003', 'A node matching step is not allowed directly after a property dot operator');
       end;
     end;
@@ -2566,7 +2608,7 @@ var
 begin
   result := nil;
   skipWhitespaceAndComment();
-  if pos^ = #0 then raiseSyntaxError('Unexpected query end');
+  if pos^ = #0 then raiseSyntaxErrorFatal('Unexpected query end');
   case pos^ of
     '''', '"':  exit(TXQTermConstant.create(parseString()));
     '$': exit(parseVariableWithDotNotation());
@@ -2858,7 +2900,7 @@ var astroot: TXQTerm;
   function parseSomething: TXQTerm;
   begin
     result := parse();
-    if result = nil then raiseSyntaxError('Unexpected query end');
+    if result = nil then raiseSyntaxErrorFatal('Unexpected query end');
   end;
 
 
@@ -3284,12 +3326,12 @@ begin
   hadPending := pendings.Count > 0;
   result := parseModuleInternal();
   if result = nil then begin
-    raiseSyntaxError('No input');
+    raiseSyntaxErrorFatal('No input');
     exit;
   end;
   if nextToken() <> '' then begin
     result.free;
-    raiseSyntaxError('Unexpected characters after end of expression (possibly an additional closing bracket)');
+    raiseSyntaxErrorFatal('Unexpected characters after end of expression (possibly an additional closing bracket)');
   end;
   if objInheritsFrom(result, TXQTermModule) then begin
     if staticContext.isLibraryModule then TXQTermModule(result).push(TXQTermSequence.Create);
@@ -3398,23 +3440,31 @@ begin
       thequery.term := parseXString(true);
       finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options);
     end;
+    if pendingException <> nil then raise pendingException;
   except
-    //not sure if this is needed, but it seems reasonable
-    for i := oldFunctionCount to high(staticContext.functions) do
-      staticContext.functions[i].free;
-    SetLength(staticContext.functions, oldFunctionCount);
-    if staticContext.associatedModules <> nil then
-      staticContext.associatedModules.Remove(thequery);
+    on e: Exception do begin
+      //not sure if this is needed, but it seems reasonable
+      for i := oldFunctionCount to high(staticContext.functions) do
+        staticContext.functions[i].free;
+      SetLength(staticContext.functions, oldFunctionCount);
+      if staticContext.associatedModules <> nil then
+        staticContext.associatedModules.Remove(thequery);
 
-    //free query
-    //thequeryinterface := thequery;  //this will automatically free the query later
-    thequery._AddRef;
-    if staticContext.sender.AutomaticallyRegisterParsedModules then
-      pendingModules.Remove(thequery);
-    while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
-    thequery._Release;
+      //free query
+      //thequeryinterface := thequery;  //this will automatically free the query later
+      thequery._AddRef;
+      if staticContext.sender.AutomaticallyRegisterParsedModules then
+        pendingModules.Remove(thequery);
+      while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
+      thequery._Release;
 
-    raise;
+      if (pendingException <> nil) and (e <> pendingException) and (e is EXQException) then begin
+        with EXQException(e) do
+          pendingExceptionLast.next := EXQParsingException.create(errorCode, Message, namespace);
+        raise pendingException;
+      end;
+      raise;
+    end;
   end;
 end;
 
@@ -3602,7 +3652,7 @@ var declarationDuplicateChecker: TStringList;
       module := engine.findModule(moduleURL);
       if module = nil then begin
         nativeModule := engine.findNativeModule(moduleURL);
-        if nativeModule = nil then raiseParsingError('XQST0059', 'Unknown module: '+moduleURL);
+        if nativeModule = nil then raiseParsingErrorFatal('XQST0059', 'Unknown module: '+moduleURL);
         if moduleName <> '' then begin
           if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
           staticContext.namespaces.add(TNamespace.make(nativeModule.namespace.getURL, moduleName));
@@ -3630,7 +3680,7 @@ var declarationDuplicateChecker: TStringList;
         vari.push(typ);
         if (typ.allowMultiple) or (typ.allowNone) then begin
           vari.free;
-          raiseSyntaxError('Expected ItemType');
+          raiseSyntaxErrorFatal('Expected ItemType');
         end;
       end else begin
         typ := TXQTermSequenceType.create();
@@ -3798,7 +3848,7 @@ begin
           else if strBeginsWith(temp, '3.1') and isModel3 then parsingModel := xqpmXQuery3_1
           else temp := 'fail';
           if not setXQueryVersion(temp) then
-            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 ' + ifthen(isModel3, ' (3.0 is disabled)', 'or 3.0'));
+            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 ' + ifthen(not isModel3, ' (3.0 is disabled)', 'or 3.0'));
           token := nextToken(true);
           if token = 'encoding' then begin
             expect(token);
@@ -4029,7 +4079,6 @@ begin
     result.free;
     raise;
   end;
-  if result = nil then exit;
 end;
 
 procedure TXQParsingContext.parseQuery(aquery: TXQuery);
@@ -4466,22 +4515,26 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   var
     st: TXQTermSequenceType;
   begin
+    result := b;
     if (b.op.func = @xqvalueCastAs) or (b.op.func = @xqvalueCastableAs) then begin
-      st := b.children[1] as TXQTermSequenceType;
-      visitSequenceType(st);
-      if not (st.isSingleType()) then
-        raiseSyntaxError('Need single typ for cast')
-      else if baseSchema.isAbstractType(st.atomicTypeInfo) then
-        raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast')
-      else if objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
-        raiseParsingError('XQST0052', 'Expected simple type');
-      result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs, st.allowNone);
+      if b.children[1] is TXQTermSequenceType then begin
+        st := TXQTermSequenceType(b.children[1]);
+        visitSequenceType(st);
+        if not (st.isSingleType()) then
+          raiseSyntaxError('Need single typ for cast')
+        else if baseSchema.isAbstractType(st.atomicTypeInfo) then
+          raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast')
+        else if objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
+          raiseParsingError('XQST0052', 'Expected simple type');
+        result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs, st.allowNone);
+      end;
     end else if b.op.func = @xqvalueInstanceOf then begin
-      st := b.children[1] as TXQTermSequenceType;
-      visitSequenceType(st);
-      if (st.kind = tikAtomic) and objInheritsFrom(st.atomicTypeInfo, TXSListType) then
-        raiseParsingError('XPST0051', 'No value is a list type');
-      result := b;
+      if b.children[1] is TXQTermSequenceType then begin
+        st := TXQTermSequenceType(b.children[1]);
+        visitSequenceType(st);
+        if (st.kind = tikAtomic) and objInheritsFrom(st.atomicTypeInfo, TXSListType) then
+          raiseParsingError('XPST0051', 'No value is a list type');
+      end;
     end else if (b.op.func = @xqvalueOrPlaceholder) or (b.op.func = @xqvalueAndPlaceholder) then begin
       //A or B => if (A) then true() else B
       //A and B => if (A) then B else false()
@@ -4495,7 +4548,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         b.children := nil;
         b.free;
       end;
-      else result := b;
     end;
   end;
 
