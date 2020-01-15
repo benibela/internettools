@@ -517,8 +517,6 @@ type
   See IXQValue for an actual description
   *)
   TXQValue = class(TFastInterfacedObject, IXQValue)
-  private
-    ffreelist: TXQValue;
   public
     ftypeAnnotation: TXSType;
     constructor create(atypeAnnotation: TXSType); virtual;
@@ -6935,18 +6933,21 @@ end;
 
 threadvar threadLocalCache: record
    runningEngines: integer;
-   commonValues: array[TXQValueKind] of TXQValue;
+   commonValues: array[TXQValueKind] of record
+      head: PPointer; //This is a TXQValue. But we override the first bytes with a pointer to the previously freed element, so it cannot be used as TXQValue
+      vmt: pointer;   //The first overriden bytes of the TXQValue. They should be the same between all TXQValues of one kind
+   end;
 end;
 
 class procedure TXQueryEngine.freeCommonCaches;
 var k: TXQValueKind;
-  v, w: TXQValue;
+  v, w: PPointer;
 begin
   with threadLocalCache do begin
     for k := low(commonValues) to high(commonValues) do begin
-      v := commonValues[k];
+      v := commonValues[k].head;
       while v <> nil do begin
-        w := v.ffreelist;
+        w := v^;
         Freemem(pointer(v));
         v := w;
       end;

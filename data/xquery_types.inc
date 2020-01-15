@@ -158,12 +158,15 @@ type TNewinstanceFunc = function: tobject of object;
 class function TXQValue.newinstance: tobject;
 var k: TXQValueKind;
   hackMethod: TMethod;
+  head: PPointer;
 begin
   k := classKind;
   with threadLocalCache do begin
-    if commonValues[k] <> nil then begin
-      result := commonValues[k];
-      commonValues[k] := txqvalue(result).ffreelist;
+    if commonValues[k].head <> nil then begin
+      head := commonValues[k].head;
+      result := TXQValue(head);
+      commonValues[k].head := head^;
+      head^ := commonValues[k].vmt;
       //A normal object needs to be cleaned up and initialized. We do the clean up in the destructor and can skip it here
       //hackMethod := tmethod(@CleanupInstance);
       //hackMethod.Data := result;
@@ -181,12 +184,16 @@ end;
 procedure TXQValue.FreeInstance;
 var
   k: TXQValueKind;
+  pself: ppointer;
 begin
   k := classKind;
   with threadLocalCache do begin
     if runningEngines > 0 then begin
-      ffreelist := commonValues[k];
-      commonValues[k] := self;
+      pself := ppointer(self);
+      if commonValues[k].vmt = nil then commonValues[k].vmt := pself^
+      else assert(commonValues[k].vmt = pself^);
+      pself^ := commonValues[k].head;
+      commonValues[k].head := pself;
     end else Freemem(pointer(self));
   end;
 end;
