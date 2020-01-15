@@ -543,9 +543,8 @@ var tempContext: TXQEvaluationContext;
     tempv: IXQValue;
   begin
     f := guessFormat(data, uri, contenttype);
-    if (f = itfJSON) and (defaultQueryEngine.ParsingOptions.AllowJSON) then begin
-      tempv := xqvalue(data);
-      exit ( defaultQueryEngine.findNativeModule('http://jsoniq.org/functions').findBasicFunction('parse-json', 1).func(1, @tempv));
+    if (f = itfJSON) then begin
+      exit(defaultQueryEngine.DefaultJSONParser.parse(data));
     end;
     if f = itfXML then begin
       if data = '' then exit(TXQValueString.create(baseSchema.untypedAtomic, ''));

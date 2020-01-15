@@ -1248,6 +1248,14 @@ begin
   seq.add(value);
 end;
 
+function TXQTermArrayBase.getContextDependencies: TXQContextDependencies;
+var
+  i: Integer;
+begin
+  result := [];
+  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+end;
+
 function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
@@ -1259,13 +1267,6 @@ begin
   result := tempSeq;
 end;
 
-function TXQTermJSONArray.getContextDependencies: TXQContextDependencies;
-var
-  i: Integer;
-begin
-  result := [];
-  for i:= 0 to high(children) do result += children[i].getContextDependencies;
-end;
 
 function TXQTermArray3_1.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
@@ -1279,13 +1280,23 @@ begin
     list.addInArray(children[i].evaluate(context));
 end;
 
-function TXQTermArray3_1.getContextDependencies: TXQContextDependencies;
+
+function TXQTermJSONiqArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: Integer;
+  tempSeq: TXQValueJSONArray;
+  v: IXQValue;
 begin
-  result := [];
-  for i:= 0 to high(children) do result += children[i].getContextDependencies;
+  tempSeq := TXQValueJSONArray.create(length(children));
+  result := tempSeq;
+  for i := 0 to high(children) do begin
+    v := children[i].evaluate(context);
+    if (v.kind = pvkNode) and (v.toNode.getParent() <> nil) then
+      v := xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode));
+    tempSeq.add(v);
+  end;
 end;
+
 
 
 { TXQTermSomeEvery }
@@ -4342,7 +4353,7 @@ function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext
         exit;
       end else v := v.get(1);
     if v is TXQValueNode then
-      exit(xqvalue(v.toNode.outerXML(false)));
+      exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
     result := v;
   end;
 
@@ -4356,7 +4367,7 @@ begin
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
     if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then continue;
-    if context.staticContext.objectsRestrictedToJSONTypes then v := transformValue(v);
+    if objectsRestrictedToJSONTypes then v := transformValue(v);
     obj.setMutable(children[i*2].evaluate(context).toString, v);
   end;
   result := obj;
@@ -4365,6 +4376,12 @@ end;
 function TXQTermJSONObjectConstructor.getContextDependencies: TXQContextDependencies;
 begin
   result := getChildrenContextDependencies;
+end;
+
+function TXQTermJSONObjectConstructor.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermJSONObjectConstructor(result).objectsRestrictedToJSONTypes := objectsRestrictedToJSONTypes;
 end;
 
 

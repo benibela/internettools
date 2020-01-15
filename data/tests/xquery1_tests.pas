@@ -187,6 +187,7 @@ var
 var //vars: TXQVariableChangeLog;
   helper: THelper;
   modu: TXQNativeModule;
+  i: integer;
 begin
 //  time := Now;
   //vars:= TXQVariableChangeLog.create();
@@ -1800,25 +1801,38 @@ begin
   t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a : b})', '{"AA": "<b>BB</b>"}');
   //t('serialize-json(<r><a>AA</a><b>BB</b></r> / {a:b})', '{"AA": "<b>BB</b>"}'); ??? what that's supposed to be?
 
-  m('declare option pxp:pure-json-objects "off"; {"a": <foo>bar</foo>}.a', 'bar');
-  m('declare option pxp:pure-json-objects "off"; jn:is-null({"a": ()}.a)', 'false');
-  m('declare option pxp:pure-json-objects "on"; {"a": <foo>bar</foo>}.a', '<foo>bar</foo>');
-  m('declare option pxp:pure-json-objects "on"; jn:is-null({"a": ()}.a)', 'true');
-//  m('declare option pxp:pure-json-objects "on"; {a: <foo>bar</foo>}.a', 'bar');
-
+  m('outer-xml({"a": <foo>bar</foo>}.a)', '<foo>bar</foo>');
+  m('let $x := <x><foo>bar</foo></x> return outer-xml({"a": $x/foo}.a/root())', '<x><foo>bar</foo></x>');
+  m('jn:is-null({"a": ()}.a)', 'false');
+  ps.ParsingOptions.JSONObjectMode:=xqjomJSONiq;
+//  m('outer-xml({"a": <foo>bar</foo>/text()}.a)', 'bar');
+  m('outer-xml({"a": <foo>bar</foo>}.a)', '<foo>bar</foo>');
+  m('let $x := <x><foo>bar</foo></x> return outer-xml({"a": $x/foo}.a/root())', '<foo>bar</foo>');
+  m('jn:is-null({"a": ()}.a)', 'true');
+  ps.ParsingOptions.JSONObjectMode:=xqjomMapAlias;
+  ps.ParsingOptions.JSONArrayMode:=xqjamStandard;
+  f('[1,2,3]', 'XPST0003');
+  ps.ParsingOptions.JSONArrayMode:=xqjamArrayAlias;
+  m('let $x := <x><foo>bar</foo></x> return outer-xml([1,2,3,$x/foo](4)/root())', '<x><foo>bar</foo></x>');
+  ps.ParsingOptions.JSONArrayMode:=xqjamJSONiq;
+  m('let $x := <x><foo>bar</foo></x> return outer-xml([1,2,3,$x/foo](4)/root())', '<foo>bar</foo>');
 
   //JSON examples from JSONiq spec
-  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');
-  t('serialize-json(let $x := { "eyes" : "blue", "hair" : "fuchsia" } let $y := { "eyes" : brown, "hair" : "brown" } return { "eyes" : $x("eyes"), "hair" : $y("hair") })', '{"eyes": "blue", "hair": "brown"}');
-  t('let $wd := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] return $wd(1)', 'Sunday');
-  t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(1))', '["mercury", "venus", "earth", "mars"]');
-  t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(2)(2))', '"tuesday"');
-  t('let $o := { "a" : 1, "b" : 2 } return jn:keys($o)', 'a b');  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" }  for $key in jn:keys($map) return serialize-json({ $key : $map($key) })', '{"eyes": "blue"} {"hair": "fuchsia"}');
-  t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] return jn:members($planets)', 'mercury venus earth mars');
-  t('let $a := [1 to 10] return jn:size($a)', '10');
-  t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] for $i in 1 to jn:size($planets) return $planets($i)', 'mercury venus earth mars');
-  t('let $object1 := { "Captain" : "Kirk" } let $object2 := { "First officer" : "Spock" } return serialize-json(jn:object(($object1, $object2)))', '{"Captain": "Kirk", "First officer": "Spock"}');
-  t('serialize-json(jn:object(for $d at $i in ("Sunday", "Monday", "Tuesday",  "Wednesday",  "Thursday",  "Friday",  "Saturday" ) return { $d : $i }  ))', '{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+  for i := 1 to 2 do begin
+    if i = 1 then ps.ParsingOptions.JSONArrayMode:=xqjamArrayAlias
+    else ps.ParsingOptions.JSONArrayMode:=xqjamJSONiq;
+    t('let $map := { "eyes" : "blue", "hair" : "fuchsia" } return $map("eyes")', 'blue');
+    t('serialize-json(let $x := { "eyes" : "blue", "hair" : "fuchsia" } let $y := { "eyes" : brown, "hair" : "brown" } return { "eyes" : $x("eyes"), "hair" : $y("hair") })', '{"eyes": "blue", "hair": "brown"}');
+    t('let $wd := ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] return $wd(1)', 'Sunday');
+    t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(1))', '["mercury", "venus", "earth", "mars"]');
+    t('let $f := [          [ "mercury", "venus", "earth", "mars" ],      [ "monday", "tuesday", "wednesday", "thursday" ]     ] return serialize-json($f(2)(2))', '"tuesday"');
+    t('let $o := { "a" : 1, "b" : 2 } return jn:keys($o)', 'a b');  t('let $map := { "eyes" : "blue", "hair" : "fuchsia" }  for $key in jn:keys($map) return serialize-json({ $key : $map($key) })', '{"eyes": "blue"} {"hair": "fuchsia"}');
+    t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] return jn:members($planets)', 'mercury venus earth mars');
+    t('let $a := [1 to 10] return jn:size($a)', '10');
+    t('let $planets :=  [ "mercury", "venus", "earth", "mars" ] for $i in 1 to jn:size($planets) return $planets($i)', 'mercury venus earth mars');
+    t('let $object1 := { "Captain" : "Kirk" } let $object2 := { "First officer" : "Spock" } return serialize-json(jn:object(($object1, $object2)))', '{"Captain": "Kirk", "First officer": "Spock"}');
+    t('serialize-json(jn:object(for $d at $i in ("Sunday", "Monday", "Tuesday",  "Wednesday",  "Thursday",  "Friday",  "Saturday" ) return { $d : $i }  ))', '{"Sunday": 1, "Monday": 2, "Tuesday": 3, "Wednesday": 4, "Thursday": 5, "Friday": 6, "Saturday": 7}');
+  end;
 
   t('let $a := for $b in (1,2,3) return $b+1 return $a', '2 3 4');
   t('string-join(let $a := for $b in (1,2,3) return $b+1 return $a, " ")', '2 3 4');

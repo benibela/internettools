@@ -2767,11 +2767,11 @@ begin
   t('jn:is-null({"a": ()}("a"))', 'false');
 //  f('{"a": (10,20,30,40,50)}.a(3)'); //no error since jsoniq 1.0.1
   t('{"a": (10,20,30,40,50)}.a[3]', '30');
-  ps.StaticContext.objectsRestrictedToJSONTypes:=true;
+  ps.ParsingOptions.JSONObjectMode:=xqjomJSONiq;
   t('jn:is-null({"a": ()}("a"))', 'true');
   t('{"a": (10,20,30,40,50)}.a(3)', '30');
   t('{"a": (10,20,30,40,50)}.a[3]', '');
-  ps.StaticContext.objectsRestrictedToJSONTypes:=false;
+  ps.ParsingOptions.JSONObjectMode:=xqjomMapAlias;
 
 
   //Tests based on failed XQTS tests

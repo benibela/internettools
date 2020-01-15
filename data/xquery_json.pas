@@ -136,7 +136,7 @@ var
   s, contenttype, data: String;
 begin
   parser.init;
-  parser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
+  parser.options := context.staticContext.sender.DefaultJSONParser.options;
   if argc = 2 then parser.setConfigFromMap(args[1]);
   s := args[0].toString;
   if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then begin

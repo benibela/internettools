@@ -107,7 +107,7 @@ protected
   function parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
   function parseX31String(): TXQTerm;
-  function parseJSONLikeObjectConstructor(): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
+  function parseJSONLikeObjectConstructor(standard: boolean): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(term: TXQTermWithChildren; closingParen: char = ']'): TXQTerm;
   function parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
 
@@ -1147,13 +1147,13 @@ begin
         end;
 
        'array': begin
-         if hadNoNamespace and (options.AllowJSON or (parsingModel in PARSING_MODEL3_1)) then begin
+         if hadNoNamespace and (options.AllowJSONiqTests or (parsingModel in PARSING_MODEL3_1)) then begin
            Result.kind:=tikAtomic;
            result.atomicTypeInfo := baseJSONiqSchema.array_;
            expect('(');
            skipWhitespaceAndComment();
            case pos^ of
-             ')': if not options.AllowJSON then raiseSyntaxError('Need array(*) or JSONiq');
+             ')': if not options.AllowJSONiqTests then raiseSyntaxError('Need array(*) or JSONiq');
              '*': begin require3_1(); inc(pos); end;
              else result.push(parseSequenceType(flags));
            end;
@@ -1179,7 +1179,7 @@ begin
        end;
 
        'object', 'json-item', 'structured-item': begin
-           if hadNoNamespace and options.AllowJSON then begin
+           if hadNoNamespace and options.AllowJSONiqTests then begin
              expect('('); expect(')');
              case word of
                'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
@@ -1187,7 +1187,7 @@ begin
                'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
                else raiseSyntaxError('WTF??');
              end;
-           end
+           end else raiseSyntaxError('Need JSONiq');
          end;
 
         'function', '%': begin
@@ -2263,7 +2263,10 @@ function TXQParsingContext.parseString: string;
 begin
   skipWhitespaceAndComment();
   if (pos^ in ['''', '"']) then result := parseString(nextToken())
-  else raiseSyntaxError('Expected string');
+  else begin
+    result := '';
+    raiseSyntaxError('Expected string');
+  end;
 end;
 
 function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
@@ -2402,7 +2405,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseJSONLikeObjectConstructor(): TXQTerm;
+function TXQParsingContext.parseJSONLikeObjectConstructor(standard: boolean): TXQTerm;
 var
   token: String;
   jn: TXQNativeModule;
@@ -2411,7 +2414,7 @@ var
   resultfunc: TXQTermNamedFunction;
 begin
   //expect('{'); parsed by caller
-  if pos^ = '|' then begin
+  if (pos^ = '|') and not standard then begin
     expect('|');
     jn := TXQueryEngine.findNativeModule('http://jsoniq.org/functions');
     if jn = nil then raiseParsingError('pxp:JSONIQ', 'The {| .. |} syntax can only be used, if the json unit is loaded.');
@@ -2423,6 +2426,7 @@ begin
     exit;
   end;
   resobj := TXQTermJSONObjectConstructor.create();
+  resobj.objectsRestrictedToJSONTypes := not standard and (options.JSONObjectMode = xqjomJSONiq);
   result := resobj;
   try
     skipWhitespaceAndComment();
@@ -2430,7 +2434,7 @@ begin
     repeat
       resobj.push(parse);
       skipWhitespaceAndComment();
-      optional := pos^ = '?';
+      optional := (not standard) and (pos^ = '?');
       if optional then expect('?:')
       else expect(':');
       //if not (result.children[high(result.children)] is TXQTermString) then raiseParsingError('pxp:OBJ','Expected simple string, got: '+result.children[high(result.children)].ToString); //removed as json-iq allows variables there
@@ -2658,15 +2662,20 @@ begin
     end;
 
     '{': begin
-      if not options.AllowJSON then raiseSyntaxError('Unexpected {. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like object) ');
+      if options.JSONObjectMode = xqjomForbidden then raiseSyntaxError('Unexpected {. (use map{} or enable JSONIq extensions to create objects) ');
       inc(pos);
-      exit(parseJSONLikeObjectConstructor);
+      exit(parseJSONLikeObjectConstructor(false));
     end;
     '[': begin
       inc(pos);
-      if options.AllowJSON then result := TXQTermJSONArray.Create
-      else if parsingModel in PARSING_MODEL3_1 then result := TXQTermArray3_1.Create
-      else raiseSyntaxError('Unexpected [. (Enable json extension (e.g. by including xquery_json and using xquery version "3.0-xidel";), to create a json like array) ');
+      case options.JSONArrayMode of
+        xqjamStandard: begin
+          require3_1();
+          result := TXQTermArray3_1.Create
+        end;
+        xqjamArrayAlias: result := TXQTermJSONArray.Create;
+        xqjamJSONiq: result := TXQTermJSONiqArray.Create;
+      end;
       exit(parseJSONLikeArray(TXQTermWithChildren(result)));
     end;
     '%': begin
@@ -2742,7 +2751,7 @@ begin
         end;
         'map': if parsingModel in PARSING_MODEL3_1 then begin
           expect('{');
-          exit(parseJSONLikeObjectConstructor());
+          exit(parseJSONLikeObjectConstructor(true));
         end;
       end;
       '#': begin
@@ -3047,7 +3056,7 @@ begin
           //staticContext.splitRawQName(TXQTermDefineVariable(result).namespace, TXQTermDefineVariable(result).variablename, xqdnkUnknown);
           exit;
         end;
-        '|': if options.AllowJSON and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
+        '|': if (options.JSONObjectMode <> xqjomForbidden) and ((pos+1)^ = '}') then exit(astroot) // {| .. |} object merging syntax
              else pushBinaryOp(TXQueryEngine.findOperator(pos)); //| operator
         '?': begin
           if (pos+1)^ <> ':' {jsoniq} then begin
@@ -3825,6 +3834,7 @@ var
   namespaceMode: TXQNamespaceMode;
 
   oldDecimalFormatCount: integer;
+  tempBool: Boolean;
 begin
   result := nil;
   declarationDuplicateChecker := nil;
@@ -4019,7 +4029,11 @@ begin
             case token of
               'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI, 'XQST0038');
               'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
-              'json': readBoolean(options.AllowJSON, temp);
+              'json': begin
+                tempBool := false;
+                readBoolean(tempBool, temp);
+                options.AllowJSON := tempBool;
+              end;
               'mutable-variables': readBoolean(options.AllowMutableVariables, temp);
               'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
                 case temp of
@@ -4031,7 +4045,6 @@ begin
                 end;
               'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
               'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
-              'pure-json-objects': readBoolean(staticContext.objectsRestrictedToJSONTypes, temp);
               'extended-json': readBoolean(staticContext.jsonPXPExtensions, temp);
               'string-entities':
                 case temp of

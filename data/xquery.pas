@@ -157,6 +157,7 @@ type
   public
     constructor create(); reintroduce;
     destructor destroy; override;
+    function addClone(n: TTreeNode): TTreeNode;
     property documentCache[url: string]: TTreeDocument read GetdocumentCache write SetdocumentCache;
   end;
 
@@ -197,7 +198,6 @@ type
     stringEncoding: TSystemCodePage;    //**< Encoding of strings. Currently only affects the decoding of entities in direct element constructors
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
-    objectsRestrictedToJSONTypes: boolean; //**< When false, all values can be stored in object properties; when true all property values are JSON values (e.g. sequences become arrays, () becomes null, xml is serialized, ...)
     jsonPXPExtensions: boolean; //**< Allows further json extensions, going beyond jsoniq (especially child and descendant axis test matching object properties) (for dot operator, see TXQParsingOptions) (default is true)
 
     model: TXQParsingModel;
@@ -348,6 +348,54 @@ type
     elementTag: string;// = 'e';
     objectTag: string;// = 'object';
   end;
+
+  type
+    TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine);
+    TXQMapDuplicateResolveHelper = type helper for TXQMapDuplicateResolve
+      procedure setFromString(const s: string);
+    end;
+
+    TXQJsonParser = object
+      type
+      //**Parsing options
+      //**@value jpoAllowMultipleTopLevelItems allow @code([], [], {}) as input
+      //**@value jpoLiberal             does not set joStrict for fpc's json scanner
+      //**@value jpoAllowTrailingComma  sets joIgnoreTrailingComma for fpc's json scanner
+      //**@value jpoEscapeCharacters    escapes characters for XPath/XQuery 3.1, e.g. return strings with \n or \uxxxx
+      //**@value jpoJSONiq              change from XPath/XQuery 3.1 parsing mode to JSONiq:
+      //**       @table(
+      //**       @rowHead(@cell(input)   @cell(XPath/XQuery 3.1)    @cell(  JSONiq))
+      //**       @row(@cell(number)      @cell(double  )            @cell(  int, decimal, double))
+      //**       @row(@cell(null)        @cell(empty sequence, () ) @cell(  null          ))
+      //**       @row(@cell(invalid)     @cell(err:FOJS0001)        @cell(  jerr:JNDY0021))
+      //**       )
+      TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
+      TOptions = set of TOption;
+    public
+      context: PXQEvaluationContext;
+      options: TOptions;
+      duplicateResolve: TXQMapDuplicateResolve;
+      escapeFunction: TXQValueFunction;
+      procedure init;
+      procedure setConfigFromMap(const map: IXQValue);
+      function parse(argc: SizeInt; args: PIXQValue): IXQValue;
+      function parse(const data: string): IXQValue;
+      class function parse(const data: string; someOptions: TOptions): IXQValue; static;
+    end;
+    TXQBatchFunctionCall = record
+      tempcontext: TXQEvaluationContext;
+      func: TXQValueFunction;
+      stack: TXQEvaluationStack;
+      stacksize: Integer;
+      //prepares calls to f on outerContext.
+      //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
+      //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
+      procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
+      procedure done;
+      function call(): IXQValue; inline;
+      function call1(const v: IXQValue): IXQValue;
+      function call2(const v, w: IXQValue): IXQValue;
+    end;
 
   (***
   @abstract(Variant used in XQuery-expressions)
@@ -1646,13 +1694,17 @@ type
 
   { TXQTermArray }
 
-  TXQTermJSONArray = class(TXQTermWithChildren)
-    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+  TXQTermArrayBase = class(TXQTermWithChildren)
     function getContextDependencies: TXQContextDependencies; override;
   end;
-  TXQTermArray3_1 = class(TXQTermWithChildren)
+  TXQTermJSONArray = class(TXQTermArrayBase)
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
-    function getContextDependencies: TXQContextDependencies; override;
+  end;
+  TXQTermArray3_1 = class(TXQTermArrayBase)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+  end;
+  TXQTermJSONiqArray = class(TXQTermArrayBase)
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
   end;
 
   { TXQTermType }
@@ -2161,8 +2213,10 @@ type
 
   TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
     optionals: array of boolean;
+    objectsRestrictedToJSONTypes: boolean;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+    function clone: TXQTerm; override;
   end;
 
   { TXQTermTryCatch }
@@ -2325,14 +2379,22 @@ type
 
   //** Record grouping different parsing options
   TXQParsingOptionsStringEntities = (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery);
+  TXQJSONObjectMode = (xqjomForbidden, xqjomMapAlias, xqjomJSONiq );
+  TXQJSONArrayMode = (xqjamStandard, xqjamArrayAlias, xqjamJSONiq );
   TXQParsingOptions = record
+  private
+    procedure SetAllowJSON(AValue: boolean);
+  public
     AllowExtendedStrings: boolean; //**< If strings with x-prefixes are allowed, like x"foo{$variable}bar" to embed xquery expressions in strings
     AllowPropertyDotNotation: TXQPropertyDotNotation; //**< If it is possible to access (json) object properties with the @code(($obj).property) or even @code($obj.property) syntax (default is xqpdnAllowUnambiguousDotNotation, property syntax can be used, where a dot would be an invalid expression in standard xquery)
-    AllowJSON: boolean; //**< If {"foo": bar} and [..] can be used to create json objects/arrays (default false, unless xquery_json was loaded, then it is true)
     AllowJSONLiterals: boolean; //**< If true/false/null literals are treated like true()/false()/jn:null()  (default true! However, this option is ignored and handled as false, if allowJSON is false).
+    JSONArrayMode: TXQJSONArrayMode;
+    JSONObjectMode: TXQJSONObjectMode;
+    AllowJSONiqTests: boolean;
     StringEntities: TXQParsingOptionsStringEntities; //**< XQuery is almost a super set of XPath, except for the fact that they parse string entities differently. This option lets you change the parsing behaviour.
     LineEndingNormalization: (xqlenNone, xqlenXML1, xqlenXML11); //**< If all line breaks (#$D or #$D,#$85,#$2028) should be replaced by #$A
     AllowMutableVariables: boolean; //**< If $var := 123 without let should be allowed
+    property AllowJSON: boolean write SetAllowJSON; deprecated;
   end;
 
 
@@ -2616,6 +2678,7 @@ public
 
   public
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there (internally used)
+    DefaultJSONParser: TXQJsonParser;
 
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
@@ -3035,53 +3098,6 @@ var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_
 
 
 function xqFunctionConcat(argc: SizeInt; args: PIXQValue): IXQValue;
-type
-  TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine);
-  TXQMapDuplicateResolveHelper = type helper for TXQMapDuplicateResolve
-    procedure setFromString(const s: string);
-  end;
-
-  TXQJsonParser = object
-    type
-    //**Parsing options
-    //**@value jpoAllowMultipleTopLevelItems allow @code([], [], {}) as input
-    //**@value jpoLiberal             does not set joStrict for fpc's json scanner
-    //**@value jpoAllowTrailingComma  sets joIgnoreTrailingComma for fpc's json scanner
-    //**@value jpoEscapeCharacters    escapes characters for XPath/XQuery 3.1, e.g. return strings with \n or \uxxxx
-    //**@value jpoJSONiq              change from XPath/XQuery 3.1 parsing mode to JSONiq:
-    //**       @table(
-    //**       @rowHead(@cell(input)   @cell(XPath/XQuery 3.1)    @cell(  JSONiq))
-    //**       @row(@cell(number)      @cell(double  )            @cell(  int, decimal, double))
-    //**       @row(@cell(null)        @cell(empty sequence, () ) @cell(  null          ))
-    //**       @row(@cell(invalid)     @cell(err:FOJS0001)        @cell(  jerr:JNDY0021))
-    //**       )
-    TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
-    TOptions = set of TOption;
-  public
-    context: PXQEvaluationContext;
-    options: TOptions;
-    duplicateResolve: TXQMapDuplicateResolve;
-    escapeFunction: TXQValueFunction;
-    procedure init;
-    procedure setConfigFromMap(const map: IXQValue);
-    function parse(argc: SizeInt; args: PIXQValue): IXQValue;
-    function parse(const data: string): IXQValue;
-    class function parse(const data: string; someOptions: TOptions): IXQValue; static;
-  end;
-  TXQBatchFunctionCall = record
-    tempcontext: TXQEvaluationContext;
-    func: TXQValueFunction;
-    stack: TXQEvaluationStack;
-    stacksize: Integer;
-    //prepares calls to f on outerContext.
-    //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
-    //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
-    procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
-    procedure done;
-    function call(): IXQValue; inline;
-    function call1(const v: IXQValue): IXQValue;
-    function call2(const v, w: IXQValue): IXQValue;
-  end;
 
 function xqgetTypeInfo(wrapper: Ixqvalue): TXQTermSequenceType;
 function xqvalueCastAs(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
@@ -3197,6 +3213,20 @@ begin
   t := PPointer(@a)^ ;
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
+end;
+
+
+procedure TXQParsingOptions.SetAllowJSON(AValue: boolean);
+begin
+  if avalue then begin
+    JSONArrayMode := xqjamArrayAlias;
+    JSONObjectMode := xqjomMapAlias;
+    AllowJSONiqTests := true;
+  end else begin
+    JSONArrayMode := xqjamStandard;
+    JSONObjectMode := xqjomForbidden;
+    AllowJSONiqTests := false;
+  end;
 end;
 
 procedure TXQSerializer.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
@@ -3325,6 +3355,12 @@ begin
   tempnodes.free;
   fdocumentCache.free;
   inherited destroy;
+end;
+
+function TXQTempTreeNodes.addClone(n: TTreeNode): TTreeNode;
+begin
+  result := n.clone(self);
+  tempnodes.add(result);
 end;
 
 function TXQParsingModelsHelper.requiredModelToString: string;
@@ -6038,7 +6074,6 @@ begin
     result.stringEncoding:=stringEncoding;
     result.strictTypeChecking:=strictTypeChecking;
     Result.useLocalNamespaces:=useLocalNamespaces;
-    result.objectsRestrictedToJSONTypes:=objectsRestrictedToJSONTypes;
     result.jsonPXPExtensions := jsonPXPExtensions;
     if decimalNumberFormats <> nil then begin
       result.decimalNumberFormats:= TFPList.Create;
@@ -7525,6 +7560,8 @@ begin
   FPendingModules := TXQueryModuleList.Create;
   inc(threadLocalCache.runningEngines);
   FCreationThread := GetThreadID;
+  DefaultJSONParser.init;
+  if AllowJSONDefaultInternal then DefaultJSONParser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
 end;
 
 procedure threadSafetyViolated;
