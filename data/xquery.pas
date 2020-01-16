@@ -6303,7 +6303,7 @@ var ak, bk: TXQValueKind;
     end;
 
     function compareCommonAsBinary(): integer;
-    var sa, sb: string;
+    var sa, sb, temp: string;
         at, bt: (tBase64, tHex, tUntyped, tOther);
     begin
       sa := '';
@@ -6319,12 +6319,20 @@ var ak, bk: TXQValueKind;
         else bt := tOther;
 
         result := 0;
-        if at = tUntyped then begin
-          if bt = tBase64 then sa := base64.DecodeStringBase64(a.toString)
-          else sa := a.toString.DecodeHex;
-        end else if bt = tUntyped then begin
-          if at = tBase64 then sb := base64.DecodeStringBase64(b.toString)
-          else sb := b.toString.DecodeHex;
+        if (at = tUntyped) or (bt = tUntyped) then begin
+          try
+            if at = tUntyped then temp := a.toString
+            else temp := b.toString;
+            if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
+            else begin
+              if length(temp) and 1 = 1 then exit(-2);
+              temp := temp.DecodeHex;
+            end;
+            if at = tUntyped then sa := temp
+            else sb := temp;
+          except
+            on e: Exception do exit(-2); {StreamError for base64, exception for hex}
+          end;
         end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
          //okay
         end else begin
