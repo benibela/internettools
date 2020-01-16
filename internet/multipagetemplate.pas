@@ -1351,7 +1351,7 @@ begin
   setVariable('raw', lastData);
 
   case lastDataFormat of
-    itfJSON: setVariable('json', TXQJsonParser.parse(lastData, [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma]));
+    itfJSON: setVariable('json', parser.QueryEngine.DefaultJSONParser.parse(lastData);
     else parser.parseHTMLSimple(lastData, curUrl, lastContentType);
   end;
   dataLoaded := true;

@@ -547,7 +547,6 @@ var tempContext: TXQEvaluationContext;
     f: TInternetToolsFormat;
     p: PChar;
     l: SizeInt;
-    tempv: IXQValue;
   begin
     f := guessFormat(data, uri, contenttype);
     if (f = itfJSON) then begin

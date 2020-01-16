@@ -4208,8 +4208,10 @@ begin
       with options do begin
         AllowExtendedStrings:=false;
         AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
-        AllowJSON := true;
-        AllowJSONLiterals:=true;
+        JSONArrayMode := xqjamJSONiq;
+        JSONObjectMode := xqjomJSONiq;
+        AllowJSONiqTests := true;
+        AllowJSONLiterals := true;
         StringEntities:=xqseDefault;
         AllowMutableVariables := false;
       end;
