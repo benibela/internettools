@@ -2855,9 +2855,7 @@ begin
   t('xs:base64Binary("0FB7")', '0FB7', '');
   t('xs:hexBinary("07fb")', '07FB', '');
   t('xs:hexBinary(base64Binary("YWJj"))', '616263', '');
-  ps.StaticContext.strictTypeChecking:=false;
-  t('xs:hexBinary("616263") eq xs:base64Binary("YWJj")', 'true', ''); //don't know if true or false. update: actually it is a type error
-  ps.StaticContext.strictTypeChecking:=strictTypeChecking;
+  t('xs:hexBinary("616263") eq xs:hexBinary(xs:base64Binary("YWJj"))', 'true', '');
   t('xs:hexBinary("616263") castable as xs:boolean', 'false', '');
   t('xs:hexBinary("616263") castable as xs:decimal', 'false', '');
   t('true() castable as xs:decimal', 'true', '');

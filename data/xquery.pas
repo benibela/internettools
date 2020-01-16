@@ -1483,6 +1483,7 @@ type
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
     function serialize: string;
+    function clone: TXQFunctionParameterTypes;
     procedure raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm; const addendum: string);
     procedure checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm);
   end;
@@ -1506,6 +1507,7 @@ type
     //used for native functions (which should be robust enough to handle different types on the Pascal side)
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
     function getVersion(arity: integer): PXQFunctionParameterTypes;
+    procedure setVersions(const v: array of TXQFunctionParameterTypes);
     function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
   private
@@ -3906,6 +3908,18 @@ begin
   if returnType <> nil then result += ' as ' + returnType.serialize
 end;
 
+function TXQFunctionParameterTypes.clone: TXQFunctionParameterTypes;
+var
+  i: Integer;
+begin
+  result := self;
+  SetLength(result.types, length(types));
+  for i := 0 to high(types) do
+    result.types[i] := TXQTermSequenceType(types[i].clone);
+  if returnType <> nil then
+    result.returnType := TXQTermSequenceType(returnType.clone);
+end;
+
 procedure TXQFunctionParameterTypes.raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
   term: TXQTerm; const addendum: string);
 var
@@ -6280,21 +6294,60 @@ var ak, bk: TXQValueKind;
   end;
 
   function compareCommonAsStrings(): integer;
-  var sa, sb: string;
+    function compareStrSignCapped(const sa, sb: string): integer;
+    begin
+      result := CompareStr(sa, sb);
+      if result <> 0 then
+        if result < 0 then result := -1
+        else result := 1
+    end;
+
+    function compareCommonAsBinary(): integer;
+    var sa, sb: string;
+        at, bt: (tBase64, tHex, tUntyped, tOther);
+    begin
+      sa := '';
+      sb := '';
+      if a.typeAnnotation <> b.typeAnnotation then begin
+        if a.instanceOf(baseSchema.base64Binary) then at := tBase64
+        else if a.instanceOf(baseSchema.hexBinary) then at := tHex
+        else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
+        else at := tOther;
+        if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
+        else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
+        else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
+        else bt := tOther;
+
+        result := 0;
+        if at = tUntyped then begin
+          if bt = tBase64 then sa := base64.DecodeStringBase64(a.toString)
+          else sa := a.toString.DecodeHex;
+        end else if bt = tUntyped then begin
+          if at = tBase64 then sb := base64.DecodeStringBase64(b.toString)
+          else sb := b.toString.DecodeHex;
+        end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
+         //okay
+        end else begin
+          if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
+          exit(-2);
+        end;
+      end;
+      if sa = '' then sa := (a as TXQValueString).toRawBinary;
+      if sb = '' then sb := (b as TXQValueString).toRawBinary;
+      result := compareStrSignCapped(sa, sb);
+      //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
+    end;
+
   begin
-    if overrideCollation = nil then overrideCollation := collation;
-    if a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary) then begin
-      sa := (a as TXQValueString).toRawBinary;
-      overrideCollation := nil;
-    end else sa := a.toString;
-    if b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary) then begin
-      sb := (b as TXQValueString).toRawBinary;
-      overrideCollation := nil;
-    end else sb := b.toString;
+    if    a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)
+       or b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)
+    then exit(compareCommonAsBinary());
 
-
-    if overrideCollation <> nil then result := overrideCollation.compare(sa,sb)
-    else result := CompareStr(sa, sb);
+    if overrideCollation = nil then begin
+      overrideCollation := collation;
+      if overrideCollation = nil then exit(compareStrSignCapped(a.toString, b.toString));
+    end;
+    result := overrideCollation.compare(a.toString, b.toString)
   end;
   function compareBooleans(const ab, bb: boolean): integer; inline;
   begin
@@ -7160,6 +7213,15 @@ begin
   for i := 0 to high(versions) do
     if length(versions[i].types) = arity then exit(@versions[i]);
   result := nil;
+end;
+
+procedure TXQAbstractFunctionInfo.setVersions(const v: array of TXQFunctionParameterTypes);
+var
+  i: Integer;
+begin
+  SetLength(versions, length(v));
+  for i := 0 to high(v) do
+    versions[i] := v[i].clone;
 end;
 
 
@@ -8683,8 +8745,8 @@ class function TXQueryEngine.findOperator(const pos: pchar): TXQOperatorInfo;
 var
   i: Integer;
   j: Integer;
-  sl: TStringList;
   bestMatch: Integer;
+  sl: TStringList;
   k: Integer;
 begin
   result := nil;
@@ -8699,6 +8761,7 @@ begin
             bestMatch := length(sl[k]);
             result := TXQOperatorInfo(sl.Objects[k]);
           end;
+      if result <> nil then exit;
     end;
   end;
 end;

@@ -6903,7 +6903,7 @@ end;
 
 
 
-var fn3, fn3_1, fn, pxp, pxpold, op, x, fnarray, fnmap: TXQNativeModule;
+var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
 const
       PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
       PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
@@ -6911,6 +6911,8 @@ const
 
 
 procedure initializeFunctions;
+var
+  templt: TXQOperatorInfo;
 begin
   { Modules can be submodules of other. We have the following relations
 
@@ -6931,6 +6933,11 @@ begin
     /
    x: my (new and old) extensions
 
+
+   Binary operator lookup is different
+   The first module that contains the operator is used.
+   This is only used for binary comparisons operators in 3.1
+
   }
   fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
   fn3_1.acceptedModels := PARSING_MODEL3_1;
@@ -6944,6 +6951,9 @@ begin
   pxp := TXQNativeModule.Create(XMLNamespace_MyExtensionsMerged, [fn,pxpold]);
   TXQueryEngine.registerNativeModule(pxp);
   op := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators);
+  op3_1 := TXQNativeModule.Create(XMLNamespace_MyExtensionOperators, [op]);
+  op3_1.acceptedModels := PARSING_MODEL3_1;
+  TXQueryEngine.registerNativeModule(op3_1);
   TXQueryEngine.registerNativeModule(op);
 
   //my functions
@@ -7281,14 +7291,19 @@ begin
 
   op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],['($arg1 as xs:anyAtomicType?, $arg2 as xs:anyAtomicType?) as xs:string'], []).acceptedModels:=PARSING_MODEL3;
 
+
   op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString],['numeric-equal($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'duration-equal($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-equal($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-equal($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', 'gYear-equal($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', 'gDay-equal($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', 'QName-equal($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
   op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString], ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', '($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', '($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', '($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', '($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', '($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', '($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', '($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', '($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString], ['numeric-less-than($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'yearMonthDuration-less-than($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', 'dayTimeDuration-less-than($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', 'dateTime-less-than($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-less-than($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-less-than($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString],['numeric-greater-than($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'yearMonthDuration-greater-than($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', 'dayTimeDuration-greater-than($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', 'dateTime-greater-than($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-greater-than($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-greater-than($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString],['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 
+  templt := op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],    ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
+  op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
+  op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
 
+  templt := op3_1.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],    ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean', '($a as xs:hexBinary?, $b as xs:hexBinary?) as xs:boolean', '($a as xs:base64Binary?, $b as xs:base64Binary?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op3_1.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
+  op3_1.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
+  op3_1.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
 
   op.registerBinaryOp('=',@xqvalueEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
   op.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
@@ -7316,6 +7331,7 @@ begin
   fn3.free;
   fn3_1.free;
   op.free;
+  op3_1.free;
   fnarray.free;
   fnmap.free;
 end;

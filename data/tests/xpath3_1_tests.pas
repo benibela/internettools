@@ -166,6 +166,9 @@ begin
   //t('collation-key("a0001") lt collation-key("a1")', 'true');
 
 
+  t('hexBinary("aa") lt hexBinary("ff") ', 'true');
+  t('hexBinary("aa") < hexBinary("ff") ', 'true');
+
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
   xml.Free;
