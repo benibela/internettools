@@ -4579,13 +4579,13 @@ type
    TXQTermRNGMode = (xqtrngmNext, xqtrngmPermute);
    TXQTermRNG = class(TXQTerm)
       mode: TXQTermRNGMode;
-      state: Txoshiro256ss;
+      state: TRandomNumberGenerator;
       function evaluate(var context: TXQEvaluationContext): IXQValue; override;
       function clone: TXQTerm; override;
     end;
 
-function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: Txoshiro256ss): TXQValueObject;
-var newstate: Txoshiro256ss;
+function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: TRandomNumberGenerator): TXQValueObject;
+var newstate: TRandomNumberGenerator;
   function makeFunction(mode: TXQTermRNGMode): TXQValueFunction;
   var
     rng: TXQTermRNG;
@@ -4612,7 +4612,7 @@ begin
 end;
 
 function xqFunctionRandom_Number_Generator(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var state: Txoshiro256ss;
+var state: TRandomNumberGenerator;
   temp: String;
   seed: QWord;
 begin
@@ -4632,7 +4632,7 @@ end;
 function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
   function permute(const v: IXQValue): TXQValue;
   var
-    n, i, j: Integer;
+    n, i: Integer;
     pos: array of integer = nil;
     resseq: TXQValueSequence;
   begin
@@ -4642,11 +4642,9 @@ function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
     result := resseq;
     SetLength(pos, n);
     for i := 1 to n do pos[i - 1] := i;
-    for i := n downto 1 do begin
-      j := state.next(i);
-      resseq.seq.addInArray(v.get(pos[j]));
-      pos[j] := pos[i - 1];
-    end;
+    state.shuffle(pos);
+    for i in pos do
+      resseq.seq.addInArray(v.get(i));
   end;
 
 begin
