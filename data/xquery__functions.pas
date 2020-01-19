@@ -38,7 +38,7 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
@@ -4575,6 +4575,96 @@ begin
   result := xqvalue('autoid'+strFromPtr(node));
 end;
 
+type
+   TXQTermRNGMode = (xqtrngmNext, xqtrngmPermute);
+   TXQTermRNG = class(TXQTerm)
+      mode: TXQTermRNGMode;
+      state: Txoshiro256ss;
+      function evaluate(var context: TXQEvaluationContext): IXQValue; override;
+      function clone: TXQTerm; override;
+    end;
+
+function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: Txoshiro256ss): TXQValueObject;
+var newstate: Txoshiro256ss;
+  function makeFunction(mode: TXQTermRNGMode): TXQValueFunction;
+  var
+    rng: TXQTermRNG;
+  begin
+    rng := TXQTermRNG.Create;
+    rng.state := newstate;
+    rng.mode := mode;
+    result := TXQValueFunction.create();
+    result.ownsTerms := true;
+    result.body := rng;
+    result.context := context;
+    if mode = xqtrngmPermute then begin
+      setlength(result.parameters, 1);
+      result.parameters[0].variable := TXQTermVariable.create('arg');
+    end;
+  end;
+
+begin
+  newstate := state;
+  result := TXQValueObject.create();
+  result.setMutable('number', xqvalue(newstate.nextDouble));
+  result.setMutable('next', makeFunction(xqtrngmNext));
+  result.setMutable('permute', makeFunction(xqtrngmPermute));
+end;
+
+function xqFunctionRandom_Number_Generator(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var state: Txoshiro256ss;
+  temp: String;
+  seed: QWord;
+begin
+  if (argc = 0) or (args[0].isUndefined) then begin
+    seed := PQWord(@context.staticContext.sender.CurrentDateTime)^;
+    seed := seed xor PtrToUInt(context.staticContext);
+  end else begin
+    temp := args[0].toString;
+    seed := 0;
+    if length(temp) > 0 then move(temp[1], seed, min(length(temp), sizeof(seed)))
+    else seed := ord(args[0].kind);
+  end;
+  state.randomize(seed);
+  result := makeRandomNumberGenerator(context, state);
+end;
+
+function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
+  function permute(const v: IXQValue): TXQValue;
+  var
+    n, i, j: Integer;
+    pos: array of integer = nil;
+    resseq: TXQValueSequence;
+  begin
+    n := v.getSequenceCount;
+    if n = 1 then exit(v.toValue);
+    resseq := TXQValueSequence.create(n);
+    result := resseq;
+    SetLength(pos, n);
+    for i := 1 to n do pos[i - 1] := i;
+    for i := n downto 1 do begin
+      j := state.next(i);
+      resseq.seq.addInArray(v.get(pos[j]));
+      pos[j] := pos[i - 1];
+    end;
+  end;
+
+begin
+  case mode of
+    xqtrngmNext: result := makeRandomNumberGenerator(context, state);
+    xqtrngmPermute: result := permute(context.temporaryVariables.topptr(0)^);
+  end;
+end;
+
+function TXQTermRNG.clone: TXQTerm;
+begin
+  Result:=inherited clone;
+  TXQTermRng(result).state := state;
+  TXQTermRng(result).mode := mode;
+end;
+
+
+
 //returns 1000^(i+1) as English numeral using the Conway-Wechsler system. The result always ends with 'illion'
 function strConwayWechsler(i: integer): string;
 const cache: array[0..18] of string = ('n', 'm', 'b', 'tr', 'quadr', 'quint', 'sext', 'sept', 'oct', 'non', 'dec', 'undec', 'duodec', 'tredec', 'quattuordec', 'quindec', 'sedec', 'septendec', 'octodec');      //illion
@@ -5851,15 +5941,27 @@ var
   stacksize: Integer;
   f: TXQValueFunction;
 begin
-  f := args[0] as TXQValueFunction;
-  if length(f.parameters) <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
-  stack := context.temporaryVariables;
-  stacksize := stack.Count;
-  for pv in args[1].GetEnumeratorMembersPtrUnsafe do
-    stack.push(pv^);
-  f.contextOverrideParameterNames(context, length(f.parameters));
-  result := f.evaluate(context, nil);
-  stack.popTo(stacksize);
+  case args[0].kind of
+    pvkFunction: begin
+      f := args[0] as TXQValueFunction;
+      if length(f.parameters) <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+      stack := context.temporaryVariables;
+      stacksize := stack.Count;
+      for pv in args[1].GetEnumeratorMembersPtrUnsafe do
+        stack.push(pv^);
+      f.contextOverrideParameterNames(context, length(f.parameters));
+      result := f.evaluate(context, nil);
+      stack.popTo(stacksize);
+    end;
+    pvkObject: begin
+      if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+      result := args[0].getProperty(args[1].toString);
+    end;
+    pvkArray: begin
+      if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
+      result := args[0].get(args[1].toInt64);
+    end;
+  end;
 end;
 
 function xqFunctionContains_Token(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -7200,6 +7302,7 @@ begin
 
 
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, ['() as xs:string', '($arg as node()?) as xs:string']);
+  fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())']);
 
   //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
 
