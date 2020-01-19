@@ -165,7 +165,7 @@ begin
   t('collation-key("a0c00") ne collation-key("a00c0")', 'true');
   //t('collation-key("a0001") lt collation-key("a1")', 'true');
 
-  t('let $rng := random-number-generator("abc") return ($rng?number, $rng?next()?number, $rng?permute(1 to 3))', '0.3553078841145228 0.16825667264030408 1 3 2');
+  t('let $rng := random-number-generator("abc") return ($rng?number, $rng?next()?number, $rng?permute(1 to 3))', '0.3553078841145228 0.16825667264030408 2 3 1');
 
   t('hexBinary("aa") lt hexBinary("ff") ', 'true');
   t('hexBinary("aa") < hexBinary("ff") ', 'true');
