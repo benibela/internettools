@@ -325,8 +325,8 @@ var dest: IXQValue;
 begin
   if destination.kind = pvkSequence then dest := destination.get(1)
   else dest := destination;
-  dest := defaultQueryEngine.evaluateXPath3('pxp:resolve-html(.)', dest);
   if dest.kind = pvkSequence then dest := dest.get(1);
+  if dest.kind <> pvkObject then dest := defaultQueryEngine.evaluateXPath3('pxp:resolve-html(.)', dest);
 
   case dest.kind of
     pvkUndefined: exit('');
