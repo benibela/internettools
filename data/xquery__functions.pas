@@ -4651,6 +4651,7 @@ begin
   case mode of
     xqtrngmNext: result := makeRandomNumberGenerator(context, state);
     xqtrngmPermute: result := permute(context.temporaryVariables.topptr(0)^);
+    else result := nil;
   end;
 end;
 
