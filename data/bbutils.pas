@@ -1081,7 +1081,7 @@ var
 begin
   if next + delta > bufferend then begin
     oldlen := count;
-    SetLength(buffer^, max(2*length(buffer^), oldlen + delta));
+    SetLength(buffer^, max(min(2*length(buffer^), oldlen + 32*1024*1024), oldlen + delta));
     next := pchar(buffer^) + oldlen;
     bufferend := pchar(buffer^) + length(buffer^);
   end;
