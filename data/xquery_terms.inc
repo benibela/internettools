@@ -4948,13 +4948,19 @@ end;
 
 function TXQTermTryCatch.clone: TXQTerm;
 var
-  i: Integer;
+  i, j: Integer;
+  r: TXQTermTryCatch;
 begin
-  result := TXQTermTryCatch.create(body);
-  TXQTermTryCatch(result).catches := catches;
-  SetLength(TXQTermTryCatch(result).catches, length(catches));
-  for i := 0 to high(catches) do
-    TXQTermTryCatch(result).catches[i].expr := catches[i].expr.clone;
+  result := TXQTermTryCatch.create(body.clone);
+  r := TXQTermTryCatch(result);
+  r.catches := catches;
+  SetLength(r.catches, length(catches));
+  for i := 0 to high(catches) do begin
+    r.catches[i].expr := catches[i].expr.clone;
+    SetLength(r.catches[i].tests, length(r.catches[i].tests));
+    for j := 0 to high(r.catches[i].tests) do
+      r.catches[i].tests[j].name := r.catches[i].tests[j].name.clone;
+  end;
 end;
 
 destructor TXQTermTryCatch.Destroy;
