@@ -684,10 +684,12 @@ end;
 
 function TXSStringType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 begin
-  if (lexicalSpaceRegex <> nil) then begin
+  if lexicalSpacePattern <> '' then begin
     EnterCriticalsection(lexicalSpaceRegexCS);
     try
-      if not (wregexprMatches(TWrappedRegExpr(lexicalSpaceRegex), v)) then exit(xsceFORG0001);
+      if lexicalSpaceRegex = nil then lexicalSpaceRegex := wregexprParse(lexicalSpacePattern, []);
+      if not (wregexprMatches(TWrappedRegExpr(lexicalSpaceRegex), v)) then //could move this out of the CS. flre should be  thread safe (but TRegExpr was not)
+        exit(xsceFORG0001);
     finally
       LeaveCriticalsection(lexicalSpaceRegexCS);
     end;
@@ -704,16 +706,14 @@ constructor TXSStringType.create(const aname: string; aparent: TXSType; asubtype
 begin
   inherited Create(aname, aparent, TXQValueString);
   subType:=asubtype;
-  if pattern <> '' then begin
-    lexicalSpaceRegex := wregexprParse(pattern, []);
-    InitCriticalSection(lexicalSpaceRegexCS);
-  end;
+  lexicalSpacePattern := pattern;
+  if lexicalSpacePattern <> '' then InitCriticalSection(lexicalSpaceRegexCS);
 end;
 
 destructor TXSStringType.Destroy;
 begin
-  if lexicalSpaceRegex <> nil then begin
-    wregexprFree(TWrappedRegExpr(lexicalSpaceRegex));
+  if lexicalSpacePattern <> '' then begin
+    if lexicalSpaceRegex<>nil then wregexprFree(TWrappedRegExpr(lexicalSpaceRegex));
     DoneCriticalsection(lexicalSpaceRegexCS);
   end;
   inherited Destroy;

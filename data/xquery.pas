@@ -1303,6 +1303,7 @@ type
   TXSStringSubType = (xsstString, xsstHexBinary, xsstBase64Binary, xsstUrl);
   TXSStringType = class(TXSSimpleType)
     lexicalSpaceRegex: TObject {TWrappedRegExpr};
+    lexicalSpacePattern: string;
     lexicalSpaceRegexCS: TRTLCriticalSection;
     subType: TXSStringSubType;
     function tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError; override;
