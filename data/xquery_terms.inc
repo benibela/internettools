@@ -756,6 +756,11 @@ constructor TXQTermSequenceType.create();
 begin
 end;
 
+constructor TXQTermSequenceType.create(akind: TXQTypeInformationKind);
+begin
+  kind := akind
+end;
+
 constructor TXQTermSequenceType.create(atomic: TXSType; aallowNone: boolean);
 begin
   kind := tikAtomic;
@@ -2784,14 +2789,6 @@ begin
     if afunc <> nil then begin
       akind:=xqfkNativeInterpreted;
       exit(true);
-    end;
-
-    if argcount = 2 then begin
-      aindex := module.binaryOpFunctions.IndexOf(alocalname);
-      if aindex >= 0 then begin
-        afunc := TXQOperatorInfo(module.binaryOpFunctions.Objects[aindex]);
-        exit(true);
-      end;
     end;
   end;
 

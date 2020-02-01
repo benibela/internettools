@@ -7010,7 +7010,6 @@ const
       PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
 
 
-
 procedure initializeFunctions;
 var
   templt: TXQOperatorInfo;
@@ -7079,23 +7078,30 @@ begin
   pxpold.registerFunction('garbage-collect',0,0,@xqFunctionGarbage_Collect, []);
   pxpold.registerFunction('eval',1,2,@xqFunctionEval, []);
   pxpold.registerFunction('css',1,1,@xqFunctionCSS, []);
-  pxpold.registerFunction('get',1,2,@xqFunctionGet, ['($name as xs:string) as item()*','($name as xs:string, $def as item()*) as item()*'], [xqcdContextVariables]);
+  with globalTypes do begin
+  pxpold.registerFunction('get',@xqFunctionGet,  [[stringt, itemStar], [stringt, itemStar,itemStar]], [xqcdContextVariables]);
   pxpold.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
   pxpold.registerFunction('type-of',1,1,@xqFunctionType_of, []);
   pxpold.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
   pxpold.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
   pxpold.registerFunction('join',1,2,@xqFunctionJoin,[]);
-  pxpold.registerFunction('binary-to-string',1,2,@xqFunctionBinary_To_String,['($data as xs:hexBinary|xs:base64Binary) as xs:string', '($data as xs:hexBinary|xs:base64Binary, $encoding as xs:string) as xs:string']);
-  pxpold.registerFunction('string-to-hexBinary',1,2,@xqFunctionString_To_hexBinary,['($data as xs:string) as xs:hexBinary', '($data as xs:string, $encoding as xs:string) as xs:hexBinary']);
-  pxpold.registerFunction('string-to-base64Binary',1,2,@xqFunctionString_To_base64Binary,['($data as xs:string) as xs:base64Binary', '($data as xs:string, $encoding as xs:string) as xs:base64Binary']);
+  pxpold.registerFunction('binary-to-string',@xqFunctionBinary_To_String, [[anyBinary, stringt],  [anyBinary, stringt, stringt]]);
+  pxpold.registerFunction('string-to-hexBinary',@xqFunctionString_To_hexBinary, [[stringt, hexBinary],  [stringt, stringt, hexBinary]]);
+  pxpold.registerFunction('string-to-base64Binary',@xqFunctionString_To_base64Binary, [[stringt, base64Binary],  [stringt, stringt, base64Binary]]);
 
-  pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']); //same as fn:encode-for-uri, but with an easier name
-  pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri, ['($uri-part as xs:string?) as xs:string']);
-  pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, ['($uri1 as item()*, $uri2 as item()*) as xs:string']); //will probably be removed in future version
-  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, ['($uri1 as object(), $uri2 as item()*) as object()']); //will probably be removed in future version
-  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, ['($uri1 as item(), $uri2 as item()*) as object()']); //planed replacement for form-combine and uri-combine (but name is not final yet)
-  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, ['($request as item()) as object()']);
+  pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, [[stringOrEmpty, stringt]]); //same as fn:encode-for-uri, but with an easier name
+  pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri, [[stringOrEmpty, stringt]]);
+  pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, [[itemStar, itemStar, stringt]]); //will probably be removed in future version
+  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, [[map, itemStar, map]]); //will probably be removed in future version
+  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, [[item, itemStar, map]]); //planed replacement for form-combine and uri-combine (but name is not final yet)
+  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, [[item, map]]);
 
+  {transform
+[[itemStar, functiont, map, itemStar]]
+transform
+[[itemStar, functiont, itemStar]]
+transform
+[[functiont, itemStar]]}
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
   'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
   '                typeswitch (.)'+
@@ -7106,193 +7112,197 @@ begin
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
-  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, ['($arg as item()*) as xs:string', '($arg as item()*, $params as item()?) as xs:string']);
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [[itemStar, stringt],  [itemStar, itemOrEmpty, stringt]]);
 
 
   //standard functions
-  fn.registerFunction('exists',@xqFunctionExists,['($arg as item()*) as xs:boolean']);
-  fn.registerFunction('empty', @xqFunctionempty,['($arg as item()*) as xs:boolean']);
-  fn.registerFunction('nilled', @xqFunctionNilled,['($arg as node()?) as xs:boolean?']);
-  fn3.registerFunction('nilled', @xqFunctionNilled,['() as xs:boolean']);
-  fn.registerFunction('error',@xqFunctionError,['() as none', '($error as xs:QName) as none', '($error as xs:QName?, $description as xs:string) as none', '($error as xs:QName?, $description as xs:string, $error-object as item()*) as none']);
+  fn.registerFunction('exists',@xqFunctionExists,[itemStar, boolean]);
+  fn.registerFunction('empty', @xqFunctionempty,[itemStar, boolean]);
+  fn.registerFunction('nilled', @xqFunctionNilled,[nodeOrEmpty, booleanOrEmpty]);
+  fn3.registerFunction('nilled', @xqFunctionNilled,[boolean]);
+  fn.registerFunction('error',@xqFunctionError,[[none],  [QName, none],  [QNameOrEmpty, stringt, none],  [QNameOrEmpty, stringt, itemStar, none]]);
 
-  fn.registerFunction('abs',@xqFunctionAbs,['($arg as numeric?) as numeric?']);
-  fn.registerFunction('ceiling',@xqFunctionCeiling,['($arg as numeric?) as numeric?']);
-  fn.registerFunction('floor',@xqFunctionFloor,['($arg as numeric?) as numeric?']);
-  fn.registerFunction('round',@xqFunctionRound,['($arg as numeric?) as numeric?']);
-  fn3.registerFunction('round',@xqFunctionRound,['($arg as numeric?, $precision as xs:integer) as numeric?']);
-  fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even,['($arg as numeric?) as numeric?', '($arg as numeric?, $precision as xs:integer) as numeric?']);
+  fn.registerFunction('abs',@xqFunctionAbs,[numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('ceiling',@xqFunctionCeiling,[numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('floor',@xqFunctionFloor,[numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('round',@xqFunctionRound,[numericOrEmpty, numericOrEmpty]);
+  fn3.registerFunction('round',@xqFunctionRound, [numericOrEmpty, integer, numericOrEmpty]);
+  fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even, [[numericOrEmpty, numericOrEmpty],  [numericOrEmpty, integer, numericOrEmpty]]);
 
-  fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,['($arg as xs:integer*) as xs:string']);
-  fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints,['($arg as xs:string?) as xs:integer*']);
-  fn.registerFunction('string-join',@xqFunctionString_join,['($arg1 as xs:string*, $arg2 as xs:string) as xs:string']);
-  fn3.registerFunction('string-join',@xqFunctionString_join_Nosep,['($arg1 as xs:string*) as xs:string']);
-  fn3_1.registerFunction('string-join',@xqFunctionString_join,['($arg1 as xs:anyAtomicType*, $arg2 as xs:string) as xs:string']);
-  fn3_1.registerFunction('string-join',@xqFunctionString_join_Nosep,['($arg1 as xs:anyAtomicType*) as xs:string']);
-  fn.registerFunction('substring',@xqFunctionSubstring,['($sourceString as xs:string?, $startingLoc as xs:double) as xs:string', '($sourceString as xs:string?, $startingLoc as xs:double, $length as xs:double) as xs:string']);
-  fn.registerFunction('upper-case',@xqFunctionUpper_Case,['($arg as xs:string?) as xs:string']);
-  fn.registerFunction('lower-case',@xqFunctionLower_case,['($arg as xs:string?) as xs:string']);
-  fn.registerFunction('compare',@xqFunctionCompare,['($comparand1 as xs:string?, $comparand2 as xs:string?) as xs:integer?', '($comparand1 as xs:string?, $comparand2 as xs:string?, $collation as xs:string) as xs:integer?'], [xqcdContextCollation]);
-  fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal,['($comparand1 as xs:string?, $comparand2 as xs:string?) as xs:boolean?']);
-  fn.registerFunction('contains',@xqFunctionContains,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
-  fn.registerFunction('starts-with',@xqFunctionStarts_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
-  fn.registerFunction('ends-with',@xqFunctionEnds_with,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:boolean', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:boolean'], [xqcdContextCollation]);
-  fn.registerFunction('substring-after',@xqFunctionSubstring_after,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string'], [xqcdContextCollation]);
-  fn.registerFunction('substring-before',@xqFunctionSubstring_before,['($arg1 as xs:string?, $arg2 as xs:string?) as xs:string', '($arg1 as xs:string?, $arg2 as xs:string?, $collation as xs:string) as xs:string'], [xqcdContextCollation]);
+  fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,[integerStar, stringt]);
+  fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints,[stringOrEmpty, integerStar]);
+  fn.registerFunction('string-join',@xqFunctionString_join,[stringStar, stringt, stringt]);
+  fn3.registerFunction('string-join',@xqFunctionString_join_Nosep,[stringStar, stringt]);
+  fn3_1.registerFunction('string-join',@xqFunctionString_join,[atomicStar, stringt, stringt]);
+  fn3_1.registerFunction('string-join',@xqFunctionString_join_Nosep,[atomicStar, stringt]);
+  fn.registerFunction('substring',@xqFunctionSubstring, [[stringOrEmpty, double, stringt],  [stringOrEmpty, double, double, stringt]]);
+  fn.registerFunction('upper-case',@xqFunctionUpper_Case,[stringOrEmpty, stringt]);
+  fn.registerFunction('lower-case',@xqFunctionLower_case,[stringOrEmpty, stringt]);
+  fn.registerFunction('compare',@xqFunctionCompare,[[stringOrEmpty, stringOrEmpty, integerOrEmpty],  [stringOrEmpty, stringOrEmpty, stringt, integerOrEmpty]], [xqcdContextCollation]);
+  fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal,[[stringOrEmpty, stringOrEmpty, booleanOrEmpty]]);
+  fn.registerFunction('contains',@xqFunctionContains,[[stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]], [xqcdContextCollation]);
+  fn.registerFunction('starts-with',@xqFunctionStarts_with,[[stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]], [xqcdContextCollation]);
+  fn.registerFunction('ends-with',@xqFunctionEnds_with, [[stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]], [xqcdContextCollation]);
+  fn.registerFunction('substring-after',@xqFunctionSubstring_after, [[stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]], [xqcdContextCollation]);
+  fn.registerFunction('substring-before',@xqFunctionSubstring_before,[[stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]], [xqcdContextCollation]);
   fn.registerFunction('concat',2,-1,@xqFunctionConcat,[]);
-  fn.registerFunction('translate',@xqFunctionTranslate,['($arg as xs:string?, $mapString as xs:string, $transString as xs:string) as xs:string']);
-  fn.registerFunction('replace',@xqFunctionReplace,['($input as xs:string?, $pattern as xs:string, $replacement as xs:string) as xs:string', '($input as xs:string?, $pattern as xs:string, $replacement as xs:string, $flags as xs:string) as xs:string ']);
-  fn.registerFunction('matches',@xqFunctionMatches,['($input as xs:string?, $pattern as xs:string) as xs:boolean', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:boolean']);
-  fn.registerFunction('tokenize',@xqFunctionTokenize,['($input as xs:string?, $pattern as xs:string) as xs:string*', '($input as xs:string?, $pattern as xs:string, $flags as xs:string) as xs:string*']);
+  fn.registerFunction('translate',@xqFunctionTranslate,[stringOrEmpty, stringt, stringt, stringt]);
+  fn.registerFunction('replace',@xqFunctionReplace,[[stringOrEmpty, stringt, stringt, stringt],  [stringOrEmpty, stringt, stringt, stringt, stringt]]);
+  fn.registerFunction('matches',@xqFunctionMatches,[[stringOrEmpty, stringt, boolean],  [stringOrEmpty, stringt, stringt, boolean]]);
+  fn.registerFunction('tokenize',@xqFunctionTokenize,[[stringOrEmpty, stringt, stringStar],  [stringOrEmpty, stringt, stringt, stringStar]]);
   fn3.registerFunction('analyze-string',@xqFunctionAnalyze_String,['( $input as xs:string?, $pattern 	 as xs:string) as element(fn:analyze-string-result)', '($input as xs:string?, $pattern as xs:string,$flags as xs:string) as element(fn:analyze-string-result)'],[]);
 
 
-  fn.registerFunction('boolean',@xqFunctionBoolean,['($arg as item()*) as xs:boolean']);
-  fn.registerFunction('true',@xqFunctionTrue,['() as xs:boolean']);
-  fn.registerFunction('false',@xqFunctionFalse,['() as xs:boolean']);
-  fn.registerFunction('not',@xqFunctionNot,['($arg as item()*) as xs:boolean']);
+  fn.registerFunction('boolean',@xqFunctionBoolean,[itemStar, boolean]);;
+  fn.registerFunction('true',@xqFunctionTrue,[boolean]);
+  fn.registerFunction('false',@xqFunctionFalse,[boolean]);
+  fn.registerFunction('not',@xqFunctionNot,[itemStar, boolean]);
 
 
-  fn.registerFunction('dateTime',@xqFunctionDateTime,['($arg1 as xs:date?, $arg2 as xs:time?) as xs:dateTime?']);
-  fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime, ['($arg as xs:dateTime?) as xs:integer?']);
-  fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime, ['($arg as xs:dateTime?) as xs:decimal?']);
+  fn.registerFunction('dateTime',@xqFunctionDateTime,[dateOrEmpty, timeOrEmpty, dateTimeOrEmpty]);
+  fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime, [dateTimeOrEmpty, decimalOrEmpty]);
 
-  fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, ['($arg as xs:duration?) as xs:integer?']);
-  fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration, ['($arg as xs:duration?) as xs:decimal?']);
+  fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, [durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, [durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, [durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, [durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, [durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration, [durationOrEmpty, decimalOrEmpty]);
 
-  fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
-  fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
-  fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime, ['($arg as xs:date?) as xs:integer?']);
-  fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
-  fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime, ['($arg as xs:time?) as xs:integer?']);
-  fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, ['($arg as xs:time?) as xs:decimal?']);
-  fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime, ['($arg as xs:time?) as xs:dayTimeDuration?']);
-  fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime, ['($arg as xs:date?) as xs:dayTimeDuration?']);
-  fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime, ['($arg as xs:dateTime?) as xs:dayTimeDuration?']);
-  fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:dateTime?) as xs:dateTime?', '($arg as xs:dateTime?, $timezone as xs:dayTimeDuration?) as xs:dateTime?'], [xqcdContextTime]);
-  fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:date?) as xs:date?', '($arg as xs:date?, $timezone as xs:dayTimeDuration?) as xs:date?'], [xqcdContextTime]);
-  fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, ['($arg as xs:time?) as xs:time?', '($arg as xs:time?, $timezone as xs:dayTimeDuration?) as xs:time?'], [xqcdContextTime]);
-  fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, ['() as xs:dayTimeDuration'], [xqcdContextTime]);
-
-
-  fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime,['() as xs:dateTime'], [xqcdContextTime]);
-  fn.registerFunction('current-date',@xqFunctionCurrent_Date,['() as xs:date'], [xqcdContextTime]);
-  fn.registerFunction('current-time',@xqFunctionCurrent_Time,['() as xs:time'], [xqcdContextTime]);
-
-  fn.registerFunction('trace',@xqFunctionTrace, ['($value as item()*, $label as xs:string) as item()*']);
-  fn.registerFunction('default-collation', @xqFunctionDefault_Collation, ['() as xs:string']);
-  fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri, ['() as xs:anyURI?']);
-  fn.registerFunction('base-uri',@xqFunctionBase_Uri, ['() as xs:anyURI?', '($arg as node()?) as xs:anyURI?']);
-  fn.registerFunction('document-uri',@xqFunctionDocument_Uri, ['($arg as node()?) as xs:anyURI?']);
-  fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0, ['() as xs:anyURI?']);
-
-  fn.registerFunction('doc', @xqFunctionDoc, ['($uri as xs:string?) as document-node()?']);
-  fn.registerFunction('doc-available', @xqFunctionDoc_Available, ['($uri as xs:string?) as xs:boolean']);
-  fn.registerFunction('collection', @xqFunctionCollection, ['() as node()*', '($arg as xs:string?) as node()*']);
-  fn3.registerFunction('uri-collection', @xqFunctionUri_Collection, ['() as xs:anyURI*', '($arg as xs:string?) as xs:anyURI*']);
+  fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime, [dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime, [dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime, [dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime, [timeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime, [timeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, [timeOrEmpty, decimalOrEmpty]);
+  fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime, [timeOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime, [dateOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime, [dateTimeOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [[dateTimeOrEmpty, dateTimeOrEmpty],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTimeOrEmpty]], [xqcdContextTime]);
+  fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [[dateOrEmpty, dateOrEmpty],  [dateOrEmpty, dayTimeDurationOrEmpty, dateOrEmpty]], [xqcdContextTime]);
+  fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [[timeOrEmpty, timeOrEmpty],  [timeOrEmpty, dayTimeDurationOrEmpty, timeOrEmpty]], [xqcdContextTime]);
+  fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, [[dayTimeDuration]], [xqcdContextTime]);
 
 
-  fn.registerFunction('root', @xqFunctionRoot, ['() as node()', '($arg as node()?) as node()?'], [xqcdFocusItem]);
-  fn.registerFunction('lang', @xqFunctionLang, ['($testlang as xs:string?) as xs:boolean', '($testlang as xs:string?, $node as node()) as xs:boolean']);
+  fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime, [dateTime], [xqcdContextTime]);
+  fn.registerFunction('current-date',@xqFunctionCurrent_Date, [date], [xqcdContextTime]);
+  fn.registerFunction('current-time',@xqFunctionCurrent_Time, [time], [xqcdContextTime]);
+
+  fn.registerFunction('trace',@xqFunctionTrace, [[itemStar, stringt, itemStar]]);
+  fn.registerFunction('default-collation', @xqFunctionDefault_Collation, [[stringt]]);
+  fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri, [[anyURIOrEmpty]]);
+  fn.registerFunction('base-uri',@xqFunctionBase_Uri, [[anyURIOrEmpty],  [nodeOrEmpty, anyURIOrEmpty]]);
+  fn.registerFunction('document-uri',@xqFunctionDocument_Uri, [[nodeOrEmpty, anyURIOrEmpty]]);
+  fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0, [[anyURIOrEmpty]]);
+
+  fn.registerFunction('doc', @xqFunctionDoc, [[stringOrEmpty, documentNodeOrEmpty]]);
+  fn.registerFunction('doc-available', @xqFunctionDoc_Available, [[stringOrEmpty, boolean]]);
+  fn.registerFunction('collection', @xqFunctionCollection, [[nodeStar],  [stringOrEmpty, nodeStar]]);
+  fn3.registerFunction('uri-collection', @xqFunctionUri_Collection, [[anyURIStar],  [stringOrEmpty, anyURIStar]]);
 
 
-  fn.registerFunction('QName',@xqFunctionQName, ['($paramURI as xs:string?, $paramQName as xs:string) as xs:QName']);
-  fn.registerFunction('name',@xqFunctionName, ['() as xs:string', '($arg as node()?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('local-name',@xqFunctionLocal_Name, ['() as xs:string', '($arg as node()?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, ['() as xs:anyURI', '($arg as node()?) as xs:anyURI'], [xqcdFocusItem]);
-  fn.registerFunction('node-name', @xqFunctionNode_Name, ['($arg as node()?) as xs:QName?']);
-  fn3.registerFunction('node-name', @xqFunctionNode_Name, ['() as xs:QName?']);
-  fn.registerFunction('resolve-QName',@xqFunctionResolve_QName, ['($qname as xs:string?, $element as element()) as xs:QName?'], [xqcdContextCollation]);
-  fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
-  fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName, ['($arg as xs:QName?) as xs:NCName?']);
-  fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName, ['($arg as xs:QName?) as xs:anyURI?']);
-  fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix, ['($prefix as xs:string?, $element as element()) as xs:anyURI?']);
-  fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes, ['($element as element()) as xs:string*']);
+  fn.registerFunction('root', @xqFunctionRoot, [[node],  [nodeOrEmpty, nodeOrEmpty]], [xqcdFocusItem]);
+  fn.registerFunction('lang', @xqFunctionLang, [[stringOrEmpty, boolean],  [stringOrEmpty, node, boolean]]);
+
+
+  fn.registerFunction('QName',@xqFunctionQName, [stringOrEmpty, stringt, QName]);
+  fn.registerFunction('name',@xqFunctionName, [[stringt],  [nodeOrEmpty, stringt]], [xqcdFocusItem]);
+  fn.registerFunction('local-name',@xqFunctionLocal_Name, [[stringt],  [nodeOrEmpty, stringt]], [xqcdFocusItem]);
+  fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, [[anyURI],  [nodeOrEmpty, anyURI]], [xqcdFocusItem]);
+  fn.registerFunction('node-name', @xqFunctionNode_Name, [nodeOrEmpty, QNameOrEmpty]);
+  fn3.registerFunction('node-name', @xqFunctionNode_Name, [QNameOrEmpty]);
+  fn.registerFunction('resolve-QName',@xqFunctionResolve_QName,  [stringOrEmpty, element, QNameOrEmpty], [xqcdContextCollation]);
+  fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName, [[QNameOrEmpty, NCNameOrEmpty]]);
+  fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName, [[QNameOrEmpty, NCNameOrEmpty]]);
+  fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName, [QNameOrEmpty, anyURIOrEmpty]);
+  fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix, [stringOrEmpty, element, anyURIOrEmpty]);
+  fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes, [element, stringStar]);
 
 
   fn.registerFunction('resolve-uri', @xqFunctionResolve_Uri, ['($relative as xs:string?) as xs:anyURI?', '($relative as xs:string?, $base as xs:string) as xs:anyURI?']);
-  fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri, ['($uri-part as xs:string?) as xs:string']);
-  fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri, ['($iri as xs:string?) as xs:string']);
-  fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri, ['($uri as xs:string?) as xs:string']);
+  fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri, [stringOrEmpty, stringt]);
+  fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri, [stringOrEmpty, stringt]);
+  fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri, [stringOrEmpty, stringt]);
 
 
-  fn.registerFunction('data', @xqFunctionData, ['($arg as item()*) as xs:anyAtomicType*']);
-  fn3.registerFunction('data', @xqFunctionData, ['() as xs:anyAtomicType*']);
-  fn.registerFunction('number',@xqFunctionNumber, ['() as xs:double', '($arg as xs:anyAtomicType?) as xs:double'], [xqcdFocusItem]);
-  fn.registerFunction('string',@xqFunctionString, ['() as xs:string', '($arg as item()?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('string-length',@xqFunctionString_length, ['() as xs:integer', '($arg as xs:string?) as xs:integer'], [xqcdFocusItem]);
-  fn.registerFunction('normalize-space',@xqFunctionNormalize_space, ['() as xs:string', '($arg as xs:string?) as xs:string'], [xqcdFocusItem]);
-  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, ['($arg as xs:string?) as xs:string', '($arg as string?, $normalizationForm as xs:string) as xs:string']);
+  fn.registerFunction('data', @xqFunctionData, [itemStar, atomicStar]);
+  fn3.registerFunction('data', @xqFunctionData, [atomicStar]);
+  fn.registerFunction('number',@xqFunctionNumber, [[double],  [atomicOrEmpty, double]], [xqcdFocusItem]);
+  fn.registerFunction('string',@xqFunctionString, [[stringt],  [itemOrEmpty, stringt]], [xqcdFocusItem]);
+  fn.registerFunction('string-length',@xqFunctionString_length, [[integer],  [stringOrEmpty, integer]], [xqcdFocusItem]);
+  fn.registerFunction('normalize-space',@xqFunctionNormalize_space, [[stringt],  [stringOrEmpty, stringt]], [xqcdFocusItem]);
+  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, [[stringOrEmpty, stringt],  [stringOrEmpty, stringt, stringt]]);
 
   fn.registerFunction('concatenate',2, 2, @xqFunctionConcatenate, []); //this should be an operator
-  fn.registerFunction('index-of', @xqFunctionindex_of, ['($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType) as xs:integer*', '($seqParam as xs:anyAtomicType*, $srchParam as xs:anyAtomicType, $collation as xs:string) as xs:integer*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('distinct-values', @xqFunctiondistinct_values, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType*', '($arg as xs:anyAtomicType*, $collation as xs:string) as xs:anyAtomicType*'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('insert-before', @xqFunctioninsert_before, ['($target as item()*, $position as xs:integer, $inserts as item()*) as item()*']);
-  fn.registerFunction('remove', @xqFunctionremove, ['($target as item()*, $position as xs:integer) as item()*']);
-  fn.registerFunction('reverse', @xqFunctionreverse, ['($arg as item()*) as item()*']);
-  fn.registerFunction('subsequence', @xqFunctionsubsequence, ['($sourceSeq as item()*, $startingLoc as xs:double) as item()*', '($sourceSeq as item()*, $startingLoc as xs:double, $length as xs:double) as item()*']);
-  fn.registerFunction('unordered', @xqFunctionunordered, ['($sourceSeq as item()*) as item()']);
-  fn.registerFunction('zero-or-one', @xqFunctionzero_or_one, ['($arg as item()*) as item()?']);
-  fn.registerFunction('one-or-more', @xqFunctionone_or_more, ['($arg as item()*) as item()+']);
-  fn.registerFunction('exactly-one', @xqFunctionexactly_one, ['($arg as item()*) as item()']);
-  fn.registerFunction('deep-equal', @xqFunctiondeep_equal, ['($parameter1 as item()*, $parameter2 as item()*) as xs:boolean', '($parameter1 as item()*, $parameter2 as item()*, $collation as string) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('count', @xqFunctioncount, ['($arg as item()*) as xs:integer']);
-  fn.registerFunction('avg', @xqFunctionavg, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?']);
-  fn.registerFunction('max', @xqFunctionmax, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('min', @xqFunctionmin, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType?', '($arg as xs:anyAtomicType*, $collation as string) as xs:anyAtomicType?'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('sum', @xqFunctionsum, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType', '($arg as xs:anyAtomicType*, $zero as xs:anyAtomicType?) as xs:anyAtomicType?']);
-  x.registerFunction('product', @xqFunctionProduct, ['($arg as xs:anyAtomicType*) as xs:anyAtomicType']);
+  fn.registerFunction('index-of', @xqFunctionindex_of, [[atomicStar, atomic, integerStar],  [atomicStar, atomic, stringt, integerStar]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  fn.registerFunction('distinct-values', @xqFunctiondistinct_values, [[atomicStar, atomicStar],  [atomicStar, stringt, atomicStar]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  fn.registerFunction('insert-before', @xqFunctioninsert_before, [itemStar, integer, itemStar, itemStar]);
+  fn.registerFunction('remove', @xqFunctionremove, [itemStar, integer, itemStar]);
+  fn.registerFunction('reverse', @xqFunctionreverse, [itemStar, itemStar]);
+  fn.registerFunction('subsequence', @xqFunctionsubsequence, [[itemStar, double, itemStar],  [itemStar, double, double, itemStar]]);
+  fn.registerFunction('unordered', @xqFunctionunordered, [itemStar, item]);
+  fn.registerFunction('zero-or-one', @xqFunctionzero_or_one, [itemStar, itemOrEmpty]);
+  fn.registerFunction('one-or-more', @xqFunctionone_or_more, [itemStar, itemPlus]);
+  fn.registerFunction('exactly-one', @xqFunctionexactly_one, [itemStar, item]);
+  fn.registerFunction('deep-equal', @xqFunctiondeep_equal, [[itemStar, itemStar, boolean],  [itemStar, itemStar, stringt, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  fn.registerFunction('count', @xqFunctioncount, [itemStar, integer]);
+  fn.registerFunction('avg', @xqFunctionavg, [atomicStar, atomicOrEmpty]);
+  fn.registerFunction('max', @xqFunctionmax, [[atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  fn.registerFunction('min', @xqFunctionmin, [[atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  fn.registerFunction('sum', @xqFunctionsum, [[atomicStar, atomic],  [atomicStar, atomicOrEmpty, atomicOrEmpty]]);
+  x.registerFunction('product', @xqFunctionProduct, [atomicStar, atomic]);
 
-  fn.registerFunction('position', @xqFunctionPosition, ['() as xs:integer'], [xqcdFocusPosition]);
-  fn.registerFunction('last', @xqFunctionLast, ['() as xs:integer'], [xqcdFocusLast]);
+  fn.registerFunction('position', @xqFunctionPosition, [integer], [xqcdFocusPosition]);
+  fn.registerFunction('last', @xqFunctionLast, [integer], [xqcdFocusLast]);
 
-  fn.registerFunction('id', @xqFunctionId, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']);
-  fn.registerFunction('idref', @xqFunctionIdRef, ['($arg as xs:string*) as node()*', '($arg as xs:string*, $node as node()) as node()*']);
-  fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, ['($arg as xs:string*) as element()*', '($arg as xs:string*, $node as node()) as element()*']); //TODO: should search for #ID nodes (?)
+  fn.registerFunction('id', @xqFunctionId, [[stringStar, elementStar],  [stringStar, node, elementStar]]);
+  fn.registerFunction('idref', @xqFunctionIdRef, [[stringStar, nodeStar],  [stringStar, node, nodeStar]]);
+  fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, [[stringStar, elementStar],  [stringStar, node, elementStar]]); //TODO: should search for #ID nodes (?)
 
-  fn3.registerFunction('head', @xqFunctionHead, ['($arg as item()*) as item()?']);
-  fn3.registerFunction('tail', @xqFunctionTail, ['($arg as item()*) as item()*']);
+  fn3.registerFunction('head', @xqFunctionHead, [itemStar, itemOrEmpty]);
+  fn3.registerFunction('tail', @xqFunctionTail, [itemStar, itemStar]);
 
-  fn3.registerFunction('has-children', @xqFunctionHas_Children, ['() as xs:boolean', '($node as node()?) as xs:boolean']);
+  fn3.registerFunction('has-children', @xqFunctionHas_Children, [[boolean],  [nodeOrEmpty, boolean]]);
+  //[nodeStar, nodeStar]
   fn3.registerInterpretedFunction('innermost', '($nodes as node()*) as node()*', '$nodes except $nodes/ancestor::node()', []);
+  //[nodeStar, nodeStar]
   fn3.registerInterpretedFunction('outermost', '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
-  fn3.registerFunction('path', @xqFunctionPath, ['() as xs:string?', '($arg as node()?) as xs:string?']);
+  fn3.registerFunction('path', @xqFunctionPath, [[stringOrEmpty],  [nodeOrEmpty, stringOrEmpty]]);
 
-  fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, ['($value as xs:integer?, $picture as xs:string) as xs:string', '(	$value	 as xs:integer?, $picture	 as xs:string,$lang	 as xs:string?) as xs:string']);
-  fn3.registerFunction('format-dateTime', @xqFunctionFormat_DateTime, ['($value as xs:dateTime?, $picture as xs:string) as xs:string?', '( 	$value 	 as xs:dateTime?, $picture 	 as xs:string, $language 	 as xs:string?, $calendar as xs:string?, $place as xs:string?) as xs:string?']);
-  fn3.registerFunction('format-date', @xqFunctionFormat_Date, ['($value as xs:date?, $picture as xs:string) as xs:string?', '( 	$value 	 as xs:date?,$picture 	 as xs:string,$language 	 as xs:string?,$calendar 	 as xs:string?,$place 	 as xs:string?) as xs:string?']);
-  fn3.registerFunction('format-time', @xqFunctionFormat_Time, ['($value as xs:time?, $picture as xs:string) as xs:string?','( 	$value 	 as xs:time?,$picture 	 as xs:string,$language 	 as xs:string?,$calendar 	 as xs:string?,$place 	 as xs:string?) as xs:string?']);
-  fn3.registerFunction('format-number', @xqFunctionFormat_Number, ['($value as xs:numeric?, $picture as xs:string) as xs:string', '(	$value	 as xs:numeric?, $picture	 as xs:string,$decimal-format-name	 as xs:string?) as xs:string']);
+  fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, [[integerOrEmpty, stringt, stringt],  [integerOrEmpty, stringt, stringOrEmpty, stringt]]);
+  fn3.registerFunction('format-dateTime', @xqFunctionFormat_DateTime, [[dateTimeOrEmpty, stringt, stringOrEmpty],  [dateTimeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]]);
+  fn3.registerFunction('format-date', @xqFunctionFormat_Date, [[dateOrEmpty, stringt, stringOrEmpty],  [dateOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]]);
+  fn3.registerFunction('format-time', @xqFunctionFormat_Time, [[timeOrEmpty, stringt, stringOrEmpty],  [timeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]]);
+  fn3.registerFunction('format-number', @xqFunctionFormat_Number, [[numericOrEmpty, stringt, stringt],  [numericOrEmpty, stringt, stringOrEmpty, stringt]]);
 
-  fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, ['($name as xs:QName, $arity as xs:integer) as function(*)?']);
-  fn3.registerFunction('function-name', @xqFunctionFunction_Name, ['($func as function(*)) as xs:QName?']);
-  fn3.registerFunction('function-arity', @xqFunctionFunction_Arity, ['($func as function(*)) as xs:integer']);
+  fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, [QName, integer, functiontOrEmpty]);
+  fn3.registerFunction('function-name', @xqFunctionFunction_Name, [functiont, QNameOrEmpty]);
+  fn3.registerFunction('function-arity', @xqFunctionFunction_Arity, [functiont, integer]);
 
+  //[itemStar, functiont, itemStar]
   fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
+  //[itemStar, functiont, itemStar]
   fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
-  fn3.registerFunction('fold-left', @xqFunctionFold_left, ['($seq as item()*, $zero as item()*, $f as function(item()*, item()) as item()*) as item()*']);
-  fn3.registerFunction('fold-right', @xqFunctionFold_right, ['($seq as item()*, $zero 	 as item()*, $f 	 as function(item(), item()*) as item()*) as item()*']);
-  fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, ['($seq1 as item()*, $seq2 as item()*, $f as function(item(), item()) as item()*) as item()*']);
+  fn3.registerFunction('fold-left', @xqFunctionFold_left, [itemStar, itemStar, functionItemStarItemItemStar, itemStar]);
+  fn3.registerFunction('fold-right', @xqFunctionFold_right, [itemStar, itemStar, functionItemItemStarItemStar, itemStar]);
+  fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, [itemStar, itemStar, functionItemItemItemStar, itemStar]);
 
-  fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable, ['($name as xs:string) as xs:string?']);
-  fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables, ['() as xs:string*']);
+  fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable, [stringt, stringOrEmpty]);
+  fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables, [stringStar]);
 
-  fn3.registerFunction('parse-xml', @xqFunctionParse_XML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, ['($arg as xs:string?) as document-node(element(*))?'], [xqcdFocusItem]);
-  fn3.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '($arg as item()*,$params as element(Q{http://www.w3.org/2010/xslt-xquery-serialization}serialization-parameters)?) as xs:string']);
-  fn3_1.registerFunction('serialize', @xqFunctionSerialize, ['($arg as item()*) as xs:string', '($arg as item()*,$params as item()?) as xs:string']);
+  fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [stringOrEmpty, documentElementNodeOrEmpty], [xqcdFocusItem]);
+  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [stringOrEmpty, documentElementNodeOrEmpty], [xqcdFocusItem]);
+  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [stringOrEmpty, documentElementNodeOrEmpty], [xqcdFocusItem]);
+  fn3.registerFunction('serialize', @xqFunctionSerialize, [[itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]]);
+  fn3_1.registerFunction('serialize', @xqFunctionSerialize, [[itemStar, stringt],  [itemStar, itemOrEmpty, stringt]]);
 
-  fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, ['($href as xs:string?) as xs:string?', '($href as xs:string?, $encoding as xs:string) as xs:string?'], []);
-  fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, ['($href as xs:string?) as xs:boolean', '($href as xs:string?, $encoding as xs:string) as xs:boolean'], []);
+  fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, [[stringOrEmpty, stringOrEmpty],  [stringOrEmpty, stringt, stringOrEmpty]], []);
+  fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, [[stringOrEmpty, boolean],  [stringOrEmpty, stringt, boolean]], []);
   fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?) as xs:string*',                          'x:lines(fn:unparsed-text($href           ))');
   fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?, $encoding as xs:string) as xs:string*',  'x:lines(fn:unparsed-text($href, $encoding))');
 
@@ -7300,57 +7310,57 @@ begin
   x.registerInterpretedFunction('cps', '($list as item()*) as item()*',  '$list ! (typeswitch (.) case xs:decimal|xs:double|xs:float return codepoints-to-string(.) default return string-to-codepoints(.))');
 
 
-  fn3.registerFunction('generate-id', @xqFunctionGenerateId, ['() as xs:string', '($arg as node()?) as xs:string']);
+  fn3.registerFunction('generate-id', @xqFunctionGenerateId, [[stringt],  [nodeOrEmpty, stringt]]);
   fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())']);
 
   //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
 
-  fn3_1.registerFunction('apply', @xqFunctionApply, ['($function as function(*), $array as array(*)) as item()*']);
-  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, ['($input as xs:string*, $token as xs:string) as xs:boolean', '($input 	 as xs:string*, $token 	 as xs:string, $collation 	 as xs:string) as xs:boolean']);
-  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, ['() as xs:language']);
-  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date, ['($value as xs:string?) as xs:dateTime?']);
-  fn3_1.registerFunction('sort', @xqFunctionSort, ['($input as item()*) as item()*', '($input as item()*, $collation as xs:string?) as item()*', '($input as item()*, $collation 	 as xs:string?, $key as function(item()) as xs:anyAtomicType*) as item()*']);
-  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1,['($input as xs:string?) as xs:string*']);
-  fn3_1.registerFunction('trace', @xqFunctionTrace, ['($value as item()*) as item()*']);
-  fn3_1.registerFunction('error', @xqFunctionError,['($error as xs:QName?) as none']);
-  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, ['($key as xs:string) as xs:base64Binary', '($key as xs:string, $collation as xs:string) as xs:base64Binary']);
+  fn3_1.registerFunction('apply', @xqFunctionApply, [functiont, arrayt, itemStar]);
+  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [[stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]]);
+  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, [language]);
+  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date, [stringOrEmpty, dateTimeOrEmpty]);
+  fn3_1.registerFunction('sort', @xqFunctionSort, [[itemStar, itemStar],  [itemStar, stringOrEmpty, itemStar],  [itemStar, stringOrEmpty, functionItemAtomicStar, itemStar]]);
+  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1,[stringOrEmpty, stringStar]);
+  fn3_1.registerFunction('trace', @xqFunctionTrace, [itemStar, itemStar]);
+  fn3_1.registerFunction('error', @xqFunctionError, [QNameOrEmpty, none]);
+  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, [[stringt, base64Binary],  [stringt, stringt, base64Binary]]);
 
-  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, ['($href as xs:string?) as item()?',  '($href as xs:string?, $options as map(*)) as item()?']);
-  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, ['($json-text as xs:string?) as item()?',  '($json-text as xs:string?, $options as map(*)) as item()?']);
+  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [[stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]]);
+  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [[stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]]);
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   TXQueryEngine.registerNativeModule(fnarray);
-  fnarray.registerFunction('size', @xqFunctionArraySize, ['($array as array(*)) as xs:integer']);
-  fnarray.registerFunction('get', @xqFunctionArrayGet, ['($array as array(*), $position as xs:integer) as item()*']);
-  fnarray.registerFunction('put', @xqFunctionArrayPut, ['( $array as array(*), $position as xs:integer, $member as item()*) as array(*)']);
-  fnarray.registerFunction('append', @xqFunctionArrayAppend, ['($array as array(*), $appendage as item()*) as array(*)']);
-  fnarray.registerFunction('subarray', @xqFunctionArraySubarray, ['($array as array(*), $start as xs:integer) as array(*)', '($array as array(*),$start as xs:integer,$length as xs:integer) as array(*)']);
-  fnarray.registerFunction('remove', @xqFunctionArrayRemove, ['($array as array(*), $positions as xs:integer*) as array(*)']);
-  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before, ['( $array as array(*), $position as xs:integer, $member as item()*) as array(*)']);
-  fnarray.registerFunction('head', @xqFunctionArrayHead, ['($array as array(*)) as item()*']);
-  fnarray.registerFunction('tail', @xqFunctionArrayTail, ['($array as array(*)) as array(*)']);
-  fnarray.registerFunction('reverse', @xqFunctionArrayReverse, ['($array as array(*)) as array(*)']);
-  fnarray.registerFunction('join', @xqFunctionArrayJoin, ['($arrays as array(*)*) as array(*)']);
-  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, ['( $array as array(*), $action as function(item()*) as item()*) as array(*)']);
-  fnarray.registerFunction('filter', @xqFunctionArrayFilter, ['( $array as array(*), $function as function(item()*) as xs:boolean) as array(*)']);
-  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, ['( $array as array(*),$zero as item()*,$function as function(item()*, item()*) as item()*) as item()*']);
-  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, ['( $array as array(*),$zero as item()*,$function as function(item()*, item()*) as item()*) as item()*']);
-  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, ['( $array1 as array(*),$array2 as array(*),$function as function(item()*, item()*) as item()*) as array(*)']);
-  fnarray.registerFunction('sort', @xqFunctionArraySort, ['($array as array(*)) as array(*)', '($array as array(*), $collation as xs:string?) as array(*)', '( $array as array(*), $collation as xs:string?, $key as function(item()*) as xs:anyAtomicType*) as array(*)']);
-  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten, ['($input as item()*) as item()*']);
+  fnarray.registerFunction('size', @xqFunctionArraySize, [arrayt, integer]);
+  fnarray.registerFunction('get', @xqFunctionArrayGet, [arrayt, integer, itemStar]);
+  fnarray.registerFunction('put', @xqFunctionArrayPut, [arrayt, integer, itemStar, arrayt]);
+  fnarray.registerFunction('append', @xqFunctionArrayAppend, [arrayt, itemStar, arrayt]);
+  fnarray.registerFunction('subarray', @xqFunctionArraySubarray, [[arrayt, integer, arrayt],  [arrayt, integer, integer, arrayt]]);
+  fnarray.registerFunction('remove', @xqFunctionArrayRemove, [arrayt, integerStar, arrayt]);
+  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before, [arrayt, integer, itemStar, arrayt]);
+  fnarray.registerFunction('head', @xqFunctionArrayHead, [arrayt, itemStar]);
+  fnarray.registerFunction('tail', @xqFunctionArrayTail, [arrayt, arrayt]);
+  fnarray.registerFunction('reverse', @xqFunctionArrayReverse, [arrayt, arrayt]);
+  fnarray.registerFunction('join', @xqFunctionArrayJoin, [arrayStar, arrayt]);
+  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, [arrayt, functionItemStarItemStar, arrayt]);
+  fnarray.registerFunction('filter', @xqFunctionArrayFilter, [arrayt, functionItemStarBoolean, arrayt]);
+  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, [arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
+  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, [arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
+  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, [arrayt, arrayt, functionItemStarItemStarItemStar, arrayt]);
+  fnarray.registerFunction('sort', @xqFunctionArraySort, [[arrayt, arrayt],  [arrayt, stringOrEmpty, arrayt],  [arrayt, stringOrEmpty, functionItemStarAtomicStar, arrayt]]);
+  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten, [itemStar, itemStar]);
 
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   TXQueryEngine.registerNativeModule(fnmap);
-  fnmap.registerFunction('merge', @xqFunctionMapMerge, ['($maps as map(*)*) as map(*)', '($maps as map(*)*,$options as map(*)) as map(*)']);
-  fnmap.registerFunction('size', @xqFunctionMapSize, ['($map as map(*)) as xs:integer']);
-  fnmap.registerFunction('keys', @xqFunctionMapKeys, ['($map as map(*)) as xs:anyAtomicType*']);
-  fnmap.registerFunction('contains', @xqFunctionMapContains, ['($map as map(*),$key as xs:anyAtomicType) as xs:boolean']);
-  fnmap.registerFunction('get', @xqFunctionMapGet, ['($map as map(*),$key as xs:anyAtomicType) as item()*']);
-  fnmap.registerFunction('find', @xqFunctionMapFind, ['($input as item()*,$key as xs:anyAtomicType) as array(*)']);
-  fnmap.registerFunction('put', @xqFunctionMapPut, ['($map as map(*),$key as xs:anyAtomicType, $value as item()*) as map(*)']);
-  fnmap.registerFunction('entry', @xqFunctionMapEntry, ['($key as xs:anyAtomicType,$value as item()*) as map(*)']);
-  fnmap.registerFunction('remove', @xqFunctionMapRemove, ['($map as map(*),$keys as xs:anyAtomicType*) as map(*)']);
-  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, ['($map as map(*),$action as function(xs:anyAtomicType, item()*) as item()*) as item()*']);
+  fnmap.registerFunction('merge', @xqFunctionMapMerge, [[mapStar, map],  [mapStar, map, map]]);
+  fnmap.registerFunction('size', @xqFunctionMapSize, [map, integer]);
+  fnmap.registerFunction('keys', @xqFunctionMapKeys, [map, atomicStar]);
+  fnmap.registerFunction('contains', @xqFunctionMapContains, [map, atomic, boolean]);
+  fnmap.registerFunction('get', @xqFunctionMapGet, [map, atomic, itemStar]);
+  fnmap.registerFunction('find', @xqFunctionMapFind, [itemStar, atomic, arrayt]);
+  fnmap.registerFunction('put', @xqFunctionMapPut, [map, atomic, itemStar, map]);
+  fnmap.registerFunction('entry', @xqFunctionMapEntry, [atomic, itemStar, map]);
+  fnmap.registerFunction('remove', @xqFunctionMapRemove, [map, atomicStar, map]);
+  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, [map, functionAtomicItemStarItemStar, itemStar]);
 
 
 
@@ -7360,68 +7370,70 @@ begin
   //For *, +  functions with reverted argument order were added (since the order does not matter )
   //For eq/ne/.. boolean and string cases were added
 
-  op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [], []);
-  op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [], []);
-  op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [], []).acceptedModels := PARSING_MODEL3;
+  op.registerBinaryOp('/',@xqvalueNodeStepChild,300, [xqofAssociativeSyntax], [xqcdFocusItem]);
+  op.registerBinaryOp('//',@xqvalueNodeStepDescendant,300, [xqofAssociativeSyntax], [xqcdFocusItem]);
+  op.registerBinaryOp('!',@xqvalueSimpleMap,300, [xqofAssociativeSyntax], [xqcdFocusItem]).acceptedModels := PARSING_MODEL3;
 
-  op.registerBinaryOp('unary~hack-', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
-  op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], ['($x as empty-sequence(), $arg as numeric?) as numeric?'], []);
+  op.registerBinaryOp('unary~hack-', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
+  op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
 
-  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax, xqofSpecialParsing], [], []).acceptedModels:= PARSING_MODEL3_1;
+  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax, xqofSpecialParsing], []).acceptedModels:= PARSING_MODEL3_1;
 
-  op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], [], []);
-  op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], [], []);
-  op.registerBinaryOp('treat as',@xqvalueTreatAs,150, [], [], []);
-  op.registerBinaryOp('instance of',@xqvalueInstanceOf,140, [], [], []);
+  op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], []);
+  op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], []);
+  op.registerBinaryOp('treat as',@xqvalueTreatAs,150, [], []);
+  op.registerBinaryOp('instance of',@xqvalueInstanceOf,140, [], []);
 
-  op.registerBinaryOp('intersect',@xqvalueIntersect,125, [xqofAssociativeSyntax], ['intersect($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
-  op.registerBinaryOp('except',@xqvalueExcept,125,[xqofAssociativeSyntax],['except($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
+  op.registerBinaryOp('intersect',@xqvalueIntersect,125, [xqofAssociativeSyntax], [nodeStar, nodeStar, nodeStar], []);
+  op.registerBinaryOp('except',@xqvalueExcept,125,[xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
 
-  op.registerBinaryOp('|',@xqvalueUnion,115, [xqofAssociativeSyntax],['union($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
-  op.registerBinaryOp('union',@xqvalueUnion,115, [xqofAssociativeSyntax],['union($parameter1 as node()*, $parameter2 as node()*) as node()*'], []);
-
-
-  op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-integer-divide($arg1 as numeric?, $arg2 as numeric?) as xs:integer'], []);
-  op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-divide($arg1 as numeric?, $arg2 as numeric?) as numeric', 'divide-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', 'divide-yearMonthDuration-by-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:decimal', 'divide-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', 'divide-dayTimeDuration-by-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:decimal'], []);
-  op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-multiply($arg1 as numeric?, $arg2 as numeric?) as numeric', 'multiply-yearMonthDuration($arg1 as xs:yearMonthDuration?, $arg2 as xs:double?) as xs:yearMonthDuration', '($arg2 as xs:double?, $arg1 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'multiply-dayTimeDuration($arg1 as xs:dayTimeDuration?, $arg2 as xs:double?) as xs:dayTimeDuration', '($arg2 as xs:double?, $arg1 as xs:dayTimeDuration?) as xs:dayTimeDuration'], []);
-  op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-mod($arg1 as numeric?, $arg2 as numeric?) as numeric'], []);
-
-  op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-add($arg1 as numeric?, $arg2 as numeric?) as numeric', 'add-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'add-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'add-yearMonthDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'add-dayTimeDuration-to-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'add-yearMonthDuration-to-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'add-dayTimeDuration-to-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'add-dayTimeDuration-to-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time', {reverted: } '($arg2 as xs:yearMonthDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:dateTime?) as xs:dateTime', '($arg2 as xs:yearMonthDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:date?) as xs:date', '($arg2 as xs:dayTimeDuration?, $arg1 as xs:time?) as xs:time'], []);
-  op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],['numeric-subtract($arg1 as numeric?, $arg2 as numeric?) as numeric', 'subtract-yearMonthDurations($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:yearMonthDuration', 'subtract-dayTimeDurations($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:dayTimeDuration', 'subtract-dateTimes($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:dayTimeDuration', 'subtract-dates($arg1 as xs:date?, $arg2 as xs:date?) as xs:dayTimeDuration', 'subtract-times($arg1 as xs:time?, $arg2 as xs:time?) as xs:dayTimeDuration', 'subtract-yearMonthDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:yearMonthDuration?) as xs:dateTime', 'subtract-dayTimeDuration-from-dateTime($arg1 as xs:dateTime?, $arg2 as xs:dayTimeDuration?) as xs:dateTime', 'subtract-yearMonthDuration-from-date($arg1 as xs:date?, $arg2 as xs:yearMonthDuration?) as xs:date', 'subtract-dayTimeDuration-from-date($arg1 as xs:date?, $arg2 as xs:dayTimeDuration?) as xs:date', 'subtract-dayTimeDuration-from-time($arg1 as xs:time?, $arg2 as xs:dayTimeDuration?) as xs:time'], []);
-
-  op.registerBinaryOp('to',@xqvalueTo,60,[],['to($firstval as xs:integer?, $lastval as xs:integer?) as xs:integer*'], []);
-
-  op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],['($arg1 as xs:anyAtomicType?, $arg2 as xs:anyAtomicType?) as xs:string'], []).acceptedModels:=PARSING_MODEL3;
+  op.registerBinaryOp('|',@xqvalueUnion,115, [xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
+  op.registerBinaryOp('union',@xqvalueUnion,115, [xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
 
 
-  op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString],['numeric-equal($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', 'duration-equal($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', 'dateTime-equal($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', 'date-equal($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', 'time-equal($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', 'gYearMonth-equal($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', 'gYear-equal($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', 'gMonthDay-equal($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', 'gMonth-equal($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', 'gDay-equal($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', 'QName-equal($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', 'hexBinary-equal($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', 'base64Binary-equal($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', 'NOTATION-equal($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString], ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:duration?, $arg2 as xs:duration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($arg1 as xs:gYearMonth?, $arg2 as xs:gYearMonth?) as xs:boolean', '($arg1 as xs:gYear?, $arg2 as xs:gYear?) as xs:boolean', '($arg1 as xs:gMonthDay?, $arg2 as xs:gMonthDay?) as xs:boolean', '($arg1 as xs:gMonth?, $arg2 as xs:gMonth?) as xs:boolean', '($arg1 as xs:gDay?, $arg2 as xs:gDay?) as xs:boolean', '($arg1 as xs:QName?, $arg2 as xs:QName?) as xs:boolean', '($value1 as xs:hexBinary?, $value2 as xs:hexBinary?) as xs:boolean', '($value1 as xs:base64Binary?, $value2 as xs:base64Binary?) as xs:boolean', '($arg1 as xs:NOTATION?, $arg2 as xs:NOTATION?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[numericOrEmpty, numericOrEmpty, integer], []);
+  op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, decimal],  [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, decimal]], []);
+  op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration],  [doubleOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration],  [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration],  [doubleOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]], []);
+  op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [numericOrEmpty, numericOrEmpty, numeric], []);
 
-  templt := op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],    ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
-  op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
-  op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
+  op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration],  [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime],  [dateOrEmpty, yearMonthDurationOrEmpty, date],  [dateOrEmpty, dayTimeDurationOrEmpty, date],  [timeOrEmpty, dayTimeDurationOrEmpty, time],  [yearMonthDurationOrEmpty, dateTimeOrEmpty, dateTime],  [dayTimeDurationOrEmpty, dateTimeOrEmpty, dateTime],  [yearMonthDurationOrEmpty, dateOrEmpty, date],  [dayTimeDurationOrEmpty, dateOrEmpty, date],  [dayTimeDurationOrEmpty, timeOrEmpty, time]], []);
+  op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration],  [dateTimeOrEmpty, dateTimeOrEmpty, dayTimeDuration],  [dateOrEmpty, dateOrEmpty, dayTimeDuration],  [timeOrEmpty, timeOrEmpty, dayTimeDuration],  [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime],  [dateOrEmpty, yearMonthDurationOrEmpty, date],  [dateOrEmpty, dayTimeDurationOrEmpty, date],  [timeOrEmpty, dayTimeDurationOrEmpty, time]], []);
 
-  templt := op3_1.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],    ['($arg1 as numeric?, $arg2 as numeric?) as xs:boolean', '($arg1 as xs:yearMonthDuration?, $arg2 as xs:yearMonthDuration?) as xs:boolean', '($arg1 as xs:dayTimeDuration?, $arg2 as xs:dayTimeDuration?) as xs:boolean', '($arg1 as xs:dateTime?, $arg2 as xs:dateTime?) as xs:boolean', '($arg1 as xs:date?, $arg2 as xs:date?) as xs:boolean', '($arg1 as xs:time?, $arg2 as xs:time?) as xs:boolean', '($a as xs:string?, $b as xs:string?) as xs:boolean', '($a as xs:boolean?, $b as xs:boolean?) as xs:boolean', '($a as xs:hexBinary?, $b as xs:hexBinary?) as xs:boolean', '($a as xs:base64Binary?, $b as xs:base64Binary?) as xs:boolean'], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op3_1.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
-  op3_1.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
-  op3_1.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersions(templt.versions);
+  op.registerBinaryOp('to',@xqvalueTo,60,[],[integerOrEmpty, integerOrEmpty, integerStar], []);
 
-  op.registerBinaryOp('=',@xqvalueEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('<',@xqvalueLessThanGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,[],[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('is',@xqvalueSameNode,50,[],['is-same-node($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
-  op.registerBinaryOp('<<',@xqvalueNodeBefore,50,[],['node-before($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
-  op.registerBinaryOp('>>',@xqvalueNodeAfter,50,[],['node-after($parameter1 as node()?, $parameter2 as node()?) as xs:boolean'], []);
+  op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],[atomicOrEmpty, atomicOrEmpty, stringt], []).acceptedModels:=PARSING_MODEL3;
+
+
+  op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString],  [[numericOrEmpty, numericOrEmpty, boolean],  [durationOrEmpty, durationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [gYearMonthOrEmpty, gYearMonthOrEmpty, boolean],  [gYearOrEmpty, gYearOrEmpty, boolean],  [gMonthDayOrEmpty, gMonthDayOrEmpty, boolean],  [gMonthOrEmpty, gMonthOrEmpty, boolean],  [gDayOrEmpty, gDayOrEmpty, boolean],  [QNameOrEmpty, QNameOrEmpty, boolean],  [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean],  [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean],  [NOTATIONOrEmpty, NOTATIONOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString],[[numericOrEmpty, numericOrEmpty, boolean],  [durationOrEmpty, durationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [gYearMonthOrEmpty, gYearMonthOrEmpty, boolean],  [gYearOrEmpty, gYearOrEmpty, boolean],  [gMonthDayOrEmpty, gMonthDayOrEmpty, boolean],  [gMonthOrEmpty, gMonthOrEmpty, boolean],  [gDayOrEmpty, gDayOrEmpty, boolean],  [QNameOrEmpty, QNameOrEmpty, boolean],  [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean],  [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean],  [NOTATIONOrEmpty, NOTATIONOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+
+  templt := op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],  [[numericOrEmpty, numericOrEmpty, boolean],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+
+  templt := op3_1.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],[[numericOrEmpty, numericOrEmpty, boolean],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean],  [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean],  [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op3_1.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op3_1.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+  op3_1.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
+
+  op.registerBinaryOp('=',@xqvalueEqualGeneric,50,[],[xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('!=',@xqvalueUnequalGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('<',@xqvalueLessThanGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('>',@xqvalueGreaterThanGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('<=',@xqvalueLessEqualGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('>=',@xqvalueGreaterEqualGeneric,50,[], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  op.registerBinaryOp('is',@xqvalueSameNode,50,[],[nodeOrEmpty, nodeOrEmpty, boolean], []);
+  op.registerBinaryOp('<<',@xqvalueNodeBefore,50,[],[nodeOrEmpty, nodeOrEmpty, boolean], []);
+  op.registerBinaryOp('>>',@xqvalueNodeAfter,50,[],[nodeOrEmpty, nodeOrEmpty, boolean], []);
 
   op.registerBinaryOp('and',@xqvalueAndPlaceholder,40,[xqofAssociativeSyntax],[]);
 
   op.registerBinaryOp('or',@xqvalueOrPlaceholder,30,[xqofAssociativeSyntax],[]);
 
-  op.registerBinaryOp(':=',@xqvalueAssignment,20,[xqofAssociativeSyntax],[]);
+  op.registerBinaryOp(':=',@xqvalueAssignment,20,[xqofAssociativeSyntax]);
+
+  end;
 end;
 
 procedure finalizeFunctions;

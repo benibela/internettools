@@ -314,22 +314,24 @@ begin
 
   module := TXQNativeModule.create(XMLNamespace_Math);
 
-  module.registerFunction('pi', @mathPi, ['() as xs:double']);
-  module.registerFunction('exp', @mathExp, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('exp10', @mathExp10, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('log', @mathLog, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('log10', @mathLog10, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('sqrt', @mathSqrt, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('sin', @mathSin, ['($θ as xs:double?) as xs:double?']);
-  module.registerFunction('cos', @mathCos, ['($θ as xs:double?) as xs:double?']);
-  module.registerFunction('tan', @mathTan, ['($θ as xs:double?) as xs:double?']);
-  module.registerFunction('asin', @mathAsin, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('acos', @mathAcos, ['($arg as xs:double?) as xs:double?']);
-  module.registerFunction('atan', @mathAtan, ['($arg as xs:double?) as xs:double?']);
-  baseSchema.show('numeric');
-  module.registerFunction('pow', @mathPow, ['($x as xs:double?, $y as numeric) as xs:double?']);
-  baseSchema.hide('numeric');
-  module.registerFunction('atan2', @mathAtan2, ['($y as xs:double, $x as xs:double) as xs:double']);
+  with globalTypes do begin
+    module.registerFunction('pi', @mathPi, [double]);
+    module.registerFunction('exp', @mathExp, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('exp10', @mathExp10, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('log', @mathLog, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('log10', @mathLog10, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('sqrt', @mathSqrt, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('sin', @mathSin, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('cos', @mathCos, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('tan', @mathTan, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('asin', @mathAsin, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('acos', @mathAcos, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('atan', @mathAtan, [doubleOrEmpty, doubleOrEmpty]);
+    baseSchema.show('numeric');
+    module.registerFunction('pow', @mathPow, [doubleOrEmpty, numeric, doubleOrEmpty]);
+    baseSchema.hide('numeric');
+    module.registerFunction('atan2', @mathAtan2, [double, double, double]);
+  end;
 
   TXQueryEngine.registerNativeModule(module);
   GlobalStaticNamespaces.add(XMLNamespace_Math);

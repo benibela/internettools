@@ -202,125 +202,142 @@ initialization
   //XMLNamespace_JSONiqTypes:=TNamespace.create('http://jsoniq.org/updates', 'jupd');
 
 
-  jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
-  TXQueryEngine.registerNativeModule(jn);
-  jn.registerFunction('keys', @xqFunctionKeys, ['($arg as item()*) as xs:string*']);
-  jn.registerFunction('members', @xqFunctionMembers, ['($arg as item()*) as item()*']);
+  with globalTypes do begin
+    jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
+    TXQueryEngine.registerNativeModule(jn);
+    jn.registerFunction('keys', @xqFunctionKeys, [itemStar, stringStar]);
+    jn.registerFunction('members', @xqFunctionMembers, [itemStar, itemStar]);
 
-  //TODO: fn:string/fn:data errors
-  //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
-  //TODO:  6.9. jn:json-doc
-//  jn.registerFunction('encode-for-roundtrip', @xqFunctionEncode_For_Roundtrip, ['jn:encode-for-roundtrip($items as item()*) as json-item()* ', 'jn:encode-for-roundtrip($items as item()*, $options as object()) as json-item()* ']);
-  jn.registerFunction('is-null', @xqFunctionIsNull, ['($arg as item()) as xs:boolean']);
-  jn.registerFunction('json-doc', @xqFunctionJSON_Doc, ['($uri as xs:string?) as json-item()?'], [xqcdContextOther]);
-  jn.registerFunction('null', @xqFunctionNull, ['() as xs:null']);
-  jn.registerFunction('object', 0, -1, @xqFunctionObject, []); //deprecated
-  jn.registerFunction('parse-json', @xqFunctionParseJson, ['($arg as xs:string?) as json-item()*', '($arg as xs:string?, $options as object()) as json-item()*']);
-  jn.registerFunction('size', @xqFunctionSize, ['($arg as array()?) as xs:integer?']);
+    //TODO: fn:string/fn:data errors
+    //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
+    //TODO:  6.9. jn:json-doc
+  //  jn.registerFunction('encode-for-roundtrip', @xqFunctionEncode_For_Roundtrip, ['jn:encode-for-roundtrip($items as item()*) as json-item()* ', 'jn:encode-for-roundtrip($items as item()*, $options as object()) as json-item()* ']);
+    jn.registerFunction('is-null', @xqFunctionIsNull, [item, boolean]);
+    jn.registerFunction('json-doc', @xqFunctionJSON_Doc, [stringOrEmpty, jsonItemOrEmpty], [xqcdContextOther]);
+    jn.registerFunction('null', @xqFunctionNull, [null]);
+    jn.registerFunction('object', 0, -1, @xqFunctionObject, []); //deprecated
+    jn.registerFunction('parse-json', @xqFunctionParseJson, [[stringOrEmpty, jsonitemStar],  [stringOrEmpty, map, jsonItemStar]]);
+    jn.registerFunction('size', @xqFunctionSize, [arrayOrEmpty, integerOrEmpty]);
 
-  pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
-  pxp.registerFunction('json', @xqFunctionJson, ['($arg as xs:string) as item()*', '($arg as xs:string, $options as object()) as item()*'], [xqcdContextOther]);
+    pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
+    pxp.registerFunction('json', @xqFunctionJson, [[stringt, itemStar],  [stringt, map, itemStar]], [xqcdContextOther]);
 
+    {[itemStar, map]
+descendant-arrays
+[itemStar, arrayStar]
+descendant-objects
+[itemStar, mapStar]
+descendant-pairs
+[itemStar, itemStar]
+flatten
+[itemStar, itemStar]
+intersect
+[itemStar, map]
+project
+[itemStar, stringStar, itemStar]
+remove-keys
+[itemStar, stringStar, itemStar]
+values
+[itemStar, itemStar]}
 
+    XMLNamespace_JSONiqLibraryFunctions:=TNamespace.makeWithRC1('http://jsoniq.org/function-library', 'libjn');
+    libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
+  //new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
+    {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()',
+      'jn:object( ' +
+        ' let $o := for $p in $seq '+
+                    'return if ($p instance of object()) then $p else ()'+
+           ', $all-keys := for $object in $o return jn:keys($object)' +
+         'for $distinct-key in distinct-values($all-keys) '+
+         'let $values := $o($distinct-key) '+
+         'return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
+    //old accumulate function: libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
 
-  XMLNamespace_JSONiqLibraryFunctions:=TNamespace.makeWithRC1('http://jsoniq.org/function-library', 'libjn');
-  libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
-//new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
-  {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()',
-    'jn:object( ' +
-      ' let $o := for $p in $seq '+
-                  'return if ($p instance of object()) then $p else ()'+
-         ', $all-keys := for $object in $o return jn:keys($object)' +
-       'for $distinct-key in distinct-values($all-keys) '+
-       'let $values := $o($distinct-key) '+
-       'return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
-  //old accumulate function: libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
+    libjn.registerInterpretedFunction('descendant-arrays', '($seq as item()*) as array()*',
+        'for $i in $seq ' +
+        'return typeswitch ($i) ' +
+        'case array() return ( ' +
+        '  $i, ' +
+        '  libjn:descendant-arrays(jn:members($i)) ' +
+        ') ' +
+        'case object() ' +
+        '    return libjn:descendant-arrays(libjn:values($i)) ' +
+        'default return () ');
 
-  libjn.registerInterpretedFunction('descendant-arrays', '($seq as item()*) as array()*',
+    libjn.registerInterpretedFunction('descendant-objects', '($seq as item()*) as object()*',
+        'for $i in $seq ' +
+        'return typeswitch ($i) ' +
+        'case object() return ( ' +
+        '  $i, ' +
+        '  libjn:descendant-objects(libjn:values($i)) ' +
+        ') ' +
+        'case array() return ' +
+        '    libjn:descendant-objects(jn:members($i)) ' +
+        'default return () ');
+    libjn.registerInterpretedFunction('descendant-pairs', '($seq as item()*) as item()*',
+        'for $i in $seq ' +
+        'return typeswitch ($i) ' +
+        'case object() return ' +
+        '  for $k in jn:keys($i) ' +
+        '  let $v := $i($k) ' +
+        '  return ( ' +
+        '    { $k : $v }, ' +
+        '    libjn:descendant-pairs($v) ' +
+        '  ) ' +
+        'case array() return ' +
+        '  libjn:descendant-pairs(jn:members($i)) ' +
+        'default return () '
+    );
+    libjn.registerInterpretedFunction('flatten', '($seq as item()*) as item()* ',
       'for $i in $seq ' +
-      'return typeswitch ($i) ' +
-      'case array() return ( ' +
-      '  $i, ' +
-      '  libjn:descendant-arrays(jn:members($i)) ' +
-      ') ' +
-      'case object() ' +
-      '    return libjn:descendant-arrays(libjn:values($i)) ' +
-      'default return () ');
-
-  libjn.registerInterpretedFunction('descendant-objects', '($seq as item()*) as object()*',
-      'for $i in $seq ' +
-      'return typeswitch ($i) ' +
-      'case object() return ( ' +
-      '  $i, ' +
-      '  libjn:descendant-objects(libjn:values($i)) ' +
-      ') ' +
-      'case array() return ' +
-      '    libjn:descendant-objects(jn:members($i)) ' +
-      'default return () ');
-  libjn.registerInterpretedFunction('descendant-pairs', '($seq as item()*) as item()*',
-      'for $i in $seq ' +
-      'return typeswitch ($i) ' +
-      'case object() return ' +
-      '  for $k in jn:keys($i) ' +
-      '  let $v := $i($k) ' +
-      '  return ( ' +
-      '    { $k : $v }, ' +
-      '    libjn:descendant-pairs($v) ' +
-      '  ) ' +
-      'case array() return ' +
-      '  libjn:descendant-pairs(jn:members($i)) ' +
-      'default return () '
-  );
-  libjn.registerInterpretedFunction('flatten', '($seq as item()*) as item()* ',
-    'for $i in $seq ' +
-    'return ' +
-    '  typeswitch ($i) ' +
-    '  case array() return libjn:flatten(jn:members($i)) ' +
-    '  default return $i '
-  );
-  libjn.registerInterpretedFunction('intersect', '($seq as item()*) as object()',
-    '{| ' +
-    '  let $objects := $seq[. instance of object()] ' +
-    '  for $key in jn:keys(($objects)[1]) ' +
-    '  where every $object in ($objects)[position() > 1] ' +
-    '        satisfies exists(index-of(jn:keys($object), $key)) ' +
-    '  return { $key : $objects($key) } ' +
-    '|} '
-  );
+      'return ' +
+      '  typeswitch ($i) ' +
+      '  case array() return libjn:flatten(jn:members($i)) ' +
+      '  default return $i '
+    );
+    libjn.registerInterpretedFunction('intersect', '($seq as item()*) as object()',
+      '{| ' +
+      '  let $objects := $seq[. instance of object()] ' +
+      '  for $key in jn:keys(($objects)[1]) ' +
+      '  where every $object in ($objects)[position() > 1] ' +
+      '        satisfies exists(index-of(jn:keys($object), $key)) ' +
+      '  return { $key : $objects($key) } ' +
+      '|} '
+    );
 
 
-  libjn.registerInterpretedFunction('project', '($seq as item()*, $keys as xs:string*) as item()*',
-    'for $item in $seq ' +
-    'return typeswitch ($item) ' +
-    '       case $object as object() return ' +
-    '       {| ' +
-    '         for $key in jn:keys($object) ' +
-    '         where some $to-project in $keys satisfies $to-project eq $key ' +
-//    '         let $value := $object($key) ' + requires XQuery 3
-    '         return { $key : $object($key) } ' +
-    '       |} ' +
-    '       default return $item ');
+    libjn.registerInterpretedFunction('project', '($seq as item()*, $keys as xs:string*) as item()*',
+      'for $item in $seq ' +
+      'return typeswitch ($item) ' +
+      '       case $object as object() return ' +
+      '       {| ' +
+      '         for $key in jn:keys($object) ' +
+      '         where some $to-project in $keys satisfies $to-project eq $key ' +
+  //    '         let $value := $object($key) ' + requires XQuery 3
+      '         return { $key : $object($key) } ' +
+      '       |} ' +
+      '       default return $item ');
 
-  libjn.registerInterpretedFunction('remove-keys', '($seq as item()*, $keys as xs:string*) as item()*',
-    'for $item in $seq ' +
-    'return typeswitch ($item) ' +
-    '       case $object as object() return ' +
-    '       {| ' +
-    '         for $key in jn:keys($object) ' +
-    '         where every $to-remove in $keys satisfies $to-remove ne $key ' +
- //   '         let $value := $object($key) ' +
-    '         return { $key : $object($key) } ' +
-    '       |} ' +
-    '       default return $item ');
+    libjn.registerInterpretedFunction('remove-keys', '($seq as item()*, $keys as xs:string*) as item()*',
+      'for $item in $seq ' +
+      'return typeswitch ($item) ' +
+      '       case $object as object() return ' +
+      '       {| ' +
+      '         for $key in jn:keys($object) ' +
+      '         where every $to-remove in $keys satisfies $to-remove ne $key ' +
+   //   '         let $value := $object($key) ' +
+      '         return { $key : $object($key) } ' +
+      '       |} ' +
+      '       default return $item ');
 
-  libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
-    'for $i in $seq '+
-    'for $k in jn:keys($i) '+
-    'return $i($k)');
+    libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
+      'for $i in $seq '+
+      'for $k in jn:keys($i) '+
+      'return $i($k)');
 
 
-  TXQueryEngine.registerNativeModule(libjn);
-
+    TXQueryEngine.registerNativeModule(libjn);
+  end;
 finalization
   libjn.free;
   jn.free;

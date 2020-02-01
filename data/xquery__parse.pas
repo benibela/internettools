@@ -4393,18 +4393,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           f.init(staticContext);
           exit(true);
         end;
-
-        if argcount = 2 then begin
-          f.func := module.findBinaryOp(alocalname, model);
-          if f.func <> nil then begin
-            binop := TXQTermBinaryOp.create(TXQOperatorInfo(f.func));
-            binop.children := f.children;
-            f.children := nil;
-            f.free;
-            txqterm(f) := binop;
-            exit(true);
-          end;
-        end;
       end;
 
       otherModuleStaticContext := staticContext.findModuleStaticContext(anamespace);

@@ -1249,3 +1249,124 @@ begin
 //  jsonItem, array_, object_: TXSType;
 end;
 
+
+
+
+
+
+
+
+
+
+
+
+
+procedure TXQGlobalTypes.init;
+begin
+  none := nil;
+  empty := TXQTermSequenceType.create(); empty.kind := tikNone;
+  atomic := TXQTermSequenceType.create(baseSchema.anyAtomicType);  atomicOrEmpty := orEmpty(atomic); atomicStar := star(atomic);
+  item := TXQTermSequenceType.create(tikAny); itemStar := star(item); itemOrEmpty := orEmpty(item); itemPlus := star(item); itemPlus.allowNone := false;
+
+  boolean := TXQTermSequenceType.create(baseSchema.boolean); booleanOrEmpty := orEmpty(boolean);
+
+  integer := TXQTermSequenceType.create(baseSchema.integer); integerOrEmpty := orEmpty(integer); integerStar := star(integer);
+  decimal := TXQTermSequenceType.create(baseSchema.decimal); decimalOrEmpty := orEmpty(decimal);
+  double := TXQTermSequenceType.create(baseSchema.double); doubleOrEmpty := orEmpty(double);
+  numeric := TXQTermSequenceType.create(baseSchema.numericPseudoType); numericOrEmpty := orEmpty(numeric);
+
+
+
+  stringt := TXQTermSequenceType.create(baseSchema.string_); stringOrEmpty := orEmpty(stringt); stringStar := star(stringt);
+  untypedAtomic := TXQTermSequenceType.create(baseSchema.untypedAtomic);
+  anyURI := TXQTermSequenceType.create(baseSchema.anyURI); anyURIOrEmpty := orEmpty(anyURI); anyURIStar := star(anyURI);
+  hexBinary := TXQTermSequenceType.create(baseSchema.hexBinary); hexBinaryOrEmpty := orEmpty(hexBinary);
+  base64Binary := TXQTermSequenceType.create(baseSchema.base64Binary); base64BinaryOrEmpty := orEmpty(base64Binary);
+  anyBinary := TXQTermSequenceType.create(tikUnion); anyBinary.push(hexBinary.clone); anyBinary.push(base64Binary.clone);
+  NOTATIONOrEmpty := TXQTermSequenceType.create(baseSchema.NOTATION, true);
+  NCNameOrEmpty := TXQTermSequenceType.create(baseSchema.NCName, true);
+  QName := TXQTermSequenceType.create(baseSchema.QName); QNameOrEmpty := orEmpty(QName);
+  language := TXQTermSequenceType.create(baseSchema.language);
+
+  time := TXQTermSequenceType.create(baseSchema.time); timeOrEmpty := orEmpty(time);
+  date := TXQTermSequenceType.create(baseSchema.date); dateOrEmpty := orEmpty(date);
+  dateTime := TXQTermSequenceType.create(baseSchema.dateTime); dateTimeOrEmpty := orEmpty(dateTime);
+  durationOrEmpty := TXQTermSequenceType.create(baseSchema.duration, true);
+  dayTimeDuration := TXQTermSequenceType.create(baseSchema.dayTimeDuration); dayTimeDurationOrEmpty := orEmpty(dayTimeDuration);
+  yearMonthDuration := TXQTermSequenceType.create(baseSchema.yearMonthDuration); yearMonthDurationOrEmpty := orEmpty(yearMonthDuration);
+  gYearMonthOrEmpty := TXQTermSequenceType.create(baseSchema.gYearMonth, true);
+  gYearOrEmpty := TXQTermSequenceType.create(baseSchema.gYear, true);
+  gMonthDayOrEmpty := TXQTermSequenceType.create(baseSchema.gMonthDay, true);
+  gMonthOrEmpty := TXQTermSequenceType.create(baseSchema.gMonth, true);
+  gDayOrEmpty := TXQTermSequenceType.create(baseSchema.gDay, true);
+
+
+
+  map := TXQTermSequenceType.create(baseJSONiqSchema.object_); mapStar := star(map);
+  arrayt := TXQTermSequenceType.create(baseJSONiqSchema.array_); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
+  null := TXQTermSequenceType.create(baseJSONiqSchema.jsNull);
+  jsonItemOrEmpty := TXQTermSequenceType.create(baseJSONiqSchema.jsonItem, true);  jsonItemStar := star(jsonItemOrEmpty);
+
+  functiont := TXQTermSequenceType.create(tikFunctionTest); functiontOrEmpty := orEmpty(functiont);
+  functionItemAtomicStar := f([item, atomicStar]); functionAtomicItemStarItemStar := f([atomic,itemStar,itemStar]); functionItemStarAtomicStar := f([itemStar,atomicStar]);
+  functionItemStarItemItemStar := f([itemStar,item,itemStar]); functionItemItemStarItemStar := f([item,itemStar,itemStar]); functionItemItemItemStar := f([item,item,itemStar]);
+  functionItemStarItemStar := f([itemStar,itemStar]); functionItemStarBoolean := f([itemStar, boolean]); functionItemStarItemStarItemStar := f([itemStar,itemStar,itemStar]);
+
+  node := TXQTermSequenceType.create(tikElementTest); node.nodeMatching.typ := tneaDirectChild; node.nodeMatching.matching := [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
+  nodeOrEmpty := orEmpty(node); nodeStar := star(node);
+  element := TXQTermSequenceType.create(tikElementTest); element.nodeMatching.typ := tneaDirectChild; element.nodeMatching.matching := [qmElement];
+  elementStar := star(element);
+  documentNodeOrEmpty := TXQTermSequenceType.create(tikElementTest);
+  with documentNodeOrEmpty do begin
+    nodeMatching.typ := tneaDirectChild;
+    nodeMatching.matching := [qmDocument];
+    allowNone := true;
+  end;
+  documentElementNodeOrEmpty := TXQTermSequenceType.create(tikElementTest);
+  with documentElementNodeOrEmpty do begin
+    nodeMatching.typ := tneaDirectChild;
+    nodeMatching.matching := [qmDocument, qmCheckOnSingleChild];
+    allowNone := true;
+  end;
+  elementSerializationParams := TXQTermSequenceType.create(tikElementTest);
+  with elementSerializationParams do begin
+    nodeMatching.typ := tneaDirectChild;
+    nodeMatching.matching := [qmElement,qmValue,qmCheckNamespaceURL];
+    nodeMatching.value := 'serialization-parameters';
+    nodeMatching.valueHash := nodeNameHash(nodeMatching.value);
+    nodeMatching.namespaceURLOrPrefix := 'http://www.w3.org/2010/xslt-xquery-serialization'
+  end;
+  elementSerializationParamsOrEmpty := orEmpty(elementSerializationParams);
+end;
+
+procedure TXQGlobalTypes.free;
+var
+  i: Integer;
+begin
+  for i := low(cachedTypes) to high(cachedTypes) do begin
+    cachedTypes[i].free;
+  end;
+end;
+
+function TXQGlobalTypes.orEmpty(t: TXQTermSequenceType): TXQTermSequenceType;
+begin
+  result := TXQTermSequenceType(t.clone);
+  result.allowNone := true;
+end;
+
+function TXQGlobalTypes.star(t: TXQTermSequenceType): TXQTermSequenceType;
+begin
+  result := TXQTermSequenceType(t.clone);
+  result.allowNone := true;
+  result.allowMultiple := true;
+end;
+
+function TXQGlobalTypes.f(args: array of TXQTermSequenceType): TXQTermSequenceType;
+var
+  i: Integer;
+begin
+  result := TXQTermSequenceType.create(tikFunctionTest);
+  SetLength(result.arguments, length(args));
+  for i := 0 to high(args) do result.arguments[i] := TXQTermSequenceType(args[i].clone);
+end;
+

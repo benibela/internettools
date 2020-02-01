@@ -2030,18 +2030,18 @@ begin
   t('xs:date("2000-10-30") - xs:yearMonthDuration("P1Y2M")', '1999-08-30', '');
   if ps.StaticContext.namespaces = nil then ps.StaticContext.namespaces := TNamespaceList.create;
   ps.StaticContext.namespaces.add(XMLNamespace_MyExtensionOperators);
-  t('op:subtract-yearMonthDuration-from-date(xs:date("2000-02-29Z"), xs:yearMonthDuration("P1Y"))', '1999-02-28Z', '');
-  t('op:subtract-yearMonthDuration-from-date(xs:date("2000-10-31-05:00"), xs:yearMonthDuration("P1Y1M"))', '1999-09-30-05:00', '');
-  t('op:subtract-yearMonthDuration-from-dateTime(xs:dateTime("2000-10-30T11:12:00"), xs:yearMonthDuration("P1Y2M"))', '1999-08-30T11:12:00', '');
-  t('op:subtract-dayTimeDurations(xs:dayTimeDuration("P2DT12H"), xs:dayTimeDuration("P1DT10H30M"))', 'P1DT1H30M', '');
-  t('op:subtract-yearMonthDurations(xs:yearMonthDuration("P2Y11M"), xs:yearMonthDuration("P3Y3M"))', '-P4M', '');
-  t('op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))', 'P337D', '');
-  t('op:subtract-dateTimes(xs:dateTime("2000-10-30T06:12:00-05:00"), xs:dateTime("1999-11-28T09:00:00Z"))', 'P337DT2H12M', '');
-  t('op:subtract-times(xs:time("11:12:00Z"), xs:time("04:00:00-05:00"))', 'PT2H12M', '');
-  t('op:subtract-times(xs:time("11:00:00-05:00"), xs:time("21:30:00+05:30"))', 'PT0S', '');
-  t('op:subtract-times(xs:time("17:00:00-06:00"), xs:time("08:00:00+09:00"))', 'P1D', '');
-  t('op:subtract-times(xs:time("24:00:00"), xs:time("23:59:59"))', '-PT23H59M59S', '');
-  t('op:subtract-times(xs:time("24:00:00"), xs:time("23:59:59"))', '-PT23H59M59S', '');
+  t('xs:date("2000-02-29Z") - xs:yearMonthDuration("P1Y")', '1999-02-28Z', '');
+  t('xs:date("2000-10-31-05:00") - xs:yearMonthDuration("P1Y1M")', '1999-09-30-05:00', '');
+  t('xs:dateTime("2000-10-30T11:12:00") - xs:yearMonthDuration("P1Y2M")', '1999-08-30T11:12:00', '');
+  t('xs:dayTimeDuration("P2DT12H") - xs:dayTimeDuration("P1DT10H30M")', 'P1DT1H30M', '');
+  t('xs:yearMonthDuration("P2Y11M") - xs:yearMonthDuration("P3Y3M")', '-P4M', '');
+  t('xs:date("2000-10-30") - xs:date("1999-11-28")', 'P337D', '');
+  t('xs:dateTime("2000-10-30T06:12:00-05:00") - xs:dateTime("1999-11-28T09:00:00Z")', 'P337DT2H12M', '');
+  t('xs:time("11:12:00Z") - xs:time("04:00:00-05:00")', 'PT2H12M', '');
+  t('xs:time("11:00:00-05:00") - xs:time("21:30:00+05:30")', 'PT0S', '');
+  t('xs:time("17:00:00-06:00") - xs:time("08:00:00+09:00")', 'P1D', '');
+  t('xs:time("24:00:00") - xs:time("23:59:59")', '-PT23H59M59S', '');
+  t('xs:time("24:00:00") - xs:time("23:59:59")', '-PT23H59M59S', '');
   t('fn:adjust-dateTime-to-timezone(xs:dateTime("2002-03-07T10:00:00"))', '2002-03-07T10:00:00-05:00', '');
   t('fn:adjust-dateTime-to-timezone(xs:dateTime(''2002-03-07T10:00:00-07:00''))', '2002-03-07T12:00:00-05:00', '');
   t('fn:adjust-dateTime-to-timezone(xs:dateTime("2002-03-07T10:00:00"), xs:dayTimeDuration("-PT10H"))', '2002-03-07T10:00:00-10:00', '');
@@ -2883,9 +2883,8 @@ begin
   t('(xs:date("1999-07-19") - xs:date("1969-11-30")) eq xs:dayTimeDuration("P10823D")', 'true', '');
   t('fn:dateTime(date("1999-12-30"), time("20:30:40.23-05:00"))', '1999-12-30T20:30:40.23-05:00', '');
   t('fn:dateTime(date("1999-12-30+04:00"), time("20:30:40.23"))', '1999-12-30T20:30:40.23+04:00', '');
-  t('op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))', 'P337D', '');
-  t('(op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28"))) + dayTimeDuration("P1D")', 'P338D', '');
-  t('dayTimeDuration("P1D") + (op:subtract-dates(xs:date("2000-10-30"), xs:date("1999-11-28")))', 'P338D', '');
+  t('(xs:date("2000-10-30") - xs:date("1999-11-28")) + dayTimeDuration("P1D")', 'P338D', '');
+  t('dayTimeDuration("P1D") + (xs:date("2000-10-30") - xs:date("1999-11-28"))', 'P338D', '');
   if baseSchema.version = xsd11 then begin
     bce1 := '0000';
     bce2 := '-0001';
@@ -3034,8 +3033,8 @@ begin
   t('(xs:gYear("2005-12:00") eq xs:gYear("2005+12:00"))', 'false', '');
   t('(xs:gDay("---12") eq xs:gDay("---12Z"))', 'false', '');
   t('xs:time("08:00:00+09:00") eq xs:time("17:00:00-06:00")', 'false', ''); //from xpath standard example
-  t('op:time-equal(xs:time("21:30:00+10:30"), xs:time("06:00:00-05:00"))', 'true', ''); //from xpath standard example
-  t('op:time-equal(xs:time("24:00:00+01:00"), xs:time("00:00:00+01:00"))', 'true', ''); //from xpath standard example
+  t('xs:time("21:30:00+10:30") eq xs:time("06:00:00-05:00")', 'true', ''); //from xpath standard example
+  t('xs:time("24:00:00+01:00") eq xs:time("00:00:00+01:00")', 'true', ''); //from xpath standard example
   t('xs:duration("-P1YT2.3S")', '-P1YT2.3S', '');
   t('xs:dayTimeDuration(xs:yearMonthDuration("-P543Y456M"))', 'PT0S', '');
   t('deep-equal(xs:float("NaN"),xs:double("NaN"))', 'true', '');
@@ -3622,15 +3621,15 @@ begin
   t('deep-equal(1, current-dateTime())', 'false');
   t('deep-equal((1,2,3), ("1", "2", "3"))', 'false');
   t('xs:yearMonthDuration("P0Y") eq xs:dayTimeDuration("P0D")', 'true');
-  t('op:duration-equal(xs:duration("P1Y"), xs:duration("P12M"))', 'true');
-  t('op:duration-equal(xs:duration("PT24H"), xs:duration("P1D"))', 'true');
-  t('op:duration-equal(xs:duration("P1Y"), xs:duration("P365D"))', 'false');
-  t('op:duration-equal(xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))', 'true');
-  t('op:duration-equal(xs:yearMonthDuration("P1Y"), xs:dayTimeDuration("P365D"))', 'false');
-  t('op:duration-equal(xs:yearMonthDuration("P2Y"), xs:yearMonthDuration("P24M"))', 'true');
-  t('op:duration-equal(xs:dayTimeDuration("P10D"), xs:dayTimeDuration("PT240H"))', 'true');
-  t('op:duration-equal(xs:duration("P2Y0M0DT0H0M0S"), xs:yearMonthDuration("P24M"))', 'true');
-  t('op:duration-equal(xs:duration("P0Y0M10D"), xs:dayTimeDuration("PT240H"))', 'true');
+  t('(xs:duration("P1Y") eq xs:duration("P12M"))', 'true');
+  t('(xs:duration("PT24H") eq xs:duration("P1D"))', 'true');
+  t('(xs:duration("P1Y") eq xs:duration("P365D"))', 'false');
+  t('(xs:yearMonthDuration("P0Y") eq xs:dayTimeDuration("P0D"))', 'true');
+  t('(xs:yearMonthDuration("P1Y")eq xs:dayTimeDuration("P365D"))', 'false');
+  t('(xs:yearMonthDuration("P2Y")eq xs:yearMonthDuration("P24M"))', 'true');
+  t('(xs:dayTimeDuration("P10D")eq xs:dayTimeDuration("PT240H"))', 'true');
+  t('(xs:duration("P2Y0M0DT0H0M0S")eq xs:yearMonthDuration("P24M"))', 'true');
+  t('(xs:duration("P0Y0M10D")eq xs:dayTimeDuration("PT240H"))', 'true');
   t('join(fn:distinct-values((xs:yearMonthDuration("P0Y"), xs:dayTimeDuration("P0D"))),":")', 'P0M');
   t('index-of(./r/a, "y")', '2', '<r foo="z"><a>X</a><a>Y</a><a>Z</a></r>');
   t('index-of(./r/a, ./r/@foo)', '3');
