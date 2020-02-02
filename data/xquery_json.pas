@@ -205,22 +205,22 @@ initialization
   with globalTypes do begin
     jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
     TXQueryEngine.registerNativeModule(jn);
-    jn.registerFunction('keys', @xqFunctionKeys, [itemStar, stringStar]);
-    jn.registerFunction('members', @xqFunctionMembers, [itemStar, itemStar]);
+    jn.registerBasicFunction('keys', @xqFunctionKeys, [itemStar, stringStar]);
+    jn.registerBasicFunction('members', @xqFunctionMembers, [itemStar, itemStar]);
 
     //TODO: fn:string/fn:data errors
     //TODO:   6.6. jn:decode-from-roundtrip 6.7. jn:encode-for-roundtrip
     //TODO:  6.9. jn:json-doc
   //  jn.registerFunction('encode-for-roundtrip', @xqFunctionEncode_For_Roundtrip, ['jn:encode-for-roundtrip($items as item()*) as json-item()* ', 'jn:encode-for-roundtrip($items as item()*, $options as object()) as json-item()* ']);
-    jn.registerFunction('is-null', @xqFunctionIsNull, [item, boolean]);
+    jn.registerBasicFunction('is-null', @xqFunctionIsNull, [item, boolean]);
     jn.registerFunction('json-doc', @xqFunctionJSON_Doc, [stringOrEmpty, jsonItemOrEmpty], [xqcdContextOther]);
-    jn.registerFunction('null', @xqFunctionNull, [null]);
+    jn.registerBasicFunction('null', @xqFunctionNull, [null]);
     jn.registerFunction('object', 0, -1, @xqFunctionObject, []); //deprecated
-    jn.registerFunction('parse-json', @xqFunctionParseJson, [[stringOrEmpty, jsonitemStar],  [stringOrEmpty, map, jsonItemStar]]);
-    jn.registerFunction('size', @xqFunctionSize, [arrayOrEmpty, integerOrEmpty]);
+    jn.registerFunction('parse-json', @xqFunctionParseJson).setVersionsShared([stringOrEmpty, jsonitemStar],  [stringOrEmpty, map, jsonItemStar]);
+    jn.registerBasicFunction('size', @xqFunctionSize, [arrayOrEmpty, integerOrEmpty]);
 
     pxp := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsMerged);
-    pxp.registerFunction('json', @xqFunctionJson, [[stringt, itemStar],  [stringt, map, itemStar]], [xqcdContextOther]);
+    pxp.registerFunction('json', @xqFunctionJson, [xqcdContextOther]).setVersionsShared([stringt, itemStar],  [stringt, map, itemStar]);
 
     {[itemStar, map]
 descendant-arrays

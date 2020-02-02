@@ -315,22 +315,22 @@ begin
   module := TXQNativeModule.create(XMLNamespace_Math);
 
   with globalTypes do begin
-    module.registerFunction('pi', @mathPi, [double]);
-    module.registerFunction('exp', @mathExp, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('exp10', @mathExp10, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('log', @mathLog, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('log10', @mathLog10, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('sqrt', @mathSqrt, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('sin', @mathSin, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('cos', @mathCos, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('tan', @mathTan, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('asin', @mathAsin, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('acos', @mathAcos, [doubleOrEmpty, doubleOrEmpty]);
-    module.registerFunction('atan', @mathAtan, [doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('pi', @mathPi).setVersionsShared([double]);
+    module.registerFunction('exp', @mathExp).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('exp10', @mathExp10).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('log', @mathLog).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('log10', @mathLog10).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('sqrt', @mathSqrt).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('sin', @mathSin).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('cos', @mathCos).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('tan', @mathTan).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('asin', @mathAsin).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('acos', @mathAcos).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
+    module.registerFunction('atan', @mathAtan).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
     baseSchema.show('numeric');
-    module.registerFunction('pow', @mathPow, [doubleOrEmpty, numeric, doubleOrEmpty]);
+    module.registerFunction('pow', @mathPow).setVersionsShared([doubleOrEmpty, numeric, doubleOrEmpty]);
     baseSchema.hide('numeric');
-    module.registerFunction('atan2', @mathAtan2, [double, double, double]);
+    module.registerFunction('atan2', @mathAtan2).setVersionsShared([double, double, double]);
   end;
 
   TXQueryEngine.registerNativeModule(module);

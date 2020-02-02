@@ -7013,7 +7013,12 @@ const
 procedure initializeFunctions;
 var
   templt: TXQOperatorInfo;
+  dependencyNodeCollation, dependencyNone, dependencyAll: TXQContextDependencies;
+  lastfn: TXQAbstractFunctionInfo;
 begin
+  dependencyNodeCollation := [xqcdContextCollation, xqcdContextOther];
+  dependencyNone := [];
+  dependencyAll := [low(TXQContextDependencies)..high(TXQContextDependencies)];
   { Modules can be submodules of other. We have the following relations
 
                 fn3_1: standard xpath/xquery 3.1 functions
@@ -7079,22 +7084,22 @@ begin
   pxpold.registerFunction('eval',1,2,@xqFunctionEval, []);
   pxpold.registerFunction('css',1,1,@xqFunctionCSS, []);
   with globalTypes do begin
-  pxpold.registerFunction('get',@xqFunctionGet,  [[stringt, itemStar], [stringt, itemStar,itemStar]], [xqcdContextVariables]);
+  pxpold.registerFunction('get',@xqFunctionGet, [xqcdContextVariables]).setVersionsShared([stringt, itemStar], [stringt, itemStar,itemStar]);
   pxpold.registerFunction('is-nth',3,3,@xqFunctionIs_Nth, []);
   pxpold.registerFunction('type-of',1,1,@xqFunctionType_of, []);
   pxpold.registerFunction('get-property',2,2,@xqFunctionGet_Property, []);
   pxpold.registerFunction('object',0,1,@xqFunctionObject,[]); //deprecated
   pxpold.registerFunction('join',1,2,@xqFunctionJoin,[]);
-  pxpold.registerFunction('binary-to-string',@xqFunctionBinary_To_String, [[anyBinary, stringt],  [anyBinary, stringt, stringt]]);
-  pxpold.registerFunction('string-to-hexBinary',@xqFunctionString_To_hexBinary, [[stringt, hexBinary],  [stringt, stringt, hexBinary]]);
-  pxpold.registerFunction('string-to-base64Binary',@xqFunctionString_To_base64Binary, [[stringt, base64Binary],  [stringt, stringt, base64Binary]]);
+  pxpold.registerFunction('binary-to-string',@xqFunctionBinary_To_String).setVersionsShared([anyBinary, stringt],  [anyBinary, stringt, stringt]);
+  pxpold.registerFunction('string-to-hexBinary',@xqFunctionString_To_hexBinary).setVersionsShared([stringt, hexBinary],  [stringt, stringt, hexBinary]);
+  pxpold.registerFunction('string-to-base64Binary',@xqFunctionString_To_base64Binary).setVersionsShared([stringt, base64Binary],  [stringt, stringt, base64Binary]);
 
-  pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri, [[stringOrEmpty, stringt]]); //same as fn:encode-for-uri, but with an easier name
-  pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri, [[stringOrEmpty, stringt]]);
-  pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, [[itemStar, itemStar, stringt]]); //will probably be removed in future version
-  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, [[map, itemStar, map]]); //will probably be removed in future version
-  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, [[item, itemStar, map]]); //planed replacement for form-combine and uri-combine (but name is not final yet)
-  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, [[item, map]]);
+  pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri).setVersionsShared([stringOrEmpty, stringt]); //same as fn:encode-for-uri, but with an easier name
+  pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri).setVersionsShared([stringOrEmpty, stringt]);
+  pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, dependencyNodeCollation).setVersionsShared([itemStar, itemStar, stringt]); //will probably be removed in future version
+  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, dependencyNodeCollation).setVersionsShared([map, itemStar, map]); //will probably be removed in future version
+  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, dependencyNodeCollation).setVersionsShared([item, itemStar, map]); //planed replacement for form-combine and uri-combine (but name is not final yet)
+  pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, dependencyNodeCollation).setVersionsShared([item, map]);
 
   {transform
 [[itemStar, functiont, map, itemStar]]
@@ -7112,197 +7117,202 @@ transform
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
-  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [[itemStar, stringt],  [itemStar, itemOrEmpty, stringt]]);
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
 
   //standard functions
-  fn.registerFunction('exists',@xqFunctionExists,[itemStar, boolean]);
-  fn.registerFunction('empty', @xqFunctionempty,[itemStar, boolean]);
-  fn.registerFunction('nilled', @xqFunctionNilled,[nodeOrEmpty, booleanOrEmpty]);
-  fn3.registerFunction('nilled', @xqFunctionNilled,[boolean]);
-  fn.registerFunction('error',@xqFunctionError,[[none],  [QName, none],  [QNameOrEmpty, stringt, none],  [QNameOrEmpty, stringt, itemStar, none]]);
+  fn.registerFunction('exists',@xqFunctionExists).setVersionsShared([itemStar, boolean]);
+  fn.registerFunction('empty', @xqFunctionempty).setVersionsShared([itemStar, boolean]);
+  fn.registerFunction('nilled', @xqFunctionNilled, dependencyNodeCollation).setVersionsShared([nodeOrEmpty, booleanOrEmpty]);
+  fn3.registerFunction('nilled', @xqFunctionNilled, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([boolean]);
+  lastfn := fn.registerFunction('error',@xqFunctionError);
+  lastfn.setVersionsShared(4);
+  lastfn.setVersionsShared(0, [none]);
+  lastfn.setVersionsShared(1, [QName, none]);
+  lastfn.setVersionsShared(2, [QNameOrEmpty, stringt, none]);
+  lastfn.setVersionsShared(3, [QNameOrEmpty, stringt, itemStar, none]);
 
-  fn.registerFunction('abs',@xqFunctionAbs,[numericOrEmpty, numericOrEmpty]);
-  fn.registerFunction('ceiling',@xqFunctionCeiling,[numericOrEmpty, numericOrEmpty]);
-  fn.registerFunction('floor',@xqFunctionFloor,[numericOrEmpty, numericOrEmpty]);
-  fn.registerFunction('round',@xqFunctionRound,[numericOrEmpty, numericOrEmpty]);
-  fn3.registerFunction('round',@xqFunctionRound, [numericOrEmpty, integer, numericOrEmpty]);
-  fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even, [[numericOrEmpty, numericOrEmpty],  [numericOrEmpty, integer, numericOrEmpty]]);
+  fn.registerFunction('abs',@xqFunctionAbs).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('ceiling',@xqFunctionCeiling).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('floor',@xqFunctionFloor).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn.registerFunction('round',@xqFunctionRound).setVersionsShared([numericOrEmpty, numericOrEmpty]);
+  fn3.registerFunction('round',@xqFunctionRound).setVersionsShared([numericOrEmpty, integer, numericOrEmpty]);
+  fn.registerFunction('round-half-to-even',@xqFunctionRound_Half_To_Even).setVersionsShared([numericOrEmpty, numericOrEmpty],  [numericOrEmpty, integer, numericOrEmpty]);
 
-  fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string,[integerStar, stringt]);
-  fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints,[stringOrEmpty, integerStar]);
-  fn.registerFunction('string-join',@xqFunctionString_join,[stringStar, stringt, stringt]);
-  fn3.registerFunction('string-join',@xqFunctionString_join_Nosep,[stringStar, stringt]);
-  fn3_1.registerFunction('string-join',@xqFunctionString_join,[atomicStar, stringt, stringt]);
-  fn3_1.registerFunction('string-join',@xqFunctionString_join_Nosep,[atomicStar, stringt]);
-  fn.registerFunction('substring',@xqFunctionSubstring, [[stringOrEmpty, double, stringt],  [stringOrEmpty, double, double, stringt]]);
-  fn.registerFunction('upper-case',@xqFunctionUpper_Case,[stringOrEmpty, stringt]);
-  fn.registerFunction('lower-case',@xqFunctionLower_case,[stringOrEmpty, stringt]);
-  fn.registerFunction('compare',@xqFunctionCompare,[[stringOrEmpty, stringOrEmpty, integerOrEmpty],  [stringOrEmpty, stringOrEmpty, stringt, integerOrEmpty]], [xqcdContextCollation]);
-  fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal,[[stringOrEmpty, stringOrEmpty, booleanOrEmpty]]);
-  fn.registerFunction('contains',@xqFunctionContains,[[stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]], [xqcdContextCollation]);
-  fn.registerFunction('starts-with',@xqFunctionStarts_with,[[stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]], [xqcdContextCollation]);
-  fn.registerFunction('ends-with',@xqFunctionEnds_with, [[stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]], [xqcdContextCollation]);
-  fn.registerFunction('substring-after',@xqFunctionSubstring_after, [[stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]], [xqcdContextCollation]);
-  fn.registerFunction('substring-before',@xqFunctionSubstring_before,[[stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]], [xqcdContextCollation]);
+  fn.registerFunction('codepoints-to-string',@xqFunctionCodepoints_to_string).setVersionsShared([integerStar, stringt]);
+  fn.registerFunction('string-to-codepoints',@xqFunctionString_to_codepoints).setVersionsShared([stringOrEmpty, integerStar]);
+  fn.registerFunction('string-join',@xqFunctionString_join).setVersionsShared([stringStar, stringt, stringt]);
+  fn3.registerFunction('string-join',@xqFunctionString_join_Nosep).setVersionsShared([stringStar, stringt]);
+  fn3_1.registerFunction('string-join',@xqFunctionString_join).setVersionsShared([atomicStar, stringt, stringt]);
+  fn3_1.registerFunction('string-join',@xqFunctionString_join_Nosep).setVersionsShared([atomicStar, stringt]);
+  fn.registerFunction('substring',@xqFunctionSubstring).setVersionsShared([stringOrEmpty, double, stringt],  [stringOrEmpty, double, double, stringt]);
+  fn.registerFunction('upper-case',@xqFunctionUpper_Case).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('lower-case',@xqFunctionLower_case).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('compare',@xqFunctionCompare, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, integerOrEmpty],  [stringOrEmpty, stringOrEmpty, stringt, integerOrEmpty]);
+  fn.registerFunction('codepoint-equal',@xqFunctionCodePoint_Equal).setVersionsShared([stringOrEmpty, stringOrEmpty, booleanOrEmpty]);
+  fn.registerFunction('contains',@xqFunctionContains, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]);
+  fn.registerFunction('starts-with',@xqFunctionStarts_with, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]);
+  fn.registerFunction('ends-with',@xqFunctionEnds_with, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, stringt, boolean]);
+  fn.registerFunction('substring-after',@xqFunctionSubstring_after, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]);
+  fn.registerFunction('substring-before',@xqFunctionSubstring_before, [xqcdContextCollation]).setVersionsShared([stringOrEmpty, stringOrEmpty, stringt],  [stringOrEmpty, stringOrEmpty, stringt, stringt]);
   fn.registerFunction('concat',2,-1,@xqFunctionConcat,[]);
-  fn.registerFunction('translate',@xqFunctionTranslate,[stringOrEmpty, stringt, stringt, stringt]);
-  fn.registerFunction('replace',@xqFunctionReplace,[[stringOrEmpty, stringt, stringt, stringt],  [stringOrEmpty, stringt, stringt, stringt, stringt]]);
-  fn.registerFunction('matches',@xqFunctionMatches,[[stringOrEmpty, stringt, boolean],  [stringOrEmpty, stringt, stringt, boolean]]);
-  fn.registerFunction('tokenize',@xqFunctionTokenize,[[stringOrEmpty, stringt, stringStar],  [stringOrEmpty, stringt, stringt, stringStar]]);
+  fn.registerFunction('translate',@xqFunctionTranslate).setVersionsShared([stringOrEmpty, stringt, stringt, stringt]);
+  fn.registerFunction('replace',@xqFunctionReplace).setVersionsShared([stringOrEmpty, stringt, stringt, stringt],  [stringOrEmpty, stringt, stringt, stringt, stringt]);
+  fn.registerFunction('matches',@xqFunctionMatches).setVersionsShared([stringOrEmpty, stringt, boolean],  [stringOrEmpty, stringt, stringt, boolean]);
+  fn.registerFunction('tokenize',@xqFunctionTokenize).setVersionsShared([stringOrEmpty, stringt, stringStar],  [stringOrEmpty, stringt, stringt, stringStar]);
   fn3.registerFunction('analyze-string',@xqFunctionAnalyze_String,['( $input as xs:string?, $pattern 	 as xs:string) as element(fn:analyze-string-result)', '($input as xs:string?, $pattern as xs:string,$flags as xs:string) as element(fn:analyze-string-result)'],[]);
 
 
-  fn.registerFunction('boolean',@xqFunctionBoolean,[itemStar, boolean]);;
-  fn.registerFunction('true',@xqFunctionTrue,[boolean]);
-  fn.registerFunction('false',@xqFunctionFalse,[boolean]);
-  fn.registerFunction('not',@xqFunctionNot,[itemStar, boolean]);
+  fn.registerFunction('boolean',@xqFunctionBoolean).setVersionsShared([itemStar, boolean]);;
+  fn.registerFunction('true',@xqFunctionTrue).setVersionsShared([boolean]);
+  fn.registerFunction('false',@xqFunctionFalse).setVersionsShared([boolean]);
+  fn.registerFunction('not',@xqFunctionNot).setVersionsShared([itemStar, boolean]);
 
 
-  fn.registerFunction('dateTime',@xqFunctionDateTime,[dateOrEmpty, timeOrEmpty, dateTimeOrEmpty]);
-  fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime, [dateTimeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime, [dateTimeOrEmpty, decimalOrEmpty]);
+  fn.registerFunction('dateTime',@xqFunctionDateTime).setVersionsShared([dateOrEmpty, timeOrEmpty, dateTimeOrEmpty]);
+  fn.registerFunction('year-from-dateTime',@xqFunctionYear_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('month-from-dateTime',@xqFunctionMonth_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('day-from-dateTime',@xqFunctionDay_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-dateTime',@xqFunctionHours_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-dateTime',@xqFunctionMinutes_From_Datetime).setVersionsShared([dateTimeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-dateTime',@xqFunctionSeconds_From_Datetime).setVersionsShared([dateTimeOrEmpty, decimalOrEmpty]);
 
-  fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration, [durationOrEmpty, integerOrEmpty]);
-  fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration, [durationOrEmpty, integerOrEmpty]);
-  fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration, [durationOrEmpty, integerOrEmpty]);
-  fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration, [durationOrEmpty, integerOrEmpty]);
-  fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration, [durationOrEmpty, integerOrEmpty]);
-  fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration, [durationOrEmpty, decimalOrEmpty]);
+  fn.registerFunction('years-from-duration',@xqFunctionYear_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('months-from-duration',@xqFunctionMonth_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('days-from-duration',@xqFunctionDay_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-duration',@xqFunctionHours_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-duration',@xqFunctionMinutes_From_Duration).setVersionsShared([durationOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-duration',@xqFunctionSeconds_From_Duration).setVersionsShared([durationOrEmpty, decimalOrEmpty]);
 
-  fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime, [dateOrEmpty, integerOrEmpty]);
-  fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime, [dateOrEmpty, integerOrEmpty]);
-  fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime, [dateOrEmpty, integerOrEmpty]);
-  fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime, [timeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime, [timeOrEmpty, integerOrEmpty]);
-  fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime, [timeOrEmpty, decimalOrEmpty]);
-  fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime, [timeOrEmpty, dayTimeDurationOrEmpty]);
-  fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime, [dateOrEmpty, dayTimeDurationOrEmpty]);
-  fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime, [dateTimeOrEmpty, dayTimeDurationOrEmpty]);
-  fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [[dateTimeOrEmpty, dateTimeOrEmpty],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTimeOrEmpty]], [xqcdContextTime]);
-  fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [[dateOrEmpty, dateOrEmpty],  [dateOrEmpty, dayTimeDurationOrEmpty, dateOrEmpty]], [xqcdContextTime]);
-  fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [[timeOrEmpty, timeOrEmpty],  [timeOrEmpty, dayTimeDurationOrEmpty, timeOrEmpty]], [xqcdContextTime]);
-  fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, [[dayTimeDuration]], [xqcdContextTime]);
-
-
-  fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime, [dateTime], [xqcdContextTime]);
-  fn.registerFunction('current-date',@xqFunctionCurrent_Date, [date], [xqcdContextTime]);
-  fn.registerFunction('current-time',@xqFunctionCurrent_Time, [time], [xqcdContextTime]);
-
-  fn.registerFunction('trace',@xqFunctionTrace, [[itemStar, stringt, itemStar]]);
-  fn.registerFunction('default-collation', @xqFunctionDefault_Collation, [[stringt]]);
-  fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri, [[anyURIOrEmpty]]);
-  fn.registerFunction('base-uri',@xqFunctionBase_Uri, [[anyURIOrEmpty],  [nodeOrEmpty, anyURIOrEmpty]]);
-  fn.registerFunction('document-uri',@xqFunctionDocument_Uri, [[nodeOrEmpty, anyURIOrEmpty]]);
-  fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0, [[anyURIOrEmpty]]);
-
-  fn.registerFunction('doc', @xqFunctionDoc, [[stringOrEmpty, documentNodeOrEmpty]]);
-  fn.registerFunction('doc-available', @xqFunctionDoc_Available, [[stringOrEmpty, boolean]]);
-  fn.registerFunction('collection', @xqFunctionCollection, [[nodeStar],  [stringOrEmpty, nodeStar]]);
-  fn3.registerFunction('uri-collection', @xqFunctionUri_Collection, [[anyURIStar],  [stringOrEmpty, anyURIStar]]);
+  fn.registerFunction('year-from-date',@xqFunctionYear_From_Datetime).setVersionsShared([dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('month-from-date',@xqFunctionMonth_From_Datetime).setVersionsShared([dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('day-from-date',@xqFunctionDay_From_Datetime).setVersionsShared([dateOrEmpty, integerOrEmpty]);
+  fn.registerFunction('hours-from-time',@xqFunctionHours_From_Datetime).setVersionsShared([timeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('minutes-from-time',@xqFunctionMinutes_From_Datetime).setVersionsShared([timeOrEmpty, integerOrEmpty]);
+  fn.registerFunction('seconds-from-time',@xqFunctionSeconds_From_Datetime).setVersionsShared([timeOrEmpty, decimalOrEmpty]);
+  fn.registerFunction('timezone-from-time',@xqFunctionTimezone_From_Datetime).setVersionsShared([timeOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('timezone-from-date',@xqFunctionTimezone_From_Datetime).setVersionsShared([dateOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('timezone-from-dateTime',@xqFunctionTimezone_From_Datetime).setVersionsShared([dateTimeOrEmpty, dayTimeDurationOrEmpty]);
+  fn.registerFunction('adjust-dateTime-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [xqcdContextTime]).setVersionsShared([dateTimeOrEmpty, dateTimeOrEmpty],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTimeOrEmpty]);
+  fn.registerFunction('adjust-date-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [xqcdContextTime]).setVersionsShared([dateOrEmpty, dateOrEmpty],  [dateOrEmpty, dayTimeDurationOrEmpty, dateOrEmpty]);
+  fn.registerFunction('adjust-time-to-timezone',@xqFunctionAdjustDateTimeToTimeZone, [xqcdContextTime]).setVersionsShared([timeOrEmpty, timeOrEmpty],  [timeOrEmpty, dayTimeDurationOrEmpty, timeOrEmpty]);
+  fn.registerFunction('implicit-timezone',@xqFunctionImplicit_Timezone, [xqcdContextTime]).setVersionsShared([dayTimeDuration]);
 
 
-  fn.registerFunction('root', @xqFunctionRoot, [[node],  [nodeOrEmpty, nodeOrEmpty]], [xqcdFocusItem]);
-  fn.registerFunction('lang', @xqFunctionLang, [[stringOrEmpty, boolean],  [stringOrEmpty, node, boolean]]);
+  fn.registerFunction('current-dateTime',@xqFunctionCurrent_Datetime, [xqcdContextTime]).setVersionsShared([dateTime]);
+  fn.registerFunction('current-date',@xqFunctionCurrent_Date, [xqcdContextTime]).setVersionsShared([date]);
+  fn.registerFunction('current-time',@xqFunctionCurrent_Time, [xqcdContextTime]).setVersionsShared([time]);
+
+  fn.registerFunction('trace',@xqFunctionTrace,[xqcdContextOther]).setVersionsShared([itemStar, stringt, itemStar]);
+  fn.registerFunction('default-collation', @xqFunctionDefault_Collation,[xqcdContextCollation]).setVersionsShared([stringt]);
+  fn.registerFunction('static-base-uri',@xqFunctionStatic_Base_Uri,[xqcdContextOther]).setVersionsShared([anyURIOrEmpty]);
+  fn.registerFunction('base-uri',@xqFunctionBase_Uri, [xqcdFocusItem]+dependencyNodeCollation).setVersionsShared([anyURIOrEmpty],  [nodeOrEmpty, anyURIOrEmpty]);
+  fn.registerFunction('document-uri',@xqFunctionDocument_Uri).setVersionsShared([nodeOrEmpty, anyURIOrEmpty]);
+  fn3.registerFunction('document-uri',@xqFunctionDocument_Uri0,[xqcdFocusItem]).setVersionsShared([anyURIOrEmpty]);
+
+  fn.registerFunction('doc', @xqFunctionDoc,[xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty]);
+  fn.registerFunction('doc-available', @xqFunctionDoc_Available,[xqcdContextOther]).setVersionsShared([stringOrEmpty, boolean]);
+  fn.registerFunction('collection', @xqFunctionCollection,[xqcdContextOther]).setVersionsShared([nodeStar],  [stringOrEmpty, nodeStar]);
+  fn3.registerFunction('uri-collection', @xqFunctionUri_Collection,[xqcdContextOther]).setVersionsShared([anyURIStar],  [stringOrEmpty, anyURIStar]);
 
 
-  fn.registerFunction('QName',@xqFunctionQName, [stringOrEmpty, stringt, QName]);
-  fn.registerFunction('name',@xqFunctionName, [[stringt],  [nodeOrEmpty, stringt]], [xqcdFocusItem]);
-  fn.registerFunction('local-name',@xqFunctionLocal_Name, [[stringt],  [nodeOrEmpty, stringt]], [xqcdFocusItem]);
-  fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, [[anyURI],  [nodeOrEmpty, anyURI]], [xqcdFocusItem]);
-  fn.registerFunction('node-name', @xqFunctionNode_Name, [nodeOrEmpty, QNameOrEmpty]);
-  fn3.registerFunction('node-name', @xqFunctionNode_Name, [QNameOrEmpty]);
-  fn.registerFunction('resolve-QName',@xqFunctionResolve_QName,  [stringOrEmpty, element, QNameOrEmpty], [xqcdContextCollation]);
-  fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName, [[QNameOrEmpty, NCNameOrEmpty]]);
-  fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName, [[QNameOrEmpty, NCNameOrEmpty]]);
-  fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName, [QNameOrEmpty, anyURIOrEmpty]);
-  fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix, [stringOrEmpty, element, anyURIOrEmpty]);
-  fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes, [element, stringStar]);
+  fn.registerFunction('root', @xqFunctionRoot, [xqcdFocusItem]).setVersionsShared([node],  [nodeOrEmpty, nodeOrEmpty]);
+  fn.registerFunction('lang', @xqFunctionLang, [xqcdFocusItem]+dependencyNodeCollation).setVersionsShared([stringOrEmpty, boolean],  [stringOrEmpty, node, boolean]);
 
 
-  fn.registerFunction('resolve-uri', @xqFunctionResolve_Uri, ['($relative as xs:string?) as xs:anyURI?', '($relative as xs:string?, $base as xs:string) as xs:anyURI?']);
-  fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri, [stringOrEmpty, stringt]);
-  fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri, [stringOrEmpty, stringt]);
-  fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri, [stringOrEmpty, stringt]);
+  fn.registerFunction('QName',@xqFunctionQName).setVersionsShared([stringOrEmpty, stringt, QName]);
+  fn.registerFunction('name',@xqFunctionName, [xqcdFocusItem]).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
+  fn.registerFunction('local-name',@xqFunctionLocal_Name, [xqcdFocusItem]).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
+  fn.registerFunction('namespace-uri',@xqFunctionNamespace_URI, [xqcdFocusItem]).setVersionsShared([anyURI],  [nodeOrEmpty, anyURI]);
+  fn.registerFunction('node-name', @xqFunctionNode_Name, dependencyNone).setVersionsShared([nodeOrEmpty, QNameOrEmpty]);
+  fn3.registerFunction('node-name', @xqFunctionNode_Name, [xqcdFocusItem]).setVersionsShared([QNameOrEmpty]);
+  fn.registerFunction('resolve-QName',@xqFunctionResolve_QName, dependencyNodeCollation).setVersionsShared([stringOrEmpty, element, QNameOrEmpty]);
+  fn.registerFunction('prefix-from-QName',@xqFunctionPrefix_From_QName).setVersionsShared([QNameOrEmpty, NCNameOrEmpty]);
+  fn.registerFunction('local-name-from-QName',@xqFunctionLocal_Name_From_QName).setVersionsShared([QNameOrEmpty, NCNameOrEmpty]);
+  fn.registerFunction('namespace-uri-from-QName',@xqFunctionNamespace_URI_from_QName).setVersionsShared([QNameOrEmpty, anyURIOrEmpty]);
+  fn.registerFunction('namespace-uri-for-prefix',@xqFunctionNamespace_URI_For_Prefix).setVersionsShared([stringOrEmpty, element, anyURIOrEmpty]);
+  fn.registerFunction('in-scope-prefixes',@xqFunctionIn_Scope_prefixes).setVersionsShared([element, stringStar]);
 
 
-  fn.registerFunction('data', @xqFunctionData, [itemStar, atomicStar]);
-  fn3.registerFunction('data', @xqFunctionData, [atomicStar]);
-  fn.registerFunction('number',@xqFunctionNumber, [[double],  [atomicOrEmpty, double]], [xqcdFocusItem]);
-  fn.registerFunction('string',@xqFunctionString, [[stringt],  [itemOrEmpty, stringt]], [xqcdFocusItem]);
-  fn.registerFunction('string-length',@xqFunctionString_length, [[integer],  [stringOrEmpty, integer]], [xqcdFocusItem]);
-  fn.registerFunction('normalize-space',@xqFunctionNormalize_space, [[stringt],  [stringOrEmpty, stringt]], [xqcdFocusItem]);
-  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode, [[stringOrEmpty, stringt],  [stringOrEmpty, stringt, stringt]]);
+  fn.registerFunction('resolve-uri', @xqFunctionResolve_Uri, [xqcdContextOther]).setVersionsShared([stringOrEmpty, anyURIOrEmpty], [stringOrEmpty, stringt, anyURIOrEmpty]);
+  fn.registerFunction('encode-for-uri', @xqFunctionEncode_For_Uri).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('iri-to-uri', @xqFunctionIri_To_Uri).setVersionsShared([stringOrEmpty, stringt]);
+  fn.registerFunction('escape-html-uri', @xqFunctionEscape_Html_Uri).setVersionsShared([stringOrEmpty, stringt]);
+
+
+  fn.registerFunction('data', @xqFunctionData, dependencyNone).setVersionsShared([itemStar, atomicStar]);
+  fn3.registerFunction('data', @xqFunctionData, [xqcdFocusItem]).setVersionsShared([atomicStar]);
+  fn.registerFunction('number',@xqFunctionNumber, [xqcdFocusItem]).setVersionsShared([double],  [atomicOrEmpty, double]);
+  fn.registerFunction('string',@xqFunctionString, [xqcdFocusItem]).setVersionsShared([stringt],  [itemOrEmpty, stringt]);
+  fn.registerFunction('string-length',@xqFunctionString_length, [xqcdFocusItem]).setVersionsShared([integer],  [stringOrEmpty, integer]);
+  fn.registerFunction('normalize-space',@xqFunctionNormalize_space, [xqcdFocusItem]).setVersionsShared([stringt],  [stringOrEmpty, stringt]);
+  fn.registerFunction('normalize-unicode', @xqFunctionNormalizeUnicode).setVersionsShared([stringOrEmpty, stringt],  [stringOrEmpty, stringt, stringt]);
 
   fn.registerFunction('concatenate',2, 2, @xqFunctionConcatenate, []); //this should be an operator
-  fn.registerFunction('index-of', @xqFunctionindex_of, [[atomicStar, atomic, integerStar],  [atomicStar, atomic, stringt, integerStar]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('distinct-values', @xqFunctiondistinct_values, [[atomicStar, atomicStar],  [atomicStar, stringt, atomicStar]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('insert-before', @xqFunctioninsert_before, [itemStar, integer, itemStar, itemStar]);
-  fn.registerFunction('remove', @xqFunctionremove, [itemStar, integer, itemStar]);
-  fn.registerFunction('reverse', @xqFunctionreverse, [itemStar, itemStar]);
-  fn.registerFunction('subsequence', @xqFunctionsubsequence, [[itemStar, double, itemStar],  [itemStar, double, double, itemStar]]);
-  fn.registerFunction('unordered', @xqFunctionunordered, [itemStar, item]);
-  fn.registerFunction('zero-or-one', @xqFunctionzero_or_one, [itemStar, itemOrEmpty]);
-  fn.registerFunction('one-or-more', @xqFunctionone_or_more, [itemStar, itemPlus]);
-  fn.registerFunction('exactly-one', @xqFunctionexactly_one, [itemStar, item]);
-  fn.registerFunction('deep-equal', @xqFunctiondeep_equal, [[itemStar, itemStar, boolean],  [itemStar, itemStar, stringt, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('count', @xqFunctioncount, [itemStar, integer]);
-  fn.registerFunction('avg', @xqFunctionavg, [atomicStar, atomicOrEmpty]);
-  fn.registerFunction('max', @xqFunctionmax, [[atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('min', @xqFunctionmin, [[atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  fn.registerFunction('sum', @xqFunctionsum, [[atomicStar, atomic],  [atomicStar, atomicOrEmpty, atomicOrEmpty]]);
-  x.registerFunction('product', @xqFunctionProduct, [atomicStar, atomic]);
+  fn.registerFunction('index-of', @xqFunctionindex_of, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomic, integerStar],  [atomicStar, atomic, stringt, integerStar]);
+  fn.registerFunction('distinct-values', @xqFunctiondistinct_values, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomicStar],  [atomicStar, stringt, atomicStar]);
+  fn.registerFunction('insert-before', @xqFunctioninsert_before).setVersionsShared([itemStar, integer, itemStar, itemStar]);
+  fn.registerFunction('remove', @xqFunctionremove).setVersionsShared([itemStar, integer, itemStar]);
+  fn.registerFunction('reverse', @xqFunctionreverse).setVersionsShared([itemStar, itemStar]);
+  fn.registerFunction('subsequence', @xqFunctionsubsequence).setVersionsShared([itemStar, double, itemStar], [itemStar, double, double, itemStar]);
+  fn.registerFunction('unordered', @xqFunctionunordered).setVersionsShared([itemStar, item]);
+  fn.registerFunction('zero-or-one', @xqFunctionzero_or_one).setVersionsShared([itemStar, itemOrEmpty]);
+  fn.registerFunction('one-or-more', @xqFunctionone_or_more).setVersionsShared([itemStar, itemPlus]);
+  fn.registerFunction('exactly-one', @xqFunctionexactly_one).setVersionsShared([itemStar, item]);
+  fn.registerFunction('deep-equal', @xqFunctiondeep_equal, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([itemStar, itemStar, boolean],  [itemStar, itemStar, stringt, boolean]);
+  fn.registerFunction('count', @xqFunctioncount).setVersionsShared([itemStar, integer]);
+  fn.registerFunction('avg', @xqFunctionavg).setVersionsShared([atomicStar, atomicOrEmpty]);
+  fn.registerFunction('max', @xqFunctionmax, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]);
+  fn.registerFunction('min', @xqFunctionmin, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, atomicOrEmpty],  [atomicStar, stringt, atomicOrEmpty]);
+  fn.registerFunction('sum', @xqFunctionsum).setVersionsShared([atomicStar, atomic],  [atomicStar, atomicOrEmpty, atomicOrEmpty]);
+  x.registerFunction('product', @xqFunctionProduct, dependencyNone).setVersionsShared([atomicStar, atomic]);
 
-  fn.registerFunction('position', @xqFunctionPosition, [integer], [xqcdFocusPosition]);
-  fn.registerFunction('last', @xqFunctionLast, [integer], [xqcdFocusLast]);
+  fn.registerFunction('position', @xqFunctionPosition, [xqcdFocusPosition]).setVersionsShared([integer]);
+  fn.registerFunction('last', @xqFunctionLast, [xqcdFocusLast]).setVersionsShared([integer]);
 
-  fn.registerFunction('id', @xqFunctionId, [[stringStar, elementStar],  [stringStar, node, elementStar]]);
-  fn.registerFunction('idref', @xqFunctionIdRef, [[stringStar, nodeStar],  [stringStar, node, nodeStar]]);
-  fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, [[stringStar, elementStar],  [stringStar, node, elementStar]]); //TODO: should search for #ID nodes (?)
+  fn.registerFunction('id', @xqFunctionId, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([stringStar, elementStar],  [stringStar, node, elementStar]);
+  fn.registerFunction('idref', @xqFunctionIdRef, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([stringStar, nodeStar],  [stringStar, node, nodeStar]);
+  fn.registerFunction('element-with-id', @xqFunctionElement_With_Id, dependencyNodeCollation+[xqcdFocusItem]).setVersionsShared([stringStar, elementStar],  [stringStar, node, elementStar]); //TODO: should search for #ID nodes (?)
 
-  fn3.registerFunction('head', @xqFunctionHead, [itemStar, itemOrEmpty]);
-  fn3.registerFunction('tail', @xqFunctionTail, [itemStar, itemStar]);
+  fn3.registerFunction('head', @xqFunctionHead).setVersionsShared([itemStar, itemOrEmpty]);
+  fn3.registerFunction('tail', @xqFunctionTail).setVersionsShared([itemStar, itemStar]);
 
-  fn3.registerFunction('has-children', @xqFunctionHas_Children, [[boolean],  [nodeOrEmpty, boolean]]);
+  fn3.registerFunction('has-children', @xqFunctionHas_Children, [xqcdFocusItem]).setVersionsShared([boolean],  [nodeOrEmpty, boolean]);
   //[nodeStar, nodeStar]
   fn3.registerInterpretedFunction('innermost', '($nodes as node()*) as node()*', '$nodes except $nodes/ancestor::node()', []);
   //[nodeStar, nodeStar]
   fn3.registerInterpretedFunction('outermost', '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
-  fn3.registerFunction('path', @xqFunctionPath, [[stringOrEmpty],  [nodeOrEmpty, stringOrEmpty]]);
+  fn3.registerFunction('path', @xqFunctionPath, [xqcdFocusItem]).setVersionsShared([stringOrEmpty],  [nodeOrEmpty, stringOrEmpty]);
 
-  fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, [[integerOrEmpty, stringt, stringt],  [integerOrEmpty, stringt, stringOrEmpty, stringt]]);
-  fn3.registerFunction('format-dateTime', @xqFunctionFormat_DateTime, [[dateTimeOrEmpty, stringt, stringOrEmpty],  [dateTimeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]]);
-  fn3.registerFunction('format-date', @xqFunctionFormat_Date, [[dateOrEmpty, stringt, stringOrEmpty],  [dateOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]]);
-  fn3.registerFunction('format-time', @xqFunctionFormat_Time, [[timeOrEmpty, stringt, stringOrEmpty],  [timeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]]);
-  fn3.registerFunction('format-number', @xqFunctionFormat_Number, [[numericOrEmpty, stringt, stringt],  [numericOrEmpty, stringt, stringOrEmpty, stringt]]);
+  fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, [xqcdContextOther]).setVersionsShared([integerOrEmpty, stringt, stringt],  [integerOrEmpty, stringt, stringOrEmpty, stringt]);
+  fn3.registerFunction('format-dateTime', @xqFunctionFormat_DateTime, [xqcdContextOther]).setVersionsShared([dateTimeOrEmpty, stringt, stringOrEmpty],  [dateTimeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]);
+  fn3.registerFunction('format-date', @xqFunctionFormat_Date, [xqcdContextOther]).setVersionsShared([dateOrEmpty, stringt, stringOrEmpty],  [dateOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]);
+  fn3.registerFunction('format-time', @xqFunctionFormat_Time, [xqcdContextOther]).setVersionsShared([timeOrEmpty, stringt, stringOrEmpty],  [timeOrEmpty, stringt, stringOrEmpty, stringOrEmpty, stringOrEmpty, stringOrEmpty]);
+  fn3.registerFunction('format-number', @xqFunctionFormat_Number, [xqcdContextOther]).setVersionsShared([numericOrEmpty, stringt, stringt],  [numericOrEmpty, stringt, stringOrEmpty, stringt]);
 
-  fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, [QName, integer, functiontOrEmpty]);
-  fn3.registerFunction('function-name', @xqFunctionFunction_Name, [functiont, QNameOrEmpty]);
-  fn3.registerFunction('function-arity', @xqFunctionFunction_Arity, [functiont, integer]);
+  fn3.registerFunction('function-lookup', @xqFunctionFunction_lookup, [xqcdContextOther]).setVersionsShared([QName, integer, functiontOrEmpty]);
+  fn3.registerFunction('function-name', @xqFunctionFunction_Name).setVersionsShared([functiont, QNameOrEmpty]);
+  fn3.registerFunction('function-arity', @xqFunctionFunction_Arity).setVersionsShared([functiont, integer]);
 
   //[itemStar, functiont, itemStar]
   fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
   //[itemStar, functiont, itemStar]
   fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
-  fn3.registerFunction('fold-left', @xqFunctionFold_left, [itemStar, itemStar, functionItemStarItemItemStar, itemStar]);
-  fn3.registerFunction('fold-right', @xqFunctionFold_right, [itemStar, itemStar, functionItemItemStarItemStar, itemStar]);
-  fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, [itemStar, itemStar, functionItemItemItemStar, itemStar]);
+  fn3.registerFunction('fold-left', @xqFunctionFold_left, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemStarItemItemStar, itemStar]);
+  fn3.registerFunction('fold-right', @xqFunctionFold_right, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemItemStarItemStar, itemStar]);
+  fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemItemItemStar, itemStar]);
 
-  fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable, [stringt, stringOrEmpty]);
-  fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables, [stringStar]);
+  fn3.registerFunction('environment-variable', @xqFunctionEnvironment_Variable).setVersionsShared([stringt, stringOrEmpty]);
+  fn3.registerFunction('available-environment-variables', @xqFunctionAvailable_Environment_Variables).setVersionsShared([stringStar]);
 
-  fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [stringOrEmpty, documentElementNodeOrEmpty], [xqcdFocusItem]);
-  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [stringOrEmpty, documentElementNodeOrEmpty], [xqcdFocusItem]);
-  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [stringOrEmpty, documentElementNodeOrEmpty], [xqcdFocusItem]);
-  fn3.registerFunction('serialize', @xqFunctionSerialize, [[itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]]);
-  fn3_1.registerFunction('serialize', @xqFunctionSerialize, [[itemStar, stringt],  [itemStar, itemOrEmpty, stringt]]);
+  fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  fn3.registerFunction('serialize', @xqFunctionSerialize).setVersionsShared([itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]);
+  fn3_1.registerFunction('serialize', @xqFunctionSerialize).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
-  fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, [[stringOrEmpty, stringOrEmpty],  [stringOrEmpty, stringt, stringOrEmpty]], []);
-  fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, [[stringOrEmpty, boolean],  [stringOrEmpty, stringt, boolean]], []);
+  fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, dependencyNone).setVersionsShared([stringOrEmpty, stringOrEmpty],  [stringOrEmpty, stringt, stringOrEmpty]);
+  fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, dependencyNone).setVersionsShared([stringOrEmpty, boolean],  [stringOrEmpty, stringt, boolean]);
   fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?) as xs:string*',                          'x:lines(fn:unparsed-text($href           ))');
   fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?, $encoding as xs:string) as xs:string*',  'x:lines(fn:unparsed-text($href, $encoding))');
 
@@ -7310,57 +7320,65 @@ transform
   x.registerInterpretedFunction('cps', '($list as item()*) as item()*',  '$list ! (typeswitch (.) case xs:decimal|xs:double|xs:float return codepoints-to-string(.) default return string-to-codepoints(.))');
 
 
-  fn3.registerFunction('generate-id', @xqFunctionGenerateId, [[stringt],  [nodeOrEmpty, stringt]]);
-  fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())']);
+  fn3.registerFunction('generate-id', @xqFunctionGenerateId, dependencyAll).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
+  fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())'], [xqcdContextOther]);
 
   //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
 
-  fn3_1.registerFunction('apply', @xqFunctionApply, [functiont, arrayt, itemStar]);
-  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [[stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]]);
-  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, [language]);
-  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date, [stringOrEmpty, dateTimeOrEmpty]);
-  fn3_1.registerFunction('sort', @xqFunctionSort, [[itemStar, itemStar],  [itemStar, stringOrEmpty, itemStar],  [itemStar, stringOrEmpty, functionItemAtomicStar, itemStar]]);
-  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1,[stringOrEmpty, stringStar]);
-  fn3_1.registerFunction('trace', @xqFunctionTrace, [itemStar, itemStar]);
-  fn3_1.registerFunction('error', @xqFunctionError, [QNameOrEmpty, none]);
-  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, [[stringt, base64Binary],  [stringt, stringt, base64Binary]]);
+  fn3_1.registerFunction('apply', @xqFunctionApply, dependencyNone).setVersionsShared([functiont, arrayt, itemStar]);
+  fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [xqcdContextCollation]).setVersionsShared([stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]);
+  fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, [xqcdContextCollation]).setVersionsShared([language]);
+  fn3_1.registerFunction('parse-ietf-date', @xqFunctionParse_Ietf_Date).setVersionsShared([stringOrEmpty, dateTimeOrEmpty]);
+  lastfn := fn3_1.registerFunction('sort', @xqFunctionSort, [xqcdContextCollation]);
+  lastfn.setVersionsShared(3);
+  lastfn.setVersionsShared(0, [itemStar, itemStar]);
+  lastfn.setVersionsShared(1, [itemStar, stringOrEmpty, itemStar]);
+  lastfn.setVersionsShared(2, [itemStar, stringOrEmpty, functionItemAtomicStar, itemStar]);
+  fn3_1.registerFunction('tokenize',@xqFunctionTokenize_1).setVersionsShared([stringOrEmpty, stringStar]);
+  fn3_1.registerFunction('trace', @xqFunctionTrace, [xqcdContextOther]).setVersionsShared([itemStar, itemStar]);
+  fn3_1.registerFunction('error', @xqFunctionError).setVersionsShared([QNameOrEmpty, none]);
+  fn3_1.registerFunction('collation-key', @xqFunctionCollation_Key, [xqcdContextCollation]).setVersionsShared([stringt, base64Binary],  [stringt, stringt, base64Binary]);
 
-  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [[stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]]);
-  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [[stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]]);
+  fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
+  fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   TXQueryEngine.registerNativeModule(fnarray);
-  fnarray.registerFunction('size', @xqFunctionArraySize, [arrayt, integer]);
-  fnarray.registerFunction('get', @xqFunctionArrayGet, [arrayt, integer, itemStar]);
-  fnarray.registerFunction('put', @xqFunctionArrayPut, [arrayt, integer, itemStar, arrayt]);
-  fnarray.registerFunction('append', @xqFunctionArrayAppend, [arrayt, itemStar, arrayt]);
-  fnarray.registerFunction('subarray', @xqFunctionArraySubarray, [[arrayt, integer, arrayt],  [arrayt, integer, integer, arrayt]]);
-  fnarray.registerFunction('remove', @xqFunctionArrayRemove, [arrayt, integerStar, arrayt]);
-  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before, [arrayt, integer, itemStar, arrayt]);
-  fnarray.registerFunction('head', @xqFunctionArrayHead, [arrayt, itemStar]);
-  fnarray.registerFunction('tail', @xqFunctionArrayTail, [arrayt, arrayt]);
-  fnarray.registerFunction('reverse', @xqFunctionArrayReverse, [arrayt, arrayt]);
-  fnarray.registerFunction('join', @xqFunctionArrayJoin, [arrayStar, arrayt]);
-  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, [arrayt, functionItemStarItemStar, arrayt]);
-  fnarray.registerFunction('filter', @xqFunctionArrayFilter, [arrayt, functionItemStarBoolean, arrayt]);
-  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, [arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
-  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, [arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
-  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, [arrayt, arrayt, functionItemStarItemStarItemStar, arrayt]);
-  fnarray.registerFunction('sort', @xqFunctionArraySort, [[arrayt, arrayt],  [arrayt, stringOrEmpty, arrayt],  [arrayt, stringOrEmpty, functionItemStarAtomicStar, arrayt]]);
-  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten, [itemStar, itemStar]);
+  fnarray.registerFunction('size', @xqFunctionArraySize).setVersionsShared([arrayt, integer]);
+  fnarray.registerFunction('get', @xqFunctionArrayGet).setVersionsShared([arrayt, integer, itemStar]);
+  fnarray.registerFunction('put', @xqFunctionArrayPut).setVersionsShared([arrayt, integer, itemStar, arrayt]);
+  fnarray.registerFunction('append', @xqFunctionArrayAppend).setVersionsShared([arrayt, itemStar, arrayt]);
+  fnarray.registerFunction('subarray', @xqFunctionArraySubarray).setVersionsShared([arrayt, integer, arrayt], [arrayt, integer, integer, arrayt]);
+  fnarray.registerFunction('remove', @xqFunctionArrayRemove).setVersionsShared([arrayt, integerStar, arrayt]);
+  fnarray.registerFunction('insert-before', @xqFunctionArrayInsert_before).setVersionsShared([arrayt, integer, itemStar, arrayt]);
+  fnarray.registerFunction('head', @xqFunctionArrayHead).setVersionsShared([arrayt, itemStar]);
+  fnarray.registerFunction('tail', @xqFunctionArrayTail).setVersionsShared([arrayt, arrayt]);
+  fnarray.registerFunction('reverse', @xqFunctionArrayReverse).setVersionsShared([arrayt, arrayt]);
+  fnarray.registerFunction('join', @xqFunctionArrayJoin).setVersionsShared([arrayStar, arrayt]);
+  fnarray.registerFunction('for-each', @xqFunctionArrayFor_each, [xqcdContextOther]).setVersionsShared([arrayt, functionItemStarItemStar, arrayt]);
+  fnarray.registerFunction('filter', @xqFunctionArrayFilter, [xqcdContextOther]).setVersionsShared([arrayt, functionItemStarBoolean, arrayt]);
+  fnarray.registerFunction('fold-left', @xqFunctionArrayFold_left, [xqcdContextOther]).setVersionsShared([arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
+  fnarray.registerFunction('fold-right', @xqFunctionArrayFold_right, [xqcdContextOther]).setVersionsShared([arrayt, itemStar, functionItemStarItemStarItemStar, itemStar]);
+  fnarray.registerFunction('for-each-pair', @xqFunctionArrayFor_each_pair, [xqcdContextOther]).setVersionsShared([arrayt, arrayt, functionItemStarItemStarItemStar, arrayt]);
+  lastfn := fnarray.registerFunction('sort', @xqFunctionArraySort, [xqcdContextOther,xqcdContextCollation]);
+  lastfn.setVersionsShared(3);
+  lastfn.setVersionsShared(0, [arrayt, arrayt]);
+  lastfn.setVersionsShared(1, [arrayt, stringOrEmpty, arrayt]);
+  lastfn.setVersionsShared(2, [arrayt, stringOrEmpty, functionItemStarAtomicStar, arrayt]);
+  fnarray.registerFunction('flatten', @xqFunctionArrayFlatten).setVersionsShared([itemStar, itemStar]);
 
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   TXQueryEngine.registerNativeModule(fnmap);
-  fnmap.registerFunction('merge', @xqFunctionMapMerge, [[mapStar, map],  [mapStar, map, map]]);
-  fnmap.registerFunction('size', @xqFunctionMapSize, [map, integer]);
-  fnmap.registerFunction('keys', @xqFunctionMapKeys, [map, atomicStar]);
-  fnmap.registerFunction('contains', @xqFunctionMapContains, [map, atomic, boolean]);
-  fnmap.registerFunction('get', @xqFunctionMapGet, [map, atomic, itemStar]);
-  fnmap.registerFunction('find', @xqFunctionMapFind, [itemStar, atomic, arrayt]);
-  fnmap.registerFunction('put', @xqFunctionMapPut, [map, atomic, itemStar, map]);
-  fnmap.registerFunction('entry', @xqFunctionMapEntry, [atomic, itemStar, map]);
-  fnmap.registerFunction('remove', @xqFunctionMapRemove, [map, atomicStar, map]);
-  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, [map, functionAtomicItemStarItemStar, itemStar]);
+  fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
+  fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
+  fnmap.registerFunction('keys', @xqFunctionMapKeys).setVersionsShared([map, atomicStar]);
+  fnmap.registerFunction('contains', @xqFunctionMapContains).setVersionsShared([map, atomic, boolean]);
+  fnmap.registerFunction('get', @xqFunctionMapGet).setVersionsShared([map, atomic, itemStar]);
+  fnmap.registerFunction('find', @xqFunctionMapFind).setVersionsShared([itemStar, atomic, arrayt]);
+  fnmap.registerFunction('put', @xqFunctionMapPut).setVersionsShared([map, atomic, itemStar, map]);
+  fnmap.registerFunction('entry', @xqFunctionMapEntry).setVersionsShared([atomic, itemStar, map]);
+  fnmap.registerFunction('remove', @xqFunctionMapRemove).setVersionsShared([map, atomicStar, map]);
+  fnmap.registerFunction('for-each', @xqFunctionMapFor_each, [xqcdContextOther]).setVersionsShared([map, functionAtomicItemStarItemStar, itemStar]);
 
 
 
@@ -7392,27 +7410,103 @@ transform
 
 
   op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[numericOrEmpty, numericOrEmpty, integer], []);
-  op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, decimal],  [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, decimal]], []);
-  op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration],  [doubleOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration],  [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration],  [doubleOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]], []);
+  lastfn := op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble]);
+  lastfn.setVersionsShared(5);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, decimal]);
+  lastfn.setVersionsShared(3, [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(4, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, decimal]);
+  lastfn := op.registerBinaryOp('*',@xqvalueMultiply,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble]);
+  lastfn.setVersionsShared(5);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, doubleOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [doubleOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(3, [dayTimeDurationOrEmpty, doubleOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(4, [doubleOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]);
   op.registerBinaryOp('mod',@xqvalueMod,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [numericOrEmpty, numericOrEmpty, numeric], []);
 
-  op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble], [[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration],  [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime],  [dateOrEmpty, yearMonthDurationOrEmpty, date],  [dateOrEmpty, dayTimeDurationOrEmpty, date],  [timeOrEmpty, dayTimeDurationOrEmpty, time],  [yearMonthDurationOrEmpty, dateTimeOrEmpty, dateTime],  [dayTimeDurationOrEmpty, dateTimeOrEmpty, dateTime],  [yearMonthDurationOrEmpty, dateOrEmpty, date],  [dayTimeDurationOrEmpty, dateOrEmpty, date],  [dayTimeDurationOrEmpty, timeOrEmpty, time]], []);
-  op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[[numericOrEmpty, numericOrEmpty, numeric],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration],  [dateTimeOrEmpty, dateTimeOrEmpty, dayTimeDuration],  [dateOrEmpty, dateOrEmpty, dayTimeDuration],  [timeOrEmpty, timeOrEmpty, dayTimeDuration],  [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime],  [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime],  [dateOrEmpty, yearMonthDurationOrEmpty, date],  [dateOrEmpty, dayTimeDurationOrEmpty, date],  [timeOrEmpty, dayTimeDurationOrEmpty, time]], []);
+  lastfn := op.registerBinaryOp('+',@xqvalueAdd,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble], []);
+  lastfn.setVersionsShared(13);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(3, [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(4, [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(5, [dateOrEmpty, yearMonthDurationOrEmpty, date]);
+  lastfn.setVersionsShared(6, [dateOrEmpty, dayTimeDurationOrEmpty, date]);
+  lastfn.setVersionsShared(7, [timeOrEmpty, dayTimeDurationOrEmpty, time]);
+  lastfn.setVersionsShared(8, [yearMonthDurationOrEmpty, dateTimeOrEmpty, dateTime]);
+  lastfn.setVersionsShared(9, [dayTimeDurationOrEmpty, dateTimeOrEmpty, dateTime]);
+  lastfn.setVersionsShared(10, [yearMonthDurationOrEmpty, dateOrEmpty, date]);
+  lastfn.setVersionsShared(11, [dayTimeDurationOrEmpty, dateOrEmpty, date]);
+  lastfn.setVersionsShared(12, [dayTimeDurationOrEmpty, timeOrEmpty, time]);
+
+  lastfn := op.registerBinaryOp('-',@xqvalueSubtract,70,[xqofAssociativeSyntax,xqofCastUntypedToDouble], []);
+  lastfn.setVersionsShared(11);
+  lastfn.setVersionsShared(0, [numericOrEmpty, numericOrEmpty, numeric]);
+  lastfn.setVersionsShared(1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, yearMonthDuration]);
+  lastfn.setVersionsShared(2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(3, [dateTimeOrEmpty, dateTimeOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(4, [dateOrEmpty, dateOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(5, [timeOrEmpty, timeOrEmpty, dayTimeDuration]);
+  lastfn.setVersionsShared(6, [dateTimeOrEmpty, yearMonthDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(7, [dateTimeOrEmpty, dayTimeDurationOrEmpty, dateTime]);
+  lastfn.setVersionsShared(8, [dateOrEmpty, yearMonthDurationOrEmpty, date]);
+  lastfn.setVersionsShared(9, [dateOrEmpty, dayTimeDurationOrEmpty, date]);
+  lastfn.setVersionsShared(10, [timeOrEmpty, dayTimeDurationOrEmpty, time]);
 
   op.registerBinaryOp('to',@xqvalueTo,60,[],[integerOrEmpty, integerOrEmpty, integerStar], []);
 
   op.registerBinaryOp('||',@xqvalueConcat,55,[xqofAssociativeSyntax],[atomicOrEmpty, atomicOrEmpty, stringt], []).acceptedModels:=PARSING_MODEL3;
 
 
-  op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString],  [[numericOrEmpty, numericOrEmpty, boolean],  [durationOrEmpty, durationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [gYearMonthOrEmpty, gYearMonthOrEmpty, boolean],  [gYearOrEmpty, gYearOrEmpty, boolean],  [gMonthDayOrEmpty, gMonthDayOrEmpty, boolean],  [gMonthOrEmpty, gMonthOrEmpty, boolean],  [gDayOrEmpty, gDayOrEmpty, boolean],  [QNameOrEmpty, QNameOrEmpty, boolean],  [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean],  [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean],  [NOTATIONOrEmpty, NOTATIONOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-  op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString],[[numericOrEmpty, numericOrEmpty, boolean],  [durationOrEmpty, durationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [gYearMonthOrEmpty, gYearMonthOrEmpty, boolean],  [gYearOrEmpty, gYearOrEmpty, boolean],  [gMonthDayOrEmpty, gMonthDayOrEmpty, boolean],  [gMonthOrEmpty, gMonthOrEmpty, boolean],  [gDayOrEmpty, gDayOrEmpty, boolean],  [QNameOrEmpty, QNameOrEmpty, boolean],  [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean],  [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean],  [NOTATIONOrEmpty, NOTATIONOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  lastfn := op.registerBinaryOp('eq',@xqvalueEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  lastfn.setVersionsShared( 16 );
+  lastfn.setVersionsShared( 0, [numericOrEmpty, numericOrEmpty, boolean]);
+  lastfn.setVersionsShared( 1, [durationOrEmpty, durationOrEmpty, boolean]);
+  lastfn.setVersionsShared( 2, [dateTimeOrEmpty, dateTimeOrEmpty, boolean]);
+  lastfn.setVersionsShared( 3, [dateOrEmpty, dateOrEmpty, boolean]);
+  lastfn.setVersionsShared( 4, [timeOrEmpty, timeOrEmpty, boolean]);
+  lastfn.setVersionsShared( 5, [gYearMonthOrEmpty, gYearMonthOrEmpty, boolean]);
+  lastfn.setVersionsShared( 6, [gYearOrEmpty, gYearOrEmpty, boolean]);
+  lastfn.setVersionsShared( 7, [gMonthDayOrEmpty, gMonthDayOrEmpty, boolean]);
+  lastfn.setVersionsShared( 8, [gMonthOrEmpty, gMonthOrEmpty, boolean]);
+  lastfn.setVersionsShared( 9, [gDayOrEmpty, gDayOrEmpty, boolean]);
+  lastfn.setVersionsShared(10, [QNameOrEmpty, QNameOrEmpty, boolean]);
+  lastfn.setVersionsShared(11, [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean]);
+  lastfn.setVersionsShared(12, [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean]);
+  lastfn.setVersionsShared(13, [NOTATIONOrEmpty, NOTATIONOrEmpty, boolean]);
+  lastfn.setVersionsShared(14, [stringOrEmpty, stringOrEmpty, boolean]);
+  lastfn.setVersionsShared(15, [booleanOrEmpty, booleanOrEmpty, boolean]);
+  op.registerBinaryOp('ne',@xqvalueUnequalAtomic,50,[xqofCastUntypedToString],  [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(lastfn.versions);
 
-  templt := op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],  [[numericOrEmpty, numericOrEmpty, boolean],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  templt := op.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  templt.setVersionsShared( 8 );
+  templt.setVersionsShared( 0, [numericOrEmpty, numericOrEmpty, boolean]);
+  templt.setVersionsShared( 1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 3, [dateTimeOrEmpty, dateTimeOrEmpty, boolean]);
+  templt.setVersionsShared( 4, [dateOrEmpty, dateOrEmpty, boolean]);
+  templt.setVersionsShared( 5, [timeOrEmpty, timeOrEmpty, boolean]);
+  templt.setVersionsShared( 6, [stringOrEmpty, stringOrEmpty, boolean]);
+  templt.setVersionsShared( 7, [booleanOrEmpty, booleanOrEmpty, boolean]);
   op.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
   op.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
   op.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
 
-  templt := op3_1.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString],[[numericOrEmpty, numericOrEmpty, boolean],  [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean],  [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean],  [dateTimeOrEmpty, dateTimeOrEmpty, boolean],  [dateOrEmpty, dateOrEmpty, boolean],  [timeOrEmpty, timeOrEmpty, boolean],  [stringOrEmpty, stringOrEmpty, boolean],  [booleanOrEmpty, booleanOrEmpty, boolean],  [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean],  [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean]], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  templt := op3_1.registerBinaryOp('lt',@xqvalueLessThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  templt.setVersionsShared( 10 );
+  templt.setVersionsShared( 0, [numericOrEmpty, numericOrEmpty, boolean]);
+  templt.setVersionsShared( 1, [yearMonthDurationOrEmpty, yearMonthDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 2, [dayTimeDurationOrEmpty, dayTimeDurationOrEmpty, boolean]);
+  templt.setVersionsShared( 3, [dateTimeOrEmpty, dateTimeOrEmpty, boolean]);
+  templt.setVersionsShared( 4, [dateOrEmpty, dateOrEmpty, boolean]);
+  templt.setVersionsShared( 5, [timeOrEmpty, timeOrEmpty, boolean]);
+  templt.setVersionsShared( 6, [stringOrEmpty, stringOrEmpty, boolean]);
+  templt.setVersionsShared( 7, [booleanOrEmpty, booleanOrEmpty, boolean]);
+  templt.setVersionsShared( 8, [hexBinaryOrEmpty, hexBinaryOrEmpty, boolean]);
+  templt.setVersionsShared( 9, [base64BinaryOrEmpty, base64BinaryOrEmpty, boolean]);
   op3_1.registerBinaryOp('gt',@xqvalueGreaterThanAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
   op3_1.registerBinaryOp('le',@xqvalueLessEqualAtomic,50,[xqofCastUntypedToString],   [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);
   op3_1.registerBinaryOp('ge',@xqvalueGreaterEqualAtomic,50,[xqofCastUntypedToString], [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared(templt.versions);

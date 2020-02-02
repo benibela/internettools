@@ -1510,6 +1510,10 @@ type
     class function checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean; static;
     function getVersion(arity: integer): PXQFunctionParameterTypes;
     procedure setVersionsShared(const v: array of TXQFunctionParameterTypes);
+    procedure setVersionsShared(const v: array of TXQTermSequenceType);
+    procedure setVersionsShared(const v,w: array of TXQTermSequenceType);
+    procedure setVersionsShared(i: integer; const v: array of TXQTermSequenceType);
+    procedure setVersionsShared(count: integer);
     function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
     destructor Destroy; override;
   private
@@ -2974,34 +2978,29 @@ type
   constructor create(const anamespace: TNamespace; const aparentModule: array of TXQNativeModule);
   constructor create(const anamespace: TNamespace);
   destructor Destroy; override;
-  type TXQTermSequenceTypeArray = array of TXQTermSequenceType;
 protected
-  function registerFunction(const name: string; func: TXQBasicFunction): TXQBasicFunctionInfo; overload;
-  function registerFunction(const name: string; func: TXQComplexFunction; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
   procedure setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of string);
-  procedure setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceTypeArray);
-  procedure setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: TXQTermSequenceTypeArray);
+  procedure setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceType);
 public
+  function registerFunction(const name: string; func: TXQComplexFunction; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo; overload;
+  function registerFunction(const name: string; func: TXQBasicFunction): TXQBasicFunctionInfo; overload;
   //** Registers a function that does not depend on the context.
   //** TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
   function registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo; overload;
-  function registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo;
-  function registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of TXQTermSequenceTypeArray): TXQBasicFunctionInfo;
-  function registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: TXQTermSequenceTypeArray): TXQBasicFunctionInfo;
+  function registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo; overload;
+  function registerBasicFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of TXQTermSequenceType): TXQBasicFunctionInfo; //this should also be called registerFunction, but then it does not find the overload
   //** Registers a function that does depend on the context.
   //**TypeChecking contains a list of standard XQuery function declarations (without the function name) for strict type checking.
   function registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
   function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
-  function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
-  function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
+  function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
   //** Registers a function from an XQuery body
   //**TypeChecking must a standard XQuery function declarations (without the function name but WITH the variable names) (it uses a simplified parser, so only space whitespace is allowed)
   procedure registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a binary operator
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of string; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
-  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
-  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
+  function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
   function findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQBasicFunctionInfo;
@@ -3014,9 +3013,6 @@ protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
   class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
-  {$ifdef dumpFunctions}
-  procedure logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
-  {$endif}
 end;
 
 
@@ -7314,6 +7310,48 @@ begin
   sharedVersions := true;
 end;
 
+procedure TXQAbstractFunctionInfo.setVersionsShared(const v: array of TXQTermSequenceType);
+begin
+  sharedVersions := true;
+  SetLength(versions, 1);
+  minArgCount:=length(v) - 1;
+  maxArgCount:=maxArgCount;
+  setVersionsShared(0, v);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(const v, w: array of TXQTermSequenceType);
+begin
+  sharedVersions := true;
+  SetLength(versions, 2);
+  minArgCount:=length(v) - 1;
+  maxArgCount:=maxArgCount;
+  setVersionsShared(0, v);
+  setVersionsShared(1, w);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(i: integer; const v: array of TXQTermSequenceType);
+var
+  arglen: Integer;
+begin
+  arglen := length(v) - 1;
+  with versions[i] do begin
+    SetLength(types, arglen);
+    for i := 0 to high(types) do
+      types[i] := v[i];
+    returnType := v[high(v)];
+  end;
+  minArgCount:=min(minArgCount, arglen);
+  maxArgCount:=max(maxArgCount, arglen);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(count: integer);
+begin
+  SetLength(versions, count);
+  sharedVersions := true;
+  minArgCount := high(minArgCount);
+  maxArgCount := low(minArgCount);
+end;
+
 
 function TXQAbstractFunctionInfo.checkOrConvertTypes(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm): integer;
 var
@@ -9140,34 +9178,16 @@ procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractF
 begin
   globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking, true);
   {$ifdef dumpFunctionTypes}logFunctionTypes(name, info);{$endif}
-  {$ifdef dumpFunctions}logFunctionCreation(name, temp, typeChecking);{$endif}
   if length(info.versions) > 0 then begin
     info.versions[0].name := name;
     info.guessArgCount;
   end;
 end;
 
-procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceTypeArray);
-var
-  i: Integer;
+procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceType);
 begin
-  SetLength(info.versions, length(typeChecking));
-  for i := 0 to high(typeChecking) do begin
-    info.versions[i].types := typeChecking[i];
-    SetLength(info.versions[i].types, length(info.versions[i].types) - 1);
-    info.versions[i].returnType := typeChecking[i][high(typeChecking[i])];
-  end;
-  info.sharedVersions := true;
-  {$ifdef dumpFunctions}logFunctionCreation(name, temp, typeChecking);{$endif}
-  if length(info.versions) > 0 then begin
-    info.versions[0].name := name;
-    info.guessArgCount;
-  end;
-end;
-
-procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: TXQTermSequenceTypeArray);
-begin
-  setTypeChecking(name, info, [typeChecking]);
+  info.setVersionsShared(typeChecking);
+  info.versions[0].name := name;
 end;
 
 function TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo;
@@ -9186,17 +9206,12 @@ begin
   setTypeChecking(name, result, typeChecking);
 end;
 
-function TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of TXQTermSequenceTypeArray): TXQBasicFunctionInfo;
+function TXQNativeModule.registerBasicFunction(const name: string; func: TXQBasicFunction; const typeChecking: array of TXQTermSequenceType): TXQBasicFunctionInfo;
 begin
   result := registerFunction(name, func);
   setTypeChecking(name, result, typeChecking);
 end;
 
-function TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction; const typeChecking: TXQTermSequenceTypeArray): TXQBasicFunctionInfo;
-begin
-  result := registerFunction(name, func);
-  setTypeChecking(name, result, typeChecking);
-end;
 
 function TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQComplexFunction; const typeChecking: array of string; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
 begin
@@ -9214,14 +9229,7 @@ begin
 end;
 
 function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction;
-  const typeChecking: array of TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
-begin
-  result := registerFunction(name, func, contextDependencies);
-  setTypeChecking(name, result, typeChecking);
-end;
-
-function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: TXQTermSequenceTypeArray;
-  contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
+  const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQComplexFunctionInfo;
 begin
   result := registerFunction(name, func, contextDependencies);
   setTypeChecking(name, result, typeChecking);
@@ -9248,14 +9256,7 @@ begin
 end;
 
 function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;
-  const typeChecking: array of TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
-begin
-  result := registerBinaryOp(name, func, priority, flags, contextDependencies);
-  setTypeChecking(name, result, typeChecking);
-end;
-
-function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;
-  const typeChecking: TXQTermSequenceTypeArray; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
+  const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
 begin
   result := registerBinaryOp(name, func, priority, flags, contextDependencies);
   setTypeChecking(name, result, typeChecking);

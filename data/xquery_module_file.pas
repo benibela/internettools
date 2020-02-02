@@ -736,49 +736,61 @@ end;
 
 
 procedure registerModuleFile;
+var
+  dependencyFiles: TXQContextDependencies;
+  lastfn: TXQComplexFunctionInfo;
 begin
   if Assigned(module) then exit;
 
   with globalTypes do begin
+    dependencyFiles := [low(TXQContextDependency),high(TXQContextDependency)];
     module :=  TXQNativeModule.create(XMLNamespace_Expath_File);
-    module.registerFunction('exists', @exists, [stringt, boolean]);
-    module.registerFunction('is-dir', @is_dir, [stringt, boolean]);
-    module.registerFunction('is-file', @is_file, [stringt, boolean]);
-    module.registerFunction('last-modified', @last_modified, [stringt, dateTime]);
-    module.registerFunction('size', @size, [stringt, integer]);
+    module.registerFunction('exists', @exists, dependencyFiles).setVersionsShared([stringt, boolean]);
+    module.registerFunction('is-dir', @is_dir, dependencyFiles).setVersionsShared([stringt, boolean]);
+    module.registerFunction('is-file', @is_file, dependencyFiles).setVersionsShared([stringt, boolean]);
+    module.registerFunction('last-modified', @last_modified, dependencyFiles).setVersionsShared([stringt, dateTime]);
+    module.registerFunction('size', @size, dependencyFiles).setVersionsShared([stringt, integer]);
 
-    module.registerFunction('append', @append, [[stringt, itemStar, empty],  [stringt, itemStar, elementSerializationParams, empty]]);
-    module.registerFunction('append-binary', @append_binary, [stringt, base64Binary, empty]);
-    module.registerFunction('append-text', @append_text, [[stringt, stringt, empty],  [stringt, stringt, stringt, empty]]);
-    module.registerFunction('append-text-lines', @append_text_lines, [[stringt, stringStar, empty],  [stringt, stringStar, stringt, empty]]);
-    module.registerFunction('copy', @copy, [stringt, stringt, empty]);
-    module.registerFunction('create-dir', @create_dir, [stringt, empty]);
-    module.registerFunction('create-temp-dir', @create_temp_dir, [[stringt, stringt, stringt],  [stringt, stringt, stringt, stringt]]);
-    module.registerFunction('create-temp-file', @create_temp_file, [[stringt, stringt, stringt],  [stringt, stringt, stringt, stringt]]);
-    module.registerFunction('delete', @delete, [[stringt, empty],  [stringt, boolean, empty]]);
-    module.registerFunction('list', @list, [[stringt, stringStar],  [stringt, boolean, stringStar],  [stringt, boolean, stringt, stringStar]]);
-    module.registerFunction('move', @move, [stringt, stringt, empty]);
-    module.registerFunction('read-binary', @read_binary, [[stringt, base64Binary],  [stringt, integer, base64Binary],  [stringt, integer, integer, base64Binary]]);
-    module.registerFunction('read-text', @read_text, [[stringt, stringt],  [stringt, stringt, stringt]]);
+    module.registerFunction('append', @append, dependencyFiles).setVersionsShared([stringt, itemStar, empty],  [stringt, itemStar, elementSerializationParams, empty]);
+    module.registerFunction('append-binary', @append_binary, dependencyFiles).setVersionsShared([stringt, base64Binary, empty]);
+    module.registerFunction('append-text', @append_text, dependencyFiles).setVersionsShared([stringt, stringt, empty],  [stringt, stringt, stringt, empty]);
+    module.registerFunction('append-text-lines', @append_text_lines, dependencyFiles).setVersionsShared([stringt, stringStar, empty],  [stringt, stringStar, stringt, empty]);
+    module.registerFunction('copy', @copy, dependencyFiles).setVersionsShared([stringt, stringt, empty]);
+    module.registerFunction('create-dir', @create_dir, dependencyFiles).setVersionsShared([stringt, empty]);
+    module.registerFunction('create-temp-dir', @create_temp_dir, dependencyFiles).setVersionsShared([stringt, stringt, stringt],  [stringt, stringt, stringt, stringt]);
+    module.registerFunction('create-temp-file', @create_temp_file, dependencyFiles).setVersionsShared([stringt, stringt, stringt],  [stringt, stringt, stringt, stringt]);
+    module.registerFunction('delete', @delete, dependencyFiles).setVersionsShared([stringt, empty],  [stringt, boolean, empty]);
+    lastfn := module.registerFunction('list', @list, dependencyFiles);
+    lastfn.setVersionsShared(3);
+    lastfn.setVersionsShared([stringt, stringStar]);
+    lastfn.setVersionsShared([stringt, boolean, stringStar]);
+    lastfn.setVersionsShared([stringt, boolean, stringt, stringStar]);
+    module.registerFunction('move', @move, dependencyFiles).setVersionsShared([stringt, stringt, empty]);
+    lastfn := module.registerFunction('read-binary', @read_binary, dependencyFiles);
+    lastfn.setVersionsShared(3);
+    lastfn.setVersionsShared([stringt, base64Binary]);
+    lastfn.setVersionsShared([stringt, integer, base64Binary]);
+    lastfn.setVersionsShared([stringt, integer, integer, base64Binary]);
+    module.registerFunction('read-text', @read_text, dependencyFiles).setVersionsShared([stringt, stringt],  [stringt, stringt, stringt]);
     //[stringt, stringStar]
     module.registerInterpretedFunction('read-text-lines', '($file as xs:string) as xs:string*',                          'x:lines(file:read-text($file           ))');
     module.registerInterpretedFunction('read-text-lines', '($file as xs:string, $encoding as xs:string) as xs:string*',  'x:lines(file:read-text($file, $encoding))');
-    module.registerFunction('write', @write, [[stringt, itemStar, empty],  [stringt, itemStar, elementSerializationParams, empty]]);
-    module.registerFunction('write-binary', @write_binary, [[stringt, base64Binary, empty],  [stringt, base64Binary, integer, empty]]);
-    module.registerFunction('write-text', @write_text, [[stringt, stringt, empty],  [stringt, stringt, stringt, empty]]);
-    module.registerFunction('write-text-lines', @write_text_lines, [[stringt, stringStar, empty],  [stringt, stringStar, stringt, empty]]);
+    module.registerFunction('write', @write, dependencyFiles).setVersionsShared([stringt, itemStar, empty],  [stringt, itemStar, elementSerializationParams, empty]);
+    module.registerFunction('write-binary', @write_binary, dependencyFiles).setVersionsShared([stringt, base64Binary, empty],  [stringt, base64Binary, integer, empty]);
+    module.registerFunction('write-text', @write_text, dependencyFiles).setVersionsShared([stringt, stringt, empty],  [stringt, stringt, stringt, empty]);
+    module.registerFunction('write-text-lines', @write_text_lines, dependencyFiles).setVersionsShared([stringt, stringStar, empty],  [stringt, stringStar, stringt, empty]);
 
-    module.registerFunction('name', @name, [stringt, stringt]);
-    module.registerFunction('parent', @parent, [stringt, stringOrEmpty]);
-    module.registerFunction('path-to-native', @path_to_native, [stringt, stringt]);
-    module.registerFunction('children', @children, [stringt, stringStar]);
-    module.registerFunction('path-to-uri', @path_to_uri, [stringt, anyURI]);
-    module.registerFunction('resolve-path', @resolve_path, [stringt, stringt]);
+    module.registerFunction('name', @name).setVersionsShared([stringt, stringt]);
+    module.registerFunction('parent', @parent, dependencyFiles).setVersionsShared([stringt, stringOrEmpty]);
+    module.registerFunction('path-to-native', @path_to_native, dependencyFiles).setVersionsShared([stringt, stringt]);
+    module.registerFunction('children', @children, dependencyFiles).setVersionsShared([stringt, stringStar]);
+    module.registerFunction('path-to-uri', @path_to_uri, dependencyFiles).setVersionsShared([stringt, anyURI]);
+    module.registerFunction('resolve-path', @resolve_path, dependencyFiles).setVersionsShared([stringt, stringt]);
 
-    module.registerFunction('dir-separator', @dir_separator, [stringt]);
-    module.registerFunction('line-separator', @line_separator, [stringt]);
-    module.registerFunction('path-separator', @path_separator, [stringt]);
-    module.registerFunction('temp-dir', @temp_dir, [stringt]);
+    module.registerFunction('dir-separator', @dir_separator).setVersionsShared([stringt]);
+    module.registerFunction('line-separator', @line_separator).setVersionsShared([stringt]);
+    module.registerFunction('path-separator', @path_separator).setVersionsShared([stringt]);
+    module.registerFunction('temp-dir', @temp_dir).setVersionsShared([stringt]);
     module.registerInterpretedFunction('base-dir', '() as xs:string', 'Q{http://expath.org/ns/file}parent(static-base-uri())');
     module.registerInterpretedFunction('current-dir', '() as xs:string', 'Q{http://expath.org/ns/file}resolve-path(".")');
   end;
