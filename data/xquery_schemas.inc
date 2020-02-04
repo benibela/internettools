@@ -985,20 +985,83 @@ begin
 end;
 
 procedure TXSSchema.cacheDescendants;
+var graph: array[0..64] of record
+  count: integer;
+  children: array[0..23] of integer;
+end;
+  function initDescendants(t: TXSType): Int64;
+  var
+    i: Integer;
+    c: TXSType;
+  begin
+    if t.descendantsIds > 0 then exit(t.descendantsIds);
+    result := int64(1) shl t.id;
+    with graph[t.id] do begin
+      for i := 0 to count - 1 do begin
+        c := TXSType(typeList.Objects[children[i]]);
+        result := result or initDescendants(c);
+      end;
+    end;
+    t.descendantsIds := result;
+  end;
+
 var
-  i, j: Integer;
+  i,j: Integer;
+  parent, curType: TXSType;
 begin
   assert(typeList.Count < 64);
   assert((hiddenTypeList = nil) or (hiddenTypeList.count = 0));
   for i := 0 to typeList.Count - 1 do begin
-    TXSType(typeList.Objects[i]).id := -1;
+    TXSType(typeList.Objects[i]).id := i;
     TXSType(typeList.Objects[i]).descendantsIds := 0;
-    for j := 0 to typeList.Count - 1 do
-      if TXSType(typeList.Objects[j]).derivedFrom(TXSType(typeList.Objects[i])) then
-        TXSType(typeList.Objects[i]).descendantsIds := TXSType(typeList.Objects[i]).descendantsIds or (int64(1) shl j);
+    graph[i].count := 0;
+  end;
+  //convert schema parent relationships to tree
+  for i := 0 to typeList.Count - 1 do begin
+    curType := TXSType(typeList.Objects[i]);
+    parent := curType.base;
+    if parent <> nil then
+      with graph[parent.id] do begin
+        children[count] := i;
+        count += 1;
+        assert(count < 24);
+      end;
+  end;
+  //separately handle union types
+  for i := 1 to 2 do begin
+    if i = 1 then curType := numericPseudoType else curType := untypedOrNodeUnion;
+    with TXSUnionType(curType), graph[curType.id] do begin
+      for j := 0 to high(members) do
+        children[count + j] := members[j].id;
+      count += length(members);
+      assert(count < 24);
+    end;
   end;
   for i := 0 to typeList.Count - 1 do
-    TXSType(typeList.Objects[i]).id := i;
+    initDescendants(TXSType(typeList.Objects[i]));
+
+  {writeln('children:');
+
+  for i := 0 to typeList.Count - 1 do begin
+    writeln;
+    writeln(TXSType(typeList.Objects[i]).name, ' ',TXSType(typeList.Objects[i]).id, ' ',i);
+    with graph[i] do
+      for j := 0 to count - 1 do begin
+        curType := TXSType(typeList.Objects[children[j]]);
+        write(curType.name, ' ');
+      end;
+  end;
+
+  writeln('descendants:');
+
+  for i := 0 to typeList.Count - 1 do begin
+    writeln;
+    writeln(TXSType(typeList.Objects[i]).name, ' ',TXSType(typeList.Objects[i]).id, ' ',i);
+    for j := 0 to typeList.Count - 1 do
+      if TXSType(typeList.Objects[j]).derivedFrom(TXSType(typeList.Objects[i])) then
+        write(TXSType(typeList.Objects[j]).name,  '  ');
+  end;}
+
 end;
 
 
@@ -1211,7 +1274,8 @@ begin
   typeList.AddObject('error', error);
 
   numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
-  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyAtomicType, TXQValueString, [untypedAtomic, untyped, node]);
+
+  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, TXQValueString, [untypedAtomic, untyped, node]);
   typeList.sorted := true;
 end;
 
