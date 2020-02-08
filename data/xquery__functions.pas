@@ -4600,6 +4600,12 @@ var newstate: TRandomNumberGenerator;
     if mode = xqtrngmPermute then begin
       setlength(result.parameters, 1);
       result.parameters[0].variable := TXQTermVariable.create('arg');
+      result.parameters[0].seqtype := TXQTermSequenceType(globalTypes.itemStar.clone);
+      result.resulttype := TXQTermSequenceType(globalTypes.itemStar.clone);
+    end else begin
+      result.resulttype := TXQTermSequenceType.create(baseJSONiqSchema.object_);
+      result.resulttype.push(TXQTermSequenceType.create(baseSchema.string_));
+      result.resulttype.push(TXQTermSequenceType.create(tikAny));
     end;
   end;
 
