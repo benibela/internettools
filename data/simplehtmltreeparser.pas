@@ -2961,11 +2961,12 @@ end;
 
 
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
+//see http://mimesniff.spec.whatwg.org/
 var
   tdata: PChar;
   tdatalength: SizeInt;
-  function checkRawDataForHtml: boolean; //following http://mimesniff.spec.whatwg.org/ (except allowing #9 as TT ) todo: what is with utf-16?
-  var tocheck: array[1..16] of string = ('<!DOCTYPE HTML', '<HTML', '<HEAD', '<SCRIPT', '<IFRAME', '<H1', '<DIV', '<FONT', '<TABLE', '<A', '<STYLE', '<TITLE', '<B', '<BODY', '<BR', '<P');
+  function checkRawDataForHtml: boolean;
+  var tocheck: array[1..16] of string = ('<!DOCTYPE HTML', '<HTML', '<HEAD', '<TITLE', '<BODY', '<SCRIPT', '<IFRAME', '<H1', '<DIV', '<FONT', '<TABLE', '<A', '<STYLE', '<B', '<BR', '<P');
     i: Integer;
   begin
     for i := low(tocheck) to high(tocheck) do
@@ -2977,23 +2978,47 @@ var
   end;
 
 begin
+  if contenttype.beginsWithI('text/xml') or contenttype.beginsWithI('application/xml') then
+    exit(itfXML);
+  if contenttype.beginsWithI('text/html') then
+    exit(itfHTML);
+  if contenttype.beginsWithI('text/json') or contenttype.beginsWithI('application/json') then
+    exit(itfJSON);
+
+  if contenttype.containsI('html') then
+    exit(itfHTML);
+  if contenttype.containsI('xml') then
+    exit(itfXML);
+  if contenttype.containsI('json') then
+    exit(itfJSON);
+
+  if uri.endsWithI('.html') or uri.endsWithI('.htm') then
+    exit(itfHTML);
+  if uri.endsWithI('.xml') then
+    exit(itfXML);
+  if uri.endsWithI('.json') then
+    exit(itfJSON);
+
+
   tdata := pchar(data);
   tdatalength := length(data);
   strlTrim(tdata, tdatalength);
-  if striEndsWith(uri, 'html') or striEndsWith(uri, 'htm')
-     or striContains(contenttype, 'html')
-     or checkRawDataForHtml() then
-      Result := itfHTML
-    else if strBeginsWith(tdata, '<?xml') //mimesniff.spec says to check for this
-            or striContains(contenttype, 'xml') then
-      result := itfXML
-    else if striEndsWith(uri, '.json')
-         or striContains(contentType, 'json')
-         or strBeginsWith(tdata, '{')
-         or strBeginsWith(tdata, '[') then
-      result := itfJSON
-    else
-      result := itfXML;
+
+  if strBeginsWith(tdata, '<?xml') then
+    exit(itfXML);
+  if checkRawDataForHtml() then
+    exit(itfHTML);
+  if strBeginsWith(tdata, '{') or strBeginsWith(tdata, '[') then
+    exit(itfJSON);
+
+  if striBeginsWith(tdata, '<!doctype') then begin
+    tdata += 9;
+    tdatalength -= 9;
+    strlTrim(tdata, tdatalength);
+    if striBeginsWith(tdata, 'html') then exit(itfHTML);
+  end;
+
+  result := itfXML;
 end;
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
