@@ -158,6 +158,12 @@ type
   TCharSet = set of ansichar;
 {$ifdef FPC_HAS_CPSTRING}
   TBBStringHelper = Type Helper(TStringHelper) for AnsiString
+    function beginsWith(const s: string): boolean; inline;
+    function beginsWithI(const s: string): boolean; inline;
+    function endsWith(const s: string): boolean; inline;
+    function endsWithI(const s: string): boolean; inline;
+    function containsI(const s: string): boolean; inline;
+
       function EncodeHex: String; inline;
       function DecodeHex: String; inline;
       function RemoveFromLeft(chopoff: SizeInt): String;
@@ -5281,6 +5287,31 @@ begin
 end;
 
 {$ifdef FPC_HAS_CPSTRING}
+
+function TBBStringHelper.beginsWith(const s: string): boolean;
+begin
+  result := strbeginswith(self, s);
+end;
+
+function TBBStringHelper.beginsWithI(const s: string): boolean;
+begin
+  result := stribeginswith(self, s);
+end;
+
+function TBBStringHelper.endsWith(const s: string): boolean;
+begin
+  result := strendswith(self, s);
+end;
+
+function TBBStringHelper.endsWithI(const s: string): boolean;
+begin
+  result := striendswith(self, s);
+end;
+
+function TBBStringHelper.containsI(const s: string): boolean;
+begin
+  result := striContains(self, s);
+end;
 
 function TBBStringHelper.EncodeHex: String;
 begin
