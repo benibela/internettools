@@ -43,6 +43,7 @@ type
   TEnterTagEvent=function (tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult of object;
   TLeaveTagEvent=function (tagName: pchar; tagNameLen: SizeInt):TParsingResult of object;
   TCommentEvent=function (comment: pchar; commentLen: SizeInt):TParsingResult of object;
+  TDocTypeEvent=procedure (name: pchar; nameLen: SizeInt; more: pchar; moreLen: SizeInt) of object;
   TTextFlags = set of (tfCDATA);
   TTextEvent=function (text: pchar; textLen: SizeInt; textFlags: TTextFlags):TParsingResult of object;
 
@@ -71,7 +72,8 @@ type
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent;
                     commentEvent: TCommentEvent = nil;
-                    processingInstruction: TTextEvent = nil
+                    processingInstruction: TTextEvent = nil;
+                    docType: TDocTypeEvent = nil
                     );
 
 
@@ -105,12 +107,18 @@ end;
 procedure parseML(const html:string; const options: TParsingOptions;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent; commentEvent: TCommentEvent = nil;
-                    processingInstruction: TTextEvent = nil);
+                    processingInstruction: TTextEvent = nil;
+                    docType: TDocTypeEvent = nil);
 var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     valueStart:char;
     tempLen:longint;
     properties:THTMLProperties;
     cdataTag: boolean;
+  procedure parseWhitespace;
+  begin
+    while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
+  end;
+
   procedure handleProcessingInstruction;
   begin
     inc(pos);
@@ -119,6 +127,124 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     if Assigned(processingInstruction) then processingInstruction(marker, pos - marker, []);
     inc(pos, 2);
     marker := pos;
+  end;
+  procedure handleDocType;
+    procedure expect(const s: string);
+    var
+      i: Integer;
+    begin
+      for i := 1 to length(s) do
+        if (pos^ = s[i]) or (UpCase(pos^) = upcase(s[i])) then inc(pos)
+        else exit
+      //strliBeginsWith(pos+1, htmlEnd-pos, s
+      //inc(pos, length(s));
+    end;
+    function matches(const s: string): boolean;
+    begin
+      result := strliBeginsWith(pos, htmlEnd-pos, s);
+      if result then inc(pos, length(s));
+    end;
+
+    procedure parseName;
+    begin
+      while (pos<=htmlEnd) and  not (pos^ in (WHITE_SPACE + ['[','>','<'])) do inc(pos);
+    end;
+
+    procedure parseString;
+    var
+      c: Char;
+    begin
+      c := pos^;
+      inc(pos);
+      while (pos <= htmlEnd) and (pos^ <> c) do inc(pos);
+      if pos^ = c then inc(pos);
+    end;
+
+    procedure parseID;
+    begin
+      parseWhitespace;
+      case pos^ of
+        'S', 's': begin
+          expect('SYSTEM');
+          parseWhitespace;
+          parseString;
+        end;
+        'P', 'p': begin
+          expect('PUBLIC');
+          parseWhitespace;
+          parseString;
+          parseWhitespace;
+          if pos^ in ['"', ''''] then parseString;
+        end;
+      end;
+    end;
+
+
+  var
+    nameStart, moreStart: PChar;
+    nameLen: sizeint;
+  begin
+    pos := pos + 7;
+    parseWhitespace;
+    nameStart := pos;
+    parseName;
+    nameLen := pos - nameStart;
+    parseWhitespace;
+    moreStart := pos;
+    parseID;
+    parseWhitespace;
+    if pos^ = '[' then begin
+      while (pos <= htmlEnd) do begin
+        case pos^ of
+          '<': begin
+            inc(pos);
+            case pos^ of
+              '!': begin
+                inc(pos);
+                if matches('ELEMENT') or matches('ATTLIST') then begin
+                  parseWhitespace;
+                  parseName;
+                end else if matches('ENTITY') then begin
+                  parseWhitespace;
+                  if pos^ = '%' then begin inc(pos); parseWhitespace; end;
+                  parseName;
+                  parseWhitespace;
+                  case pos^ of
+                    'S', 's', 'P', 'p': parseID;
+                    '"', '''': parseString;
+                  end;
+                end else if matches('NOTATION') then begin
+                  parseWhitespace;
+                  parseName;
+                  parseWhitespace;
+                  parseID;
+                end;
+              end;
+              '?': begin
+                while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+              end;
+              '-': begin
+                inc(pos);
+                if (pos^ = '-') then begin
+                  inc(pos);
+                  while (pos<=htmlEnd) and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>')) do
+                    inc(pos);
+                end;
+              end;
+            end;
+            while (pos <= htmlEnd) and (pos^ <> '>') do inc(pos);
+            inc(pos);
+          end;
+          ']': begin inc(pos); break; end;
+          '>': break;
+          else inc(pos);
+        end;
+      end;
+    end;
+    parsewhitespace;
+    while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
+    if assigned(docType) then docType(nameStart,nameLen, moreStart, pos - moreStart);
+    inc(pos);
   end;
 
 begin
@@ -141,8 +267,8 @@ begin
             if (pos^ in ['D','d']) and ((pos+1)^ in ['O','o']) and ((pos+2)^ in ['C','c'])
                and ((pos+3)^ in ['T','t']) and ((pos+4)^ in ['Y','y'])and ((pos+5)^ in ['P','p'])
                and ((pos+6)^ in ['E','e'])  then begin//doctype
-              while (pos<=htmlEnd) and (pos^ <> '>') do inc(pos);
-              inc(pos);
+              handleDocType;
+              marker := pos;
              end else if (pos^ in ['[']) and (strliBeginsWith(pos+1, htmlEnd-pos, 'CDATA[')) then begin //cdata
                pos += 7;
                marker:=pos;
