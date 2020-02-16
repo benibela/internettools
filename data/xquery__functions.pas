@@ -1323,10 +1323,23 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
     end;
   end;
 
+  procedure addObject(const v: IXQValue);
+  var
+    p: TXQProperty;
+  begin
+    for p in v.getPropertyEnumerator do begin
+      if p.Value.kind <> pvkObject then
+        addPair(p.Name, p.Value.toString)
+       else begin
+         arrayAdd(specialNames, p.Name);
+         setlength(specialValues, length(specialValues) + 1);
+         specialValues[high(specialValues)] := p.Value;
+       end;
+    end;
+  end;
+
 var temp: IXQValue;
   v: PIXQValue;
-  tempobj: TXQValueObject;
-  i: Integer;
   sname: string;
   svalue: string;
 begin
@@ -1335,23 +1348,14 @@ begin
   specialNames := nil;
   specialValues := nil;
   for v in value.GetEnumeratorPtrUnsafe do
-    if v^ is TXQValueObject then begin
-      if (v^ as TXQValueObject).prototype = nil then temp := v^
-      else temp := v^.clone;
-      tempobj := temp as TXQValueObject;
-      for i:=0 to tempobj.values.count-1 do begin
-        if tempobj.values.Values[i].kind <> pvkObject then
-          addPair(tempobj.values.Names[i], tempobj.values.Values[i].toString)
-         else begin
-           arrayAdd(specialNames, tempobj.values.Names[i]);
-           setlength(specialValues, length(specialValues) + 1);
-           specialValues[high(specialValues)] := tempobj.values.Values[i];
-         end;
-      end;
-    end else if v^.kind = pvkNode then begin
-      if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
-        addPair(sname, svalue);
-    end else add(v^.toString)
+    case v^.kind of
+      pvkObject: addObject(v^);
+      pvkNode:
+        if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
+          addPair(sname, svalue)
+       else add(v^.toString);
+     else add(v^.toString)
+   end;
 end;
 
 procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValueObject; defaultValue: string = '');
@@ -1660,7 +1664,7 @@ var
     for i := 0 to high(specialNames) do begin
       j := mime.getFormDataIndex(specialNames[i]);
       temps := '';
-      if j >= 0 then temps := mime.data[j].data;;
+      if j >= 0 then temps := mime.data[j].data;
       addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i] as TXQValueObject, temps);
       if j >= 0 then begin
         mime.data[j] := mime.data[high(mime.data)];
@@ -2461,7 +2465,7 @@ end;
 function xqFunctionGet_Property({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 2);
-  if not (args[0] is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object');
+  if args[0].kind <> pvkObject then raise EXQEvaluationException.Create('pxp:OBJECT', 'Expected object');
   result := args[0].getProperty(args[1].toString);
 end;
 
