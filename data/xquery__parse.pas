@@ -780,6 +780,13 @@ end;
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
 var start:pchar;
+  procedure error(const s: string);
+  begin
+    lastTokenStart := start;
+    raiseSyntaxError(s);
+  end;
+
+var
    numberE, numberPoint: boolean;
    tempOp: TXQOperatorInfo;
 begin
@@ -794,10 +801,7 @@ begin
           if ((pos+1)^ <> start^) then break
           else pos+=1;
       until pos^ in [#0];
-      if pos^ = #0 then begin
-        lastTokenStart := start;
-        raiseSyntaxErrorFatal('Unclosed string');
-      end;
+      if pos^ = #0 then error('Unclosed string');
       pos+=1;
     end;
     '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', '@', '$', '%', '-': begin//SYMBOLS+START_SYMBOLS - [:-]
@@ -826,19 +830,19 @@ begin
         repeat
           pos+=1;
           if pos^ = '.' then begin
-            if numberPoint then raiseSyntaxError('Double . in number');
+            if numberPoint then error('Double . in number');
             numberPoint:=true;
             pos+=1;
           end;
           if pos^ in ['e','E'] then begin
-            if numberE then raiseSyntaxError('Double e in number');
+            if numberE then error('Double e in number');
             pos+=1;
             numberE:=true;
-            if not (pos^ in ['0'..'9','+','-']) then raiseSyntaxError('Invalid character after e in number')
+            if not (pos^ in ['0'..'9','+','-']) then error('Invalid character after e in number')
             else pos+=1;
           end;
         until not (pos^ in ['0'..'9']);
-        if (pos^ in ['a'..'z','A'..'Z']) then raiseSyntaxError('Space needed between number and non-symbolic operator');
+        if (pos^ in ['a'..'z','A'..'Z']) then error('Space needed between number and non-symbolic operator');
       end;
     end;
     else begin
@@ -1361,13 +1365,9 @@ var token: String;
     var flags: TXQTermFlowerWindowFlags;
       window: TXQTermFlowerWindow;
     begin
-      token := nextToken();
-      flags := [];
-      case token of
-        'tumbling': ; //flags := [];
-        'sliding': flags := [xqtfwSliding];
-        else raiseSyntaxError('Expected variable, sliding/tumbling window or pattern in flowr expression, but got: '+token);
-      end;
+      if nextTokenIs('tumbling') then flags := []
+      else if nextTokenIs('sliding') then flags := [xqtfwSliding]
+      else raiseSyntaxError('Expected variable, sliding/tumbling window or pattern in flowr expression, but got: '+nextToken());
       requireXQuery3();
       expect('window');
       window := TXQTermFlowerWindow.Create;
@@ -1386,7 +1386,7 @@ var token: String;
       else if xqtfwSliding in window.flags then expect('end');
     end;
 
-  var temp: string;
+  var
     clause: TXQTermFlowerLet;
     patternclause: TXQTermFlowerLetPattern;
     isfor: boolean;
@@ -1413,31 +1413,26 @@ var token: String;
         with clause do begin
           loopvar := parseFlowerVariable;
 
-          temp := nextToken;
-          if temp = 'as' then begin
+          if nextTokenIs('as') then begin
             requireXQuery;
             sequenceTyp := parseSequenceType([]);
-            temp := nextToken;
           end else sequenceTyp := nil;
 
           if kind = xqtfcFor then begin
-
-            if temp = 'allowing' then begin
+            if nextTokenIs('allowing') then begin
               requireXQuery3;
               expect('empty');
               TXQTermFlowerFor(clause).allowingEmpty := true;
-              temp := nextToken;
             end;
 
-            if temp = 'at' then begin
+            if nextTokenIs('at') then begin
               requireXQuery;
               TXQTermFlowerFor(clause).positionvar := parseFlowerVariable;
-              temp := nextToken;
             end;
 
-            if temp <> 'in' then raiseSyntaxError('Expected "in".')
+            expect('in');
           end else
-            if temp <> ':=' then raiseSyntaxError('Expected ":=".');
+            expect(':=');
 
           expr := parse();
         end;
@@ -1447,15 +1442,13 @@ var token: String;
         result.push(patternclause);
         with patternclause do begin
           patternclause.pattern := parsePatternMatcher;
-          temp := nextToken;
-          if temp = 'as' then begin
+          if nextTokenIs('as') then begin
             requireXQuery;
             sequenceTyp := parseSequenceType([]);
-            temp := nextToken;
           end else sequenceTyp := nil;
           case kind of
-            xqtfcLetPattern: if temp <> ':=' then raiseSyntaxError('Expected ":=".');
-            xqtfcForPattern: if temp <> 'in' then raiseSyntaxError('Expected "in".');
+            xqtfcLetPattern: expect(':=');
+            xqtfcForPattern: expect('in');
           end;
           expr := parse();
         end;
