@@ -58,6 +58,7 @@ protected
   tempcontext: TXQEvaluationContext;
   pendingException, pendingExceptionLast: EXQParsingException;
   lastErrorPos: pchar;
+  lastTokenStart: pchar;
   procedure raiseParsingError(errcode, s: string);
   procedure raiseSyntaxError(s: string);
   procedure raiseParsingErrorFatal(errcode, s: string);
@@ -580,6 +581,7 @@ var lines, i: SizeInt;
     lineStart: pchar;
     view: TCharArrayView;
     line, msg: String;
+    errorStart: Integer;
 begin
   if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
 
@@ -589,11 +591,14 @@ begin
   line := view.ToString;
 
   msg := s + LineEnding + 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
-  line := copy(line, 1, pos - lineStart - 1);
+  line := copy(line, 1, pos - lineStart + 1);
+  if (lastTokenStart >= pchar(str)) and (lastTokenStart <= pos) then errorStart := lastTokenStart - lineStart + 1
+  else errorStart := pos - lineStart;
   for i := 1 to length(line) do
-    if line[i] <> #9 then line[i] := ' ';
-  msg += line + '/|\'+LineEnding;
-  msg += line + ' --- error occurs before here';
+    if line[i] <> #9 then
+      if i >= errorStart then line[i] := '^'
+      else line[i] := ' ';
+  msg += line + '  error occurs around here';
 
   if pendingException = nil then begin
     pendingException := EXQParsingException.Create(errcode, msg);
@@ -783,7 +788,10 @@ begin
           if ((pos+1)^ <> start^) then break
           else pos+=1;
       until pos^ in [#0];
-      if pos^ = #0 then raiseSyntaxErrorFatal('Unclosed string');
+      if pos^ = #0 then begin
+        lastTokenStart := start;
+        raiseSyntaxErrorFatal('Unclosed string');
+      end;
       pos+=1;
     end;
     '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', '@', '$', '%', '-': begin//SYMBOLS+START_SYMBOLS - [:-]
@@ -793,6 +801,7 @@ begin
 
       if lookahead then exit(result)
       else begin
+        lastTokenStart := pos;
         pos+=length(result);
         exit(result);
       end;
@@ -834,7 +843,8 @@ begin
   end;
   assert(start<pos);
   result:=strslice(start,pos-1);
-  if lookahead then pos:=start;
+  if lookahead then pos:=start
+  else lastTokenStart := start;
 end;
 
 function TXQParsingContext.nextTokenIs(const s: string): boolean;
