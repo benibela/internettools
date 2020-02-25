@@ -750,6 +750,9 @@ begin
   else error();
 end;
 
+const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', ':', '@', '$', '%'];
+const START_SYMBOLS = ['-'];
+
 procedure TXQParsingContext.expect(s: string);
   procedure error;
   begin
@@ -767,11 +770,14 @@ begin
     end;
     pos+=1;
   end;
+  if s[1] in ['a'..'z','A'..'Z'] then
+    if not (pos^ in WHITE_SPACE + SYMBOLS + [#0]) then begin
+      lastTokenStart := pos - length(s);
+      raiseSyntaxError('Missing whitespace or symbol');
+    end;
 end;
 
 //read the next token ('string', number: (-?[0-9]+|[0-9]*.[0-9]+|[0-9]+.[0-9]*)([eE][+-]?[0-9]+)?, symbol, identifier)
-const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', ':', '@', '$', '%'];
-const START_SYMBOLS = ['-'];
 function TXQParsingContext.nextToken(lookahead: boolean=false): string;
 var start:pchar;
    numberE, numberPoint: boolean;
