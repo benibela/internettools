@@ -78,6 +78,7 @@ protected
   procedure expect(c: char);
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
+  function nextTokenIs(const s: string): boolean; //checks the next token and skips it if it matches
   function nextTokenNCName(): string; inline; //returns a NCName
   // $foo       -> ('', '', 'foo',    xqnmPrefix)
   // $*:foo     -> ('', '*', 'foo',   xqnmNone)
@@ -836,6 +837,25 @@ begin
   if lookahead then pos:=start;
 end;
 
+function TXQParsingContext.nextTokenIs(const s: string): boolean;
+var
+  temppos: pchar;
+  i: Integer;
+begin
+  skipWhitespaceAndComment();
+  temppos := pos;
+  for i := 1 to length(s) do begin
+    if temppos^ <> s[i] then
+      exit(false);
+    inc(temppos);
+  end;
+  if s[1] in ['a'..'z','A'..'Z'] then
+    if not (temppos^ in WHITE_SPACE + SYMBOLS + [#0]) then
+      exit(false);
+  result := true;
+  pos := temppos;
+end;
+
 function TXQParsingContext.nextTokenNCName(): string;
 begin
   result := nextToken(false);
@@ -1238,9 +1258,9 @@ begin
 
     while parens > 0 do begin expect(')'); parens -= 1; end;
 
-    word := nextToken(true);
-    if (length(word) = 1) and (word[1] in ['?', '*', '+']) then begin
-      case word[1] of
+    skipWhitespaceAndComment();
+    if (pos^ in ['?', '*', '+']) then begin
+      case pos^ of
         '?': result.allowNone:=true;
         '+': result.allowMultiple:=true;
         '*': begin result.allowNone:=true; result.allowMultiple:=true; end;
@@ -1259,14 +1279,14 @@ var
   temp: TXQTermSequenceType;
 begin
   result := parseSequenceType(flags);
-  if isModel3 and (nextToken(true) = '|') then begin
+  skipWhitespaceAndComment();
+  if isModel3 and (pos^ = '|') then begin
     temp := result;
     result := TXQTermSequenceType.create();
     try
       result.kind := tikUnion;
       result.push(temp);
-      while nextToken(true) = '|' do begin
-        expect('|');
+      while nextTokenIs('|') do begin
         result.push(parseSequenceType(flags));
       end;
     except
@@ -1312,18 +1332,12 @@ var token: String;
       begin
         skipWhitespaceAndComment();
         if pos^ = '$' then vars.currentItem := parseFlowerVariable;
-        if nextToken(true) = 'at' then begin
-          expect('at');
+        if nextTokenIs('at') then
           vars.positionVar := parseFlowerVariable;
-        end;
-        if nextToken(true) = 'previous' then begin
-          expect('previous');
+        if nextTokenIs('previous') then
           vars.previousItem := parseFlowerVariable;
-        end;
-        if nextToken(true) = 'next' then begin
-          expect('next');
+        if nextTokenIs('next') then
           vars.nextItem := parseFlowerVariable;
-        end;
         expect('when');
         vars.when := parse;
       end;
@@ -1344,22 +1358,16 @@ var token: String;
       result.push(window);
       window.flags := flags;
       window.loopvar := parseFlowerVariable;
-      if nextToken(true) = 'as' then begin
-        expect('as');
+      if nextTokenIs('as') then
         window.sequenceTyp := parseSequenceType([]);
-      end;
       expect('in');
       window.expr := parse();
       expect('start');
       parseWindowVars(window.startCondition);
-      if nextToken(true) = 'only' then begin
-        expect('only');
+      if nextTokenIs('only') then
         Include(window.flags, xqtfwEndOnlyWhen);
-      end;
-      if ( xqtfwSliding in window.flags ) or (nextToken(true) = 'end')  then begin
-        expect('end');
-        parseWindowVars(window.endCondition);
-      end;
+      if nextTokenIs('end') then parseWindowVars(window.endCondition)
+      else if xqtfwSliding in window.flags then expect('end');
     end;
 
   var temp: string;
@@ -2049,10 +2057,8 @@ function TXQParsingContext.parseDefineVariable: TXQTermDefineVariable;
 begin
   result := TXQTermDefineVariable.create(parseVariable);
   try
-    if nextToken(true) = 'as' then begin
-      expect('as');
+    if nextTokenIs('as') then
       result.push(parseSequenceType([]));
-    end;
   except
     result.free;
     raise;
@@ -2080,21 +2086,18 @@ begin
         end;
         name := TXQEQNameUnresolved.makeEQName(namespaceUrl, namespacePrefix, local, mode);
         SetLength(params, 0);
-        if nextToken(true) = '(' then begin
-          expect('(');
+        if nextTokenIs('(') then begin
           while true do begin
             SetLength(params, length(params) + 1);
             params[high(params)] := parseValue;
             if not objInheritsFrom(params[high(params)], TXQTermConstant) or (TXQTermConstant(params[high(params)]).value.Count <> 1) then
               raiseSyntaxError('Only literals allowed as annotation arguments');
-            if nextToken(true) <> ',' then break;
-            expect(',');
+            if not nextTokenIs(',') then break;
           end;
           expect(')')
         end;
       end;
-      if nextToken(true) <> '%' then break;
-      expect('%');
+      if not nextTokenIs('%') then break;
       setlength(result, length(result)+1);
     end;
   except
@@ -2113,7 +2116,7 @@ begin
       expect('(');
     end else require3('Anonymous functions need XPath/XQuery 3');
     skipWhitespaceAndComment();
-    while nextToken(true) <> ')' do begin
+    while pos^ <> ')' do begin
       result.push(parseDefineVariable);
       skipWhitespaceAndComment();
       if not (pos^ in [',', ')']) then raiseSyntaxError('Missing , or )');
@@ -2121,8 +2124,7 @@ begin
     end;
     pos+=1;
     result.parameterCount:=length(result.children);
-    if nextToken(true) = 'as' then begin
-      expect('as');
+    if nextTokenIs('as') then begin
       result.push(parseSequenceType([]));
     end;
     case nextToken() of
@@ -2156,7 +2158,6 @@ end;
 function TXQParsingContext.parseTryCatch: TXQTermTryCatch;
 var
   kind: TXQNamespaceMode;
-  token: String;
   namespaceUrl: string;
   namespacePrefix: string;
   local: string;
@@ -2164,9 +2165,7 @@ begin
   expect('{');
   result := TXQTermTryCatch.Create(parseOptionalExpr31);
   try
-    token := nextToken(true);
-    while token = 'catch' do begin
-      expect('catch');
+    while nextTokenIs('catch') do begin
       SetLength(result.catches, length(result.catches) + 1);
       repeat
         SetLength(result.catches[high(result.catches)].tests, length(result.catches[high(result.catches)].tests) + 1);
@@ -2176,11 +2175,9 @@ begin
           result.catches[high(result.catches)].tests[high(result.catches[high(result.catches)].tests)].name := TXQEQName.create('', local)
          else
           result.catches[high(result.catches)].tests[high(result.catches[high(result.catches)].tests)].name := TXQEQNameUnresolved.makeEQName(namespaceUrl, namespacePrefix, local, kind);
-        token := nextToken();
-      until token <> '|';
-      if token <> '{' then raiseSyntaxError('{ expected');
+      until not nextTokenIs('|');
+      if not nextTokenIs('{') then raiseSyntaxError('{ expected');
       result.catches[high(result.catches)].expr := parseOptionalExpr31;
-      token := nextToken(true);
     end;
   except
     result.free;
@@ -2700,9 +2697,8 @@ begin
     marker := pos;
     word := nextToken();
     if word = '@' then axis := 'attribute'
-    else if nextToken(true) = '::' then begin
+    else if nextTokenIs('::') then begin
       axis := word;
-      expect('::');
     end else pos := marker; //roll back
     namespaceMode := nextTokenEQName(namespaceURL, namespacePrefix, word, true);
 
@@ -2768,7 +2764,7 @@ begin
       case word of
         'element', 'attribute', 'document', 'text', 'processing-instruction', 'comment', 'namespace': begin
           skipWhitespaceAndComment();
-          constr := nextToken(true) = '{';
+          constr := pos^ = '{';
           if (not constr) and (pos^ <> #0) and not (pos^ in SYMBOLS) then begin //look for name (this will allow something like text name {...} here, but that's going to raise an error later anyways)
             temp := pos;
             nextTokenEQName(namespaceURL, namespacePrefix, wordlookahead, true);
@@ -2816,8 +2812,7 @@ function TXQParsingContext.parse: TXQTerm;
     result := false;
     if nextToken() = '<' then begin
       if baseSchema.isValidNCName(nextToken()) then begin
-        if nextToken(true) = ':' then begin
-          nextToken(); //:
+        if nextTokenIs(':') then begin
           nextToken(); //ns:name
         end;
         temp := nextToken();
@@ -2860,8 +2855,7 @@ begin
       exit(parseSwitch);
     'typeswitch': if parsingModel in PARSING_MODEL_XQUERY then
       exit(parseTypeSwitch);
-    'if': if nextToken(true) = '(' then begin
-      expect('(');
+    'if': if nextTokenIs('(') then begin
       result := TXQTermIf.Create();
       with TXQTermIf(result) do begin
         push(parsePrimaryLevel);
@@ -3123,10 +3117,10 @@ var
 begin
   result := parse;
   try
-    if nextToken(true) = ',' then begin
+    skipWhitespaceAndComment();
+    if pos^ = ',' then begin
       result := TXQTermSequence.Create.push([result]);
-      while nextToken(true) = ',' do begin
-        expect(',');
+      while nextTokenIs(',') do begin
         temp := parse();
         if temp = nil then raiseSyntaxError('Expression missing');
         TXQTermSequence(result).push(temp);
@@ -3597,11 +3591,10 @@ var declarationDuplicateChecker: TStringList;
     end;
     url := xmlStrWhitespaceCollapse(url);
     if staticContext.importedSchemas = nil then staticContext.importedSchemas := TNamespaceList.Create;
-    if nextToken(true) = 'at' then begin
-      expect('at');
+    if nextTokenIs('at') then begin
       //discard schema addresses
       parseString;
-      while nextToken(true) = ',' do begin expect(','); parseString(); end;
+      while nextTokenIs(',') do parseString();
     end;
     if (url <> XMLNamespaceURL_XMLSchema) then raiseParsingError('XQST0059', 'Unknown schema: ' + url);
     staticContext.importedSchemas.add(TNamespace.make(XMLNamespaceURL_XMLSchema, prefix)); //treat all schemas as equivalent to the default schema
@@ -3635,10 +3628,9 @@ var declarationDuplicateChecker: TStringList;
     end;
     moduleURL := TNamespace.uniqueUrl(parseNamespaceURI('','XQST0088'));
     at := nil;
-    if nextToken(true) = 'at' then begin
-      expect('at');
+    if nextTokenIs('at') then begin
       arrayAdd(at, parseString);
-      while nextToken(true) = ',' do begin expect(','); arrayAdd(at, parseString); end;
+      while nextTokenIs(',') do arrayAdd(at, parseString);
       //todo resolve at with static context
     end;
 
@@ -3683,8 +3675,7 @@ var declarationDuplicateChecker: TStringList;
       vari.annotations := annotations;
     end else begin
       vari := TXQTermDefineVariable.create('$', nil);
-      if nextToken(true) = 'as' then begin
-        expect('as');
+      if nextTokenIs('as') then begin
         typ := parseSequenceType([]);
         vari.push(typ);
         if (typ.allowMultiple) or (typ.allowNone) then begin
@@ -3703,9 +3694,8 @@ var declarationDuplicateChecker: TStringList;
       raiseParsingError( 'XQST0048', 'Wrong namespace: ' + vari.debugTermToString);
     case nextToken() of
       ':=': vari.push(parse());
-      'external': if nextToken(true) = ':=' then begin
+      'external': if nextTokenIs(':=') then begin
         requireXQuery3('default value');
-        expect(':=');
         vari.push(parse());
         SetLength(vari.annotations, length(vari.annotations)+1);
         vari.annotations[high(vari.annotations)].name := TXQEQName.create(XMLNamespaceURL_MyExtensionsNew, 'external');
@@ -3768,35 +3758,34 @@ var declarationDuplicateChecker: TStringList;
            raiseParsingError('XQST0111', 'Multiple declarations');
 
       try
-        while true do
-          case nextToken(true) of
-            ';', '': break;
-            else begin
-              pname := nextToken();
-              expect('=');
-              value := parseString;
-              if tempPropertyDuplicateChecker.IndexOf(pname) >= 0 then raiseParsingError('XQST0114', 'Duplicate property')
-              else tempPropertyDuplicateChecker.Add(pname);
+        skipWhitespaceAndComment();
+        while not (pos^ in [';',#0]) do begin
+          pname := nextToken();
+          expect('=');
+          value := parseString;
+          if tempPropertyDuplicateChecker.IndexOf(pname) >= 0 then raiseParsingError('XQST0114', 'Duplicate property')
+          else tempPropertyDuplicateChecker.Add(pname);
 
-              case pname of
-                'decimal-separator': setChar(xqdfpDecimalSeparator);
-                'digit':  setChar(xqdfpDigit);
-                'grouping-separator':  setChar(xqdfpGroupingSeparator);
-                'infinity':  decimalformat.formats.infinity := value;
-                'minus-sign':  setChar(xqdfpMinusSign);
-                'NaN':  decimalformat.formats.nan := value;
-                'pattern-separator':  setChar(xqdfpPatternSeparator);
-                'percent':  setChar(xqdfpPercent);
-                'per-mille':  setChar(xqdfpPerMille);
-                'zero-digit':  begin
-                  setChar(xqdfpZeroDigit);
-                  if decimalFormat.formats.chars[xqdfpZeroDigit] <> charUnicodeZero(decimalFormat.formats.chars[xqdfpZeroDigit]) then
-                    raiseParsingError('XQST0097', 'Need zero digit');
-                end
-                else raiseSyntaxError('Unknown property');
-              end;
-            end;
+          case pname of
+            'decimal-separator': setChar(xqdfpDecimalSeparator);
+            'digit':  setChar(xqdfpDigit);
+            'grouping-separator':  setChar(xqdfpGroupingSeparator);
+            'infinity':  decimalformat.formats.infinity := value;
+            'minus-sign':  setChar(xqdfpMinusSign);
+            'NaN':  decimalformat.formats.nan := value;
+            'pattern-separator':  setChar(xqdfpPatternSeparator);
+            'percent':  setChar(xqdfpPercent);
+            'per-mille':  setChar(xqdfpPerMille);
+            'zero-digit':  begin
+              setChar(xqdfpZeroDigit);
+              if decimalFormat.formats.chars[xqdfpZeroDigit] <> charUnicodeZero(decimalFormat.formats.chars[xqdfpZeroDigit]) then
+                raiseParsingError('XQST0097', 'Need zero digit');
+            end
+            else raiseSyntaxError('Unknown property');
           end;
+
+          skipWhitespaceAndComment();
+        end;
 
         with decimalFormat.formats do
           for i := low(uniqueSigns) to high(uniqueSigns) do begin
