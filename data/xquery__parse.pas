@@ -2120,7 +2120,11 @@ begin
       result.push(parseDefineVariable);
       skipWhitespaceAndComment();
       if not (pos^ in [',', ')']) then raiseSyntaxError('Missing , or )');
-      if pos^ = ',' then pos+=1;
+      if pos^ = ',' then begin
+        pos+=1;
+        skipWhitespaceAndComment();
+        if pos^ = ')' then raiseSyntaxError('trailing ,');
+      end;
     end;
     pos+=1;
     result.parameterCount:=length(result.children);
