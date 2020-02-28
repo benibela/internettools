@@ -7405,7 +7405,7 @@ transform
   op.registerBinaryOp('unary~hack-', @xqvalueUnaryMinus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
   op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
 
-  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax, xqofSpecialParsing], []).acceptedModels:= PARSING_MODEL3_1;
+  op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax], []).acceptedModels:= PARSING_MODEL3_1;
 
   op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], []);
   op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], []);

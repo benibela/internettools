@@ -165,6 +165,7 @@ end;
    destructor Destroy; override;
  end;
 
+ //resolve namespaces, and ast reorganization
  TFinalNamespaceResolving = class(TXQTerm_Visitor)
    mainModule: TXQTermModule;
    staticContext: TXQStaticContext;
@@ -2923,30 +2924,6 @@ var astroot: TXQTerm;
   procedure pushBinaryOp(const opinfo: TXQOperatorInfo);
   var replace: PXQTerm;
 
-    procedure handleArrowOperator;
-    var
-      dynamicFunction: TXQTerm;
-      namespaceURL, namespacePrefix, localName: string;
-      namespaceMode: TXQNamespaceMode;
-      funcCall: TXQTermWithChildren;
-    begin
-      skipWhitespaceAndComment();
-      case pos^ of
-        '$', '(': begin
-          dynamicFunction := parseValue;
-          funcCall := TXQTermDynamicFunctionCall.Create(dynamicFunction);
-        end;
-        else begin
-          namespaceMode := nextTokenEQName(namespaceURL, namespacePrefix, localName, true);
-          funcCall := createFunctionCall(namespaceURL, namespacePrefix, localName, namespaceMode);
-        end;
-      end;
-      expect('(');
-      funcCall.push(replace^);
-      replace^ := funcCall;
-      replace^ := parseFunctionCall(funcCall)
-    end;
-
     function createBinOpTerm: TXQTermBinaryOp;
     begin
       result := TXQTermBinaryOp.Create(opinfo);
@@ -2980,7 +2957,6 @@ var astroot: TXQTerm;
 
     if xqofSpecialParsing in opinfo.flags then begin
       if opinfo.followedBy <> '' then handleCastStrangeness
-      else if opinfo.name = '=>' then handleArrowOperator
       else raiseSyntaxError('20180922 Unknown operator');
     end else begin
       res := createBinOpTerm;
@@ -4517,6 +4493,40 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   function visitBinaryOp(b: TXQTermBinaryOp): TXQTerm;
+    function handleArrowOperator: TXQTerm;
+    var
+      tcall: TXQTermWithChildren;
+      insertAt: Integer;
+      tdf: TXQTermDefineFunction;
+    begin
+      result := b.children[1];
+      if b.children[1] is TXQTermDynamicFunctionCall then begin
+        insertAt := 1;
+        tcall := b.children[1] as TXQTermWithChildren;
+      end else if b.children[1] is TXQTermNamedFunction then begin
+        insertAt := 0;
+        tcall := b.children[1] as TXQTermWithChildren;
+      end else if b.children[1] is TXQTermDefineFunction then begin
+        tdf := TXQTermDefineFunction(b.children[1]);
+        case tdf.kind of
+          xqtdfStaticPartialApplication: insertAt := 0;
+          xqtdfDynamicPartialApplication: insertAt := 1;
+          else raiseSyntaxError('=>');
+        end;
+        tcall := tdf.children[0] as TXQTermWithChildren;
+      end else
+        raiseSyntaxError('=>');
+      setlength(tcall.children, length(tcall.children) + 1);
+      if insertAt <> high(tcall.children) then
+        move(tcall.children[insertAt], tcall.children[insertAt + 1], sizeof(tcall.children[0]) * (length(tcall.children) - insertAt - 1));
+      tcall.children[insertAt] := b.children[0];
+      b.children := nil; //complicated memory tracking here. the below functions can throw, so all nodes need to be exactly once in the ast
+      if result is TXQTermNamedFunction then result := visitNamedFunction(TXQTermNamedFunction(result))
+      else if result is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(result));
+      b.free;
+    end;
+
+
   var
     st: TXQTermSequenceType;
   begin
@@ -4553,6 +4563,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         b.children := nil;
         b.free;
       end;
+      '=>': result := handleArrowOperator;
     end;
   end;
 
