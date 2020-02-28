@@ -569,6 +569,11 @@ type
   generic TBaseArrayList<TElement> = object
     type PElement = ^TElement;
          TArrayBuffer = array of TElement;
+    type TBasePreEnumerator = object
+    public
+      fcurrent, fend: PElement;
+      function MoveNext: Boolean;
+    end;
   private
     function getCapacity: SizeInt; inline;
   protected
@@ -576,6 +581,7 @@ type
     FCount: SizeInt;
     procedure setCount(NewCount: SizeInt);
     procedure checkIndex(AIndex : SizeInt); inline;
+    procedure initEnumerator(var result: TBasePreEnumerator);
   public
     procedure init;
     procedure addAll(other: TBaseArrayList);
@@ -591,12 +597,10 @@ type
   end;
 
   generic TCopyingArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
-    type TEnumerator = record
+    type TEnumerator = object(TBasePreEnumerator)
     private
       function GetCurrent: TElement;
     public
-      fcurrent, fend: PElement;
-      function MoveNext: Boolean;
       property current: TElement read GetCurrent;
     end;
     protected
@@ -605,7 +609,7 @@ type
       function first: TElement;
       function last: TElement;
     public
-      function GetEnumerator: TEnumerator;
+      function GetEnumerator: TEnumerator; inline;
       property Items[Index: SizeInt]: TElement read get write put; default;
   end;
   generic TCopyingPtrArrayList<TElement> = object(specialize TCopyingArrayList<TElement>)
@@ -616,12 +620,20 @@ type
   TStringArrayList = specialize TCopyingArrayList<String>;
 
   generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
+    type TEnumerator = object(TBasePreEnumerator)
+    private
+      function GetCurrent: PElement;
+    public
+      property current: PElement read GetCurrent;
+    end;
     protected
+      function addDefault: PElement;
       function get(Index: SizeInt): PElement; inline;
       procedure put(Index: SizeInt; Item: PElement); inline;
       function first: PElement;
       function last: PElement;
     public
+      function GetEnumerator: TEnumerator; inline;
       property Items[Index: SizeInt]: PElement read get write put; default;
   end;
 
@@ -860,16 +872,6 @@ TThreadedCall = class(TThread)
   constructor create(aproc: TProcedureOfObject;isfinished: TNotifyEvent);
 end;
 
-function TCopyingArrayList.TEnumerator.GetCurrent: TElement;
-begin
-  result := fcurrent^;
-end;
-
-function TCopyingArrayList.TEnumerator.MoveNext: Boolean;
-begin
-  inc(fcurrent);
-  result := fcurrent < fend;
-end;
 
 
 
@@ -1205,11 +1207,23 @@ end;
 
 
 
+function TBaseArrayList.TBasePreEnumerator.MoveNext: Boolean;
+begin
+  inc(fcurrent);
+  result := fcurrent < fend;
+end;
 
-
-
-
-
+procedure TBaseArrayList.initEnumerator(var result: TBasePreEnumerator);
+begin
+  if fbuffer <> nil then begin
+    result.FCurrent := @FBuffer[0];
+    result.fend := result.fcurrent + fcount;
+    dec(result.fcurrent);
+  end else begin
+    result.fcurrent := nil;
+    result.fend := nil;
+  end
+end;
 
 
 function TBaseArrayList.getCapacity: SizeInt;
@@ -1303,6 +1317,17 @@ begin
   result := fbuffer;
 end;
 
+function TRecordArrayList.TEnumerator.GetCurrent: PElement;
+begin
+  result := fcurrent;
+end;
+
+function TRecordArrayList.addDefault: PElement;
+begin
+  add(default(TElement));
+  result := last
+end;
+
 function TRecordArrayList.get(Index: SizeInt): PElement;
 begin
   //checkIndex(index);
@@ -1323,6 +1348,16 @@ end;
 function TRecordArrayList.last: PElement;
 begin
   result := @FBuffer[fcount - 1];
+end;
+
+function TRecordArrayList.GetEnumerator: TEnumerator;
+begin
+  initEnumerator(result);
+end;
+
+function TCopyingArrayList.TEnumerator.GetCurrent: TElement;
+begin
+  result := fcurrent^;
 end;
 
 function TCopyingArrayList.get(Index: SizeInt): TElement;
@@ -1347,19 +1382,10 @@ begin
   result := FBuffer[fcount - 1];
 end;
 
-function TCopyingArrayList.GetEnumerator: TEnumerator;
+function TCopyingArrayList.GetEnumerator: TElement;
 begin
-  if fbuffer <> nil then begin
-    result.FCurrent := @FBuffer[0];
-    result.fend := result.fcurrent + fcount;
-    dec(result.fcurrent);
-  end else begin
-    result.fcurrent := nil;
-    result.fend := nil;
-  end
+  initEnumerator(result);
 end;
-
-
 
 
 {$endif}
