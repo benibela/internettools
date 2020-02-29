@@ -4171,7 +4171,7 @@ begin
     str:=typeChecking[i];
     pos:=@str[1];
     skipWhitespaceAndComment();
-    if pos^ <> '(' then info.versions[i].name:=nextTokenNCName();
+    if pos^ <> '(' then info.name:=nextTokenNCName();
     expect('(');
     skipWhitespaceAndComment();
     if pos^ <> ')' then begin

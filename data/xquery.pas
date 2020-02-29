@@ -1478,9 +1478,7 @@ type
 
 
 
-  { TXQParsingContext }
   TXQFunctionParameterTypes = record
-    name: string;
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
     function serialize: string;
@@ -1501,6 +1499,7 @@ type
   { TXQAbstractFunctionInfo }
 
   TXQAbstractFunctionInfo = class
+    name: string;
     minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
     sharedVersions: boolean;
@@ -1549,7 +1548,6 @@ type
                              xqofSpecialParsing
                              );
   TXQOperatorInfo = class(TXQAbstractFunctionInfo)
-    name: string;
     func: TXQBinaryOp;
     priority: integer;
     flags: TXQOperatorFlags;
@@ -4002,7 +4000,7 @@ end;
 procedure TXQFunctionParameterTypes.raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
   term: TXQTerm; const addendum: string);
 var
-  errCode, errMessage: String;
+  errCode, errMessage, name: String;
   i: Integer;
 begin
   errCode := 'XPTY0004';
@@ -4014,7 +4012,13 @@ begin
      errCode := 'XPTY0117'; //wtf?
      break;
     end;
-  errMessage := 'Invalid types for function '+name+'#'+IntToStr(count)+'.'+LineEnding;
+  name := '';
+  if (term is TXQTermNamedFunction) and (TXQTermNamedFunction(term).func is TXQAbstractFunctionInfo) then
+    name := 'function ' + TXQAbstractFunctionInfo(TXQTermNamedFunction(term).func).name
+  else if term is TXQTermBinaryOp then
+    name := 'operator ' + TXQTermBinaryOp(term).op.name
+  ;
+  errMessage := 'Invalid types for '+name+'#'+IntToStr(count)+'.'+LineEnding;
   errMessage += 'Got: ';
   for i := 0 to high(types) do begin
     if i <> 0 then errMessage += ', ';
@@ -4449,7 +4453,7 @@ begin
     message := message + ':'+LineEnding+value.toXQuery();
   term := aterm;
   if term <> nil then
-    message := message + ' in '+LineEnding+term.ToString;
+    message := message + LineEnding+'in '+term.ToString;
 end;
 
 
@@ -7370,7 +7374,7 @@ var
     for i := 0 to high(versions) do begin
       if length(versions[i].types) <> count then continue;
       if i = countMatch then continue;
-      errMessage += LineEnding + 'or ' + versions[i].serialize;
+      errMessage += LineEnding + '          or ' + versions[i].serialize;
     end;
     versions[countMatch].raiseErrorMessage(values, count, context, term, errMessage);
   end;
@@ -9160,6 +9164,7 @@ function TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunc
 begin
   result := TXQBasicFunctionInfo.Create;
   result.func := func;
+  result.name := name;
   basicFunctions.AddObject(name, result);
 end;
 
@@ -9168,6 +9173,7 @@ function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFu
 begin
   result := TXQComplexFunctionInfo.Create;
   result.func := func;
+  result.name := name;
   result.contextDependencies:=contextDependencies;
   complexFunctions.AddObject(name, result);
 end;
@@ -9179,7 +9185,7 @@ begin
   globalTypeParsingContext.parseFunctionTypeInfo(info, typeChecking, true);
   {$ifdef dumpFunctionTypes}logFunctionTypes(name, info);{$endif}
   if length(info.versions) > 0 then begin
-    info.versions[0].name := name;
+    info.name := name;
     info.guessArgCount;
   end;
 end;
@@ -9187,7 +9193,7 @@ end;
 procedure TXQNativeModule.setTypeChecking(const name: string; info: TXQAbstractFunctionInfo; const typeChecking: array of TXQTermSequenceType);
 begin
   info.setVersionsShared(typeChecking);
-  info.versions[0].name := name;
+  info.name := name;
 end;
 
 function TXQNativeModule.registerFunction(const name: string; minArgCount, maxArgCount: integer; func: TXQBasicFunction; const typeChecking: array of string): TXQBasicFunctionInfo;
