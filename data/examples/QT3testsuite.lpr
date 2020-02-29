@@ -323,6 +323,22 @@ begin
   end;
 end;
 
+function trimLines(const s: string): string;
+var
+  leadingSpace, i: Integer;
+  lines: bbutils.TStringArray;
+begin
+  result := s;
+  while (result <> '') and (result[1] in [#10,#13]) do delete(result, 1, 1);
+  if strBeginsWith(result, ' ') then begin
+    lines := strSplit(result, #10);
+    leadingSpace := 0;
+    while (leadingSpace < length(lines[0])) and (lines[0][leadingSpace + 1] in [#9, ' ']) do inc(leadingSpace);
+    for i := 0 to high(lines) do Delete(lines[i], 1, leadingSpace);
+    result := strJoin(lines, #10);
+  end;
+end;
+
 constructor TResource.create(n: TTreeNode);
 begin
   filename := strResolveURI(n['file'], n.getDocument().baseURI);
@@ -342,7 +358,12 @@ begin
 
   writeln('<!doctype html><html><head><title>XQuery Test Suite Evaluation</title>');
   writeln('<link rel="stylesheet" type="text/css" href="xqts.css">');
-  writeln('<style>.restable tr {background-color: #AAFFAA} .restable tr.S {background-color: white;}</style>');
+  writeln('<style>.restable tr {background-color: #AAFFAA} .restable tr.S {background-color: white;}');
+  writeln('table.testcases td:nth-child(2) {font-weight: bold }');
+  writeln('table.testcases td:nth-child(3) {white-space: pre-wrap; font-family: monospace }');
+  writeln('table.testcases td:nth-child(4) {white-space: pre-wrap; font-family: monospace }');
+  writeln('table.testcases td:nth-child(5) {white-space: pre-wrap; font-family: monospace }');
+  writeln('</style>');
   writeln('</head><body>');
 
   writeln('<h1>XQuery/XPath Test Suite Evaluation</h1>');
@@ -393,17 +414,17 @@ begin
   if not logAllTestCases then begin
     if not testCasesToLog[resultValue.result] then exit;
   end;
-  if bufferTestSet.count = 0 then bufferTestSet.add('<table><tr><th>Testname</th><th>Status</th><th>Got</th><th>Expected</th>'+ifthen(printInputs,'<th>Test Input</th>','')+'</tr>');
+  if bufferTestSet.count = 0 then bufferTestSet.add('<table class="testcases"><tr><th>Testname</th><th>Status</th><th>Got</th><th>Expected</th>'+ifthen(printInputs,'<th>Test Input</th>','')+'</tr>');
   n := '<td>'+tc.name+'</td>';
   case resultValue.result of
     tcrPass: bufferTestSet.add('<tr class="passed" >'+n+'<td colspan="4">passed</td>');
     tcrFail: begin
-      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
-      if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
+      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+trimLines(htmlStrEscape(got))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrWrongError: begin
-      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+htmlStrEscape(got)+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
-      if printInputs then bufferTestSet.add('<td>'+htmlStrEscape(TTest(tc.tests[0]).test)+'</td>');
+      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+trimLines(htmlStrEscape(got))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrNA: bufferTestSet.add('<tr class="correctNA" >'+n+'<td colspan="4">n/a</td>');
     tcrDisputed: bufferTestSet.add('<tr class="correctIgnored" >'+n+'<td colspan="4">disputed</td>');
@@ -978,10 +999,12 @@ end;
 
 { TTestCase }
 
+
 function TTestCase.expectedPrettier: string;
 begin
   result := expected;
   if strContains(result, '&lt;') then result := strDecodeHTMLEntities(result,CP_UTF8) + ' <!--unescaped--> ';
+  result := trimLines(result);
 end;
 
 constructor TTestCase.create(e: TTreeNode);
