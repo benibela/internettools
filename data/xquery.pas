@@ -2402,6 +2402,9 @@ type
     property AllowJSON: boolean write SetAllowJSON; deprecated;
   end;
 
+  TXQDebugInfo = class
+    function lineInfoMessage(t: TObject): string; virtual; abstract;
+  end;
 
 
   //============================MAIN CLASS==========================
@@ -2684,6 +2687,7 @@ public
   public
     DefaultParser: TTreeParser; //used by fn:doc if no context node is there (internally used)
     DefaultJSONParser: TXQJsonParser;
+    LastDebugInfo: TXQDebugInfo;
 
     class procedure registerNativeModule(const module: TXQNativeModule);
     class function collationsInternal: TStringList;
@@ -3076,7 +3080,9 @@ function defaultQueryEngine: TXQueryEngine;
 procedure freeThreadVars;
 
 
-type TXQAbstractParsingContext = class
+type
+
+TXQAbstractParsingContext = class
 protected
   engine: TXQueryEngine;
 
@@ -3087,6 +3093,8 @@ protected
 
   str: string;
   pos: pchar;
+
+  debugInfo: TXQDebugInfo;
   procedure parseQuery(aquery: TXQuery); virtual; abstract;
   procedure parseQueryXStringOnly(aquery: TXQuery); virtual; abstract;
   procedure parseFunctionTypeInfo(info: TXQAbstractFunctionInfo; const typeChecking: array of string; op: boolean); virtual; abstract;
@@ -7651,6 +7659,7 @@ end;
 procedure TXQueryEngine.clear;
 begin
   FLastQuery:=nil;
+  FreeAndNil(LastDebugInfo);
   FModules.Clear;
 end;
 
@@ -8004,6 +8013,9 @@ begin
     result := TXQuery.Create(cxt.staticContext);
     result.staticContextShared := staticContextShared;
     cxt.parseQuery(result);
+    if LastDebugInfo <> nil then LastDebugInfo.free;
+    LastDebugInfo := cxt.debugInfo;
+    cxt.debugInfo := nil;
   finally
     cxt.free;
   end;

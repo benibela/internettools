@@ -37,7 +37,7 @@ type
  TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow, xqstNoMultiples);
  TXQSequenceTypeFlags = set of TXQSequenceTypeFlag;
 
- TXQParsingErrorTracker = record
+ TXQParsingErrorTracker = class(TXQDebugInfo)
    type
    TTermLocation = packed record
      id: TObject;
@@ -50,12 +50,14 @@ type
    pendingException, pendingExceptionLast: EXQParsingException;
    lastErrorPos: pchar;
    errorLocations: specialize TRecordArrayList<TTermLocation>;
-   procedure init(const astr: string);
+   constructor Create(const astr: string);
    procedure raiseParsingError(startAt, endAt: pchar; errcode, message: string);
    procedure raiseParsingError(term: tobject; errcode, message: string);
    procedure registerTermLocation(aid: TObject; astartpos, aendpos: pchar);
+   function findLocation(t: TObject): PTermLocation;
+   function lineInfoMessage(startAt, endAt: pchar): string;
+   function lineInfoMessage(t: TObject): string; override;
  end;
- PXQParsingErrorTracker = ^TXQParsingErrorTracker;
 
  TXQEQNameUnresolved = class(TXQEQNameWithPrefix)
    function resolveURI(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind = xqdnkUnknown): string;
@@ -77,7 +79,7 @@ protected
   thequery: TXQuery;
   tempcontext: TXQEvaluationContext;
   lastTokenStart: pchar;
-  errorTracking: TXQParsingErrorTracker;
+  function errorTracking: TXQParsingErrorTracker; inline;
   procedure registerTermLocation(t: TObject);
   procedure raiseParsingError(errcode, s: string);
   procedure raiseSyntaxError(s: string);
@@ -161,7 +163,7 @@ protected
 
   function parseModule(): TXQTerm;
 
-  class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions; errortracker: PXQParsingErrorTracker);
+  class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions; errortracker: TXQParsingErrorTracker);
   procedure parseQuery(aquery: TXQuery; onlySpecialString: boolean);
   procedure parseQuery(aquery: TXQuery); override;
   procedure parseQueryXStringOnly(aquery: TXQuery); override;
@@ -171,6 +173,7 @@ protected
 
 
   function optimizeConstantChildren(seq: TXQTermWithChildren): TXQTerm;
+  destructor Destroy; override;
 end;
 
  { TJSONLiteralReplaceVisitor }
@@ -193,7 +196,7 @@ end;
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: SizeInt;
    checker: TFlowerVariableChecker;
-   errorTracking: ^TXQParsingErrorTracker;
+   errorTracking: TXQParsingErrorTracker;
    //globalVariableHack: TXQVariableChangeLog;
    procedure declare(v: PXQTermVariable); override;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
@@ -604,42 +607,20 @@ begin
   end;
 end;
 
-procedure TXQParsingErrorTracker.init(const astr: string);
+constructor TXQParsingErrorTracker.Create(const astr: string);
 begin
   str := astr;
   errorLocations.init;
 end;
 
 procedure TXQParsingErrorTracker.raiseParsingError(startAt, endAt: pchar; errcode, message: string);
-var lines, i: SizeInt;
-    lineStart: pchar;
-    view: TCharArrayView;
-    line, msg: String;
-    errorStart: Integer;
-    pos: pchar absolute endAt;
-    lastTokenStart: pchar absolute startAt;
+var
+  temp, msg: String;
 begin
   msg := message;
 
-  if str.unsafeView.isInBounds(pos) then begin
-    if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
-
-    strCountLinesBeforePos(str, pos, lines, lineStart);
-    view := str.unsafeView.viewFrom(lineStart);
-    view := view.viewUntil(view.findLineBreak.nilToLast);
-    line := view.ToString;
-
-    msg += LineEnding + 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
-    line := copy(line, 1, pos - lineStart + 1);
-    if (lastTokenStart >= pchar(str)) and (lastTokenStart <= pos) then errorStart := lastTokenStart - lineStart + 1
-    else errorStart := pos - lineStart;
-    for i := 1 to length(line) do
-      if line[i] <> #9 then
-        if i >= errorStart then line[i] := '^'
-        else line[i] := ' ';
-    msg += line + '  error occurs around here';
-    lastErrorPos := pos;
-  end;
+  temp := lineInfoMessage(startAt, endAt);
+  if temp <> '' then msg += LineEnding + temp;
 
   if pendingException = nil then begin
     pendingException := EXQParsingException.Create(errcode, msg);
@@ -653,11 +634,11 @@ end;
 procedure TXQParsingErrorTracker.raiseParsingError(term: tobject; errcode, message: string);
 var l: PTermLocation;
 begin
-  for l in errorLocations do
-    if l^.id = term then begin
-      raiseParsingError(l^.startpos, l^.endpos, errcode, message);
-      exit;
-    end;
+  l := findLocation(term);
+  if l <> nil then begin
+    raiseParsingError(l^.startpos, l^.endpos, errcode, message);
+    exit;
+  end;
   raiseParsingError(nil, nil, errcode, message);
 end;
 
@@ -668,6 +649,60 @@ begin
     startpos := astartpos;
     endpos := aendpos;
   end;
+end;
+
+function TXQParsingErrorTracker.findLocation(t: TObject): PTermLocation;
+var l: PTermLocation;
+begin
+  for l in errorLocations do
+    if l^.id = t then
+      exit(l);
+  exit(nil);
+end;
+
+function TXQParsingErrorTracker.lineInfoMessage(startAt, endAt: pchar): string;
+var lines, i: SizeInt;
+    lineStart: pchar;
+    view: TCharArrayView;
+    line: String;
+    errorStart: Integer;
+    pos: pchar absolute endAt;
+    lastTokenStart: pchar absolute startAt;
+begin
+  result := '';
+  if str.unsafeView.isInBounds(pos) then begin
+    if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
+
+    strCountLinesBeforePos(str, pos, lines, lineStart);
+    view := str.unsafeView.viewFrom(lineStart);
+    view := view.viewUntil(view.findLineBreak.nilToLast);
+    line := view.ToString;
+
+    result := 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
+    line := copy(line, 1, pos - lineStart + 1);
+    if (lastTokenStart >= pchar(str)) and (lastTokenStart <= pos) then errorStart := lastTokenStart - lineStart + 1
+    else errorStart := pos - lineStart;
+    for i := 1 to length(line) do
+      if line[i] <> #9 then
+        if i >= errorStart then line[i] := '^'
+        else line[i] := ' ';
+    result += line + '  error occurs around here';
+    lastErrorPos := pos;
+  end;
+end;
+
+function TXQParsingErrorTracker.lineInfoMessage(t: TObject): string;
+var
+  l: PTermLocation;
+begin
+  l := findLocation(t);
+  if l <> nil then result := lineInfoMessage(l^.startpos, l^.endpos)
+  else result := ''
+end;
+
+function TXQParsingContext.errorTracking: TXQParsingErrorTracker;
+begin
+  result := TXQParsingErrorTracker(debugInfo);
 end;
 
 procedure TXQParsingContext.registerTermLocation(t: TObject);
@@ -3420,7 +3455,7 @@ begin
     finalResolving(TXQueryBreakerHelper.PTerm(otherQuery)^, otherQuery.getStaticContext, options, nil);
     finalizeFunctionsEvenMore(otherQuery.Term as TXQTermModule, otherQuery.getStaticContext, otherQuery.staticContextShared);
   end;
-  finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options, @self.errorTracking);
+  finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options, self.errorTracking);
   result := thequery.term;
   if objInheritsFrom(result, TXQTermModule) then
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, thequery.staticContextShared);
@@ -3499,7 +3534,7 @@ var
   oldPendingCount, oldFunctionCount, i: Integer;
   pendingModules: TXQueryModuleList;
 begin
-  errorTracking.str := str;
+  debugInfo := TXQParsingErrorTracker.Create(str);
   thequery := aquery;
   pendingModules := TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules;
   oldPendingCount := pendingModules.Count;
@@ -3512,7 +3547,7 @@ begin
         collectVariables(TXQTermModule(thequery.term));
     end else begin
       thequery.term := parseXString(true);
-      finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options, @self.errorTracking);
+      finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options, self.errorTracking);
     end;
     if errorTracking.pendingException <> nil then raise errorTracking.pendingException;
   except
@@ -3548,7 +3583,7 @@ begin
   parseQuery(aquery, true);
 end;
 
-class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions; errortracker: PXQParsingErrorTracker);
+class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions; errortracker: TXQParsingErrorTracker);
 var
   visitor: TFinalNamespaceResolving;
   varvisitor: TFinalVariableResolving;
@@ -4295,6 +4330,12 @@ begin
   seq.free;
 end;
 
+destructor TXQParsingContext.Destroy;
+begin
+  debuginfo.free;
+  inherited Destroy;
+end;
+
 
 { TJSONLiteralReplaceVisitor }
 
@@ -4343,7 +4384,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       hasPrivatePublic := false;
       for i := 0 to high(ans) do begin
         oldname := ans[i].name;
-        if objInheritsFrom(ans[i].name, TXQEQNameUnresolved) then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext,errorTracking^);
+        if objInheritsFrom(ans[i].name, TXQEQNameUnresolved) then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext,errorTracking);
 
         case ans[i].name.namespaceURL of
           XMLNamespaceUrl_XQuery: begin
@@ -4496,7 +4537,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if f.name = nil then exit; //already parsed
     unresolved := objInheritsFrom(f.name, TXQEQNameUnresolved);
-    if unresolved then TXQEQNameUnresolved(f.name).resolveURI(staticContext,errorTracking^, xqdnkFunction);
+    if unresolved then TXQEQNameUnresolved(f.name).resolveURI(staticContext,errorTracking, xqdnkFunction);
 
     if findFunction(f.name.namespaceURL, f.name.localname, length(f.children)) then
       exit();
@@ -4535,7 +4576,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     oldfname: TXQEQNameWithPrefix;
   begin
     oldfname := f.name;
-    if objInheritsFrom(f.name, TXQEQNameUnresolved) then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext,errorTracking^, xqdnkFunction);
+    if objInheritsFrom(f.name, TXQEQNameUnresolved) then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext,errorTracking, xqdnkFunction);
     visitAnnotations(f.annotations, true, f.name = nil);
     if f.kind = xqtdfUserDefined then begin
       resolveFunctionParams(f,staticContext);
@@ -4688,7 +4729,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     for i := 0 to high(t.catches) do
       for j := 0 to high(t.catches[i].tests) do
         if objInheritsFrom(t.catches[i].tests[j].name, TXQEQNameUnresolved) then
-          t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext,errorTracking^);
+          t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext,errorTracking);
   end;
 
 var
@@ -4842,9 +4883,9 @@ end;
 procedure TFinalNamespaceResolving.raiseParsingError(a, b: string; location: TObject);
 begin
   if errorTracking <> nil then begin
-    errorTracking^.lastErrorPos := nil;
-    errorTracking^.raiseParsingError(location, a,b);
-    raise errorTracking^.pendingException;
+    errorTracking.lastErrorPos := nil;
+    errorTracking.raiseParsingError(location, a,b);
+    raise errorTracking.pendingException;
   end else  raise EXQParsingException.create(a,b);
 end;
 
