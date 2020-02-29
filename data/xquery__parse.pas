@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 {$mode objfpc}{$H+}
-
+{$ModeSwitch advancedrecords}
 interface
 
 uses
@@ -37,11 +37,30 @@ type
  TXQSequenceTypeFlag = (xqstAllowValidationTypes, xqstIsCast, xqstResolveNow, xqstNoMultiples);
  TXQSequenceTypeFlags = set of TXQSequenceTypeFlag;
 
+ TXQParsingErrorTracker = record
+   type
+   TTermLocation = packed record
+     id: TObject;
+     startpos, endpos: pchar;
+   end;
+   PTermLocation = ^TTermLocation;
+ private
+   str: string;
+ public
+   pendingException, pendingExceptionLast: EXQParsingException;
+   lastErrorPos: pchar;
+   errorLocations: specialize TRecordArrayList<TTermLocation>;
+   procedure init(const astr: string);
+   procedure raiseParsingError(startAt, endAt: pchar; errcode, message: string);
+   procedure raiseParsingError(term: tobject; errcode, message: string);
+   procedure registerTermLocation(aid: TObject; astartpos, aendpos: pchar);
+ end;
+ PXQParsingErrorTracker = ^TXQParsingErrorTracker;
 
  TXQEQNameUnresolved = class(TXQEQNameWithPrefix)
-   function resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind = xqdnkUnknown): string;
-   function resolveAndFreeToEQName(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind = xqdnkUnknown): TXQEQName;
-   function resolveAndFreeToEQNameWithPrefix(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind = xqdnkUnknown): TXQEQNameWithPrefix;
+   function resolveURI(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind = xqdnkUnknown): string;
+   function resolveAndFreeToEQName(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind = xqdnkUnknown): TXQEQName;
+   function resolveAndFreeToEQNameWithPrefix(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind = xqdnkUnknown): TXQEQNameWithPrefix;
    function freeToEQName: TXQEQName;
 
    class function makeEQName(const url, prefix, local: string; mode: TXQNamespaceMode): TXQEQName;
@@ -52,13 +71,14 @@ type
    pattern: string;
  end;
 
+
 TXQParsingContext = class(TXQAbstractParsingContext)
 protected
   thequery: TXQuery;
   tempcontext: TXQEvaluationContext;
-  pendingException, pendingExceptionLast: EXQParsingException;
-  lastErrorPos: pchar;
   lastTokenStart: pchar;
+  errorTracking: TXQParsingErrorTracker;
+  procedure registerTermLocation(t: TObject);
   procedure raiseParsingError(errcode, s: string);
   procedure raiseSyntaxError(s: string);
   procedure raiseParsingErrorFatal(errcode, s: string);
@@ -141,7 +161,7 @@ protected
 
   function parseModule(): TXQTerm;
 
-  class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
+  class procedure finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions; errortracker: PXQParsingErrorTracker);
   procedure parseQuery(aquery: TXQuery; onlySpecialString: boolean);
   procedure parseQuery(aquery: TXQuery); override;
   procedure parseQueryXStringOnly(aquery: TXQuery); override;
@@ -173,12 +193,13 @@ end;
    implicitNamespaceCounts: TLongintArray;
    implicitNamespaceCountsLength: SizeInt;
    checker: TFlowerVariableChecker;
+   errorTracking: ^TXQParsingErrorTracker;
    //globalVariableHack: TXQVariableChangeLog;
    procedure declare(v: PXQTermVariable); override;
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
-   procedure raiseParsingError(a, b: string);
-   procedure raiseSyntaxError(m: string);
+   procedure raiseParsingError(a, b: string; location: TObject);
+   procedure raiseSyntaxError(m: string; location: TObject);
 
    constructor Create;
    destructor Destroy; override;
@@ -512,22 +533,28 @@ end;
 
 
 
-function TXQEQNameUnresolved.resolveURI(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind): string;
+function TXQEQNameUnresolved.resolveURI(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind): string;
+var
+  temp: TNamespace;
 begin
-  namespaceurl := staticContext.findNamespaceURLMandatory(namespaceprefix, kind);
-  result := namespaceurl;
+  temp := staticContext.findNamespace(namespaceprefix, kind);
+  if temp <> nil then result := temp.getURL
+  else result := '';
+  if (namespacePrefix <> '') and (result = '') then
+    errortracker.raiseParsingError(self, 'XPST0081', 'Unknown namespace prefix: ' + namespacePrefix);
+  namespaceurl := result; //staticContext.findNamespaceURLMandatory(namespaceprefix, kind);
 end;
 
-function TXQEQNameUnresolved.resolveAndFreeToEQName(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind): TXQEQName;
+function TXQEQNameUnresolved.resolveAndFreeToEQName(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind): TXQEQName;
 begin
-  resolveURI(staticContext, kind);
+  resolveURI(staticContext, errortracker, kind);
   result := freeToEQName;
 end;
 
-function TXQEQNameUnresolved.resolveAndFreeToEQNameWithPrefix(const staticContext: TXQStaticContext; kind: TXQDefaultNamespaceKind
+function TXQEQNameUnresolved.resolveAndFreeToEQNameWithPrefix(const staticContext: TXQStaticContext; const errortracker: TXQParsingErrorTracker; kind: TXQDefaultNamespaceKind
   ): TXQEQNameWithPrefix;
 begin
-  resolveURI(staticContext, kind);
+  resolveURI(staticContext, errortracker,kind);
   result := TXQEQNameWithPrefix.create(namespaceURL, namespacePrefix, localname);
   free;
 end;
@@ -577,29 +604,42 @@ begin
   end;
 end;
 
-procedure TXQParsingContext.raiseParsingError(errcode, s: string);
+procedure TXQParsingErrorTracker.init(const astr: string);
+begin
+  str := astr;
+  errorLocations.init;
+end;
+
+procedure TXQParsingErrorTracker.raiseParsingError(startAt, endAt: pchar; errcode, message: string);
 var lines, i: SizeInt;
     lineStart: pchar;
     view: TCharArrayView;
     line, msg: String;
     errorStart: Integer;
+    pos: pchar absolute endAt;
+    lastTokenStart: pchar absolute startAt;
 begin
-  if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
+  msg := message;
 
-  strCountLinesBeforePos(str, pos, lines, lineStart);
-  view := str.unsafeView.viewFrom(lineStart);
-  view := view.viewUntil(view.findLineBreak.nilToLast);
-  line := view.ToString;
+  if str.unsafeView.isInBounds(pos) then begin
+    if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
 
-  msg := s + LineEnding + 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
-  line := copy(line, 1, pos - lineStart + 1);
-  if (lastTokenStart >= pchar(str)) and (lastTokenStart <= pos) then errorStart := lastTokenStart - lineStart + 1
-  else errorStart := pos - lineStart;
-  for i := 1 to length(line) do
-    if line[i] <> #9 then
-      if i >= errorStart then line[i] := '^'
-      else line[i] := ' ';
-  msg += line + '  error occurs around here';
+    strCountLinesBeforePos(str, pos, lines, lineStart);
+    view := str.unsafeView.viewFrom(lineStart);
+    view := view.viewUntil(view.findLineBreak.nilToLast);
+    line := view.ToString;
+
+    msg += LineEnding + 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
+    line := copy(line, 1, pos - lineStart + 1);
+    if (lastTokenStart >= pchar(str)) and (lastTokenStart <= pos) then errorStart := lastTokenStart - lineStart + 1
+    else errorStart := pos - lineStart;
+    for i := 1 to length(line) do
+      if line[i] <> #9 then
+        if i >= errorStart then line[i] := '^'
+        else line[i] := ' ';
+    msg += line + '  error occurs around here';
+    lastErrorPos := pos;
+  end;
 
   if pendingException = nil then begin
     pendingException := EXQParsingException.Create(errcode, msg);
@@ -608,7 +648,36 @@ begin
     pendingExceptionLast.next := EXQParsingException.Create(errcode, msg);
     pendingExceptionLast := pendingExceptionLast.next;
   end;
-  lastErrorPos := pos;
+end;
+
+procedure TXQParsingErrorTracker.raiseParsingError(term: tobject; errcode, message: string);
+var l: PTermLocation;
+begin
+  for l in errorLocations do
+    if l^.id = term then begin
+      raiseParsingError(l^.startpos, l^.endpos, errcode, message);
+      exit;
+    end;
+  raiseParsingError(nil, nil, errcode, message);
+end;
+
+procedure TXQParsingErrorTracker.registerTermLocation(aid: TObject; astartpos, aendpos: pchar);
+begin
+  with errorLocations.addDefault^ do begin
+    id := aid;
+    startpos := astartpos;
+    endpos := aendpos;
+  end;
+end;
+
+procedure TXQParsingContext.registerTermLocation(t: TObject);
+begin
+  errorTracking.registerTermLocation(t, lastTokenStart, pos);
+end;
+
+procedure TXQParsingContext.raiseParsingError(errcode, s: string);
+begin
+  errorTracking.raiseParsingError(lastTokenStart, pos, errcode, s);
 end;
 
 procedure TXQParsingContext.raiseSyntaxError(s: string);
@@ -619,7 +688,7 @@ end;
 procedure TXQParsingContext.raiseParsingErrorFatal(errcode, s: string);
 begin
   raiseParsingError(errcode, s);
-  raise pendingException;
+  raise errorTracking.pendingException;
 end;
 
 procedure TXQParsingContext.raiseSyntaxErrorFatal(s: string);
@@ -950,6 +1019,7 @@ var
 begin
   mode := nextTokenEQName(namespaceUrl, namespacePrefix, local);
   result := TXQEQNameUnresolved.makeEQName(namespaceUrl, namespacePrefix, local, mode);
+  registerTermLocation(result);
 end;
 
 function TXQParsingContext.parseEQNameWithPrefix: TXQEQNameWithPrefix;
@@ -961,6 +1031,7 @@ var
 begin
   mode := nextTokenEQName(namespaceUrl, namespacePrefix, local);
   result := TXQEQNameUnresolved.makeEQNameWithPrefix(namespaceUrl, namespacePrefix, local, mode);
+  registerTermLocation(result);
 end;
 
 function TXQParsingContext.normalizeLineEnding(const s: string): string;
@@ -1040,7 +1111,9 @@ function TXQParsingContext.createFunctionCall(const url, prefix, local: string; 
 begin
   if (prefix = '') then refuseReservedFunctionName(local);
   result := TXQTermNamedFunction.create();
+  registerTermLocation(result);
   result.name := TXQEQNameUnresolved.makeEQName(URL, prefix, local, mode);
+  registerTermLocation(result.name);
 end;
 
 procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQPathMatchingStep);
@@ -1091,6 +1164,7 @@ begin
     kindTest.matching := [qmAttribute, qmCheckNamespaceURL];
     kindTest.namespaceURLOrPrefix := XMLNamespaceUrl_XMLNS;
   end;
+  if qmSchemaFail in kindtest.matching then registerTermLocation(tobject(@kindTest));
   kindTest.requiredType := nil;
 
   skipWhitespaceAndComment();
@@ -1372,6 +1446,7 @@ var token: String;
       requireXQuery3();
       expect('window');
       window := TXQTermFlowerWindow.Create;
+      registerTermLocation(window);
       result.push(window);
       window.flags := flags;
       window.loopvar := parseFlowerVariable;
@@ -1411,6 +1486,7 @@ var token: String;
         if isfor then result.push(TXQTermFlowerFor.Create)
         else result.push(TXQTermFlowerLet.Create);
         clause := TXQTermFlowerLet(result.children[high(result.children)]);
+        registerTermLocation(clause);
         with clause do begin
           loopvar := parseFlowerVariable;
 
@@ -1491,6 +1567,7 @@ var token: String;
     expect('by');
 
     group := TXQTermFlowerGroup.Create;
+    registerTermLocation(group);
     result.push(group);
     parseSpec;
     while pos^ = ',' do begin
@@ -1862,6 +1939,7 @@ begin
     #9,#10,#13,' ': raiseSyntaxError('Invalid whitespace in constructor');
   end;
   result := TXQTermConstructor.create(tetOpen, nextTokenQName(xqptElement));
+  registerTermLocation(result);
   try
     hadWhitespace := true; //if there is no whitespace the qname would have eaten pos^
     skipWhitespace();
@@ -2095,6 +2173,7 @@ begin
           mode := xqnmURL;
         end;
         name := TXQEQNameUnresolved.makeEQName(namespaceUrl, namespacePrefix, local, mode);
+        registerTermLocation(name);
         SetLength(params, 0);
         if nextTokenIs('(') then begin
           while true do begin
@@ -2149,7 +2228,7 @@ begin
     //resolve name. Do it at the end, so we know there was no XPST0003 error in the function
     if not anonymous then begin
       if objInheritsFrom(result.name, TXQEQNameUnresolved) then
-        result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
+        result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, errorTracking,xqdnkFunction);
       if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
       if staticContext.isLibraryModule and (result.name.namespaceURL <> namespaceGetURL(staticContext.moduleNamespace)) then
         raiseParsingError('XQST0048', 'Expected module namespace url');
@@ -2927,6 +3006,7 @@ var astroot: TXQTerm;
     function createBinOpTerm: TXQTermBinaryOp;
     begin
       result := TXQTermBinaryOp.Create(opinfo);
+      registerTermLocation(result);
       result.push(replace^);
       replace^ := result;
     end;
@@ -3011,6 +3091,7 @@ begin
           replace := ripBinOpApart(@astroot, 10000);
           if pos^ <> ']' then replace^ := TXQTermFilterSequence.Create(replace^, parsePrimaryLevel())
           else                replace^ := TXQTermFilterSequence.Create(replace^); //stupid hack to allow $var [] :=
+          registerTermLocation(replace^);
           expect(']');
         end;
         '(': begin
@@ -3336,10 +3417,10 @@ begin
   for i := pendings.Count - 1 downto 0 do begin
     otherQuery := pendings[i] as txquery;
     if otherQuery.Term = result then continue;
-    finalResolving(TXQueryBreakerHelper.PTerm(otherQuery)^, otherQuery.getStaticContext, options);
+    finalResolving(TXQueryBreakerHelper.PTerm(otherQuery)^, otherQuery.getStaticContext, options, nil);
     finalizeFunctionsEvenMore(otherQuery.Term as TXQTermModule, otherQuery.getStaticContext, otherQuery.staticContextShared);
   end;
-  finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options);
+  finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options, @self.errorTracking);
   result := thequery.term;
   if objInheritsFrom(result, TXQTermModule) then
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, thequery.staticContextShared);
@@ -3418,6 +3499,7 @@ var
   oldPendingCount, oldFunctionCount, i: Integer;
   pendingModules: TXQueryModuleList;
 begin
+  errorTracking.str := str;
   thequery := aquery;
   pendingModules := TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules;
   oldPendingCount := pendingModules.Count;
@@ -3430,9 +3512,9 @@ begin
         collectVariables(TXQTermModule(thequery.term));
     end else begin
       thequery.term := parseXString(true);
-      finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options);
+      finalResolving(TXQueryBreakerHelper.PTerm(thequery)^, staticContext, options, @self.errorTracking);
     end;
-    if pendingException <> nil then raise pendingException;
+    if errorTracking.pendingException <> nil then raise errorTracking.pendingException;
   except
     on e: Exception do begin
       //not sure if this is needed, but it seems reasonable
@@ -3450,12 +3532,13 @@ begin
       while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
       thequery._Release;
 
-      if (pendingException <> nil) and (e <> pendingException) and (e is EXQException) then begin
-        with EXQException(e) do
-          pendingExceptionLast.next := EXQParsingException.create(errorCode, Message, namespace);
-        raise pendingException;
-      end;
-      raise;
+      with errorTracking do
+        if (pendingException <> nil) and (e <> pendingException) and (e is EXQException) then begin
+          with EXQException(e) do
+            pendingExceptionLast.next := EXQParsingException.create(errorCode, Message, namespace);
+          raise pendingException;
+        end;
+        raise;
     end;
   end;
 end;
@@ -3465,7 +3548,7 @@ begin
   parseQuery(aquery, true);
 end;
 
-class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions);
+class procedure TXQParsingContext.finalResolving(var result: TXQTerm; sc: TXQStaticContext; const opts: TXQParsingOptions; errortracker: PXQParsingErrorTracker);
 var
   visitor: TFinalNamespaceResolving;
   varvisitor: TFinalVariableResolving;
@@ -3493,6 +3576,7 @@ begin
   try
     try
       visitor := TFinalNamespaceResolving.Create();
+      visitor.errorTracking := errorTracker;
       if objInheritsFrom(result, TXQTermModule) then visitor.mainModule := TXQTermModule(result);
       visitor.staticContext := sc;
       visitor.simpleTermVisit(@result, nil);
@@ -3727,7 +3811,7 @@ var declarationDuplicateChecker: TStringList;
       j: Integer;
   begin
     if name <> nil then begin
-      if objInheritsFrom(name, TXQEQNameUnresolved) then name := TXQEQNameUnresolved(name).resolveAndFreeToEQName(staticContext);
+      if objInheritsFrom(name, TXQEQNameUnresolved) then name := TXQEQNameUnresolved(name).resolveAndFreeToEQName(staticContext,errorTracking);
       namespaceURL := name.namespaceURL;
       localname := name.localname;
     end else begin
@@ -4241,7 +4325,7 @@ begin
   t := txqterm(v^);
   if (t <> nil) and (t.InheritsFrom(TXQTermPendingEQNameToken)) then begin
     pending := TXQTermPendingEQNameToken(t);
-    if pending.pending <> xqptVariable then raiseSyntaxError('Internal error 20160101181238b');
+    if pending.pending <> xqptVariable then raiseSyntaxError('Internal error 20160101181238b', t);
     v^ := TXQTermVariable(pending.resolveAndFree(staticContext));
   end;
   inherited;
@@ -4254,28 +4338,30 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     var
       i: Integer;
       hasPrivatePublic: Boolean;
+      oldname: TXQEQName;
     begin
       hasPrivatePublic := false;
       for i := 0 to high(ans) do begin
-        if objInheritsFrom(ans[i].name, TXQEQNameUnresolved) then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext);
+        oldname := ans[i].name;
+        if objInheritsFrom(ans[i].name, TXQEQNameUnresolved) then ans[i].name := TXQEQNameUnresolved(ans[i].name).resolveAndFreeToEQName(staticContext,errorTracking^);
 
         case ans[i].name.namespaceURL of
           XMLNamespaceUrl_XQuery: begin
             case ans[i].name.localname of
               'private', 'public': ; //ok
-              else raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+XMLNamespaceUrl_XQuery);
+              else raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+XMLNamespaceUrl_XQuery, oldname);
             end;
             if hasPrivatePublic then
-              raiseParsingError(ifthen(isFunction, 'XQST0106', 'XQST0116'), '%private/%public has to be unique');
+              raiseParsingError(ifthen(isFunction, 'XQST0106', 'XQST0116'), '%private/%public has to be unique', oldname);
             hasPrivatePublic := true;
-            if isAnonymousFunction then raiseParsingError('XQST0125', 'anonymous functions cannot be public or private');
+            if isAnonymousFunction then raiseParsingError('XQST0125', 'anonymous functions cannot be public or private', oldname);
           end;
           XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance,
           XMLNamespaceURL_XPathFunctions, XMLNamespaceURL_XPathFunctionsMath:
-            raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
+            raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL, oldname);
           XMLNamespaceURL_XPathFunctionsArray, XMLNamespaceURL_XPathFunctionsMap:
             if staticContext.model in PARSING_MODEL3_1 then
-              raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL);
+              raiseParsingError('XQST0045', 'No annotations are allowed in namespace '+ans[i].name.namespaceURL, oldname);
         end;
       end;
     end;
@@ -4292,14 +4378,14 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       schema := staticContext.findSchema(pending.resolveURI(staticContext, xqdnkType));
       if schema <> nil then st.atomicTypeInfo := schema.findType(pending.localpart)
       else if pending.namespaceprefix <> '' then
-        raiseParsingError(ifthen(errCode <> '', errCode, 'XPST0081'), 'Unknown schema: '+pending.namespaceUrl)
+        raiseParsingError(ifthen(errCode <> '', errCode, 'XPST0081'), 'Unknown schema: '+pending.namespaceUrl, pending)
       else st.atomicTypeInfo := nil;
       if (st.atomicTypeInfo = nil)
          or (not (xqstAllowValidationTypes in flags) and baseSchema.isValidationOnlyType(st.atomicTypeInfo)) then begin
            if errCode = '' then
              if (xqstIsCast in flags) and (staticContext.model in PARSING_MODEL3) then errCode := 'XQST0052'
              else errCode := 'XPST0051';
-           raiseParsingError(errCode, 'Unknown type: Q{'+pending.namespaceurl+'}'+pending.localpart);
+           raiseParsingError(errCode, 'Unknown type: Q{'+pending.namespaceurl+'}'+pending.localpart, pending);
          end;
       pending.free;
       SetLength(st.children, 0);
@@ -4343,7 +4429,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       schema: TXSSchema;
       i: Integer;
       otherModuleStaticContext: TXQStaticContext;
-      binop: TXQTermBinaryOp;
     begin
       module := TXQueryEngine.findNativeModule(anamespace);
 
@@ -4382,7 +4467,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           if f.functionStaticContext <> staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
             for i := 0 to high(f.interpretedFunction.annotations) do
               if f.interpretedFunction.annotations[i].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
-                raiseParsingError('XPST0017', f.interpretedFunction.name + ' is private');
+                raiseParsingError('XPST0017', f.interpretedFunction.name + ' is private', f);
           exit(true);
         end;
       end;
@@ -4411,7 +4496,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if f.name = nil then exit; //already parsed
     unresolved := objInheritsFrom(f.name, TXQEQNameUnresolved);
-    if unresolved then TXQEQNameUnresolved(f.name).resolveURI(staticContext, xqdnkFunction);
+    if unresolved then TXQEQNameUnresolved(f.name).resolveURI(staticContext,errorTracking^, xqdnkFunction);
 
     if findFunction(f.name.namespaceURL, f.name.localname, length(f.children)) then
       exit();
@@ -4430,7 +4515,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     else if TXQEQNameUnresolved(f.name).namespacePrefix = '' then name := ''
     else name := TXQEQNameUnresolved(f.name).namespacePrefix + ':' ;
     name += f.name.localname;
-    raiseParsingError('XPST0017', 'unknown function: ' + name + ' #' + IntToStr(length(f.children)) + suggestions(f.name.localname));
+    raiseParsingError('XPST0017', 'unknown function: ' + name + ' #' + IntToStr(length(f.children)) + suggestions(f.name.localname), f);
   end;
 
   function visitNamedFunction(var f: TXQTermNamedFunction): TXQTerm;
@@ -4447,8 +4532,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   var
     i, j: Integer;
+    oldfname: TXQEQNameWithPrefix;
   begin
-    if objInheritsFrom(f.name, TXQEQNameUnresolved) then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext, xqdnkFunction);
+    oldfname := f.name;
+    if objInheritsFrom(f.name, TXQEQNameUnresolved) then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext,errorTracking^, xqdnkFunction);
     visitAnnotations(f.annotations, true, f.name = nil);
     if f.kind = xqtdfUserDefined then begin
       resolveFunctionParams(f,staticContext);
@@ -4457,7 +4544,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         for j := i + 1 to f.parameterCount - 1 do begin
           if not objInheritsFrom(f.children[j], TXQTermDefineVariable) then continue;
           if TXQTermVariable(TXQTermDefineVariable(f.children[i]).variable).equalsVariable(TXQTermVariable(TXQTermDefineVariable(f.children[j]).variable)) then
-            raiseParsingError('XQST0039', 'Duplicate variable name: '+TXQTermDefineVariable(f.children[i]).variable.ToString);
+            raiseParsingError('XQST0039', 'Duplicate variable name: '+TXQTermDefineVariable(f.children[i]).variable.ToString, oldfname);
         end;
       end;
     end;
@@ -4471,23 +4558,22 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     visitAnnotations(f.annotations, false);
   end;
 
-  procedure visitPathStep(var step: TXQPathMatchingStep);
-  begin
-    if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in step.matching) then begin
-      step.matching := step.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
-      if step.typ = tneaAttribute then
-        step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkUnknown)
-       else
-        step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkElementType);
-    end;
-    if qmCheckNamespaceURL in step.matching then step.namespaceURLOrPrefix := TNamespace.uniqueUrl(step.namespaceURLOrPrefix);
-    if step.requiredType <> nil then
-      visitSequenceType(step.requiredType, 'XPST0008');
-    if qmSchemaFail in step.matching then
-      raiseParsingError('XPST0008', 'Schema tests are not supported');
-  end;
-
   procedure visitNodeMatcher(n: TXQTermNodeMatcher);
+    procedure visitPathStep(var step: TXQPathMatchingStep);
+    begin
+      if not staticContext.useLocalNamespaces and (qmCheckNamespacePrefix in step.matching) then begin
+        step.matching := step.matching - [qmCheckNamespacePrefix] + [qmCheckNamespaceURL];
+        if step.typ = tneaAttribute then
+          step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkUnknown)
+         else
+          step.namespaceURLOrPrefix := staticContext.findNamespaceURLMandatory(step.namespaceURLOrPrefix, xqdnkElementType);
+      end;
+      if qmCheckNamespaceURL in step.matching then step.namespaceURLOrPrefix := TNamespace.uniqueUrl(step.namespaceURLOrPrefix);
+      if step.requiredType <> nil then
+        visitSequenceType(step.requiredType, 'XPST0008');
+      if qmSchemaFail in step.matching then
+        raiseParsingError('XPST0008', 'Schema tests are not supported', tobject(@step));
+    end;
   begin
     visitPathStep(n.queryCommand);
   end;
@@ -4511,11 +4597,11 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         case tdf.kind of
           xqtdfStaticPartialApplication: insertAt := 0;
           xqtdfDynamicPartialApplication: insertAt := 1;
-          else raiseSyntaxError('=>');
+          else raiseSyntaxError('=>', b);
         end;
         tcall := tdf.children[0] as TXQTermWithChildren;
       end else
-        raiseSyntaxError('=>');
+        raiseSyntaxError('=>', b);
       setlength(tcall.children, length(tcall.children) + 1);
       if insertAt <> high(tcall.children) then
         move(tcall.children[insertAt], tcall.children[insertAt + 1], sizeof(tcall.children[0]) * (length(tcall.children) - insertAt - 1));
@@ -4536,11 +4622,11 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         st := TXQTermSequenceType(b.children[1]);
         visitSequenceType(st);
         if not (st.isSingleType()) then
-          raiseSyntaxError('Need single typ for cast')
+          raiseSyntaxError('Need single typ for cast', b)
         else if baseSchema.isAbstractType(st.atomicTypeInfo) then
-          raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast')
+          raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast', b)
         else if objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
-          raiseParsingError('XQST0052', 'Expected simple type');
+          raiseParsingError('XQST0052', 'Expected simple type', b);
         result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs, st.allowNone);
       end;
     end else if b.op.func = @xqvalueInstanceOf then begin
@@ -4548,7 +4634,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         st := TXQTermSequenceType(b.children[1]);
         visitSequenceType(st);
         if (st.kind = tikAtomic) and objInheritsFrom(st.atomicTypeInfo, TXSListType) then
-          raiseParsingError('XPST0051', 'No value is a list type');
+          raiseParsingError('XPST0051', 'No value is a list type', b);
       end;
     end else if (b.op.func = @xqvalueOrPlaceholder) or (b.op.func = @xqvalueAndPlaceholder) then begin
       //A or B => if (A) then true() else B
@@ -4602,7 +4688,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     for i := 0 to high(t.catches) do
       for j := 0 to high(t.catches[i].tests) do
         if objInheritsFrom(t.catches[i].tests[j].name, TXQEQNameUnresolved) then
-          t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext);
+          t.catches[i].tests[j].name := TXQEQNameUnresolved(t.catches[i].tests[j].name).resolveAndFreeToEQName(staticContext,errorTracking^);
   end;
 
 var
@@ -4649,7 +4735,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
             if a2.typ <> tetAttribute then continue;
             if ((a1.nameValue as TXQTermEQNameToken).namespaceurl = (a2.nameValue as TXQTermEQNameToken).namespaceurl) and
                ((a1.nameValue as TXQTermEQNameToken).localpart = (a2.nameValue as TXQTermEQNameToken).localpart) then
-                 raiseParsingError('XQST0040', 'Duplicated attribute: '+a1.nameValue.debugTermToString);
+                 raiseParsingError('XQST0040', 'Duplicated attribute: '+a1.nameValue.debugTermToString, c);
           end;
       end;
     end;
@@ -4683,21 +4769,25 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   var
     i: Integer;
     j: Integer;
+    clause: TXQTermFlowerSubClause;
+    groupclause: TXQTermFlowerGroup;
   begin
     if checker = nil then checker := TFlowerVariableChecker.create;
     checker.knownVars.clear;
     for i := 0 to high(f.children) - 1 do begin
-      case TXQTermFlowerSubClause(f.children[i]).kind of
+      clause := TXQTermFlowerSubClause(f.children[i]);
+      case clause.kind of
         xqtfcFor:
           if (TXQTermFlowerFor(f.children[i]).positionVar <> nil) and TXQTermFlowerFor(f.children[i]).positionVar.equalsVariable(TXQTermFlowerFor(f.children[i]).loopvar) then
-            raiseParsingError('XQST0089', 'Duplicate variable: ' + TXQTermFlowerFor(f.children[i]).positionVar.ToString);
-        xqtfcGroup:
-          with TXQTermFlowerGroup(f.children[i]) do
-            for j := 0 to high(vars) do
-              if not checker.knownVars.hasVariable(vars[j]) then
-                raiseParsingError('XQST0094', 'Variable unknown: '+vars[j].ToString);
+            raiseParsingError('XQST0089', 'Duplicate variable: ' + TXQTermFlowerFor(f.children[i]).positionVar.ToString, clause);
+        xqtfcGroup: begin
+          groupclause := TXQTermFlowerGroup(f.children[i]);
+          for j := 0 to high(groupclause.vars) do
+            if not checker.knownVars.hasVariable(groupclause.vars[j]) then
+              raiseParsingError('XQST0094', 'Variable unknown: '+groupclause.vars[j].ToString, clause);
+        end;
         xqtfcWindow: if TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable <> nil then
-          raiseParsingError('XQST0103', 'Duplicate variable: '+TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable.ToString);
+          raiseParsingError('XQST0103', 'Duplicate variable: '+TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable.ToString, clause);
       end;
       TXQTermFlowerSubClause(f.children[i]).visitchildrenToUndeclare(checker);
     end;
@@ -4725,7 +4815,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   function visitFilterSequence(t: TXQTermFilterSequence): TXQTerm;
   begin
     if (length(t.children) < 2) and (not objInheritsFrom(parent, TXQTermDefineVariable) or (TXQTermDefineVariable(parent).variable <> t)) then
-      raiseSyntaxError('[] not allowed');
+      raiseSyntaxError('[] not allowed', t);
     if objInheritsFrom(t.children[0], TXQTermNodeMatcher) then result := TXQTermPath.create(t) //this ensures the indices in filters are correct. i.e. in ancestors::*[$i] indices in reverse document order (opposite order of (ancestors::*)[$i])
     else result := t;
   end;
@@ -4749,14 +4839,18 @@ begin
   result := xqtvaContinue;
 end;
 
-procedure TFinalNamespaceResolving.raiseParsingError(a, b: string);
+procedure TFinalNamespaceResolving.raiseParsingError(a, b: string; location: TObject);
 begin
-  raise EXQParsingException.create(a,b);
+  if errorTracking <> nil then begin
+    errorTracking^.lastErrorPos := nil;
+    errorTracking^.raiseParsingError(location, a,b);
+    raise errorTracking^.pendingException;
+  end else  raise EXQParsingException.create(a,b);
 end;
 
-procedure TFinalNamespaceResolving.raiseSyntaxError(m: string);
+procedure TFinalNamespaceResolving.raiseSyntaxError(m: string; location: TObject);
 begin
-  raiseParsingError('XPST0003', m);
+  raiseParsingError('XPST0003', m, location);
 end;
 
 constructor TFinalNamespaceResolving.Create;
