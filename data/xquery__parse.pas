@@ -674,15 +674,16 @@ begin
   if str.unsafeView.isInBounds(pos) then begin
     if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
 
+    if (lastTokenStart < pchar(str)) or (lastTokenStart > pos) then lastTokenStart := pos - 1;
+
     strCountLinesBeforePos(str, pos, lines, lineStart);
     view := str.unsafeView.viewFrom(lineStart);
     view := view.viewUntil(view.findLineBreak.nilToLast);
     line := view.ToString;
 
-    result := 'in line ' + inttostr(lines) + LineEnding + line + LineEnding;
+    result := 'in line ' + inttostr(lines) + ' column ' + inttostr(lastTokenStart - lineStart + 1) + LineEnding + line + LineEnding;
     line := copy(line, 1, pos - lineStart + 1);
-    if (lastTokenStart >= pchar(str)) and (lastTokenStart <= pos) then errorStart := lastTokenStart - lineStart + 1
-    else errorStart := pos - lineStart;
+    errorStart := lastTokenStart - lineStart + 1;
     for i := 1 to length(line) do
       if line[i] <> #9 then
         if i >= errorStart then line[i] := '^'
@@ -986,7 +987,7 @@ function TXQParsingContext.nextTokenNCName(): string;
 begin
   result := nextToken(false);
   if not baseSchema.isValidNCName(result) then
-    raiseSyntaxError('Invalid NCName: '''+result+'''');
+    raiseSyntaxError('Invalid NCName: "'+result+'" (possibly missing expression, missing argument, additional comma ",", or additional closing parentheses. It expects the start of something, but finds the end or something unparsable. ) ');
 end;
 
 function TXQParsingContext.nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
@@ -3171,7 +3172,7 @@ begin
             expect(word);
             parseDotOperator;
           end else
-            raiseSyntaxError('Unknown or unexpected operator: '+word+ ' (possible missing comma , or closing parentheses)}] )' );
+            raiseSyntaxError('Unknown or unexpected operator: "'+word+ '" (possibly missing comma "," or closing parentheses ")}]" )' );
         end;
       end;
     end;
