@@ -2761,7 +2761,6 @@ end;
 
 class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
-  aindex: Integer;
   module: TXQNativeModule;
   t: TXSType;
   model: TXQParsingModel;

@@ -173,6 +173,7 @@ protected
 
 
   function optimizeConstantChildren(seq: TXQTermWithChildren): TXQTerm;
+public
   destructor Destroy; override;
 end;
 

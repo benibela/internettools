@@ -581,7 +581,7 @@ type
     FCount: SizeInt;
     procedure setCount(NewCount: SizeInt);
     procedure checkIndex(AIndex : SizeInt); inline;
-    procedure initEnumerator(var result: TBasePreEnumerator);
+    procedure initEnumerator(out result: TBasePreEnumerator);
   public
     procedure init;
     procedure addAll(other: TBaseArrayList);
@@ -1213,7 +1213,7 @@ begin
   result := fcurrent < fend;
 end;
 
-procedure TBaseArrayList.initEnumerator(var result: TBasePreEnumerator);
+procedure TBaseArrayList.initEnumerator(out result: TBasePreEnumerator);
 begin
   if fbuffer <> nil then begin
     result.FCurrent := @FBuffer[0];
