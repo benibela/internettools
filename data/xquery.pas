@@ -1373,10 +1373,11 @@ type
     node: TXSType;
 
     sequence, function_: TXSType;
-    numericPseudoType, untypedOrNodeUnion: TXSUnionType;
+    untypedOrNodeUnion: TXSUnionType;
 
-    //1.1 only
+    //3.1 only
     error: TXSSimpleType;
+    numeric: TXSUnionType;
 
     constructor Create;
     destructor Destroy; override;
@@ -3111,6 +3112,10 @@ type TXQTerm_VisitorTrackKnownVariables = class(TXQTerm_Visitor)
   procedure undeclare(v: PXQTermVariable); override;
 end;
 
+const
+PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
+PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
+PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1];
 
 var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_XPathFunctionsMap, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: TNamespace;
 
@@ -3260,8 +3265,6 @@ var
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
   const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
-
-  PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
 
 
 
@@ -9774,7 +9777,6 @@ baseSchema.cacheDescendants; //this ignores the jsoniq types
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');
 baseSchema.hide('function(*)');
-baseSchema.hide('numeric');
 
 {$ifdef dumpFunctions}baseSchema.logConstructorFunctions;{$endif}
 

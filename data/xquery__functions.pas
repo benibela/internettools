@@ -7015,9 +7015,6 @@ end;
 
 
 var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
-const
-      PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
-      PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
 
 
 procedure initializeFunctions;

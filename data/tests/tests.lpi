@@ -104,7 +104,7 @@
         <PackageName Value="LCLBase"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="15">
+    <Units Count="16">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -158,13 +158,17 @@
         <IsPartOfProject Value="True"/>
       </Unit12>
       <Unit13>
-        <Filename Value="xpath3_1_tests.pas"/>
+        <Filename Value="xquery3_1_tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit13>
       <Unit14>
         <Filename Value="xquery_serialization_tests.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit14>
+      <Unit15>
+        <Filename Value="xpath3_1_tests.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit15>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

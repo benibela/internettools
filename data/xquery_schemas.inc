@@ -145,12 +145,12 @@ begin
 
  if a = b then
    if a.derivedFrom(baseSchema.Integer) then exit(baseSchema.Decimal)
-   else if a.derivedFrom(baseSchema.numericPseudoType) then exit(a)
+   else if a.derivedFrom(baseSchema.numeric) then exit(a)
    else exit(failureType);
 
- if not a.derivedFrom(baseSchema.numericPseudoType) then
+ if not a.derivedFrom(baseSchema.numeric) then
    a := failureType;
- if not b.derivedFrom(baseSchema.numericPseudoType) then
+ if not b.derivedFrom(baseSchema.numeric) then
    b := failureType;
 
  if becomesType(baseSchema.Double) then
@@ -346,8 +346,15 @@ var
   i: Integer;
   temp: TXSCastingError;
 begin
-  if length(members) > 0 then result := xsceXPTY0004
-  else result := xsceFORG0001; //<- xs:error special case
+  if v.typeAnnotation.derivedFrom(self) then begin
+    //xs:numeric special case
+    result := xsceNoError;
+    if outv <> nil then outv^ := v.toValue;
+    exit;
+  end;
+  if length(members) = 0 then //xs:error special case
+    exit(xsceFORG0001);
+  result := xsceXPTY0004;
   for i := 0 to high(members) do begin
     temp := members[i].tryCreateValue(v, outv);
     if temp = xsceNoError then exit(xsceNoError);
@@ -1029,7 +1036,7 @@ begin
   end;
   //separately handle union types
   for i := 1 to 2 do begin
-    if i = 1 then curType := numericPseudoType else curType := untypedOrNodeUnion;
+    if i = 1 then curType := numeric else curType := untypedOrNodeUnion;
     with TXSUnionType(curType), graph[curType.id] do begin
       for j := 0 to high(members) do
         children[count + j] := members[j].id;
@@ -1273,7 +1280,7 @@ begin
   error.schema := self;
   typeList.AddObject('error', error);
 
-  numericPseudoType  := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [decimal, float, double, integer]);
+  numeric := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [double, decimal, float, integer]);
 
   untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, TXQValueString, [untypedAtomic, untyped, node]);
   typeList.sorted := true;
@@ -1337,7 +1344,7 @@ begin
   integer := TXQTermSequenceType.create(baseSchema.integer); integerOrEmpty := orEmpty(integer); integerStar := star(integer);
   decimal := TXQTermSequenceType.create(baseSchema.decimal); decimalOrEmpty := orEmpty(decimal);
   double := TXQTermSequenceType.create(baseSchema.double); doubleOrEmpty := orEmpty(double);
-  numeric := TXQTermSequenceType.create(baseSchema.numericPseudoType); numericOrEmpty := orEmpty(numeric);
+  numeric := TXQTermSequenceType.create(baseSchema.numeric); numericOrEmpty := orEmpty(numeric);
 
 
 

@@ -4599,12 +4599,12 @@ begin
   end;
 end;
 
-function nativeMetaTypeToActualType(t: TXQTermSequenceType): TXQTermSequenceType;
+function nativeMetaTypeToActualType(const context: TXQEvaluationContext; t: TXQTermSequenceType): TXQTermSequenceType;
 begin
   if t = nil then exit(nil);
   result := TXQTermSequenceType(t.clone);
   if (t.kind = tikAtomic) then
-    if ((t.atomicTypeInfo = baseSchema.numericPseudoType)) then
+    if ((t.atomicTypeInfo = baseSchema.numeric)) and not (context.staticContext.model in PARSING_MODEL3_1) then
       result.atomicTypeInfo := baseSchema.anyAtomicType;
 end;
 
@@ -4725,8 +4725,8 @@ begin
     if version <> nil then begin
       for i := 0 to parameterCount-1 do
         if version^.types[i] <> nil then
-          (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(version^.types[i]));
-      resulttype := nativeMetaTypeToActualType(version^.returnType);
+          (children[i] as TXQTermDefineVariable).push(nativeMetaTypeToActualType(context, version^.types[i]));
+      resulttype := nativeMetaTypeToActualType(context, version^.returnType);
     end else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
       for i := 0 to parameterCount-1 do
         (children[i] as TXQTermDefineVariable).push(TXQTermSequenceType.create(baseSchema.anyAtomicType, true));
@@ -4783,7 +4783,7 @@ begin
       TXQTermNamedFunction(result.body).push(makeNumberedVariable(parameterCount - j - 1, parameterCount - j - 1 + i));
       result.parameters[j].variable := makeNumberedVariable(parameterCount - j - 1);
       if version <> nil then
-        result.parameters[j].seqtype := nativeMetaTypeToActualType(version^.types[i])
+        result.parameters[j].seqtype := nativeMetaTypeToActualType(context, version^.types[i])
        else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then begin
         result.parameters[j].seqtype := TXQTermSequenceType.create(baseSchema.anyAtomicType, true);
        end else if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then begin
@@ -4801,7 +4801,7 @@ begin
   assert(j = parameterCount);
   result.ownsTerms := true;
   if version <> nil then
-    result.resulttype := nativeMetaTypeToActualType(version^.returnType)
+    result.resulttype := nativeMetaTypeToActualType(context, version^.returnType)
   else if (f.kind = xqfkBasic) and (TXQBasicFunctionInfo(f.func).func = @xqFunctionConcat) then
     result.resulttype := TXQTermSequenceType.create(baseSchema.string_)
   else if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (f.interpretedFunction.resulttype <> nil)  then

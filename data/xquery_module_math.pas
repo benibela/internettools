@@ -327,9 +327,7 @@ begin
     module.registerFunction('asin', @mathAsin).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
     module.registerFunction('acos', @mathAcos).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
     module.registerFunction('atan', @mathAtan).setVersionsShared([doubleOrEmpty, doubleOrEmpty]);
-    baseSchema.show('numeric');
     module.registerFunction('pow', @mathPow).setVersionsShared([doubleOrEmpty, numeric, doubleOrEmpty]);
-    baseSchema.hide('numeric');
     module.registerFunction('atan2', @mathAtan2).setVersionsShared([double, double, double]);
   end;
 

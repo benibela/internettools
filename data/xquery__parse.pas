@@ -371,9 +371,6 @@ begin
   end;
 end;
 
-const PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1];
-  PARSING_MODEL3 = [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1];
-  PARSING_MODEL3_1 = [xqpmXPath3_1, xqpmXQuery3_1];
 
 
 constructor TVariableCycleDetectorXQ1.create(startcontext: TXQStaticContext);
