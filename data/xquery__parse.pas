@@ -48,7 +48,6 @@ type
    str: string;
  public
    pendingException, pendingExceptionLast: EXQParsingException;
-   lastErrorPos: pchar;
    errorLocations: specialize TRecordArrayList<TTermLocation>;
    constructor Create(const astr: string);
    procedure raiseParsingError(startAt, endAt: pchar; errcode, message: string);
@@ -79,6 +78,7 @@ protected
   thequery: TXQuery;
   tempcontext: TXQEvaluationContext;
   lastTokenStart: pchar;
+  lastErrorPos: pchar;
   function errorTracking: TXQParsingErrorTracker; inline;
   procedure registerTermLocation(t: TObject);
   procedure raiseParsingError(errcode, s: string);
@@ -671,9 +671,7 @@ var lines, i: SizeInt;
     lastTokenStart: pchar absolute startAt;
 begin
   result := '';
-  if str.unsafeView.isInBounds(pos) then begin
-    if (pos <= lastErrorPos) and assigned(pendingException) then raise pendingException;
-
+  if str.unsafeView.isOnBounds(pos) then begin
     if (lastTokenStart < pchar(str)) or (lastTokenStart > pos) then lastTokenStart := pos - 1;
 
     strCountLinesBeforePos(str, pos, lines, lineStart);
@@ -689,7 +687,6 @@ begin
         if i >= errorStart then line[i] := '^'
         else line[i] := ' ';
     result += line + '  error occurs around here';
-    lastErrorPos := pos;
   end;
 end;
 
@@ -714,7 +711,9 @@ end;
 
 procedure TXQParsingContext.raiseParsingError(errcode, s: string);
 begin
+  if (pos <= lastErrorPos) and assigned(errorTracking.pendingException) then raise errorTracking.pendingException;
   errorTracking.raiseParsingError(lastTokenStart, pos, errcode, s);
+  lastErrorPos := pos;
 end;
 
 procedure TXQParsingContext.raiseSyntaxError(s: string);
@@ -4668,7 +4667,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           raiseSyntaxError('Need single typ for cast', b)
         else if baseSchema.isAbstractType(st.atomicTypeInfo) then
           raiseParsingError(ifthen((staticContext.model in PARSING_MODEL3) or (st.atomicTypeInfo <> baseSchema.anySimpleType), 'XPST0080', 'XPST0051'), 'Invalid type for cast', b)
-        else if objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) then
+        else if not objInheritsFrom(st.atomicTypeInfo, TXSSimpleType) {and not (TXSSimpleType(st.atomicTypeInfo).variety in [xsvAbsent, xsvAtomic]) } then
           raiseParsingError('XQST0052', 'Expected simple type', b);
         result := staticallyCastQNameAndNotation(b, st.atomicTypeInfo, staticContext, b.op.func = @xqvalueCastableAs, st.allowNone);
       end;
@@ -4885,7 +4884,6 @@ end;
 procedure TFinalNamespaceResolving.raiseParsingError(a, b: string; location: TObject);
 begin
   if errorTracking <> nil then begin
-    errorTracking.lastErrorPos := nil;
     errorTracking.raiseParsingError(location, a,b);
     raise errorTracking.pendingException;
   end else  raise EXQParsingException.create(a,b);
