@@ -4238,25 +4238,29 @@ begin
   result := xqFunctionParse_Common(context, argc, args, 'html');
 end;
 
-type TSerializationParams = record
+type
+TSerializationMethod = (xqsmXML, xqsmXHTML, xqsmHTML, xqsmText, xqsmJSON, xqsmAdaptive);
+TSerializationParams = record
   isAbsentMarker: string;
-
-  method, version, encoding: string;
+  method: TSerializationMethod;
+  version, encoding: string;
   htmlVersion, doctypePublic, doctypeSystem: string;
   omitXmlDeclaration: boolean;
   standalone: string;
   itemSeparator: string;
   indent: TXQSerializerInsertWhitespace;
+  jsonNodeOutputMethod: string;
   procedure setDefault;
   procedure setFromNode(paramNode: TTreeNode);
   procedure setFromMap(const v: IXQValue);
   procedure setFromXQValue(const v: IXQValue);
+  procedure setMethod(const s: string);
 end;
 
 procedure TSerializationParams.setDefault;
 begin
   isAbsentMarker := #0;
-  method := 'xml';
+  method := xqsmXML;
   version := '1.1';
   encoding := 'UTF-8';
   htmlVersion := '5.0';
@@ -4266,6 +4270,7 @@ begin
   standalone := 'omit';
   itemSeparator := isAbsentMarker;
   indent := xqsiwConservative;
+  jsonNodeOutputMethod := 'xml';
 end;
 
 procedure TSerializationParams.setFromNode(paramNode: TTreeNode);
@@ -4302,9 +4307,9 @@ begin
          'indent': if tobool(paramNode.getAttribute('value')) then indent := xqsiwIndent
                    else indent := xqsiwNever;
          'item-separator': itemSeparator := paramNode.getAttribute('value');
-         //'json-node-output-method': todo 3.1
+         'json-node-output-method': paramNode.getAttribute('value');
          'media-type': ;//todo
-         'method':         method := paramNode.getAttribute('value');
+         'method':         setMethod(paramNode.getAttribute('value'));
          'normalization-form': ;//todo
          'omit-xml-declaration': omitXmlDeclaration := tobool(paramNode.getAttribute('value'));
          'standalone':     standalone := paramNode.getAttribute('value');
@@ -4360,9 +4365,9 @@ begin
       'indent': if valueBool() then indent := xqsiwIndent
                 else indent := xqsiwNever;
       'item-separator': itemSeparator := valueString();
-      'json-node-output-method': ; //todo
+      'json-node-output-method': jsonNodeOutputMethod := valueString(); //todo
       'media-type': valueString(); //todo
-      'method': method := valueString();
+      'method': setMethod(valueString());
       'normalization-form': valueString(); //todo
       'omit-xml-declaration': omitXmlDeclaration := valueBool();
       'standalone': if valueBool() then standalone := 'yes' else standalone := 'no';
@@ -4383,6 +4388,63 @@ begin
   end;
 end;
 
+procedure TSerializationParams.setMethod(const s: string);
+begin
+  case s of
+    'xml': method := xqsmXML;
+    'html': method := xqsmHTML;
+    'xhtml': method := xqsmXHTML;
+    'text': method := xqsmText;
+    'json': method := xqsmJSON;
+    'adaptive': method := xqsmAdaptive;
+  end;
+end;
+
+function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
+var serializer: TXQSerializer;
+  temp: string;
+begin
+  serializer.init(@temp);
+  serializer.standard := true;
+
+  serializer.insertWhitespace := params.indent;
+  if serializer.insertWhitespace = xqsiwConservative then serializer.insertWhitespace := xqsiwNever;
+  case params.jsonNodeOutputMethod of
+    'xml': serializer.nodeFormat := tnsXML;
+    'xhtml': serializer.nodeFormat := tnsXML;
+    'html': serializer.nodeFormat := tnsHTML;
+    'text': serializer.nodeFormat := tnsText;
+    else serializer.error('SEPM0016', v.toValue);
+  end;
+
+  v.jsonSerialize(serializer);
+  serializer.final;
+  result := xqvalue(temp);
+end;
+
+function serializeAdaptive(const params: TSerializationParams; const v: IXQValue): IXQValue;
+var serializer: TXQSerializer;
+  temp, itemSeparator: string;
+  w: PIXQValue;
+  first: Boolean;
+begin
+  serializer.init(@temp);
+  serializer.standard := true;
+
+  serializer.insertWhitespace := params.indent;
+  serializer.insertWhitespace := xqsiwNever;
+  itemSeparator := params.itemSeparator;
+  if itemSeparator = params.isAbsentMarker then itemSeparator := #10;
+
+  first := true;
+  for w in v.GetEnumeratorPtrUnsafe do begin
+    if not first then serializer.append(itemSeparator);
+    w^.adaptiveSerialize(serializer);
+    first := false;
+  end;
+  serializer.final;
+  result := xqvalue(temp);
+end;
 
 function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -4409,6 +4471,12 @@ begin
   arg := args[0];
   params.setDefault;
   if argc = 2 then params.setFromXQValue(args[1]);
+
+  case params.method of
+    xqsmJSON: exit(serializeJSON(params, arg));
+    xqsmAdaptive: exit(serializeAdaptive(params, arg));
+  end;
+
   firstElement := nil;
   for v in arg.GetEnumeratorPtrUnsafe do with params do begin
     n := v^.toNode;
@@ -4426,26 +4494,26 @@ begin
 
   with params do begin
     case params.method of
-      'xml', 'xhtml', 'html': begin
+      xqsmXML, xqsmXHTML, xqsmHTML: begin
         //initialize missing default parameters
-        if (method = 'html') then begin
+        if (method = xqsmHTML) then begin
           if (htmlVersion = isAbsentMarker) then htmlVersion := version;
           if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
         end else if version = isAbsentMarker then version := '1.1';
 
         //headers
-        if (method <> 'html') and not omitXmlDeclaration then begin
+        if (method <> xqsmHTML) and not omitXmlDeclaration then begin
           strres += '<?xml version="'+version+'" encoding="'+encoding+'"';
           if standalone <> 'omit' then strres += ' standalone="'+standalone+'"';
           strres += '?>';
         end;
         if (htmlVersion = '5.0') and (doctypeSystem = isAbsentMarker)
            and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
-           and ( (method = 'xhtml') or ( (method = 'html') and (doctypePublic = isAbsentMarker) )) then begin
-           if method = 'html' then strres += '<!DOCTYPE html>'
+           and ( (method = xqsmXHTML) or ( (method = xqsmHTML) and (doctypePublic = isAbsentMarker) )) then begin
+           if method = xqsmHTML then strres += '<!DOCTYPE html>'
            else strres += '<!DOCTYPE '+firstElement.value+'>'
         end else if doctypeSystem <> isAbsentMarker then begin
-          if method = 'html' then strres += '<!DOCTYPE html '
+          if method = xqsmHTML then strres += '<!DOCTYPE html '
           else begin
             if firstElement = nil then raise EXQEvaluationException.create('SEPM0016', 'No element given');
             strres += '<!DOCTYPE '+firstElement.value + ' ';
@@ -4453,14 +4521,15 @@ begin
           if doctypePublic <> isAbsentMarker then strres += 'PUBLIC "' + doctypePublic + '" '
           else strres += 'SYSTEM ';
           strres += '"'+doctypeSystem+'">';
-        end else if (method = 'html') and (doctypePublic <> isAbsentMarker) then
+        end else if (method = xqsmHTML) and (doctypePublic <> isAbsentMarker) then
           strres += '<!DOCTYPE html PUBLIC "'+doctypePublic+'">';
 
-        if method = 'xhtml' then method := 'xml';
+        if method = xqsmXHTML then method := xqsmXML;
       end;
-      'text': begin
+      xqsmText: begin
         //encoding: string;
       end;
+      //xqsmJSON, xqsmAdaptive: ;
     end;
   end;
 
@@ -4477,14 +4546,14 @@ begin
         n := v^.toNode;
         if n.typ in [tetAttribute] then raise EXQEvaluationException.create('SENR0001', 'Cannot serialize attribute');
         case method of
-          'xml': strres += n.outerXML();
+          xqsmXML: strres += n.outerXML();
          // 'xhtml':;
-          'html': strres += n.outerHTML();
-          'text': strres += v^.toString;
+          xqsmHTML: strres += n.outerHTML();
+          xqsmText: strres += v^.toString;
         end;
         if not hasItemSeparator then wasNodeOrFirst := true;
       end;
-      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v^, 'serialization');
+      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v^, 'serialization of this data is not possible with xml/html methode');
       pvkFunction: raise EXQEvaluationException.create('SENR0001', 'Cannot serialize function');
       else addAtomicString(v^.toString);
     end;

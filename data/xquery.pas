@@ -329,6 +329,7 @@ type
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     insertWhitespace: TXQSerializerInsertWhitespace;
+    standard: boolean;
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
     procedure indent;
     procedure appendIndent;
@@ -338,9 +339,12 @@ type
     procedure appendJSONArrayComma;
     procedure appendJSONArrayEnd;
     procedure appendJSONObjectStart;
+    procedure appendJSONObjectKeyColon(const key: string); inline;
     procedure appendJSONObjectComma;
     procedure appendJSONObjectEnd;
 
+    procedure error(const code: string; value: TXQValue);
+    procedure error(const code: string; message: string; value: TXQValue);
   protected
     indentCache: string;
     indentLevel: integer;
@@ -479,6 +483,7 @@ type
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string; //**< Returns a xml representation of this value
     procedure jsonSerialize(var serializer: TXQSerializer);
     procedure xmlSerialize(var serializer: TXQSerializer);
+    procedure adaptiveSerialize(var serializer: TXQSerializer);
     function stringifyNodes: IXQValue; //preliminary
     function hasNodes: boolean;
 
@@ -560,6 +565,7 @@ type
     function xmlSerialize(nodeFormat: TTreeNodeSerialization; sequenceTag: string = 'seq'; elementTag: string = 'e'; objectTag: string = 'object'): string;
     procedure jsonSerialize(var serializer: TXQSerializer); virtual;
     procedure xmlSerialize(var serializer: TXQSerializer); virtual;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); virtual;
     function stringifyNodes: IXQValue; virtual;
     function hasNodes: boolean; virtual;
 
@@ -587,7 +593,7 @@ type
 
   { TXQValueUndefined }
   //**undefined/empty sequence
-  TXQValueUndefined = class(TXQValue)
+  TXQValueUndefined = class (TXQValue)
     class function classKind: TXQValueKind; override;
     function isUndefined: boolean; override;
     function toArray: TXQVArray; override;
@@ -597,6 +603,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function map(const q: string): IXQValue; override;
     function map(const q: string; const vs: array of ixqvalue): IXQValue; override;
@@ -629,6 +636,7 @@ type
     function clone: IXQValue; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
   end;
 
 
@@ -682,6 +690,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -737,6 +746,8 @@ type
 
     function toRawBinary: string;
 
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
+
     function clone: IXQValue; override;
   end;
 
@@ -758,6 +769,8 @@ type
 
     function toString: string; override; //**< Converts the TXQValue dynamically to string (excludes namespace url)
     function toBooleanEffective: boolean; override;
+
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -887,6 +900,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -977,6 +991,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -1009,6 +1024,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -1029,8 +1045,6 @@ type
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
   end;
-
-  { TXQValueFunction }
 
   { TXQFunctionParameter }
 
@@ -1065,7 +1079,7 @@ type
   TXQAnnotations = array of TXQAnnotation;
 
   //** A function. Anonymous or a named reference. Also used to store type information
-  TXQValueFunction = class(TXQValue)
+  TXQValueFunction = class (TXQValue)
     name, namespaceURL, namespacePrefix: string;
     parameters: array of TXQFunctionParameter;
     resulttype: txqtermsequencetype;
@@ -1093,6 +1107,8 @@ type
     function debugAsStringWithTypeAnnotation(textOnly: boolean=true): string;
 
     procedure assignCopiedTerms(const func: TXQValueFunction); //for internal use
+
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     procedure visit(visitor: TXQTerm_Visitor);
   end;
@@ -3324,6 +3340,7 @@ begin
   insertWhitespace := xqsiwConservative;
   indentCache := '  ';
   indentLevel := 0;
+  standard := false;
   sequenceTag :=  'seq';
   elementTag := 'e';
   objectTag := 'object';
@@ -3394,6 +3411,13 @@ begin
   end;
 end;
 
+procedure TXQSerializer.appendJSONObjectKeyColon(const key: string);
+begin
+  appendJSONString(key);
+  if insertWhitespace = xqsiwNever then append(':')
+  else append(': ');
+end;
+
 procedure TXQSerializer.appendJSONObjectComma;
 begin
   appendJSONArrayComma
@@ -3409,6 +3433,16 @@ begin
     end;
   end;
   inherited appendJSONObjectEnd;
+end;
+
+procedure TXQSerializer.error(const code: string; value: TXQValue);
+begin
+  error(code, 'Serialization error', value);
+end;
+
+procedure TXQSerializer.error(const code: string; message: string; value: TXQValue);
+begin
+  raise EXQEvaluationException.create(code, message + ', when serializing ' + value.toXQuery);
 end;
 
 function TXQTempTreeNodes.GetDocumentCache(const url: string): TTreeDocument;

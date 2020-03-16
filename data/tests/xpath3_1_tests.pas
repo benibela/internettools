@@ -170,6 +170,14 @@ begin
   t('hexBinary("aa") lt hexBinary("ff") ', 'true');
   t('hexBinary("aa") < hexBinary("ff") ', 'true');
 
+
+
+
+  t('serialize([1,2,3e0], map {"method": "json" })', '[1,2,3]');
+  t('serialize([1,2,3e0], map {"method": "json", "indent": true() })', '[1, 2, 3]');
+  t('serialize([1,2,3e0], map {"method": "adaptive", "indent": true() })', '[1,2,3.0e0]');
+
+
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
   xml.Free;
