@@ -240,6 +240,7 @@ begin
       #13: append('\r');
       '"': append('\"');
       '\': append('\\');
+      '/': append('\/'); //mandatory in xquery standard
       else append(s[i]);
     end;
   end;
