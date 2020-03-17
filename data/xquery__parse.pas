@@ -4157,7 +4157,7 @@ begin
               requireModule; //this could be omitted, but then needs more complex handling of injecting fn:serialize
               if serializationOptions = nil then begin
                 serializationOptions := TXQValueObject.create();
-                serializationOptions.setMutable(#0'static-options', temp); //mark the map as wrapping statically given options
+                serializationOptions.setMutable(#0'static-options', xqvalueTrue); //mark the map as wrapping statically given options
               end;
               case token of
                 'parameter-document':

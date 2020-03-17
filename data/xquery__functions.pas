@@ -4271,6 +4271,8 @@ procedure TSerializationParams.setFromNode(paramNode: TTreeNode);
 const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
 begin
   if paramNode = nil then exit;
+  if paramNode.typ = tetDocument then paramNode := paramnode.getFirstChild();
+  if paramNode = nil then exit;
   if not equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output)
      or (paramNode.value <> 'serialization-parameters')
      or (paramNode.typ <> tetOpen) then exit;
