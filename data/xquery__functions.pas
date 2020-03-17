@@ -3534,7 +3534,7 @@ end;
 var tempf: xqfloat;
  tempi: int64;
  temps: string;
- tempb: boolean;
+ tempb, isSeqOfYearDurations: boolean;
  temps2: String;
  collation: TXQCollation;
  tempf2: xqfloat;
@@ -3569,10 +3569,20 @@ begin
     pvkDateTime: begin
       result := seq.get(1);
       baseType := (result.typeAnnotation as TXSSimpleType).primitive;
+      isSeqOfYearDurations := false;
+      if baseType = baseSchema.duration then //xs:duration cannot be compared, only its descendants
+        if result.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) then isSeqOfYearDurations := true
+        else if not result.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) then raiseError;
+
       for pv in enumerable do begin
         if (context.staticContext.compareAtomic(result, pv^, nil) < 0) <> asmin then
           result := pv^;
-        if (pv^.typeAnnotation as TXSSimpleType).primitive <> baseType then raiseError;
+        if ((pv^.typeAnnotation as TXSSimpleType).primitive <> baseType) then
+          raiseError;
+        if baseType = baseSchema.duration then
+          if   (isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration))
+            or (not isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)) then
+             raiseError
       end;
       exit;
     end;
