@@ -2321,28 +2321,56 @@ begin
 
 end;
 
-function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+type TUnicodeNormalizationForm = (unfNFC, unfNFD, unfNFKC, unfNFKD,
+                                  //do nothing (three variants for error handling)
+                                  unfNone, unfEmpty, unfUnknown);
+function unicodeNormalizationForm(const s: string): TUnicodeNormalizationForm;
+begin
+  case s of
+    'NFC':  result := unfNFC;
+    'NFD':  result := unfNFD;
+    'NFKC': result := unfNFKC;
+    'NFKD': result := unfNFKD;
+    //'FULLY-NORMALIZED': ??
+    'none': result := unfNone;
+    '': result := unfEmpty;
+    else result := unfUnknown;
+  end;
+end;
+
+function normalizeString(str: string; method: TUnicodeNormalizationForm): UTF8String;
 var
-  method: String;
   p: pchar;
 begin
-  if args[0].toString = '' then exit(xqvalue(''));
+  p := pchar(str);
+  case method of
+    unfNFC:  p := utf8proc_NFC(p);
+    unfNFD:  p := utf8proc_NFD(p);
+    unfNFKC: p := utf8proc_NFKC(p);
+    unfNFKD: p := utf8proc_NFKD(p);
+    //'FULLY-NORMALIZED': ??
+    else exit(str);
+  end;
+
+  result := UTF8String(p);
+  Freemem(p);
+end;
+
+function xqFunctionNormalizeUnicode({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  method, str: String;
+  form: TUnicodeNormalizationForm;
+begin
+  str := args[0].toString;
+  if str = '' then exit(xqvalue(''));
   method := 'NFC';
   if argc = 2 then method := trim(UpperCase(args[1].toString));
 
-  p := pchar(args[0].toString);
-  case method of
-    'NFC':  p := utf8proc_NFC(p);
-    'NFD':  p := utf8proc_NFD(p);
-    'NFKC': p := utf8proc_NFKC(p);
-    'NFKD': p := utf8proc_NFKD(p);
-    //'FULLY-NORMALIZED': ??
-    '': exit(args[0]);
-    else raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
+  form := unicodeNormalizationForm(method);
+  case form of
+    unfNone, unfUnknown: raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
   end;
-
-  result :=xqvalue(UTF8String(p));
-  Freemem(p);
+  result := xqvalue(normalizeString(args[0].toString, form))
 end;
 
 
@@ -4243,6 +4271,7 @@ TSerializationParams = record
   itemSeparator: string;
   indent: TXQSerializerInsertWhitespace;
   jsonNodeOutputMethod: string;
+  normalizationForm: TUnicodeNormalizationForm;
   procedure setDefault;
   procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const v: IXQValue);
@@ -4251,6 +4280,7 @@ TSerializationParams = record
   procedure setMethod(const s: string);
   procedure setStandalone(s: string);
   procedure setStandalone(s: boolean);
+  procedure setNormalizationForm(const s: string);
 end;
 
 procedure TSerializationParams.setDefault;
@@ -4267,6 +4297,7 @@ begin
   itemSeparator := isAbsentMarker;
   indent := xqsiwConservative;
   jsonNodeOutputMethod := 'xml';
+  normalizationForm := unfUnknown;
 end;
 
 function toSerializationBool(const s:string): boolean;
@@ -4307,7 +4338,7 @@ begin
          'json-node-output-method': paramNode.getAttribute('value');
          'media-type': ;//todo
          'method':         setMethod(paramNode.getAttribute('value'));
-         'normalization-form': ;//todo
+         'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
          'standalone': setStandalone(paramNode.getAttribute('value'));
          'suppress-indentation': ;//todo
@@ -4374,7 +4405,7 @@ begin
       'json-node-output-method': jsonNodeOutputMethod := valueString(); //todo
       'media-type': valueString(); //todo
       'method': setMethod(valueString());
-      'normalization-form': valueString(); //todo
+      'normalization-form': setNormalizationForm(valueString()); //todo
       'omit-xml-declaration': omitXmlDeclaration := valueBool();
       'standalone': if staticOptions and (pp.Value.toString = 'omit') then standalone := xdsOmit
                     else setStandalone(valueBool());
@@ -4426,9 +4457,37 @@ begin
   else standalone := xdsNo;
 end;
 
+procedure TSerializationParams.setNormalizationForm(const s: string);
+begin
+  normalizationForm := unicodeNormalizationForm(s);
+  case normalizationForm of
+    unfEmpty, unfUnknown: raise EXQEvaluationException.Create('SESU0011', 'Unknown normalization method: '+s);
+  end;
+end;
+
+type TSpecialStringHandler = object
+  serializer: ^TXQSerializer;
+  params: ^TSerializationParams;
+  procedure appendJSONStringWithoutQuotes(const s: string);
+  procedure init;
+end;
+procedure TSpecialStringHandler.init;
+begin
+  //calling this procedure silences an object never used warning
+end;
+
+procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
+var t: string;
+begin
+  t := normalizeString(s, params^.normalizationForm);
+  serializer^.appendJSONStringWithoutQuotes(t);
+end;
+
+
 function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
 var serializer: TXQSerializer;
   temp: string;
+  interceptor: TSpecialStringHandler;
 begin
   serializer.init(@temp);
   serializer.standard := true;
@@ -4441,6 +4500,13 @@ begin
     'html': serializer.nodeFormat := tnsHTML;
     'text': serializer.nodeFormat := tnsText;
     else serializer.error('SEPM0016', v.toValue);
+  end;
+
+  if not (params.normalizationForm in [unfNone, unfUnknown]) then begin
+    interceptor.init;
+    interceptor.params := @params;
+    interceptor.serializer := @serializer;
+    serializer.onInterceptAppendJSONString := @interceptor.appendJSONStringWithoutQuotes;
   end;
 
   v.jsonSerialize(serializer);
@@ -4794,6 +4860,7 @@ begin
   state.randomize(seed);
   result := makeRandomNumberGenerator(context, state);
 end;
+
 
 function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
   function permute(const v: IXQValue): TXQValue;

@@ -145,6 +145,7 @@ type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
   procedure appendJSONArrayComma; inline;
   procedure appendJSONArrayEnd; inline;
 
+  procedure appendJSONStringWithoutQuotes(const s: string);
   procedure appendJSONString(const s: string);
 end;
 
@@ -227,11 +228,10 @@ begin
   append(']');
 end;
 
-procedure TJSONXHTMLStrBuilder.appendJSONString(const s: string);
+procedure TJSONXHTMLStrBuilder.appendJSONStringWithoutQuotes(const s: string);
 var
   i: SizeInt;
 begin
-  append('"');
   for i:=1 to length(s) do begin
     case s[i] of
       #0..#8,#11,#12,#14..#31: begin
@@ -247,6 +247,12 @@ begin
       else append(s[i]);
     end;
   end;
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONString(const s: string);
+begin
+  append('"');
+  appendJSONStringWithoutQuotes(s);
   append('"');
 end;
 

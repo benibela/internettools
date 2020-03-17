@@ -327,10 +327,14 @@ type
   PXQValueDateTimeData = ^TXQValueDateTimeData;
 
   TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
+  TXQSerializerOnString = procedure (const s: string) of object;
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     insertWhitespace: TXQSerializerInsertWhitespace;
     standard: boolean;
+
+    onInterceptAppendJSONString: TXQSerializerOnString;
+
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
     procedure indent;
     procedure appendIndent;
@@ -343,6 +347,7 @@ type
     procedure appendJSONObjectKeyColon(const key: string); inline;
     procedure appendJSONObjectComma;
     procedure appendJSONObjectEnd;
+    procedure appendJSONString(const s: string);
 
     procedure appendQualifiedQName(const namespaceurl, local: string);
     procedure appendXQueryString(const s: string);
@@ -3350,6 +3355,9 @@ begin
   sequenceTag :=  'seq';
   elementTag := 'e';
   objectTag := 'object';
+
+  //this is basically a custom VMT on the stack
+  onInterceptAppendJSONString := @appendJSONStringWithoutQuotes;
 end;
 
 procedure TXQSerializer.indent;
@@ -3439,6 +3447,13 @@ begin
     end;
   end;
   inherited appendJSONObjectEnd;
+end;
+
+procedure TXQSerializer.appendJSONString(const s: string);
+begin
+  append('"');
+  onInterceptAppendJSONString(s);
+  append('"');
 end;
 
 procedure TXQSerializer.appendQualifiedQName(const namespaceurl, local: string);
