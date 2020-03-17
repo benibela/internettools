@@ -3923,6 +3923,7 @@ var
   temp: String;
   annotations: TXQAnnotations;
   marker: PChar;
+  serializationOptions: TXQValueObject = nil;
 
 
 
@@ -3930,6 +3931,7 @@ var
 
   oldDecimalFormatCount: integer;
   tempBool: Boolean;
+  resultmodule: TXQTermModule;
 begin
   result := nil;
   declarationDuplicateChecker := nil;
@@ -4120,44 +4122,61 @@ begin
             if nameSpaceName <> '' then nameSpaceURL := staticContext.findNamespaceURLMandatory(nameSpaceName, xqdnkUnknown)
             else if isModel3 then nameSpaceURL := 'http://www.w3.org/2012/xquery'
             else raiseParsingError('XPST0081', 'No namespace');
-          if (nameSpaceURL = XMLNamespaceURL_MyExtensionsNew) or (nameSpaceURL = XMLNamespaceURL_MyExtensionsMerged) then begin
-            case token of
-              'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI, 'XQST0038');
-              'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
-              'json': begin
-                tempBool := false;
-                readBoolean(tempBool, temp);
-                options.AllowJSON := tempBool;
+          case nameSpaceURL of
+            XMLNamespaceURL_MyExtensionsNew, XMLNamespaceURL_MyExtensionsMerged: begin
+              case token of
+                'default-node-collation': staticContext.nodeCollation := staticContext.sender.getCollation(temp, staticContext.baseURI, 'XQST0038');
+                'extended-strings': readBoolean(options.AllowExtendedStrings, temp);
+                'json': begin
+                  tempBool := false;
+                  readBoolean(tempBool, temp);
+                  options.AllowJSON := tempBool;
+                end;
+                'mutable-variables': readBoolean(options.AllowMutableVariables, temp);
+                'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
+                  case temp of
+                    'on':  options.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
+                    'off': options.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
+                    'unambiguous': options.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
+                    'toggle': raiseParsingError('pxp:XPST0003', 'The "toggle" value has been removed for the property-dot-notation option.');
+                    else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/unambiguous');
+                  end;
+                'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
+                'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
+                'extended-json': readBoolean(staticContext.jsonPXPExtensions, temp);
+                'string-entities':
+                  case temp of
+                    'off': options.StringEntities:=xqseIgnoreLikeXPath;
+                    'on': options.StringEntities:=xqseResolveLikeXQuery;
+                    'default': options.StringEntities:=xqseDefault;
+                    else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/default');
+                  end;
               end;
-              'mutable-variables': readBoolean(options.AllowMutableVariables, temp);
-              'property-dot-notation': //readBoolean(AllowPropertyDotNotation, temp);
-                case temp of
-                  'on':  options.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
-                  'off': options.AllowPropertyDotNotation:=xqpdnDisallowDotNotation;
-                  'unambiguous': options.AllowPropertyDotNotation:=xqpdnAllowUnambiguousDotNotation;
-                  'toggle': raiseParsingError('pxp:XPST0003', 'The "toggle" value has been removed for the property-dot-notation option.');
-                  else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/unambiguous');
-                end;
-              'strict-type-checking': readBoolean(staticContext.strictTypeChecking, temp);
-              'use-local-namespaces': readBoolean(staticContext.useLocalNamespaces, temp);
-              'extended-json': readBoolean(staticContext.jsonPXPExtensions, temp);
-              'string-entities':
-                case temp of
-                  'off': options.StringEntities:=xqseIgnoreLikeXPath;
-                  'on': options.StringEntities:=xqseResolveLikeXQuery;
-                  'default': options.StringEntities:=xqseDefault;
-                  else raiseParsingError('pxp:XPST0003', 'Invalid option value. Expected on/off/default');
-                end;
             end;
-          end else if nameSpaceURL = 'http://jsoniq.org/functions' then
-            case token of
-              'jsoniq-boolean-and-null-literals':
-                case temp of
-                  'yes': options.AllowJSONLiterals:=true;
-                  'no': options.AllowJSONLiterals:=false;
-                  else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
-                end;
+            'http://www.w3.org/2010/xslt-xquery-serialization': begin
+              requireModule; //this could be omitted, but then needs more complex handling of injecting fn:serialize
+              if serializationOptions = nil then begin
+                serializationOptions := TXQValueObject.create();
+                serializationOptions.setMutable(#0'static-options', temp); //mark the map as wrapping statically given options
+              end;
+              case token of
+                'parameter-document':
+                  serializationOptions.setMutable('parameter-document', xqvalue(tempcontext.parseCachedDocFromUrl(temp, 'XQST0119')));
+                 else
+                  serializationOptions.setMutable(token, temp);
+              end;
             end;
+            'http://jsoniq.org/functions': begin
+              case token of
+                'jsoniq-boolean-and-null-literals':
+                  case temp of
+                    'yes': options.AllowJSONLiterals:=true;
+                    'no': options.AllowJSONLiterals:=false;
+                    else raiseParsingError('XQST0013', 'Unknown option value: '+temp+' for '+token+' (allowed is yes/no)');
+                  end;
+              end;
+            end;
+          end;
         end;
         else begin
           pos := marker;
@@ -4169,12 +4188,15 @@ begin
     end;
 
 
-
     if result = nil then result := parsePrimaryLevel()
     else if staticContext.moduleNamespace = nil then begin //main module
-        TXQTermModule(result).push(parsePrimaryLevel);
-        if TXQTermModule(result).children[high(TXQTermModule(result).children)] = nil then //huh? module only, no main expression
-          raiseSyntaxError('A main module must have a query body, it cannot only declare functions/variables (add ; ())');
+      resultmodule := TXQTermModule(result);
+      resultmodule.push(parsePrimaryLevel);
+      if resultmodule.children[high(resultmodule.children)] = nil then //huh? module only, no main expression
+        raiseSyntaxError('A main module must have a query body, it cannot only declare functions/variables (add ; ())');
+      if serializationOptions <> nil then begin
+        resultmodule.children[high(resultmodule.children)] := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'serialize', [resultmodule.children[high(resultmodule.children)], TXQTermConstant.create(serializationOptions)]);
+      end;
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
     declarationDuplicateChecker.free;
   except
@@ -4183,6 +4205,7 @@ begin
         tobject(staticContext.decimalNumberFormats[oldDecimalFormatCount]).Free;
         staticContext.decimalNumberFormats.Delete(oldDecimalFormatCount);
       end;
+    serializationOptions.free;
     declarationDuplicateChecker.Free;
     result.free;
     raise;

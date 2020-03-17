@@ -4309,6 +4309,7 @@ end;
 procedure TSerializationParams.setFromMap(const v: IXQValue);
 var
   pp: TXQProperty;
+  staticOptions: boolean = false;
   procedure raiseInvalidParameter;
   begin
     raiseXPTY0004TypeError(v, 'Invalid parameter for '+ pp.Name);
@@ -4316,8 +4317,16 @@ var
 
   function valueBool: Boolean;
   begin
-    if pp.Value.kind = pvkBoolean then result := pp.value.toBoolean
-    else begin raiseInvalidParameter; result := false; end
+    if pp.Value.kind = pvkBoolean then exit(pp.value.toBoolean);
+    if staticOptions and (pp.Value.kind = pvkString) then begin
+      case pp.Value.toString of
+        'yes': exit(true);
+        'no': exit(false);
+      end;
+    end;
+
+    result := false;
+    raiseInvalidParameter;
   end;
   function valueString(): string;
   begin
@@ -4358,6 +4367,11 @@ begin
       'undeclare-prefixes': valueBool(); //todo
       'use-character-maps': ; //todo
       'version': version := valueString();
+
+
+      #0'static-options': staticOptions := true;
+      'parameter-document': if staticOptions then
+        setFromXQValue(pp.Value);
     end;
   end;
 end;
