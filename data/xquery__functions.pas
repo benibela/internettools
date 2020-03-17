@@ -4428,6 +4428,7 @@ begin
   serializer.init(@temp);
   serializer.standard := true;
 
+  serializer.nodeFormat:=tnsXML;
   serializer.insertWhitespace := params.indent;
   serializer.insertWhitespace := xqsiwNever;
   itemSeparator := params.itemSeparator;

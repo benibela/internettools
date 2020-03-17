@@ -344,6 +344,10 @@ type
     procedure appendJSONObjectComma;
     procedure appendJSONObjectEnd;
 
+    procedure appendQualifiedQName(const namespaceurl, local: string);
+    procedure appendXQueryString(const s: string);
+    procedure appendTypeNameFunctionStart(t: TXSType);
+
     procedure error(const code: string; value: TXQValue);
     procedure error(const code: string; message: string; value: TXQValue);
   protected
@@ -663,6 +667,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -718,6 +723,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -746,8 +752,6 @@ type
 
 
     function toRawBinary: string;
-
-    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
     function clone: IXQValue; override;
   end;
@@ -860,6 +864,7 @@ type
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
+    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
@@ -3434,6 +3439,42 @@ begin
     end;
   end;
   inherited appendJSONObjectEnd;
+end;
+
+procedure TXQSerializer.appendQualifiedQName(const namespaceurl, local: string);
+begin
+  append('Q{');
+  append(namespaceurl);
+  append('}');
+  append(local);
+end;
+
+procedure TXQSerializer.appendXQueryString(const s: string);
+var
+  temp: String;
+  quot: Char;
+begin
+  temp := StringReplace(s, '&', '&amp;', [rfReplaceAll]);
+  if pos('"', temp) = 0 then quot := '"'
+  else if pos('''', temp) = 0 then quot := ''''
+  else begin
+    quot := '"';
+    temp := StringReplace(temp, '"', '""', [rfReplaceAll]);
+  end;
+  append(quot);
+  append(temp);
+  append(quot);
+end;
+
+procedure TXQSerializer.appendTypeNameFunctionStart(t: TXSType);
+begin
+  if t is TXSSimpleType then t := TXSSimpleType(t).primitive;
+  {if (t.schema <> baseSchema) and (t.schema.url <> XMLNamespaceURL_XMLSchema) then begin
+    appendQualifiedQName(t.schema.url, t.name);
+  end else begin}
+  append('xs:');
+  append(t.name);
+  append('(');
 end;
 
 procedure TXQSerializer.error(const code: string; value: TXQValue);
