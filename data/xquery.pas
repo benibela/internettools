@@ -295,6 +295,7 @@ type
     function getGlobalVariable(const v: TXQTermVariable): IXQValue; inline;
 
     function parseDoc(const data, url, contenttype: string): TTreeDocument; //for internal use
+    function parseCachedDocFromUrl(const url: string; const errorCode: string = 'FODC0002'): TTreeDocument; //for internal use
 
     function SeqValueAsString: string;
     function contextNode(mustExists: boolean = true): TTreeNode;
@@ -6972,6 +6973,25 @@ begin
       parser.repairMissingStartTags := startTags;
     end;
   end
+end;
+
+function TXQEvaluationContext.parseCachedDocFromUrl(const url: string; const errorCode: string): TTreeDocument;
+var
+  data, contenttype: String;
+begin
+  result := staticContext.needTemporaryNodes.documentCache[url];
+  if result = nil then begin
+    data := staticContext.retrieveFromURI(url, contenttype, errorCode);
+
+    try
+      result := parseDoc(data, url, contenttype);
+    except
+      on e: ETreeParseException do raise EXQEvaluationException.Create(errorCode, 'Failed to parse document: '+url + LineEnding+e.Message);
+    end;
+
+    staticContext.temporaryNodes.documentCache[url] := result;
+  end;
+  if result = nil then raise EXQEvaluationException.Create(errorCode, 'Failed to parse document: '+url);
 end;
 
 function TXQEvaluationContext.SeqValueAsString: string;
