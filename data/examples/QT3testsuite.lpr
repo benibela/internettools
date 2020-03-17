@@ -900,7 +900,7 @@ begin
   case kind of
     aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
     aakEq: try
-      result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, config.version).evaluate(),  nil) = 0];
+      result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = 0];
     except
       on e: EXQEvaluationException do
         if e.errorCode = 'XPTY0004' then result := OK[false]
