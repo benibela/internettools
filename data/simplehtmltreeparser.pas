@@ -1748,21 +1748,17 @@ var known: TNamespaceList;
         if not html then append(xmlStrEscape(value))
         else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then append(value)
         else appendHTMLText(value);
-      tetClose:  begin;
-        append('</');
-        append(getNodeName());
-        append('>');
-      end;
+      tetClose:
+        if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
+        else appendXMLElementEndTag(getNodeName());
       tetComment: begin
         append('<!--');
         append(value);
         append('-->');
       end;
-      tetProcessingInstruction: begin
-        append('<?'+value);
-        if attributes <> nil then append(' '+getAttribute(''));
-        append('?>');
-      end;
+      tetProcessingInstruction:
+        if attributes <> nil then appendXMLProcessingInstruction(value, getAttribute(''))
+        else appendXMLProcessingInstruction(value, '');
       tetOpen: begin
         oldnamespacecount:=known.Count;
         append('<');
@@ -2690,13 +2686,22 @@ class function TTreeParser.htmlElementChildless(const s: string): boolean;
 begin
   //elements that should/must not have children
   //area, base, basefont, bgsound, br, col, command, embed, frame, hr, img, input, keygen, link, meta, param, source, track or wbr
-  //Regex ([a-z]+),  => striequal(s,'\1') or
   if s = '' then exit(false);
-  result:=striequal(s,'area') or striequal(s,'base') or striequal(s,'basefont') or striequal(s,'bgsound') or striequal(s,'br') or striequal(s,'col')
-          or striequal(s,'command') or striequal(s,'embed') or striequal(s,'frame') or striequal(s,'hr') or striequal(s,'img') or striequal(s,'input')
-          or striequal(s,'keygen') or striequal(s,'link') or striequal(s,'meta') or striequal(s,'param') or striequal(s,'source') or striequal(s,'track')
-          or striequal(s,'wbr');
-
+  case s[1] of
+    'a', 'A': result := striequal(s,'area');
+    'b', 'B': result := striequal(s,'base') or striequal(s,'basefont') or striequal(s,'bgsound') or striequal(s,'br') ;
+    'c', 'C': result := striequal(s,'col') or striequal(s,'command');
+    'e', 'E': result := striequal(s,'embed');
+    'f', 'F': result := striequal(s,'frame');
+    'h', 'H': result := striequal(s,'hr') ;
+    'i', 'I': result := striequal(s,'img') or striequal(s,'input');//or striequal(s,'isindex');
+    'k', 'K': result := striequal(s,'keygen') ;
+    'l', 'L': result := striequal(s,'link') ;
+    'm', 'M': result := striequal(s,'meta') ;
+    's', 'S': result := striequal(s,'source') ;
+    't', 'T': result := striequal(s,'track');
+    'w', 'W': result := striequal(s,'wbr');
+  end;
   //elements listed above, not being void are probably (??) deprecated?
   //void elements: area, base, br, col, command, embed, hr, img, input, keygen, link, meta, param, source, track, wbr
 

@@ -4446,51 +4446,89 @@ begin
   result := xqvalue(temp);
 end;
 
-function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function serializeXMLHTMLText(var params: TSerializationParams; const v: IXQValue): IXQValue;
+var serializer: TXQSerializer;
+  function findFirstElement(const v: IXQValue): TTreeNode;
+  var
+    w, m: PIXQValue;
+    n: TTreeNode;
+  begin
+    result := nil;
+    for w in v.GetEnumeratorPtrUnsafe do begin
+      case w^.kind of
+        pvkNode: n := w^.toNode;
+        pvkArray: begin
+          for m in w^.GetEnumeratorMembersPtrUnsafe do begin
+            result := findFirstElement(m^);
+            if result <> nil then exit;
+          end;
+          continue;
+        end
+        else continue;
+      end;
+      if n.typ = tetDocument then n := n.getFirstChild();
+      if n.typ = tetAttribute then break; //fail later
+      while (n <> nil) do begin
+        if n.typ = tetOpen then exit(n)
+        else n := n.getNextSibling();
+      end;
+    end;
+  end;
+
 var
-  v: PIXQValue;
-  arg: IXQValue;
-  params: TSerializationParams;
-  strres: String;
-  wasNodeOrFirst: Boolean;
   hasItemSeparator: Boolean;
-  n: TTreeNode;
-  firstElement: TTreeNode;
+  wasNodeOrFirst: Boolean;
+
+  procedure addItemStart;
+  begin
+    if hasItemSeparator then begin
+      if not wasNodeOrFirst then serializer.append(params.itemSeparator);
+      wasNodeOrFirst := false;
+    end;
+  end;
 
   procedure addAtomicString(const s: string);
   begin
     if not hasItemSeparator then begin
-      if not wasNodeOrFirst then strres += ' ';
+      if not wasNodeOrFirst then serializer.append(' ');
       wasNodeOrFirst := false;
     end;
-    strres += s;
+    serializer.append(s);
   end;
 
-begin
-  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
-  arg := args[0];
-  params.setDefault;
-  if argc = 2 then params.setFromXQValue(args[1]);
-
-  case params.method of
-    xqsmJSON: exit(serializeJSON(params, arg));
-    xqsmAdaptive: exit(serializeAdaptive(params, arg));
-  end;
-
-  firstElement := nil;
-  for v in arg.GetEnumeratorPtrUnsafe do with params do begin
-    n := v^.toNode;
-    if n = nil then continue;
-    if n.typ = tetDocument then n := n.getFirstChild();
-    if n.typ = tetAttribute then break; //fail later
-    while (n <> nil) and (firstElement = nil) do begin
-      if n.typ = tetOpen then firstElement := n
-      else n := n.getNextSibling();
+  procedure add(const v: IXQValue);
+  var
+    w: PIXQValue;
+    n: TTreeNode;
+  begin
+    for w in v.GetEnumeratorPtrUnsafe do begin
+      addItemStart;
+      case w^.kind of
+        pvkNode: begin
+          //this might be incomplete
+          n := w^.toNode;
+          if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
+          case params.method of
+            xqsmXML: serializer.append(n.outerXML());
+           // 'xhtml':;
+            xqsmHTML: serializer.append(n.outerHTML());
+            xqsmText: serializer.append(w^.toString);
+          end;
+          if not hasItemSeparator then wasNodeOrFirst := true;
+        end;
+        pvkArray, pvkNull, pvkObject, pvkFunction: raiseXQEvaluationError('SENR0001', 'Cannot serialize with XML/HTML/Text method', w^);
+        else addAtomicString(w^.toString);
+      end;
     end;
-    if firstElement <> nil then break;
   end;
 
-  strres := '';
+var temp: string;
+  firstElement: TTreeNode;
+begin
+  firstElement := findFirstElement(v);
+
+  serializer.init(@temp);
+  serializer.standard := true;
 
   with params do begin
     case params.method of
@@ -4503,26 +4541,26 @@ begin
 
         //headers
         if (method <> xqsmHTML) and not omitXmlDeclaration then begin
-          strres += '<?xml version="'+version+'" encoding="'+encoding+'"';
-          if standalone <> 'omit' then strres += ' standalone="'+standalone+'"';
-          strres += '?>';
+          serializer.append('<?xml version="'+version+'" encoding="'+encoding+'"');
+          if standalone <> 'omit' then serializer.append(' standalone="'+standalone+'"');
+          serializer.append('?>');
         end;
         if (htmlVersion = '5.0') and (doctypeSystem = isAbsentMarker)
            and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
            and ( (method = xqsmXHTML) or ( (method = xqsmHTML) and (doctypePublic = isAbsentMarker) )) then begin
-           if method = xqsmHTML then strres += '<!DOCTYPE html>'
-           else strres += '<!DOCTYPE '+firstElement.value+'>'
+           if method = xqsmHTML then serializer.append('<!DOCTYPE html>')
+           else serializer.append('<!DOCTYPE '+firstElement.value+'>')
         end else if doctypeSystem <> isAbsentMarker then begin
-          if method = xqsmHTML then strres += '<!DOCTYPE html '
+          if method = xqsmHTML then serializer.append('<!DOCTYPE html ')
           else begin
-            if firstElement = nil then raise EXQEvaluationException.create('SEPM0016', 'No element given');
-            strres += '<!DOCTYPE '+firstElement.value + ' ';
+            if firstElement = nil then raiseXQEvaluationException('SEPM0016', 'No element given');
+            serializer.append('<!DOCTYPE '+firstElement.value + ' ');
           end;
-          if doctypePublic <> isAbsentMarker then strres += 'PUBLIC "' + doctypePublic + '" '
-          else strres += 'SYSTEM ';
-          strres += '"'+doctypeSystem+'">';
+          if doctypePublic <> isAbsentMarker then serializer.append('PUBLIC "' + doctypePublic + '" ')
+          else serializer.append('SYSTEM ');
+          serializer.append('"'+doctypeSystem+'">');
         end else if (method = xqsmHTML) and (doctypePublic <> isAbsentMarker) then
-          strres += '<!DOCTYPE html PUBLIC "'+doctypePublic+'">';
+          serializer.append('<!DOCTYPE html PUBLIC "'+doctypePublic+'">');
 
         if method = xqsmXHTML then method := xqsmXML;
       end;
@@ -4535,30 +4573,28 @@ begin
 
   hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
   wasNodeOrFirst := true;
-  for v in arg.GetEnumeratorPtrUnsafe do with params do begin
-    if hasItemSeparator then begin
-      if not wasNodeOrFirst then strres += params.itemSeparator;
-      wasNodeOrFirst := false;
-    end;
-    case v^.kind of
-      pvkNode: begin
-        //this might be incomplete
-        n := v^.toNode;
-        if n.typ in [tetAttribute] then raise EXQEvaluationException.create('SENR0001', 'Cannot serialize attribute');
-        case method of
-          xqsmXML: strres += n.outerXML();
-         // 'xhtml':;
-          xqsmHTML: strres += n.outerHTML();
-          xqsmText: strres += v^.toString;
-        end;
-        if not hasItemSeparator then wasNodeOrFirst := true;
-      end;
-      pvkObject, pvkArray, pvkNull: raiseXPTY0004TypeError(v^, 'serialization of this data is not possible with xml/html methode');
-      pvkFunction: raise EXQEvaluationException.create('SENR0001', 'Cannot serialize function');
-      else addAtomicString(v^.toString);
-    end;
+  add(v);
+
+  serializer.final;
+  result := xqvalue(temp);
+end;
+
+function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  arg: IXQValue;
+  params: TSerializationParams;
+
+begin
+  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
+  arg := args[0];
+  params.setDefault;
+  if argc = 2 then params.setFromXQValue(args[1]);
+
+  case params.method of
+    xqsmJSON: exit(serializeJSON(params, arg));
+    xqsmAdaptive: exit(serializeAdaptive(params, arg));
+    else exit(serializeXMLHTMLText(params, arg));
   end;
-  result := xqvalue(strres);
 end;
 
 function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;

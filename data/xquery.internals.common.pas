@@ -125,6 +125,7 @@ type TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendXMLElementStartClose(); inline;
   procedure appendXMLElementStartTag(const name: string); //open and close
   procedure appendXMLElementEndTag(const name: string);
+  procedure appendXMLProcessingInstruction(const name, content: string);
   procedure appendXMLEmptyElement(const name: string);
   procedure appendXMLText(const s: string);
   procedure appendXMLAttrib(const s: string);
@@ -471,6 +472,17 @@ begin
   append('</');
   append(name);
   append('>');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLProcessingInstruction(const name, content: string);
+begin
+  append('<?');
+  append(name);
+  if content <> '' then begin
+    append(' ');
+    append(content);
+  end;
+  append('?>');
 end;
 
 procedure TXHTMLStrBuilder.appendXMLEmptyElement(const name: string);
