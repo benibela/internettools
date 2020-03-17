@@ -4239,7 +4239,7 @@ TSerializationParams = record
   version, encoding: string;
   htmlVersion, doctypePublic, doctypeSystem: string;
   omitXmlDeclaration: boolean;
-  standalone: string;
+  standalone: TXMLDeclarationStandalone;
   itemSeparator: string;
   indent: TXQSerializerInsertWhitespace;
   jsonNodeOutputMethod: string;
@@ -4247,20 +4247,23 @@ TSerializationParams = record
   procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const v: IXQValue);
   procedure setFromXQValue(const v: IXQValue);
+
   procedure setMethod(const s: string);
+  procedure setStandalone(s: string);
+  procedure setStandalone(s: boolean);
 end;
 
 procedure TSerializationParams.setDefault;
 begin
   isAbsentMarker := #0;
   method := xqsmXML;
-  version := '1.1';
+  version := isAbsentMarker;
   encoding := 'UTF-8';
   htmlVersion := '5.0';
   doctypePublic := isAbsentMarker;
   doctypeSystem := isAbsentMarker;
-  omitXmlDeclaration := true;
-  standalone := 'omit';
+  omitXmlDeclaration := false;
+  standalone := xdsOmit;
   itemSeparator := isAbsentMarker;
   indent := xqsiwConservative;
   jsonNodeOutputMethod := 'xml';
@@ -4306,7 +4309,7 @@ begin
          'method':         setMethod(paramNode.getAttribute('value'));
          'normalization-form': ;//todo
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
-         'standalone':     standalone := paramNode.getAttribute('value');
+         'standalone': setStandalone(paramNode.getAttribute('value'));
          'suppress-indentation': ;//todo
          'undeclare-prefixes': ;//todo
          'use-character-maps': ;//todo
@@ -4373,7 +4376,8 @@ begin
       'method': setMethod(valueString());
       'normalization-form': valueString(); //todo
       'omit-xml-declaration': omitXmlDeclaration := valueBool();
-      'standalone': if valueBool() then standalone := 'yes' else standalone := 'no';
+      'standalone': if staticOptions and (pp.Value.toString = 'omit') then standalone := xdsOmit
+                    else setStandalone(valueBool());
       'suppress-indentation': ;
       'undeclare-prefixes': valueBool(); //todo
       'use-character-maps': ; //todo
@@ -4407,6 +4411,19 @@ begin
     'json': method := xqsmJSON;
     'adaptive': method := xqsmAdaptive;
   end;
+end;
+
+procedure TSerializationParams.setStandalone(s: string);
+begin
+  s := trim(s);
+  if s = 'omit' then standalone := xdsOmit;
+  setStandalone(toSerializationBool(s));
+end;
+
+procedure TSerializationParams.setStandalone(s: boolean);
+begin
+  if s then standalone := xdsYes
+  else standalone := xdsNo;
 end;
 
 function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
@@ -4458,29 +4475,40 @@ end;
 
 function serializeXMLHTMLText(var params: TSerializationParams; const v: IXQValue): IXQValue;
 var serializer: TXQSerializer;
-  function findFirstElement(const v: IXQValue): TTreeNode;
+
+var firstElement: TTreeNode = nil;
+
+  function findRootNodeCount(const v: IXQValue): integer;
   var
     w, m: PIXQValue;
     n: TTreeNode;
   begin
-    result := nil;
+    result := 0;
     for w in v.GetEnumeratorPtrUnsafe do begin
       case w^.kind of
         pvkNode: n := w^.toNode;
         pvkArray: begin
           for m in w^.GetEnumeratorMembersPtrUnsafe do begin
-            result := findFirstElement(m^);
-            if result <> nil then exit;
+            result := findRootNodeCount(m^);
+            if result > 1 then exit;
           end;
           continue;
         end
         else continue;
       end;
       if n.typ = tetDocument then n := n.getFirstChild();
-      if n.typ = tetAttribute then break; //fail later
-      while (n <> nil) do begin
-        if n.typ = tetOpen then exit(n)
-        else n := n.getNextSibling();
+      if n.typ <> tetAttribute then begin
+        while (n <> nil) do begin
+          case n.typ of
+            tetText: if n.value.Trim() <> '' then inc(result);
+            tetOpen: begin
+              inc(result);
+              if firstElement = nil then firstElement := n;
+              if result > 1 then exit();
+            end;
+          end;
+          n := n.getNextSibling();
+        end;
       end;
     end;
   end;
@@ -4537,39 +4565,49 @@ var
   end;
 
 var temp: string;
-  firstElement: TTreeNode;
+  hasDoctypeSystem: Boolean;
 begin
-  firstElement := findFirstElement(v);
-
   serializer.init(@temp);
   serializer.standard := true;
 
   with params do begin
+    hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
+    hasDoctypeSystem := params.doctypeSystem <> params.isAbsentMarker;
+    standalone := params.standalone;
+    if findRootNodeCount(v) > 1 then begin
+      if hasDoctypeSystem then hasDoctypeSystem := false;
+      if standalone <> xdsOmit then standalone := xdsOmit;
+    end;
+
+
     case params.method of
       xqsmXML, xqsmXHTML, xqsmHTML: begin
         //initialize missing default parameters
         if (method = xqsmHTML) then begin
           if (htmlVersion = isAbsentMarker) then htmlVersion := version;
           if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
-        end else if version = isAbsentMarker then version := '1.1';
+        end else begin
+          if omitXmlDeclaration then
+            if (standalone <> xdsOmit) or ( (version <> '1.0') and (version <> isAbsentMarker) and hasDoctypeSystem ) then
+              raiseXQEvaluationException('SEPM0009', 'Invalid serialization parameter');
+
+          if version = isAbsentMarker then version := '1.1';
+        end;
 
         //headers
-        if (method <> xqsmHTML) and not omitXmlDeclaration then begin
-          serializer.append('<?xml version="'+version+'" encoding="'+encoding+'"');
-          if standalone <> 'omit' then serializer.append(' standalone="'+standalone+'"');
-          serializer.append('?>');
+        if (method <> xqsmHTML) then begin
+          if not omitXmlDeclaration then
+            serializer.appendXMLHeader(version, encoding, standalone);
         end;
-        if (htmlVersion = '5.0') and (doctypeSystem = isAbsentMarker)
+        if (htmlVersion = '5.0') and (not hasDoctypeSystem)
            and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
            and ( (method = xqsmXHTML) or ( (method = xqsmHTML) and (doctypePublic = isAbsentMarker) )) then begin
            if method = xqsmHTML then serializer.append('<!DOCTYPE html>')
            else serializer.append('<!DOCTYPE '+firstElement.value+'>')
-        end else if doctypeSystem <> isAbsentMarker then begin
+        end else if hasDoctypeSystem then begin
           if method = xqsmHTML then serializer.append('<!DOCTYPE html ')
-          else begin
-            if firstElement = nil then raiseXQEvaluationException('SEPM0016', 'No element given');
+          else if firstElement <> nil then
             serializer.append('<!DOCTYPE '+firstElement.value + ' ');
-          end;
           if doctypePublic <> isAbsentMarker then serializer.append('PUBLIC "' + doctypePublic + '" ')
           else serializer.append('SYSTEM ');
           serializer.append('"'+doctypeSystem+'">');
@@ -4585,7 +4623,6 @@ begin
     end;
   end;
 
-  hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;
   wasNodeOrFirst := true;
   add(v);
 

@@ -111,7 +111,8 @@ public
   property Capacity: integer read fcapacity write setCapacity;
 end;
 
-type TXHTMLStrBuilder = object(TStrBuilder)
+TXMLDeclarationStandalone = (xdsOmit, xdsYes, xdsNo);
+TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendHexEntity(codepoint: integer);
 
   procedure appendHTMLText(inbuffer: pchar; len: SizeInt);
@@ -120,6 +121,7 @@ type TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendHTMLAttrib(const s: string);
   procedure appendHTMLElementAttribute(const name, value: string);
 
+  procedure appendXMLHeader(const version, anencoding: string; standalone: TXMLDeclarationStandalone);
   procedure appendXMLElementStartOpen(const name: string);
   procedure appendXMLElementAttribute(const name, value: string);
   procedure appendXMLElementStartClose(); inline;
@@ -439,6 +441,17 @@ begin
   append('="');
   appendHTMLAttrib(value);
   append('"');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLHeader(const version, anencoding: string; standalone: TXMLDeclarationStandalone);
+begin
+  append('<?xml version="'+version+'" encoding="'+anencoding+'"');
+  case standalone of
+    xdsOmit:;
+    xdsYes: append(' standalone="yes"');
+    xdsNo: append(' standalone="no"');
+  end;
+  append('?>');
 end;
 
 procedure TXHTMLStrBuilder.appendXMLElementStartOpen(const name: string);
