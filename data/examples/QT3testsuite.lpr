@@ -121,6 +121,7 @@ end;
 TResult = class
   assertions: TList;
   constructor create(e: TTreeNode);
+  function hasSerializationAssertion: boolean;
   function check(errorCode: string=''): TTestCaseResult;
   function expectError: boolean;
 end;
@@ -359,6 +360,7 @@ begin
   writeln('<!doctype html><html><head><title>XQuery Test Suite Evaluation</title>');
   writeln('<link rel="stylesheet" type="text/css" href="xqts.css">');
   writeln('<style>.restable tr {background-color: #AAFFAA} .restable tr.S {background-color: white;}');
+  writeln('table.testcases td { vertical-align: top }');
   writeln('table.testcases td:nth-child(2) {font-weight: bold }');
   writeln('table.testcases td:nth-child(3) {white-space: pre-wrap; font-family: monospace }');
   writeln('table.testcases td:nth-child(4) {white-space: pre-wrap; font-family: monospace }');
@@ -911,9 +913,10 @@ begin
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
     aakSerializationMatches: begin
       result := tcrFail;
-      node := res.toNode;
-      if node <> nil then str := node.outerXML()
-      else str := xmlStrEscape(res.toString);
+      case res.kind of
+        pvkNode: str := res.toNode.outerXML();
+        else str := res.toString;
+      end;
       regex := wregexprParse(value, regexflags);
       try
         result := OK[wregexprMatches(regex, str)]
@@ -938,11 +941,10 @@ begin
       end;
       result := OK[str = value];
     end;
-    aakError:
+    aakError, aakSerializationError:
       if errorCode = '' then result := tcrFail
       else if (errorCode = value) or (value = '*') then result := tcrPass
       else result := tcrWrongError;
-    aakSerializationError: result := tcrFail; //  raise exception.Create('assert serialization-error not supported ');
   end;
 end;
 
@@ -972,6 +974,16 @@ constructor TResult.create(e: TTreeNode);
 begin
   assertions := TList.Create;
   loadAsserts(assertions, e);
+end;
+
+function TResult.hasSerializationAssertion: boolean;
+var
+  i: Integer;
+begin
+  for i := 0 to assertions.Count - 1 do
+    if (tassertion(assertions[i]) is TAssertionAssert) and (TAssertionAssert(assertions[i]).kind in [aakSerializationError, aakSerializationMatches]) then
+      exit(true);
+  exit(false);
 end;
 
 function TResult.check(errorCode: string=''): TTestCaseResult;
@@ -1096,10 +1108,16 @@ begin
         xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);}
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
+    if Results.Count <> 1 then raise Exception.Create('invalid result count');
+    if tresult(results[0]).hasSerializationAssertion and not TTest(tests[0]).test.Contains('http://www.w3.org/2010/xslt-xquery-serialization') then
+      with TTest(tests[0]) do begin
+        test := 'declare namespace xxxxoutput = "http://www.w3.org/2010/xslt-xquery-serialization";'
+                + 'declare option xxxxoutput:method "xml";'
+                + test;
+      end;
     result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
     xq.VariableChangelog.add('result', result.value);
     //todo:. modules,
-    if Results.Count <> 1 then raise Exception.Create('invalid result count');
   except
     on e: EXQException do begin
       result.error := e.errorCode +': '+e.Message;
@@ -1111,7 +1129,7 @@ begin
     end;
   end;
   if result.error = '' then
-    result.result := TResult(results[0]).check;    ;
+    result.result := TResult(results[0]).check;
 end;
 
 procedure TTestCase.importModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
@@ -1216,7 +1234,7 @@ begin
 
   put('feature', 'moduleImport', true);
 
-  put('feature', 'serialization', false);
+  put('feature', 'serialization', true);
   put('feature', 'higherOrderFunctions', true);
   put('feature', 'typedData', false);
   put('feature', 'schemaValidation', false);
