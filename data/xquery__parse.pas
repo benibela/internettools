@@ -4159,10 +4159,13 @@ begin
                 serializationOptions := TXQValueObject.create();
                 serializationOptions.setMutable(#0'static-options', xqvalueTrue); //mark the map as wrapping statically given options
               end;
+              if serializationOptions.hasProperty(token, nil) then
+                raiseParsingError('XQST0110', 'Duplicate');
               case token of
                 'parameter-document':
                   serializationOptions.setMutable('parameter-document', xqvalue(tempcontext.parseCachedDocFromUrl(temp, 'XQST0119')));
-                 else
+                'use-character-maps': raiseParsingError('XQST0109', 'Invalid option.')
+                else
                   serializationOptions.setMutable(token, temp);
               end;
             end;

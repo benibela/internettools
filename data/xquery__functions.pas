@@ -4234,7 +4234,7 @@ TSerializationParams = record
   indent: TXQSerializerInsertWhitespace;
   jsonNodeOutputMethod: string;
   procedure setDefault;
-  procedure setFromNode(paramNode: TTreeNode);
+  procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const v: IXQValue);
   procedure setFromXQValue(const v: IXQValue);
   procedure setMethod(const s: string);
@@ -4256,22 +4256,21 @@ begin
   jsonNodeOutputMethod := 'xml';
 end;
 
-procedure TSerializationParams.setFromNode(paramNode: TTreeNode);
-  function tobool(const s:string): boolean;
-  begin
-    case s of
-      'yes': result := true;
-      'no': result := false;
-      else raise EXQEvaluationException.create('SEPM0016', 'Expected boolean, got '+s);
-    end;
+function toSerializationBool(const s:string): boolean;
+begin
+  case trim(s) of
+    'true', 'yes', '1': result := true;
+    'false', 'no', '0': result := false;
+    else raiseXQEvaluationException('SEPM0016', 'Expected boolean, got '+s);
   end;
+end;
 
 
-
+procedure TSerializationParams.setFromNode(paramNode: TTreeNode; isStatic: boolean);
 const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
 begin
   if paramNode = nil then exit;
-  if paramNode.typ = tetDocument then paramNode := paramnode.getFirstChild();
+  if isStatic and (paramNode.typ = tetDocument) then paramNode := paramnode.getFirstChild();
   if paramNode = nil then exit;
   if not equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output)
      or (paramNode.value <> 'serialization-parameters')
@@ -4289,20 +4288,20 @@ begin
          'escape-uri-attributes': ;//todo
          'html-version':   htmlVersion := paramNode.getAttribute('value');
          'include-content-type': ;//todo
-         'indent': if tobool(paramNode.getAttribute('value')) then indent := xqsiwIndent
+         'indent': if toSerializationBool(paramNode.getAttribute('value')) then indent := xqsiwIndent
                    else indent := xqsiwNever;
          'item-separator': itemSeparator := paramNode.getAttribute('value');
          'json-node-output-method': paramNode.getAttribute('value');
          'media-type': ;//todo
          'method':         setMethod(paramNode.getAttribute('value'));
          'normalization-form': ;//todo
-         'omit-xml-declaration': omitXmlDeclaration := tobool(paramNode.getAttribute('value'));
+         'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
          'standalone':     standalone := paramNode.getAttribute('value');
          'suppress-indentation': ;//todo
          'undeclare-prefixes': ;//todo
          'use-character-maps': ;//todo
          'version':        version := paramNode.getAttribute('value');
-         else raise EXQEvaluationException.create('SEPM0017', 'Invalid serialization parameter: '+paramNode.value);
+         else raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.value);
        end;
      paramNode:= paramNode.getNextSibling();
    end;
@@ -4312,23 +4311,20 @@ procedure TSerializationParams.setFromMap(const v: IXQValue);
 var
   pp: TXQProperty;
   staticOptions: boolean = false;
-  procedure raiseInvalidParameter;
+  procedure raiseInvalidParameter(typeError: boolean = true);
   begin
-    raiseXPTY0004TypeError(v, 'Invalid parameter for '+ pp.Name);
+    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.Name, pp.Value);
   end;
 
   function valueBool: Boolean;
   begin
     if pp.Value.kind = pvkBoolean then exit(pp.value.toBoolean);
     if staticOptions and (pp.Value.kind = pvkString) then begin
-      case pp.Value.toString of
-        'yes': exit(true);
-        'no': exit(false);
-      end;
+      exit(toSerializationBool(pp.value.toString));
     end;
 
     result := false;
-    raiseInvalidParameter;
+    raiseInvalidParameter();
   end;
   function valueString(): string;
   begin
@@ -4354,7 +4350,10 @@ begin
       'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
       'encoding': encoding := valueString();
       'escape-uri-attributes': valueBool(); //todo
-      'html-version': if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64) else raiseInvalidParameter;
+      'html-version':
+        if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64)
+        else if staticOptions and (pp.Value.kind = pvkString) then htmlVersion := pp.Value.toString
+        else raiseInvalidParameter;
       'include-content-type': valueBool(); //todo
       'indent': if valueBool() then indent := xqsiwIndent
                 else indent := xqsiwNever;
@@ -4373,7 +4372,8 @@ begin
 
       #0'static-options': staticOptions := true;
       'parameter-document': if staticOptions then
-        setFromXQValue(pp.Value);
+        setFromNode(pp.Value.toNode, true);
+      else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
     end;
   end;
 end;
@@ -4382,7 +4382,7 @@ procedure TSerializationParams.setFromXQValue(const v: IXQValue);
 begin
   case v.kind of
     pvkObject: setFromMap(v);
-    pvkNode: setFromNode(v.toNode);
+    pvkNode: setFromNode(v.toNode, false);
     else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node');
   end;
 end;
