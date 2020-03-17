@@ -2694,7 +2694,7 @@ begin
     'e', 'E': result := striequal(s,'embed');
     'f', 'F': result := striequal(s,'frame');
     'h', 'H': result := striequal(s,'hr') ;
-    'i', 'I': result := striequal(s,'img') or striequal(s,'input');//or striequal(s,'isindex');
+    'i', 'I': result := striequal(s,'img') or striequal(s,'input') or striequal(s,'isindex');
     'k', 'K': result := striequal(s,'keygen') ;
     'l', 'L': result := striequal(s,'link') ;
     'm', 'M': result := striequal(s,'meta') ;

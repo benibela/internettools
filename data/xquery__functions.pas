@@ -4489,6 +4489,7 @@ var
 
   procedure addAtomicString(const s: string);
   begin
+    addItemStart;
     if not hasItemSeparator then begin
       if not wasNodeOrFirst then serializer.append(' ');
       wasNodeOrFirst := false;
@@ -4498,13 +4499,13 @@ var
 
   procedure add(const v: IXQValue);
   var
-    w: PIXQValue;
+    w, m: PIXQValue;
     n: TTreeNode;
   begin
     for w in v.GetEnumeratorPtrUnsafe do begin
-      addItemStart;
       case w^.kind of
         pvkNode: begin
+          addItemStart;
           //this might be incomplete
           n := w^.toNode;
           if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
@@ -4516,7 +4517,10 @@ var
           end;
           if not hasItemSeparator then wasNodeOrFirst := true;
         end;
-        pvkArray, pvkNull, pvkObject, pvkFunction: raiseXQEvaluationError('SENR0001', 'Cannot serialize with XML/HTML/Text method', w^);
+        pvkArray: for m in v.GetEnumeratorMembersPtrUnsafe do
+          add(m^);
+        pvkNull: addAtomicString('');
+        pvkObject, pvkFunction: raiseXQEvaluationError('SENR0001', 'Cannot serialize with XML/HTML/Text method', w^);
         else addAtomicString(w^.toString);
       end;
     end;
