@@ -766,8 +766,6 @@ begin
 end;
 
 procedure TXQValueInt64.adaptiveSerialize(var serializer: TXQSerializer);
-var
-  withType: Boolean;
 begin
   if (typeAnnotation = baseSchema.integer) or (typeAnnotation = baseSchema.decimal) then begin
     serializer.appendNumber(value);
@@ -1026,8 +1024,6 @@ begin
 end;
 
 procedure TXQValueDecimal.adaptiveSerialize(var serializer: TXQSerializer);
-var
-  withType: Boolean;
 begin
   if (typeAnnotation = baseSchema.integer) or (typeAnnotation = baseSchema.decimal) then begin
     serializer.append(toString);

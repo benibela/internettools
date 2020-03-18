@@ -6202,6 +6202,7 @@ begin
       if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
       result := args[0].get(args[1].toInt64);
     end;
+    else raiseXQEvaluationException('pxp:INTERNAL', '2020031814');
   end;
 end;
 
