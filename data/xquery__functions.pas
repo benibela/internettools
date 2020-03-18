@@ -4272,7 +4272,7 @@ TSerializationParams = record
   indent: TXQSerializerInsertWhitespace;
   jsonNodeOutputMethod: string;
   normalizationForm: TUnicodeNormalizationForm;
-  procedure setDefault;
+  procedure setDefault(isFromMap: boolean);
   procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const v: IXQValue);
   procedure setFromXQValue(const v: IXQValue);
@@ -4283,19 +4283,20 @@ TSerializationParams = record
   procedure setNormalizationForm(const s: string);
 end;
 
-procedure TSerializationParams.setDefault;
+procedure TSerializationParams.setDefault(isFromMap: boolean);
 begin
   isAbsentMarker := #0;
   method := xqsmXML;
-  version := isAbsentMarker;
+  if isFromMap then version := '1.0' else version := isAbsentMarker;
   encoding := 'UTF-8';
   htmlVersion := '5.0';
   doctypePublic := isAbsentMarker;
   doctypeSystem := isAbsentMarker;
-  omitXmlDeclaration := false;
+  omitXmlDeclaration := true;
   standalone := xdsOmit;
   itemSeparator := isAbsentMarker;
-  indent := xqsiwConservative;
+  if isFromMap then indent := xqsiwNever
+  else indent := xqsiwConservative;
   jsonNodeOutputMethod := 'xml';
   normalizationForm := unfUnknown;
 end;
@@ -4415,7 +4416,10 @@ begin
       'version': version := valueString();
 
 
-      #0'static-options': staticOptions := true;
+      #0'static-options': begin
+        staticOptions := true;
+        omitXmlDeclaration := false;
+      end;
       'parameter-document': if staticOptions then
         setFromNode(pp.Value.toNode, true);
       else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
@@ -4426,8 +4430,14 @@ end;
 procedure TSerializationParams.setFromXQValue(const v: IXQValue);
 begin
   case v.kind of
-    pvkObject: setFromMap(v);
-    pvkNode: setFromNode(v.toNode, false);
+    pvkObject: begin
+      setDefault(true);
+      setFromMap(v);
+    end;
+    pvkNode: begin
+      setDefault(false);
+      setFromNode(v.toNode, false);
+    end
     else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node');
   end;
 end;
@@ -4493,7 +4503,6 @@ begin
   serializer.standard := true;
 
   serializer.insertWhitespace := params.indent;
-  if serializer.insertWhitespace = xqsiwConservative then serializer.insertWhitespace := xqsiwNever;
   case params.jsonNodeOutputMethod of
     'xml': serializer.nodeFormat := tnsXML;
     'xhtml': serializer.nodeFormat := tnsXML;
@@ -4704,8 +4713,8 @@ var
 begin
   //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
   arg := args[0];
-  params.setDefault;
-  if argc = 2 then params.setFromXQValue(args[1]);
+  if argc = 2 then params.setFromXQValue(args[1])
+  else params.setDefault(false);
 
   case params.method of
     xqsmJSON: exit(serializeJSON(params, arg));
@@ -4720,7 +4729,7 @@ var serializer: TXQSerializer;
   procedure setParams;
   var p: TSerializationParams;
   begin
-    p.setDefault;
+    p.setDefault(false);
     p.setFromXQValue(args[1]);
     serializer.insertWhitespace := p.indent;
   end;

@@ -134,6 +134,9 @@ TXHTMLStrBuilder = object(TStrBuilder)
 end;
 
 type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
+  standard: boolean;
+  procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
+
   procedure appendJSONEmptyObject; inline;
   procedure appendJSONObjectStart; inline;
   procedure appendJSONObjectKeyColon(const key: string); inline;
@@ -180,6 +183,12 @@ begin
   tempf := f + 0.5;
   result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
+end;
+
+procedure TJSONXHTMLStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
+begin
+  inherited init(abuffer, basecapacity, aencoding);
+  standard := false;
 end;
 
 procedure TJSONXHTMLStrBuilder.appendJSONEmptyObject;
@@ -243,7 +252,7 @@ begin
       #13: append('\r');
       '"': append('\"');
       '\': append('\\');
-      '/': append('\/'); //mandatory in xquery standard
+      '/': if standard then append('\/') else append('/'); //mandatory in xquery standard
       else append(s[i]);
     end;
   end;

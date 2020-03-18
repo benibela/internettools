@@ -331,7 +331,6 @@ type
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     insertWhitespace: TXQSerializerInsertWhitespace;
-    standard: boolean;
 
     onInterceptAppendJSONString: TXQSerializerOnString;
 
