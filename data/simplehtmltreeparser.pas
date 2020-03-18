@@ -2701,6 +2701,7 @@ begin
     's', 'S': result := striequal(s,'source') ;
     't', 'T': result := striequal(s,'track');
     'w', 'W': result := striequal(s,'wbr');
+    else result := false;
   end;
   //elements listed above, not being void are probably (??) deprecated?
   //void elements: area, base, br, col, command, embed, hr, img, input, keygen, link, meta, param, source, track, wbr
