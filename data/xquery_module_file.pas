@@ -57,7 +57,7 @@ type
     dest: string;
     source: String;
     procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); virtual;
-    class procedure checkResult(const res: boolean; const fn: string);
+    class procedure checkResult(const res: boolean; const fn: string); static;
   end;
 
 
@@ -83,7 +83,7 @@ type
     constructor init;
     procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); virtual;
     procedure startSearch(path: string; prefixForOutput: string=''); virtual;
-    class procedure checkResult(const res: boolean; const fn: string);
+    class procedure checkResult(const res: boolean; const fn: string); static;
   end;
 
 
