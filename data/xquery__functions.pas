@@ -4350,7 +4350,7 @@ begin
          'indent': if toSerializationBool(paramNode.getAttribute('value')) then indent := xqsiwIndent
                    else indent := xqsiwNever;
          'item-separator': itemSeparator := paramNode.getAttribute('value');
-         'json-node-output-method': paramNode.getAttribute('value');
+         'json-node-output-method': jsonNodeOutputMethod := paramNode.getAttribute('value');
          'media-type': ;//todo
          'method':         setMethod(paramNode.getAttribute('value'));
          'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
