@@ -177,7 +177,9 @@ begin
   t('serialize([1,2,3e0], map {"method": "json", "indent": true() })', '[1, 2, 3]');
   t('serialize([1,2,3e0], map {"method": "adaptive", "indent": true() })', '[1,2,3.0e0]');
 
-  t('serialize([1,2,"xyz"], map {"method": "json", "character-maps": map { "y": "foo" } })', '[1,2,"xfooz"]');
+  t('serialize([1,2,"äxyz"], map {"method": "json", "use-character-maps": map { "y": "foo" } })', '[1,2,"äxfooz"]');
+  t('serialize(["äxyz"""], map {"method": "json", "use-character-maps": map { "y": "foo" } })', '["äxfooz\""]');
+  t('serialize(["äxyz"""], map {"method": "json", "encoding": "us-ascii" })', '["\u00E4xyz\""]');
 
 
   writeln('XPath 3.1: ', count, ' completed');

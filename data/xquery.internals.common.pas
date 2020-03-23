@@ -186,6 +186,7 @@ type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
   procedure appendJSONArrayComma; inline;
   procedure appendJSONArrayEnd; inline;
 
+  procedure appendJSONStringUnicodeEscape(codepoint: integer);
   procedure appendJSONStringWithoutQuotes(const s: string);
   procedure appendJSONString(const s: string);
 end;
@@ -465,6 +466,20 @@ end;
 procedure TJSONXHTMLStrBuilder.appendJSONArrayEnd;
 begin
   append(']');
+end;
+
+procedure TJSONXHTMLStrBuilder.appendJSONStringUnicodeEscape(codepoint: integer);
+var
+  s1, s2: word;
+begin
+  append('\u');
+  if codepoint > $FFFF then begin
+    utf16EncodeSurrogatePair(codepoint, s1, s2);
+    appendHexNumber(s1, 4);
+    append('\u');
+    codepoint := s2;
+  end;
+  appendHexNumber(codepoint, 4)
 end;
 
 procedure TJSONXHTMLStrBuilder.appendJSONStringWithoutQuotes(const s: string);

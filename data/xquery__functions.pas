@@ -4265,6 +4265,7 @@ TSerializationParams = record
   isAbsentMarker: string;
   method: TSerializationMethod;
   version, encoding: string;
+  encodingCP: TSystemCodePage;
   htmlVersion, doctypePublic, doctypeSystem: string;
   omitXmlDeclaration: boolean;
   standalone: TXMLDeclarationStandalone;
@@ -4273,6 +4274,8 @@ TSerializationParams = record
   jsonNodeOutputMethod: string;
   normalizationForm: TUnicodeNormalizationForm;
   characterMaps: TXQHashmapStrStr;
+
+  procedure done;
 
   procedure setDefault(isFromMap: boolean);
   procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
@@ -4283,6 +4286,12 @@ TSerializationParams = record
   procedure setStandalone(s: string);
   procedure setStandalone(s: boolean);
   procedure setNormalizationForm(const s: string);
+  procedure setEncoding(const s: string);
+end;
+
+procedure TSerializationParams.done;
+begin
+  FreeAndNil(characterMaps);
 end;
 
 procedure TSerializationParams.setDefault(isFromMap: boolean);
@@ -4291,6 +4300,7 @@ begin
   method := xqsmXML;
   if isFromMap then version := '1.0' else version := isAbsentMarker;
   encoding := 'UTF-8';
+  encodingCP := CP_UTF8;
   htmlVersion := '5.0';
   doctypePublic := isAbsentMarker;
   doctypeSystem := isAbsentMarker;
@@ -4333,7 +4343,7 @@ begin
          'cdata-section-elements': ;//todo
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
-         'encoding':       encoding := paramNode.getAttribute('value');
+         'encoding':       setEncoding(paramNode.getAttribute('value'));
          'escape-uri-attributes': ;//todo
          'html-version':   htmlVersion := paramNode.getAttribute('value');
          'include-content-type': ;//todo
@@ -4351,8 +4361,6 @@ begin
          'use-character-maps': begin
            if characterMaps = nil then characterMaps := TXQHashmapStrStr.Create;
            mapNode := paramNode.getFirstChild();
-           writeln;
-           writeln;
            while mapNode <> nil do begin
              if (mapNode.typ = tetOpen) and (mapNode.value = 'character-map') then begin
                characterMaps.include(mapnode.getAttribute('character'), mapnode.getAttribute('map-string'));
@@ -4408,7 +4416,7 @@ begin
       'cdata-section-elements': ; //todo
       'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
       'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
-      'encoding': encoding := valueString();
+      'encoding': setEncoding(valueString());
       'escape-uri-attributes': valueBool(); //todo
       'html-version':
         if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64)
@@ -4431,7 +4439,7 @@ begin
         if characterMaps = nil then characterMaps := TXQHashmapStrStr.Create;
         if pp.value.kind <> pvkObject then raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
         for characterp in pp.value.getPropertyEnumerator do
-          characterMaps.Add(characterp.Name, characterp.Value.toString);
+          characterMaps.include(characterp.Name, characterp.Value.toString);
       end;
       'version': version := valueString();
       #0'static-options': begin
@@ -4493,6 +4501,13 @@ begin
   end;
 end;
 
+procedure TSerializationParams.setEncoding(const s: string);
+begin
+  encoding := s;
+  encodingCP := strEncodingFromName(s);
+  if encodingCP = $FFFF then raiseXQEvaluationException('SESU0007', 'Unknown encoding: '+s);
+end;
+
 type TSpecialStringHandler = object
   serializer: ^TXQSerializer;
   params: ^TSerializationParams;
@@ -4543,11 +4558,20 @@ begin
   end;
 end;
 
+function isUnicodeEncoding(e: TSystemCodePage): boolean;
+begin
+  e := strActualEncoding(e);
+  case e of
+    CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: result := true;
+    else result := false;
+  end;
+end;
 
 function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
 var serializer: TXQSerializer;
-  temp: string;
+  temp, temp2: string;
   interceptor: TSpecialStringHandler;
+  cp: Integer;
 begin
   serializer.init(@temp);
   serializer.standard := true;
@@ -4570,6 +4594,17 @@ begin
 
   v.jsonSerialize(serializer);
   serializer.final;
+
+  if not isUnicodeEncoding(params.encodingCP) then begin
+    serializer.init(@temp2);
+    for cp in temp.enumerateUtf8CodePoints do begin
+      if cp <= $7F then serializer.append(chr(cp))
+      else serializer.appendJSONStringUnicodeEscape(cp);
+    end;
+    serializer.final;
+    temp := temp2;
+  end;
+
   result := xqvalue(temp);
 end;
 
@@ -4761,16 +4796,19 @@ var
   params: TSerializationParams;
 
 begin
+  params.characterMaps := nil;
   //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
   arg := args[0];
   if argc = 2 then params.setFromXQValue(args[1])
   else params.setDefault(false);
 
   case params.method of
-    xqsmJSON: exit(serializeJSON(params, arg));
-    xqsmAdaptive: exit(serializeAdaptive(params, arg));
-    else exit(serializeXMLHTMLText(params, arg));
+    xqsmJSON: result := serializeJSON(params, arg);
+    xqsmAdaptive: result := serializeAdaptive(params, arg);
+    else result := serializeXMLHTMLText(params, arg);
   end;
+
+  params.done
 end;
 
 function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;
