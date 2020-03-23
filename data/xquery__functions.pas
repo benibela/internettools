@@ -4467,7 +4467,8 @@ begin
       setDefault(false);
       setFromNode(v.toNode, false);
     end
-    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node');
+    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node')
+    else setDefault(true);
   end;
 end;
 
