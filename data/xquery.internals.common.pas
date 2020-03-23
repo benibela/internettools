@@ -34,6 +34,7 @@ type
     class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
     class procedure createDeletionKey(out key: string); static;
   end;
+  TXQVoid = record end;
   //Hashmap based on Bero's FLRECacheHashMap
   generic TXQBaseHashmap<TKey, TBaseValue, TInfo> = object
     type THashMapEntity=record
@@ -69,6 +70,10 @@ type
     property values[const Key:TKey]: TBaseValue read GetBaseValue write SetBaseValue; default;
   end;
 
+  generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<string,TXQVoid,TInfo>)
+    procedure include(const Key:TKey; allowOverride: boolean=true);
+  end;
+  TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
 
   TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
   generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
@@ -232,6 +237,18 @@ const
 implementation
 uses math;
 
+
+class procedure TXQDefaultTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
+begin
+  data := pointer(key);
+  datalen := length(key);
+end;
+
+class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
+begin
+  result := (length(key)  = datalen) and CompareMem(data, pointer(key), datalen);
+end;
+
 constructor TXQBaseHashmap.init;
 begin
  Tinfo.createDeletionKey(DELETED_KEY);
@@ -318,7 +335,7 @@ begin
  //remove old data (not really needed)
  for Counter:=Size to min(OldSize - 1, high(Entities)) do begin
    Entities[Counter].Key:=default(TKey);
-   Entities[Counter].Value:=nil;
+   Entities[Counter].Value:=default(TBaseValue);
  end;
 end;
 
@@ -360,7 +377,7 @@ begin
  if Entity>=0 then begin
   result:=@Entities[Entity];
  end else if CreateIfNotExist then begin
-  result:=include(Key,nil);
+  result:=include(Key,default(TBaseValue));
  end;
 end;
 
@@ -384,7 +401,7 @@ begin
  Entity:=CellToEntityIndex[Cell];
  if Entity>=0 then begin
   Entities[Entity].Key:=DELETED_KEY;
-  Entities[Entity].Value:=nil;
+  Entities[Entity].Value:=default(TBaseValue);
   CellToEntityIndex[Cell]:=ENT_DELETED;
   result:=true;
  end;
@@ -404,7 +421,7 @@ begin
  if Entity>=0 then begin
   result:=Entities[Entity].Value;
  end else begin
-  result:=nil;
+  result:=default(TBaseValue);
  end;
 end;
 
@@ -568,6 +585,11 @@ end;
 procedure TFastInterfacedObject._ReleaseIfNonNil;
 begin
   if self <> nil then _Release;
+end;
+
+procedure TXQHashset.include(const Key: TKey; allowOverride: boolean);
+begin
+  inherited include(key, default(TXQVoid), allowOverride);
 end;
 
 
@@ -862,6 +884,7 @@ var
   p: Integer;
   i: Integer;
 begin
+  result := '';
   SetLength(result, length(s));
   p := 1;
   i := 1;
@@ -906,17 +929,6 @@ begin
   result := result + (result shl 3);
   result := result xor (result shr 11);
   result := result + (result shl 15);
-end;
-
-class procedure TXQDefaultTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
-begin
-  data := pointer(key);
-  datalen := length(key);
-end;
-
-class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
-begin
-  result := (length(key)  = datalen) and CompareMem(data, pointer(key), datalen);
 end;
 
 class procedure TXQDefaultTypeInfo.createDeletionKey(out key: string);
