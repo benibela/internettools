@@ -39,7 +39,9 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math, simplehtmltreeparser, bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math,
+  simplehtmltreeparser, simplehtmlparser,
+  bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}
@@ -4629,6 +4631,128 @@ begin
   end;
 end;
 
+function serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean): RawByteString;
+var known: TNamespaceList;
+
+  function htmlElementIsImplicitCDATA(const name: string): boolean;
+  begin
+    result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
+  end;
+
+  function requireNamespace(n: TNamespace): string;
+  begin //that function is useless the namespace should always be in known. But just for safety...
+    if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
+    known.add(n);
+    result := ' ' + n.serialize;
+  end;
+
+  procedure inner(n: TTreeNode); forward;
+
+  procedure outer(n: TTreeNode);
+  var attrib: TTreeAttribute;
+      oldnamespacecount: integer;
+      i: Integer;
+      temp: TNamespace;
+  begin
+    with n do with builder do
+    case typ of
+      tetText:
+        if not html then append(xmlStrEscape(value))
+        else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
+        else appendHTMLText(value);
+      tetClose:
+        if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
+        else appendXMLElementEndTag(getNodeName());
+      tetComment: begin
+        append('<!--');
+        append(value);
+        append('-->');
+      end;
+      tetProcessingInstruction:
+        if attributes <> nil then appendXMLProcessingInstruction(value, getAttribute(''))
+        else appendXMLProcessingInstruction(value, '');
+      tetOpen: begin
+        oldnamespacecount:=known.Count;
+        append('<');
+        append(getNodeName());
+
+        {
+        writeln(stderr,'--');
+         if attributes <> nil then
+          for attrib in attributes do
+            if attrib.isNamespaceNode then
+             writeln(stderr, value+': '+attrib.toNamespace.serialize);
+        }
+        if oldnamespacecount = 0 then n.getAllNamespaces(known)
+        else n.getOwnNamespaces(known);
+        for i:=oldnamespacecount to known.Count - 1 do
+          if (known.items[i].getURL <> '') or
+             (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
+                and (isNamespaceUsed(known.items[i])
+                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
+                       append(' ');
+                       append(known.items[i].serialize);
+                     end;
+
+        if namespace <> nil then append(requireNamespace(namespace))
+        else if known.hasNamespacePrefix('', temp) then
+          if temp.getURL <> '' then begin
+            known.add(TNamespace.Make('', ''));
+            append(' xmlns=""');
+          end;
+        if attributes <> nil then
+          for attrib in getEnumeratorAttributes do
+            append(requireNamespace(attrib.namespace));
+
+
+        if attributes <> nil then
+          for attrib in getEnumeratorAttributes do
+            if not attrib.isNamespaceNode then begin
+              if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
+              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
+            end;
+
+        if (n.next = reverse) and (not html or (TTreeParser.htmlElementIsChildless(value))) then begin
+          if html then append('>')
+          else append('/>');
+          if builder.insertWhitespace <> xqsiwNever then append(LineEnding);
+          while known.count > oldnamespacecount do
+            known.Delete(known.count-1);
+          exit();
+        end;
+        append('>');
+        if builder.insertWhitespace <> xqsiwNever then append(LineEnding);
+        inner(n);
+        append('</'); append(n.getNodeName()); append('>');
+        if builder.insertWhitespace <> xqsiwNever then append(LineEnding);
+        while known.count > oldnamespacecount do
+          known.Delete(known.count-1);
+      end;
+      tetDocument: inner(n);
+      else; //should not happen
+    end;
+  end;
+
+  procedure inner(n: TTreeNode);
+  var sub: TTreeNode;
+  begin
+    if not (n.typ in TreeNodesWithChildren) then exit;
+    sub := n.next;
+    while sub <> n.reverse do begin
+      outer(sub);
+      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
+      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
+      else sub := sub.reverse.next;
+    end;
+  end;
+begin
+  known := TNamespaceList.Create;
+  if nodeSelf then outer(base)
+  else inner(base);
+  known.free;
+end;
+
+
 function serializeJSON(const params: TSerializationParams; const v: IXQValue): IXQValue;
 var serializer: TXQSerializer;
   temp, temp2: string;
@@ -4895,6 +5019,16 @@ begin
   result := xqvalue(res);
 end;
 
+
+function GlobalNodeSerializationCallbackImpl(node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
+var serializer: TXQSerializer;
+begin
+  serializer.init(@result);
+  if insertLineBreaks then serializer.insertWhitespace := xqsiwIndent
+  else serializer.insertWhitespace := xqsiwNever;
+  serializeNodes(node, serializer, includeSelf, html);
+  serializer.final;
+end;
 
 function xqFunctionUnparsed_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -7935,6 +8069,8 @@ begin
   fnmap.free;
 end;
 
+initialization
+  GlobalNodeSerializationCallback := @GlobalNodeSerializationCallbackImpl;
 
 end.
 

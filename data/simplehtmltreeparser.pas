@@ -373,9 +373,9 @@ private
   function findNamespace(const prefix: string): TNamespace;
 
   function htmlTagWeight(s:string): integer;
-  class function htmlElementChildless(const s:string): boolean; static;
-  class function htmlElementIsCDATA(const s: string): boolean; static;
   class function htmlElementClosesPTag(const s: string): boolean; static;
+public
+  class function htmlElementIsChildless(const s:string): boolean; static;
 public
   treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
@@ -454,6 +454,9 @@ type HTMLNodeNameHashs = object
   const track = $AB8D6A26;
   const title = $FE8D4719;
 end;
+
+type TSerializationCallback = function (node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
+var GlobalNodeSerializationCallback: TSerializationCallback;
 
 implementation
 uses xquery, xquery.internals.common;
@@ -1723,138 +1726,18 @@ begin
   result := false;
 end;
 
-function serializationWrapper(base: TTreeNode; nodeSelf: boolean; insertLineBreaks, html: boolean): RawByteString;
-var builder: TXHTMLStrBuilder;
-var known: TNamespaceList;
-  encoding: TSystemCodePage;
-  function requireNamespace(n: TNamespace): string;
-  begin //that function is useless the namespace should always be in known. But just for safety...
-    if (n = nil) or (n.getURL = XMLNamespaceUrl_XML) or (n.getURL = XMLNamespaceUrl_XMLNS) or (known.hasNamespace(n)) then exit('');
-    known.add(n);
-    result := ' ' + n.serialize;
-  end;
-
-  procedure inner(n: TTreeNode); forward;
-
-  procedure outer(n: TTreeNode);
-  var attrib: TTreeAttribute;
-      oldnamespacecount: integer;
-      i: Integer;
-      temp: TNamespace;
-  begin
-    with n do with builder do
-    case typ of
-      tetText:
-        if not html then append(xmlStrEscape(value))
-        else if (getParent() <> nil) and TTreeParser.htmlElementIsCDATA(getParent().value) then append(value)
-        else appendHTMLText(value);
-      tetClose:
-        if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
-        else appendXMLElementEndTag(getNodeName());
-      tetComment: begin
-        append('<!--');
-        append(value);
-        append('-->');
-      end;
-      tetProcessingInstruction:
-        if attributes <> nil then appendXMLProcessingInstruction(value, getAttribute(''))
-        else appendXMLProcessingInstruction(value, '');
-      tetOpen: begin
-        oldnamespacecount:=known.Count;
-        append('<');
-        append(getNodeName());
-
-        {
-        writeln(stderr,'--');
-         if attributes <> nil then
-          for attrib in attributes do
-            if attrib.isNamespaceNode then
-             writeln(stderr, value+': '+attrib.toNamespace.serialize);
-        }
-        if oldnamespacecount = 0 then n.getAllNamespaces(known)
-        else n.getOwnNamespaces(known);
-        for i:=oldnamespacecount to known.Count - 1 do
-          if (known.items[i].getURL <> '') or
-             (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
-                and (isNamespaceUsed(known.items[i])
-                     or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
-                       append(' ');
-                       append(known.items[i].serialize);
-                     end;
-
-        if namespace <> nil then append(requireNamespace(namespace))
-        else if known.hasNamespacePrefix('', temp) then
-          if temp.getURL <> '' then begin
-            known.add(TNamespace.Make('', ''));
-            append(' xmlns=""');
-          end;
-        if attributes <> nil then
-          for attrib in getEnumeratorAttributes do
-            append(requireNamespace(attrib.namespace));
-
-
-        if attributes <> nil then
-          for attrib in getEnumeratorAttributes do
-            if not attrib.isNamespaceNode then begin
-              if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
-              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
-            end;
-
-        if (n.next = reverse) and (not html or (TTreeParser.htmlElementChildless(value))) then begin
-          if html then append('>')
-          else append('/>');
-          if insertLineBreaks then append(LineEnding);
-          while known.count > oldnamespacecount do
-            known.Delete(known.count-1);
-          exit();
-        end;
-        append('>');
-        if insertLineBreaks then append(LineEnding);
-        inner(n);
-        append('</'); append(n.getNodeName()); append('>');
-        if insertLineBreaks then append(LineEnding);
-        while known.count > oldnamespacecount do
-          known.Delete(known.count-1);
-      end;
-      tetDocument: inner(n);
-      else; //should not happen
-    end;
-  end;
-
-  procedure inner(n: TTreeNode);
-  var sub: TTreeNode;
-  begin
-    if not (n.typ in TreeNodesWithChildren) then exit;
-    sub := n.next;
-    while sub <> n.reverse do begin
-      outer(sub);
-      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
-      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
-      else sub := sub.reverse.next;
-    end;
-  end;
-begin
-  builder.init(@result);
-  known := TNamespaceList.Create;
-  encoding := CP_NONE;
-  if base.root.typ = tetDocument then encoding := base.getDocument().FEncoding;
-  if nodeSelf then outer(base)
-  else inner(base);
-  known.free;
-  builder.final;
-end;
 
 function TTreeNode.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 
 begin
   if self = nil then exit('');
-  result := serializationWrapper(self, nodeSelf, insertLineBreaks, false);
+  result := GlobalNodeSerializationCallback(self, nodeSelf, insertLineBreaks, false);
 end;
 
 function TTreeNode.serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 begin
   if self = nil then exit('');
-  result := serializationWrapper(self, nodeSelf, insertLineBreaks, true);
+  result := GlobalNodeSerializationCallback(self, nodeSelf, insertLineBreaks, true);
 end;
 
 
@@ -2375,7 +2258,7 @@ begin
       bpmInBody: if repairMissingStartTags and (striEqual(tag, 'body') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
       bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
     end;
-    FAutoCloseTag:=htmlElementChildless(tag);
+    FAutoCloseTag:=htmlElementIsChildless(tag);
     if striEqual(tag, 'table') and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, 'table') then
       leaveTag(tagName, tagNameLen);
   end;
@@ -2505,7 +2388,7 @@ begin
     end;
 
     name := strFromPchar(tagName, tagNameLen);
-    if (FParsingModel = pmHTML) and htmlElementChildless(name) then begin
+    if (FParsingModel = pmHTML) and htmlElementIsChildless(name) then begin
       parenDelta := 0;
       last := FCurrentElement;
       weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
@@ -2682,7 +2565,7 @@ begin
   if striequal(s, '') then exit(100); //force closing of root element
 end;
 
-class function TTreeParser.htmlElementChildless(const s: string): boolean;
+class function TTreeParser.htmlElementIsChildless(const s: string): boolean;
 begin
   //elements that should/must not have children
   //area, base, basefont, bgsound, br, col, command, embed, frame, hr, img, input, keygen, link, meta, param, source, track or wbr
@@ -2707,11 +2590,6 @@ begin
   //elements listed above, not being void are probably (??) deprecated?
   //void elements: area, base, br, col, command, embed, hr, img, input, keygen, link, meta, param, source, track, wbr
 
-end;
-
-class function TTreeParser.htmlElementIsCDATA(const s: string): boolean;
-begin
-  result := simplehtmlparser.htmlElementIsCDATA(pchar(s), length(s));
 end;
 
 class function TTreeParser.htmlElementClosesPTag(const s: string): boolean;
