@@ -28,63 +28,74 @@ uses
   classes, contnrs, SysUtils, bbutils;
 
 type
-  TXQHashmapKey = String;
+  TXQDefaultTypeInfo = record
+    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+    class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
+    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
+    class procedure createDeletionKey(out key: string); static;
+  end;
   //Hashmap based on Bero's FLRECacheHashMap
-  generic TXQBaseHashmapStr<TBaseValue> = class
+  generic TXQBaseHashmap<TKey, TBaseValue, TInfo> = class
     type THashMapEntity=record
-      Key: TXQHashmapKey;
+      Key: TKey;
       Value: TBaseValue;
     end;
     PHashMapEntity = ^THashMapEntity;
     PValue = ^TBaseValue;
   private
-    function FindCell(const Key:TXQHashmapKey): UInt32;
-    procedure Resize;
+    //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
+    function findCell(keydata: pchar; keylen: SizeUInt): UInt32;
+    function findCell(const Key: TKey): UInt32;
+    procedure resize;
   protected
-    DELETED_KEY: string;
+    DELETED_KEY: TKey;
     RealSize: int32;
     LogSize: int32;
     Size: int32;
     Entities:array of THashMapEntity;
     CellToEntityIndex: array of int32;
-    function GetBaseValue(const Key:TXQHashmapKey):TBaseValue;
-    procedure SetBaseValue(const Key:TXQHashmapKey;const Value:TBaseValue);
-    class function hash(const key: TXQHashmapKey): uint32; static;
+    function getBaseValue(const Key:TKey):TBaseValue;
+    procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
+    class function hash(const key: TKey): uint32; static;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
-    function AddEntity(const Key:TXQHashmapKey;Value:TBaseValue):PHashMapEntity;
-    function GetEntity(const Key:TXQHashmapKey;CreateIfNotExist:boolean=false):PHashMapEntity;
-    function Delete(const Key:TXQHashmapKey):boolean;
-    property Values[const Key:TXQHashmapKey]: TBaseValue read GetBaseValue write SetBaseValue; default;
+    function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
+    function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
+    function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+    function exclude(const Key:TKey):boolean;
+    property values[const Key:TKey]: TBaseValue read GetBaseValue write SetBaseValue; default;
   end;
 
 
-  TXQBaseHashmapStrPointer = class(specialize TXQBaseHashmapStr<pointer>)
-  end;
+  TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
   generic TXQHashmapStr<TValue> = class(TXQBaseHashmapStrPointer)
   protected
-    procedure SetValue(const Key: TXQHashmapKey; const AValue: TValue); inline;
-    function GetValue(const Key: TXQHashmapKey): TValue; inline;
+    procedure SetValue(const Key: string; const AValue: TValue); inline;
+    function GetValue(const Key: string): TValue; inline;
   public
-    procedure Add(const Key:TXQHashmapKey; const AValue:TValue); inline;
-    property Values[const Key:TXQHashmapKey]: TValue read GetValue write SetValue; default;
+    procedure Add(const Key:string; const AValue:TValue); inline;
+    function include(const Key: string; const Value: TValue; allowOverride: boolean=true):PHashMapEntity;
+    property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
   generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = class(specialize TXQHashmapStr<TValue>)
   protected
-    procedure SetValue(const Key: TXQHashmapKey; const AValue: TValue); inline;
+    procedure SetValue(const Key: string; const AValue: TValue); inline;
   public
     destructor destroy; override;
     //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
-    property Values[const Key:TXQHashmapKey]: TValue read GetValue write SetValue; default;
+    property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
-  TFreeObjectOnRelease = record
-    class procedure addRef(o: TObject); static;
-    class procedure release(o: TObject); static;
+  TXQDefaultOwnershipTracker = record
+    class procedure addRef(o: TObject); static; inline;
+    class procedure release(o: TObject); static; inline;
+    class procedure addRef(const str: string); static; inline;
+    class procedure release(var str: string); static; inline;
   end;
-  generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TFreeObjectOnRelease>);
+  generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TXQDefaultOwnershipTracker>);
   TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
+  TXQHashmapStrStr = class(specialize TXQHashmapStrOwning<string, TXQDefaultOwnershipTracker>);
 
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
 type TFastInterfacedObject = class(TObject, IUnknown)
@@ -200,13 +211,20 @@ function xqround(const f: xqfloat): Int64;
 const
   ENT_EMPTY=-1;
   ENT_DELETED=-2;
+
+{$ifdef FPC} //hide this from pasdoc, since it cannot parse external
+  //need this in interface, otherwise calls to it are not inlined
+  Procedure fpc_AnsiStr_Incr_Ref (S : Pointer); [external name 'FPC_ANSISTR_INCR_REF'];
+  Procedure fpc_ansistr_decr_ref (Var S : Pointer); [external name 'FPC_ANSISTR_DECR_REF'];
+{$endif}
+
 implementation
 uses math;
 
-constructor TXQBaseHashmapStr.Create;
+constructor TXQBaseHashmap.Create;
 begin
  inherited Create;
- DELETED_KEY := #0'DELETED'#0;
+ Tinfo.createDeletionKey(DELETED_KEY);
  RealSize:=0;
  LogSize:=0;
  Size:=0;
@@ -215,13 +233,13 @@ begin
  Resize;
 end;
 
-destructor TXQBaseHashmapStr.Destroy;
+destructor TXQBaseHashmap.Destroy;
 begin
  Clear;
  inherited Destroy;
 end;
 
-procedure TXQBaseHashmapStr.Clear;
+procedure TXQBaseHashmap.Clear;
 begin
  RealSize:=0;
  LogSize:=0;
@@ -231,11 +249,11 @@ begin
  Resize;
 end;
 
-function TXQBaseHashmapStr.FindCell(const Key:TXQHashmapKey):UInt32;
+function TXQBaseHashmap.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
 var HashCode,Mask,Step:uint32;
     Entity:int32;
 begin
- HashCode:=hash(Key);
+ HashCode:=TInfo.hash(keydata, keylen);
  Mask:=(2 shl LogSize)-1;
  Step:=((HashCode shl 1)+1) and Mask;
  if LogSize<>0 then begin
@@ -245,14 +263,22 @@ begin
  end;
  repeat
   Entity:=CellToEntityIndex[result];
-  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (Entities[Entity].Key=Key)) then begin
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
    exit;
   end;
   result:=(result+Step) and Mask;
  until false;
 end;
 
-procedure TXQBaseHashmapStr.Resize;
+function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
+var data: pchar;
+    datalen: SizeUInt;
+begin
+  TInfo.keyToData(key, data, datalen);
+  result := findCell(data, datalen);
+end;
+
+procedure TXQBaseHashmap.resize;
 var NewLogSize,NewSize,OldSize,Counter:int32;
     OldEntities:array of THashMapEntity;
 begin
@@ -278,15 +304,15 @@ begin
  end;
  for Counter:=0 to OldSize-1 do
   if pointer(OldEntities[Counter].Key) <> pointer(DELETED_KEY) then
-    AddEntity(OldEntities[Counter].Key, OldEntities[Counter].Value);
+    include(OldEntities[Counter].Key, OldEntities[Counter].Value);
  //remove old data (not really needed)
  for Counter:=Size to min(OldSize - 1, high(Entities)) do begin
-   Entities[Counter].Key:='';
+   Entities[Counter].Key:=default(TKey);
    Entities[Counter].Value:=nil;
  end;
 end;
 
-function TXQBaseHashmapStr.AddEntity(const Key:TXQHashmapKey;Value:TBaseValue):PHashMapEntity;
+function TXQBaseHashmap.include(const Key: TKey; const Value: TBaseValue; allowOverride: boolean): PHashMapEntity;
 var Entity:int32;
     Cell:uint32;
 begin
@@ -295,9 +321,10 @@ begin
   Resize;
  end;
  Cell:=FindCell(Key);
- Entity:=CellToEntityIndex[Cell];
+ Entity:=CellToEntityIndex[Cell];;
  if Entity>=0 then begin
   result:=@Entities[Entity];
+  if not allowOverride then exit;
   result^.Key:=Key;
   result^.Value:=Value;
   exit;
@@ -313,7 +340,7 @@ begin
  end;
 end;
 
-function TXQBaseHashmapStr.GetEntity(const Key:TXQHashmapKey;CreateIfNotExist:boolean=false):PHashMapEntity;
+function TXQBaseHashmap.findEntity(const Key:TKey;CreateIfNotExist:boolean=false):PHashMapEntity;
 var Entity:int32;
     Cell:uint32;
 begin
@@ -323,11 +350,22 @@ begin
  if Entity>=0 then begin
   result:=@Entities[Entity];
  end else if CreateIfNotExist then begin
-  result:=AddEntity(Key,nil);
+  result:=include(Key,nil);
  end;
 end;
 
-function TXQBaseHashmapStr.Delete(const Key:TXQHashmapKey):boolean;
+function TXQBaseHashmap.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+var Entity:int32;
+    Cell:uint32;
+begin
+ result:=nil;
+ Cell:=FindCell(data, keylen);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then
+  result:=@Entities[Entity];
+end;
+
+function TXQBaseHashmap.exclude(const Key:TKey):boolean;
 var Entity:int32;
     Cell:uint32;
 begin
@@ -342,7 +380,7 @@ begin
  end;
 end;
 
-function TXQBaseHashmapStr.GetBaseValue(const Key: TXQHashmapKey): TBaseValue;
+function TXQBaseHashmap.getBaseValue(const Key: TKey): TBaseValue;
 var Entity:int32;
     Cell:uint32;
 begin
@@ -355,10 +393,11 @@ begin
  end;
 end;
 
-procedure TXQBaseHashmapStr.SetBaseValue(const Key:TXQHashmapKey;const Value:TBaseValue);
+procedure TXQBaseHashmap.setBaseValue(const Key: TKey; const Value: TBaseValue);
 begin
- AddEntity(Key,Value);
+  include(Key,Value);
 end;
+
 
 
 
@@ -451,15 +490,25 @@ begin
   append('"');
 end;
 
-class procedure TFreeObjectOnRelease.addRef(o: TObject);
+class procedure TXQDefaultOwnershipTracker.addRef(o: TObject);
 begin
  ignore(o);
   //empty
 end;
 
-class procedure TFreeObjectOnRelease.release(o: TObject);
+class procedure TXQDefaultOwnershipTracker.release(o: TObject);
 begin
   o.free;
+end;
+
+class procedure TXQDefaultOwnershipTracker.addRef(const str: string);
+begin
+  fpc_ansistr_incr_ref(pointer(str));
+end;
+
+class procedure TXQDefaultOwnershipTracker.release(var str: string);
+begin
+ fpc_ansistr_decr_ref(pointer(str));
 end;
 
 
@@ -493,26 +542,31 @@ begin
 end;
 
 
-function TXQHashmapStr.GetValue(const Key: TXQHashmapKey): TValue;
+function TXQHashmapStr.GetValue(const Key: string): TValue;
 begin
   result := TValue(GetBaseValue(key));
 end;
 
-procedure TXQHashmapStr.SetValue(const Key: TXQHashmapKey; const AValue: TValue);
+procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
 begin
   SetBaseValue(key, pointer(avalue));
 end;
 
-procedure TXQHashmapStr.Add(const Key: TXQHashmapKey; const AValue: TValue);
+procedure TXQHashmapStr.Add(const Key: string; const AValue: TValue);
 begin
   SetBaseValue(key, pointer(avalue));
 end;
 
-procedure TXQHashmapStrOwning.SetValue(const Key: TXQHashmapKey; const AValue: TValue);
+function TXQHashmapStr.include(const Key: string; const Value: TValue; allowOverride: boolean): PHashMapEntity;
+begin
+  result := inherited include(key, pointer(value), allowOverride);
+end;
+
+procedure TXQHashmapStrOwning.SetValue(const Key: string; const AValue: TValue);
 var
   ent: PHashMapEntity;
 begin
-  ent := GetEntity(key, true);
+  ent := findEntity(key, true);
   if ent^.Value = pointer(AValue) then exit;
   if ent^.Value <> nil then
     TOwnershipTracker.release(TValue(ent^.Value));
@@ -786,13 +840,13 @@ end;
 
 
 {$PUSH}{$RangeChecks off}{$OverflowChecks off}
-class function TXQBaseHashmapStr.hash(const key: TXQHashmapKey): uint32;
+class function TXQDefaultTypeInfo.hash(data: pchar; datalen: SizeUInt): uint32;
 var
   p, last: PByte;
 begin
-  if key = '' then exit(1);
-  p := pbyte(pointer(key));
-  last := p + length(key);
+  if datalen = 0 then exit(1);
+  p := pbyte(data);
+  last := p + datalen;
   result := 0;
   while p < last do begin
     result := result + p^;
@@ -804,7 +858,27 @@ begin
   result := result + (result shl 3);
   result := result xor (result shr 11);
   result := result + (result shl 15);
-  //remember to update HTMLNodeNameHashs when changing anything here;
+end;
+
+class procedure TXQDefaultTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
+begin
+  data := pointer(key);
+  datalen := length(key);
+end;
+
+class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
+begin
+  result := (length(key)  = datalen) and CompareMem(data, pointer(key), datalen);
+end;
+
+class procedure TXQDefaultTypeInfo.createDeletionKey(out key: string);
+begin
+  key := #0'DELETED';
+end;
+
+class function TXQBaseHashmap.hash(const key: TKey): uint32;
+begin
+  result := TInfo.hash(pointer(key), length(key));
 end;
 
 function nodeNameHash(const s: RawByteString): cardinal;
