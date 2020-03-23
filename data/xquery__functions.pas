@@ -4285,7 +4285,7 @@ TSerializationParams = record
   procedure setFromXQValue(const v: IXQValue);
 
   procedure setMethod(const s: string);
-  procedure setStandalone(s: string);
+  procedure setStandalone(s: string; fromMap: boolean);
   procedure setStandalone(s: boolean);
   procedure setNormalizationForm(const s: string);
   procedure setEncoding(const s: string);
@@ -4317,29 +4317,89 @@ begin
   allowDuplicateNames := true;
 end;
 
-function toSerializationBool(const s:string): boolean;
+function toSerializationBool(const s:string; fromMap: boolean): boolean;
 begin
   case trim(s) of
     'true', 'yes', '1': result := true;
     'false', 'no', '0': result := false;
-    else raiseXQEvaluationException('SEPM0016', 'Expected boolean, got '+s);
+    else raiseXQEvaluationException(IfThen(fromMap, 'SEPM0016', 'SEPM0017'), 'Expected boolean, got '+s);
   end;
 end;
 
 
 procedure TSerializationParams.setFromNode(paramNode: TTreeNode; isStatic: boolean);
+  procedure error;
+  begin
+    raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.outerXML());
+  end;
+  procedure error(code: string);
+  begin
+    raise EXQEvaluationException.create(code, 'Invalid serialization parameter: '+paramNode.outerXML());
+  end;
+
 const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
-var mapNode: TTreeNode;
+
+  procedure checkNoAttributes(node: ttreenode; allowValue: boolean = false);
+  var att: TTreeAttribute;
+  begin
+    for att in node.getEnumeratorAttributes do
+      if ((att.value <> 'value') or not allowValue) and not att.isNamespaceNode then
+        error;
+  end;
+
+  procedure setCharacterMaps();
+  var mapNode: TTreeNode;
+      att: TTreeAttribute;
+      mapString, character: String;
+  begin
+    if characterMaps = nil then new(characterMaps,init);
+    if paramNode.hasAttribute('value') then error;
+    mapNode := paramNode.getFirstChild();
+    for mapnode in paramNode.getEnumeratorChildren do begin
+      case mapnode.typ of
+        tetOpen: begin
+          if mapnode.namespace = nil then error;
+          if not equalNamespaces(namespaceGetURL(mapNode.namespace), XMLNamespace_Output) then continue;
+          if mapNode.value <> 'character-map' then error;
+          mapString := '';
+          character := '';
+          for att in mapnode.getEnumeratorAttributes do
+            case att.value of
+              'map-string': mapString := att.realvalue;
+              'character': character := att.realvalue ;
+              else if not att.isNamespaceNode then error;
+            end;
+          if character.lengthInUtf8CodePoints <> 1 then error;
+          if characterMaps.contains(character) then error('SEPM0018');
+          characterMaps.include(character, mapString);
+        end;
+      end;
+    end;
+  end;
+
+  function toSerializationBool(const s:string): boolean; overload;
+  begin
+    result := toSerializationBool(s, false);
+  end;
+
+var duplicateValueCheck: TXQHashsetStr;
 begin
   if paramNode = nil then exit;
   if isStatic and (paramNode.typ = tetDocument) then paramNode := paramnode.getFirstChild();
   if paramNode = nil then exit;
   if not equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output)
      or (paramNode.value <> 'serialization-parameters')
-     or (paramNode.typ <> tetOpen) then exit;
-   paramNode := paramNode.getFirstChild();
-   while paramNode <> nil do begin
-     if (paramNode.typ = tetOpen) and equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then
+     or (paramNode.typ <> tetOpen) then error('XPTY0004');
+   checkNoAttributes(paramNode);
+   duplicateValueCheck.init;
+   for paramNode in paramNode.getEnumeratorChildren do begin
+     if paramnode.typ <> tetOpen then continue;
+     if paramnode.namespace = nil then error;
+     if duplicateValueCheck.contains(paramNode.getNodeName()) then
+       error('SEPM0019');
+     duplicateValueCheck.include(paramNode.getNodeName());
+     if equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then begin
+       checkNoAttributes(paramNode, true);
        case paramNode.value of
          'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
          'byte-order-mark': ; //todo
@@ -4358,24 +4418,16 @@ begin
          'method':         setMethod(paramNode.getAttribute('value'));
          'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
-         'standalone': setStandalone(paramNode.getAttribute('value'));
+         'standalone': setStandalone(paramNode.getAttribute('value'), false);
          'suppress-indentation': ;//todo
          'undeclare-prefixes': ;//todov
-         'use-character-maps': begin
-           if characterMaps = nil then new(characterMaps,init);
-           mapNode := paramNode.getFirstChild();
-           while mapNode <> nil do begin
-             if (mapNode.typ = tetOpen) and (mapNode.value = 'character-map') then begin
-               characterMaps.include(mapnode.getAttribute('character'), mapnode.getAttribute('map-string'));
-             end;
-             mapNode := mapnode.getNextSibling();
-           end;
-         end;
+         'use-character-maps': setCharacterMaps;
          'version':        version := paramNode.getAttribute('value');
-         else raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.value);
+         else error();
        end;
-     paramNode:= paramNode.getNextSibling();
+     end;
    end;
+   duplicateValueCheck.done;
 end;
 
 procedure TSerializationParams.setFromMap(const v: IXQValue);
@@ -4385,6 +4437,11 @@ var
   procedure raiseInvalidParameter(typeError: boolean = true);
   begin
     raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.Name, pp.Value);
+  end;
+
+  function toSerializationBool(const s:string): boolean; overload;
+  begin
+    result := toSerializationBool(s, true);
   end;
 
   function valueBool: Boolean;
@@ -4485,11 +4542,11 @@ begin
   end;
 end;
 
-procedure TSerializationParams.setStandalone(s: string);
+procedure TSerializationParams.setStandalone(s: string; fromMap: boolean);
 begin
   s := trim(s);
-  if s = 'omit' then standalone := xdsOmit;
-  setStandalone(toSerializationBool(s));
+  if s = 'omit' then standalone := xdsOmit
+  else setStandalone(toSerializationBool(s, fromMap));
 end;
 
 procedure TSerializationParams.setStandalone(s: boolean);
