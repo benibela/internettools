@@ -416,6 +416,7 @@ function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteSt
 function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawByteString;
 function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString; {$ifdef HASINLINE} inline; deprecated 'Use strConvert';{$endif}
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+procedure utf16EncodeSurrogatePair(codepoint: integer; out surrogate1, surrogate2: word);
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in chars.
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in bytes
 {$IFDEF fpc}
@@ -579,7 +580,8 @@ end;
       function BeforeLastOrEmpty(const sep: String): String; inline;
       }
 
-    function enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
+      function enumerateUtf8CodePoints: TStrIterator;
+      function enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
   end;
 {$endif}
 
@@ -2684,6 +2686,12 @@ begin
   end;
 end;
 
+procedure utf16EncodeSurrogatePair(codepoint: integer; out surrogate1, surrogate2: word);
+begin
+  dec(codepoint, $10000);
+  surrogate1 := Word($D800) or (codepoint shr 10);
+  surrogate2 := Word($DC00) or (codepoint and $03ff);
+end;
 
 
 
@@ -2725,6 +2733,7 @@ begin
   widestringmanager.Ansi2UnicodeMoveProc := @myAnsi2UnicodeMoveProc;
   {$endif}
 end;
+
 
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 var
@@ -5407,6 +5416,11 @@ function TBBStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
 begin
   result := self;
   delete(result, 1, chopoff);
+end;
+
+function TBBStringHelper.enumerateUtf8CodePoints: TStrIterator;
+begin
+  result := strIterator(self);
 end;
 
 function TBBStringHelper.enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
