@@ -330,6 +330,7 @@ type
   TXQSerializerOnString = procedure (const s: string) of object;
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
+    allowDuplicateNames: boolean;
     insertWhitespace: TXQSerializerInsertWhitespace;
 
     onInterceptAppendJSONString: TXQSerializerOnString;
@@ -3347,6 +3348,7 @@ procedure TXQSerializer.init(abuffer: pstring; basecapacity: SizeInt; aencoding:
 begin
   inherited init(abuffer, basecapacity, aencoding);
   nodeFormat := tnsText;
+  allowDuplicateNames := true;
   insertWhitespace := xqsiwConservative;
   indentCache := '  ';
   indentLevel := 0;

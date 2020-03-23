@@ -4274,6 +4274,7 @@ TSerializationParams = record
   jsonNodeOutputMethod: string;
   normalizationForm: TUnicodeNormalizationForm;
   characterMaps: TXQHashmapStrStr;
+  allowDuplicateNames: boolean;
 
   procedure done;
 
@@ -4312,6 +4313,7 @@ begin
   jsonNodeOutputMethod := 'xml';
   normalizationForm := unfUnknown;
   characterMaps := nil;
+  allowDuplicateNames := true;
 end;
 
 function toSerializationBool(const s:string): boolean;
@@ -4338,9 +4340,9 @@ begin
    while paramNode <> nil do begin
      if (paramNode.typ = tetOpen) and equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespace_Output) then
        case paramNode.value of
-         //'allow-duplicate-names': todo 3.1
+         'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
          'byte-order-mark': ; //todo
-         'cdata-section-elements': ;//todo
+         'cdata-section-elements': ; //todo
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
          'encoding':       setEncoding(paramNode.getAttribute('value'));
@@ -4411,7 +4413,7 @@ begin
       end;
     end;
     case pp.Name of
-      'allow-duplicate-names': valueBool(); //todo
+      'allow-duplicate-names': allowDuplicateNames := valueBool();
       'byte-order-mark': valueBool(); //todo
       'cdata-section-elements': ; //todo
       'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
@@ -4444,6 +4446,7 @@ begin
       'version': version := valueString();
       #0'static-options': begin
         staticOptions := true;
+        allowDuplicateNames := false;
         omitXmlDeclaration := false;
       end;
       'parameter-document': if staticOptions then
@@ -4576,6 +4579,7 @@ begin
   serializer.init(@temp);
   serializer.standard := true;
 
+  serializer.allowDuplicateNames := params.allowDuplicateNames;
   serializer.insertWhitespace := params.indent;
   case params.jsonNodeOutputMethod of
     'xml': serializer.nodeFormat := tnsXML;

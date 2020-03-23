@@ -65,6 +65,7 @@ type
     function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
     function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
     function exclude(const Key:TKey):boolean;
+    function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read GetBaseValue write SetBaseValue; default;
   end;
 
@@ -384,6 +385,11 @@ begin
   CellToEntityIndex[Cell]:=ENT_DELETED;
   result:=true;
  end;
+end;
+
+function TXQBaseHashmap.contains(const key: TKey): boolean;
+begin
+  result := findEntity(key) <> nil;
 end;
 
 function TXQBaseHashmap.getBaseValue(const Key: TKey): TBaseValue;

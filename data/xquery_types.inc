@@ -2228,20 +2228,32 @@ procedure TXQValueObject.jsonSerialize(var serializer: TXQSerializer);
 var
   prop: TXQProperty;
   first: Boolean;
+  nameCheck: TXQHashmapStrStr;
 begin
+  if serializer.allowDuplicateNames then nameCheck := nil
+  else nameCheck := TXQHashmapStrStr.Create();
   first := true;
-  with serializer do begin
-    for prop in getPropertyEnumerator do begin
-      if not first then appendJSONObjectComma
-      else begin
-        first := false;
-        appendJSONObjectStart;
+  try
+    with serializer do begin
+      for prop in getPropertyEnumerator do begin
+        if not first then appendJSONObjectComma
+        else begin
+          first := false;
+          appendJSONObjectStart;
+        end;
+        if assigned(nameCheck) then begin
+          if nameCheck.contains(prop.name) then
+            raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
+          nameCheck.include(prop.Name, '');
+        end;
+        appendJSONObjectKeyColon(prop.Name);
+        prop.Value.jsonSerialize(serializer);
       end;
-      appendJSONObjectKeyColon(prop.Name);
-      prop.Value.jsonSerialize(serializer);
+      if not first then appendJSONObjectEnd
+      else appendJSONEmptyObject;
     end;
-    if not first then appendJSONObjectEnd
-    else appendJSONEmptyObject;
+  finally
+    nameCheck.Free;
   end;
 end;
 
