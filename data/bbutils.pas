@@ -156,25 +156,6 @@ type
   TFloatArray = array of float;
 
   TCharSet = set of ansichar;
-{$ifdef FPC_HAS_CPSTRING}
-  TBBStringHelper = Type Helper(TStringHelper) for AnsiString
-    function beginsWith(const s: string): boolean; inline;
-    function beginsWithI(const s: string): boolean; inline;
-    function endsWith(const s: string): boolean; inline;
-    function endsWithI(const s: string): boolean; inline;
-    function containsI(const s: string): boolean; inline;
-
-      function EncodeHex: String; inline;
-      function DecodeHex: String; inline;
-      function RemoveFromLeft(chopoff: SizeInt): String;
-      {
-      function AfterOrEmpty(const sep: String): String; inline;
-      function AfterLastOrEmpty(const sep: String): String; inline;
-      function BeforeOrEmpty(const sep: String): String; inline;
-      function BeforeLastOrEmpty(const sep: String): String; inline;
-      }
-  end;
-{$endif}
 
 //-----------------------Pointer functions------------------------
 type TProcedureOfObject=procedure () of object;
@@ -537,6 +518,16 @@ end;
  //** Str iterator. Preliminary. Interface might change at any time
 function strIterator(const s: RawByteString): TStrIterator;
 
+type TUTF8StringCodePointLengthEnumerator = record
+  FCurrent: integer;
+
+  p, pend: pchar;
+  property Current: integer read FCurrent;
+  function MoveNext: Boolean;
+  function GetEnumerator: TUTF8StringCodePointLengthEnumerator;
+end;
+
+
 //** Str builder. Preliminary. Interface might change at any time
 type TStrBuilder = object
 protected
@@ -564,6 +555,34 @@ public
   procedure appendNumber(number: Int64);
   procedure chop(removedCount: SizeInt);
 end;
+
+
+
+
+
+
+{$ifdef FPC_HAS_CPSTRING}
+  TBBStringHelper = Type Helper(TStringHelper) for AnsiString
+    function beginsWith(const s: string): boolean; inline;
+    function beginsWithI(const s: string): boolean; inline;
+    function endsWith(const s: string): boolean; inline;
+    function endsWithI(const s: string): boolean; inline;
+    function containsI(const s: string): boolean; inline;
+
+    function EncodeHex: String; inline;
+    function DecodeHex: String; inline;
+    function RemoveFromLeft(chopoff: SizeInt): String;
+      {
+      function AfterOrEmpty(const sep: String): String; inline;
+      function AfterLastOrEmpty(const sep: String): String; inline;
+      function BeforeOrEmpty(const sep: String): String; inline;
+      function BeforeLastOrEmpty(const sep: String): String; inline;
+      }
+
+    function enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
+  end;
+{$endif}
+
 
 type
   generic TBaseArrayList<TElement> = object
@@ -875,6 +894,7 @@ end;
 
 
 
+
 procedure TThreadedCall.Execute;
 begin
   proc();
@@ -1015,6 +1035,40 @@ begin
   result.s := s;
   result.pos := 1;
 end;
+
+function TUTF8StringCodePointLengthEnumerator.MoveNext: Boolean;
+var
+  b: Byte;
+begin
+  p := p + FCurrent;
+  result := p < pend;
+  if result then begin
+    b := pbyte(p)^;
+    case b of
+      $00..$7F: FCurrent := 1;
+      $C2..$DF: begin
+        FCurrent := 2;
+        if (p + 1 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) then FCurrent := 1;
+      end;
+      $E0..$EF: begin
+        FCurrent := 3;
+        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) then FCurrent := 1;
+      end;
+      $F0..$F4: begin
+        FCurrent := 4;
+        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) or ((pbyte(p + 3)^ and $C0) <> $80 ) then FCurrent := 1;
+      end;
+      else FCurrent := 1;
+    end;
+  end;
+end;
+
+function TUTF8StringCodePointLengthEnumerator.GetEnumerator: TUTF8StringCodePointLengthEnumerator;
+begin
+  result := self;
+  result.FCurrent:=0;
+end;
+
 
 procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
 var temp: RawByteString;
@@ -5354,6 +5408,14 @@ begin
   result := self;
   delete(result, 1, chopoff);
 end;
+
+function TBBStringHelper.enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
+begin
+  result.FCurrent := 0;
+  result.p := pchar(self);
+  result.pend := result.p + self.length;
+end;
+
 {
 
 function TBBStringHelper.AfterOrEmpty(const sep: String): String;
