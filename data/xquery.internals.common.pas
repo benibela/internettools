@@ -57,11 +57,11 @@ type
     function getBaseValue(const Key:TKey):TBaseValue;
     procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
     class function hash(const key: TKey): uint32; static;
+    function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
-    function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
     function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
     function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
     function exclude(const Key:TKey):boolean;
@@ -70,20 +70,25 @@ type
 
 
   TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
-  generic TXQHashmapStr<TValue> = class(TXQBaseHashmapStrPointer)
+  generic TXQBaseHashmapStrPointerButNotPointer<TValue> = class(TXQBaseHashmapStrPointer)
+  protected
+    function GetValue(const Key: string): TValue; inline;
+  end;
+
+  generic TXQHashmapStr<TValue> = class(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
-    function GetValue(const Key: string): TValue; inline;
   public
     procedure Add(const Key:string; const AValue:TValue); inline;
-    function include(const Key: string; const Value: TValue; allowOverride: boolean=true):PHashMapEntity;
+    procedure include(const Key: string; const Value: TValue; allowOverride: boolean=true);
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
-  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = class(specialize TXQHashmapStr<TValue>)
+  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = class(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
   public
     destructor destroy; override;
+    procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
     //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
@@ -542,7 +547,7 @@ begin
 end;
 
 
-function TXQHashmapStr.GetValue(const Key: string): TValue;
+function TXQBaseHashmapStrPointerButNotPointer.GetValue(const Key: string): TValue;
 begin
   result := TValue(GetBaseValue(key));
 end;
@@ -557,21 +562,29 @@ begin
   SetBaseValue(key, pointer(avalue));
 end;
 
-function TXQHashmapStr.include(const Key: string; const Value: TValue; allowOverride: boolean): PHashMapEntity;
+procedure TXQHashmapStr.include(const Key: string; const Value: TValue; allowOverride: boolean);
 begin
-  result := inherited include(key, pointer(value), allowOverride);
+  inherited include(key, pointer(value), allowOverride);
 end;
 
-procedure TXQHashmapStrOwning.SetValue(const Key: string; const AValue: TValue);
+
+procedure TXQHashmapStrOwning.include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
 var
   ent: PHashMapEntity;
 begin
   ent := findEntity(key, true);
   if ent^.Value = pointer(AValue) then exit;
-  if ent^.Value <> nil then
+  if ent^.Value <> nil then begin
+    if not allowOverride then exit;
     TOwnershipTracker.release(TValue(ent^.Value));
+  end;
   TOwnershipTracker.addRef(avalue);
   ent^.Value:=pointer(avalue);
+end;
+
+procedure TXQHashmapStrOwning.SetValue(const Key: string; const AValue: TValue);
+begin
+  include(key, avalue, true);
 end;
 
 destructor TXQHashmapStrOwning.destroy;
