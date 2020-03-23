@@ -580,8 +580,10 @@ end;
       function BeforeLastOrEmpty(const sep: String): String; inline;
       }
 
-      function enumerateUtf8CodePoints: TStrIterator;
-      function enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
+    function lengthInUtf8CodePoints: sizeint;
+
+    function enumerateUtf8CodePoints: TStrIterator;
+    function enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
   end;
 {$endif}
 
@@ -5416,6 +5418,11 @@ function TBBStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
 begin
   result := self;
   delete(result, 1, chopoff);
+end;
+
+function TBBStringHelper.lengthInUtf8CodePoints: sizeint;
+begin
+  result := strLengthUtf8(self);
 end;
 
 function TBBStringHelper.enumerateUtf8CodePoints: TStrIterator;
