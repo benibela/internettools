@@ -35,7 +35,7 @@ type
     class procedure createDeletionKey(out key: string); static;
   end;
   //Hashmap based on Bero's FLRECacheHashMap
-  generic TXQBaseHashmap<TKey, TBaseValue, TInfo> = class
+  generic TXQBaseHashmap<TKey, TBaseValue, TInfo> = object
     type THashMapEntity=record
       Key: TKey;
       Value: TBaseValue;
@@ -59,8 +59,8 @@ type
     class function hash(const key: TKey): uint32; static;
     function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
   public
-    constructor Create;
-    destructor Destroy; override;
+    constructor init;
+    destructor done;
     procedure Clear;
     function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
     function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
@@ -71,24 +71,26 @@ type
 
 
   TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
-  generic TXQBaseHashmapStrPointerButNotPointer<TValue> = class(TXQBaseHashmapStrPointer)
+  generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
   protected
     function GetValue(const Key: string): TValue; inline;
   end;
 
-  generic TXQHashmapStr<TValue> = class(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
   public
-    procedure Add(const Key:string; const AValue:TValue); inline;
     procedure include(const Key: string; const Value: TValue; allowOverride: boolean=true);
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
-  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = class(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  type PXQHashmapStrOwning = ^TXQHashmapStrOwning;
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
   public
-    destructor destroy; override;
+    procedure clear;
+    destructor done;
+    procedure disposeAndNil(var map: PXQHashmapStrOwning);
     procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
     //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
@@ -99,9 +101,11 @@ type
     class procedure addRef(const str: string); static; inline;
     class procedure release(var str: string); static; inline;
   end;
-  generic TXQHashmapStrOwningGenericObject<TValue> = class(specialize TXQHashmapStrOwning<TValue, TXQDefaultOwnershipTracker>);
+  generic TXQHashmapStrOwningGenericObject<TValue> = object(specialize TXQHashmapStrOwning<TValue, TXQDefaultOwnershipTracker>)
+  end;
   TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
-  TXQHashmapStrStr = class(specialize TXQHashmapStrOwning<string, TXQDefaultOwnershipTracker>);
+  TXQHashmapStrStr = object(specialize TXQHashmapStrOwning<string, TXQDefaultOwnershipTracker>)
+  end;
 
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
 type TFastInterfacedObject = class(TObject, IUnknown)
@@ -228,9 +232,8 @@ const
 implementation
 uses math;
 
-constructor TXQBaseHashmap.Create;
+constructor TXQBaseHashmap.init;
 begin
- inherited Create;
  Tinfo.createDeletionKey(DELETED_KEY);
  RealSize:=0;
  LogSize:=0;
@@ -240,10 +243,10 @@ begin
  Resize;
 end;
 
-destructor TXQBaseHashmap.Destroy;
+destructor TXQBaseHashmap.done;
 begin
- Clear;
- inherited Destroy;
+ clear;
+ inherited;
 end;
 
 procedure TXQBaseHashmap.Clear;
@@ -578,11 +581,6 @@ begin
   SetBaseValue(key, pointer(avalue));
 end;
 
-procedure TXQHashmapStr.Add(const Key: string; const AValue: TValue);
-begin
-  SetBaseValue(key, pointer(avalue));
-end;
-
 procedure TXQHashmapStr.include(const Key: string; const Value: TValue; allowOverride: boolean);
 begin
   inherited include(key, pointer(value), allowOverride);
@@ -608,14 +606,30 @@ begin
   include(key, avalue, true);
 end;
 
-destructor TXQHashmapStrOwning.destroy;
-var i: SizeInt;
+procedure TXQHashmapStrOwning.clear;
+var
+  i: SizeInt;
 begin
-  for i := 0 to high(Entities) do
-    if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
-      TOwnershipTracker.Release(TValue(Entities[i].Value));
-  inherited destroy;
+ for i := 0 to high(Entities) do
+   if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
+     TOwnershipTracker.Release(TValue(Entities[i].Value));
+  inherited;
 end;
+
+destructor TXQHashmapStrOwning.done;
+begin
+  clear;
+end;
+
+procedure TXQHashmapStrOwning.disposeAndNil(var map: PXQHashmapStrOwning);
+begin
+   if map <> nil then begin
+     dispose(map,done);
+     map := nil;
+   end;
+end;
+
+
 
 
 

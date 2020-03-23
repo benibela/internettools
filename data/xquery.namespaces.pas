@@ -339,16 +339,16 @@ end;
 
 constructor TNamespaceCache.Create;
 begin
-  prefixes := TXQHashmapStrOwningNamespace.Create;
+  prefixes.init();
 end;
 
 destructor TNamespaceCache.Destroy;
 begin
-  prefixes.free;
+  prefixes.done;
   inherited Destroy;
 end;
 
-threadvar globalNamespaceCache: TXQHashmapStrOwningObject;
+threadvar globalNamespaceCache: ^TXQHashmapStrOwningObject;
 
 function TNamespace.getSelf: TNamespace;
 begin
@@ -368,12 +368,12 @@ end;
 
 function namespaceCache(const aurl: string): TNamespaceCache;
 begin
-  if globalNamespaceCache = nil then globalNamespaceCache := TXQHashmapStrOwningObject.Create();
-  result := TNamespaceCache(globalNamespaceCache[aurl]);
+  if globalNamespaceCache = nil then new(globalNamespaceCache,init);
+  result := TNamespaceCache(globalNamespaceCache^[aurl]);
   if result = nil then begin
     result := TNamespaceCache.Create;
     result.uniqueUrl := aurl;
-    globalNamespaceCache[aurl] := result;
+    globalNamespaceCache^[aurl] := result;
     //writeln(strFromPtr(pointer(aurl)), ' ',aurl);
   end;
 end;
@@ -406,7 +406,10 @@ end;
 
 class procedure TNamespace.freeCache;
 begin
-  FreeAndNil(globalNamespaceCache);
+  if globalNamespaceCache <> nil then begin
+    dispose(globalNamespaceCache,done);
+    globalNamespaceCache := nil;
+  end;
 end;
 
 class procedure TNamespace.assignNonNil(var old: TNamespace; new: TNamespace);

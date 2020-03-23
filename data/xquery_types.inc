@@ -2228,10 +2228,10 @@ procedure TXQValueObject.jsonSerialize(var serializer: TXQSerializer);
 var
   prop: TXQProperty;
   first: Boolean;
-  nameCheck: TXQHashmapStrStr;
+  nameCheck: ^TXQHashmapStrStr;
 begin
   if serializer.allowDuplicateNames then nameCheck := nil
-  else nameCheck := TXQHashmapStrStr.Create();
+  else new(nameCheck,init);
   first := true;
   try
     with serializer do begin
@@ -2253,7 +2253,7 @@ begin
       else appendJSONEmptyObject;
     end;
   finally
-    nameCheck.Free;
+    if assigned(nameCheck) then nameCheck^.done;
   end;
 end;
 

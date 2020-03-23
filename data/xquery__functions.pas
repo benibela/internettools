@@ -25,6 +25,7 @@ in https://www.w3.org/TR/xpath-functions/ and http://www.w3.org/TR/xpath-functio
 unit xquery__functions;
 
 {$include ../internettoolsconfig.inc}
+{$ModeSwitch autoderef}
 
 interface
 
@@ -4273,7 +4274,7 @@ TSerializationParams = record
   indent: TXQSerializerInsertWhitespace;
   jsonNodeOutputMethod: string;
   normalizationForm: TUnicodeNormalizationForm;
-  characterMaps: TXQHashmapStrStr;
+  characterMaps: ^TXQHashmapStrStr;
   allowDuplicateNames: boolean;
 
   procedure done;
@@ -4292,7 +4293,7 @@ end;
 
 procedure TSerializationParams.done;
 begin
-  FreeAndNil(characterMaps);
+  if assigned(characterMaps) then Dispose(characterMaps,done);
 end;
 
 procedure TSerializationParams.setDefault(isFromMap: boolean);
@@ -4361,7 +4362,7 @@ begin
          'suppress-indentation': ;//todo
          'undeclare-prefixes': ;//todov
          'use-character-maps': begin
-           if characterMaps = nil then characterMaps := TXQHashmapStrStr.Create;
+           if characterMaps = nil then new(characterMaps,init);
            mapNode := paramNode.getFirstChild();
            while mapNode <> nil do begin
              if (mapNode.typ = tetOpen) and (mapNode.value = 'character-map') then begin
@@ -4438,7 +4439,7 @@ begin
       'suppress-indentation': ;
       'undeclare-prefixes': valueBool(); //todo
       'use-character-maps': begin
-        if characterMaps = nil then characterMaps := TXQHashmapStrStr.Create;
+        if characterMaps = nil then new(characterMaps,init);
         if pp.value.kind <> pvkObject then raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
         for characterp in pp.value.getPropertyEnumerator do
           characterMaps.include(characterp.Name, characterp.Value.toString);

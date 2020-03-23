@@ -3505,13 +3505,11 @@ end;
 
 function TXQTempTreeNodes.GetDocumentCache(const url: string): TTreeDocument;
 begin
-  if fdocumentCache = nil then exit(nil);
   result := fdocumentCache[url];
 end;
 
 procedure TXQTempTreeNodes.SetDocumentCache(const url: string; AValue: TTreeDocument);
 begin
-  if fdocumentCache = nil then fdocumentCache := TXQHashmapStrOwningTreeDocument.Create;
   fdocumentCache[url] := AValue;
 end;
 
@@ -3524,6 +3522,7 @@ constructor TXQTempTreeNodes.create();
 begin
   inherited create(nil);
   tempnodes := TFPList.Create;
+  fdocumentCache.init;
 end;
 
 destructor TXQTempTreeNodes.destroy;
@@ -3533,7 +3532,7 @@ begin
   for i:= 0 to tempnodes.count - 1 do
     TTreeNode(tempnodes[i]).freeAll();
   tempnodes.free;
-  fdocumentCache.free;
+  fdocumentCache.done;
   inherited destroy;
 end;
 
