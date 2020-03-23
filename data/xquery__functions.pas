@@ -4272,6 +4272,8 @@ TSerializationParams = record
   indent: TXQSerializerInsertWhitespace;
   jsonNodeOutputMethod: string;
   normalizationForm: TUnicodeNormalizationForm;
+  characterMaps: TXQHashmapStrStr;
+
   procedure setDefault(isFromMap: boolean);
   procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const v: IXQValue);
@@ -4299,6 +4301,7 @@ begin
   else indent := xqsiwConservative;
   jsonNodeOutputMethod := 'xml';
   normalizationForm := unfUnknown;
+  characterMaps := nil;
 end;
 
 function toSerializationBool(const s:string): boolean;
@@ -4313,6 +4316,7 @@ end;
 
 procedure TSerializationParams.setFromNode(paramNode: TTreeNode; isStatic: boolean);
 const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
+var mapNode: TTreeNode;
 begin
   if paramNode = nil then exit;
   if isStatic and (paramNode.typ = tetDocument) then paramNode := paramnode.getFirstChild();
@@ -4343,8 +4347,19 @@ begin
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
          'standalone': setStandalone(paramNode.getAttribute('value'));
          'suppress-indentation': ;//todo
-         'undeclare-prefixes': ;//todo
-         'use-character-maps': ;//todo
+         'undeclare-prefixes': ;//todov
+         'use-character-maps': begin
+           if characterMaps = nil then characterMaps := TXQHashmapStrStr.Create;
+           mapNode := paramNode.getFirstChild();
+           writeln;
+           writeln;
+           while mapNode <> nil do begin
+             if (mapNode.typ = tetOpen) and (mapNode.value = 'character-map') then begin
+               characterMaps.include(mapnode.getAttribute('character'), mapnode.getAttribute('map-string'));
+             end;
+             mapNode := mapnode.getNextSibling();
+           end;
+         end;
          'version':        version := paramNode.getAttribute('value');
          else raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.value);
        end;
@@ -4354,7 +4369,7 @@ end;
 
 procedure TSerializationParams.setFromMap(const v: IXQValue);
 var
-  pp: TXQProperty;
+  pp, characterp: TXQProperty;
   staticOptions: boolean = false;
   procedure raiseInvalidParameter(typeError: boolean = true);
   begin
@@ -4412,10 +4427,13 @@ begin
                     else setStandalone(valueBool());
       'suppress-indentation': ;
       'undeclare-prefixes': valueBool(); //todo
-      'use-character-maps': ; //todo
+      'use-character-maps': begin
+        if characterMaps = nil then characterMaps := TXQHashmapStrStr.Create;
+        if pp.value.kind <> pvkObject then raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
+        for characterp in pp.value.getPropertyEnumerator do
+          characterMaps.Add(characterp.Name, characterp.Value.toString);
+      end;
       'version': version := valueString();
-
-
       #0'static-options': begin
         staticOptions := true;
         omitXmlDeclaration := false;
@@ -4487,10 +4505,42 @@ begin
 end;
 
 procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
-var t: string;
+var p, marker: PChar;
+    needNormalization, needEscaping: Boolean;
+  procedure appendMarkedBlock;
+  begin
+    if needNormalization or needEscaping then begin
+      serializer^.appendJSONStringWithoutQuotes(normalizeString(strFromPchar(marker, p - marker), params^.normalizationForm));
+    end else begin
+      serializer^.append(marker, p - marker);
+    end;
+    needEscaping := false;
+  end;
+
+var len: integer;
+  entity: TXQHashmapStrStr.PHashMapEntity;
 begin
-  t := normalizeString(s, params^.normalizationForm);
-  serializer^.appendJSONStringWithoutQuotes(t);
+  if params^.characterMaps = nil then begin
+    serializer^.appendJSONStringWithoutQuotes(normalizeString(s, params^.normalizationForm));
+  end else begin
+    needNormalization := not (params^.normalizationForm in [unfNone, unfUnknown, unfEmpty]);
+    needEscaping := false;
+    p := pchar(s);
+    marker := p;
+    for len in s.enumerateUtf8CodePointLengths do begin
+      entity := params^.characterMaps.findEntity(p, len);
+      if entity <> nil then begin
+        appendMarkedBlock;
+        marker := p + len;
+        serializer^.append(string(entity^.Value));
+      end else case p^ of
+        #0..#31, '"', '\', '/': needEscaping := true;
+      end;
+
+      p := p + len;
+    end;
+    appendMarkedBlock;
+  end;
 end;
 
 
@@ -4511,7 +4561,7 @@ begin
     else serializer.error('SEPM0016', v.toValue);
   end;
 
-  if not (params.normalizationForm in [unfNone, unfUnknown]) then begin
+  if not (params.normalizationForm in [unfNone, unfUnknown]) or (params.characterMaps <> nil) then begin
     interceptor.init;
     interceptor.params := @params;
     interceptor.serializer := @serializer;
