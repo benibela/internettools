@@ -2698,6 +2698,7 @@ begin
     'k', 'K': result := striequal(s,'keygen') ;
     'l', 'L': result := striequal(s,'link') ;
     'm', 'M': result := striequal(s,'meta') ;
+    'p', 'P': result := striequal(s,'param') ;
     's', 'S': result := striequal(s,'source') ;
     't', 'T': result := striequal(s,'track');
     'w', 'W': result := striequal(s,'wbr');
