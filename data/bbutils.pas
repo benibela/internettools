@@ -3525,13 +3525,21 @@ begin
 end;
 
 function strLoadFromFile(filename: string): string;
+var buffer: array[1..4096] of byte;
 var f:TFileStream;
+  readLen: LongInt;
 begin
   f:=TFileStream.Create(strRemoveFileURLPrefix(filename),fmOpenRead or fmShareDenyWrite);
   result := '';
   SetLength(result,f.Size);
   if f.size>0 then
     f.Read(Result[1],length(result));
+  //additionally read data from that have no size (e.g. <(echo foobar) pipes )
+  while true do begin
+    readLen := f.Read({%H-}buffer[low(buffer)], length(buffer));
+    if readLen <= 0 then break;
+    result := result + strFromPchar(@buffer[low(buffer)], readLen);
+  end;
   f.Free;
 end;
 
