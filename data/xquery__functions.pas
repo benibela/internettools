@@ -4290,6 +4290,7 @@ TSerializationParams = record
   procedure setStandalone(s: string; fromMap: boolean);
   procedure setStandalone(s: boolean);
   procedure setNormalizationForm(const s: string);
+  function hasNormalizationForm: boolean;
   procedure setEncoding(const s: string);
 end;
 
@@ -4565,6 +4566,11 @@ begin
   end;
 end;
 
+function TSerializationParams.hasNormalizationForm: boolean;
+begin
+  result := not (normalizationForm in [unfNone, unfUnknown, unfEmpty])
+end;
+
 procedure TSerializationParams.setEncoding(const s: string);
 begin
   encoding := s;
@@ -4575,12 +4581,22 @@ end;
 type TSpecialStringHandler = object
   serializer: ^TXQSerializer;
   params: ^TSerializationParams;
+  htmlNodes: boolean;
+  function normalizeString(p: pchar; len: sizeint): string; overload;
   procedure appendJSONStringWithoutQuotes(const s: string);
+  procedure appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
+  function appendXMLHTMLText(const n: TTreeNode): boolean;
+  function appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
   procedure init;
 end;
 procedure TSpecialStringHandler.init;
 begin
   //calling this procedure silences an object never used warning
+end;
+
+function TSpecialStringHandler.normalizeString(p: pchar; len: sizeint): string;
+begin
+  result := xquery__functions.normalizeString(strFromPchar(p, len), params^.normalizationForm)
 end;
 
 procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
@@ -4589,7 +4605,7 @@ var p, marker: PChar;
   procedure appendMarkedBlock;
   begin
     if needNormalization or needEscaping then begin
-      serializer^.appendJSONStringWithoutQuotes(normalizeString(strFromPchar(marker, p - marker), params^.normalizationForm));
+      serializer^.appendJSONStringWithoutQuotes(normalizeString(marker, p - marker));
     end else begin
       serializer^.append(marker, p - marker);
     end;
@@ -4600,9 +4616,9 @@ var len: integer;
   entity: TXQHashmapStrStr.PHashMapEntity;
 begin
   if params^.characterMaps = nil then begin
-    serializer^.appendJSONStringWithoutQuotes(normalizeString(s, params^.normalizationForm));
+    serializer^.appendJSONStringWithoutQuotes(xquery__functions.normalizeString(s, params^.normalizationForm));
   end else begin
-    needNormalization := not (params^.normalizationForm in [unfNone, unfUnknown, unfEmpty]);
+    needNormalization := params^.hasNormalizationForm;
     needEscaping := false;
     p := pchar(s);
     marker := p;
@@ -4620,6 +4636,63 @@ begin
     end;
     appendMarkedBlock;
   end;
+end;
+
+procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
+var p, marker: PChar;
+    needNormalization, needEscaping: Boolean;
+  procedure appendMarkedBlock;
+  var
+    temp: String;
+  begin
+    if needNormalization or needEscaping then begin
+      temp := normalizeString(marker, p - marker);
+      if attrib then begin
+        if htmlNodes then serializer^.appendHTMLAttrib(temp)
+        else serializer^.appendXMLAttrib(temp)
+      end else
+        if htmlNodes then serializer^.appendHTMLText(temp)
+        else serializer^.appendXMLText(temp)
+    end else begin
+      serializer^.append(marker, p - marker);
+    end;
+    needEscaping := false;
+  end;
+var len: integer;
+  entity: TXQHashmapStrStr.PHashMapEntity;
+begin
+  p := pchar(s);
+  marker := p;
+  needNormalization := params.hasNormalizationForm;
+  needEscaping := false;
+  for len in s.enumerateUtf8CodePointLengths do begin
+    entity := params^.characterMaps.findEntity(p, len);
+    if entity <> nil then begin
+      appendMarkedBlock;
+      marker := p + len;
+      serializer^.append(string(entity^.Value));
+    end else case p^ of
+      '<': needEscaping := true;
+    end;
+    p := p + len;
+  end;
+  appendMarkedBlock;
+end;
+
+function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode): boolean;
+begin
+  appendXMLHTMLCharacterMappedText(n.value, false);
+  result := true;
+end;
+
+function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
+begin
+  serializer.append(' ');
+  serializer.append(n.getNodeName());
+  serializer.append('="');
+  appendXMLHTMLCharacterMappedText(n.realvalue, true);
+  serializer.append('"');
+  result := true;
 end;
 
 function isUnicodeEncoding(e: TSystemCodePage): boolean;
@@ -4656,10 +4729,13 @@ var known: TNamespaceList;
   begin
     with n do with builder do
     case typ of
-      tetText:
-        if not html then append(xmlStrEscape(value))
+      tetText: begin
+        if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n) then begin
+          //empty
+        end else if not html then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
         else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
         else appendHTMLText(value);
+      end;
       tetClose:
         if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
         else appendXMLElementEndTag(getNodeName());
@@ -4708,23 +4784,25 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in getEnumeratorAttributes do
             if not attrib.isNamespaceNode then begin
-              if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
+              if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib) then begin
+                //empty
+              end else if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
               else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
             end;
 
         if (n.next = reverse) and (not html or (TTreeParser.htmlElementIsChildless(value))) then begin
           if html then append('>')
           else append('/>');
-          if builder.insertWhitespace <> xqsiwNever then append(LineEnding);
+          if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
           while known.count > oldnamespacecount do
             known.Delete(known.count-1);
           exit();
         end;
         append('>');
-        if builder.insertWhitespace <> xqsiwNever then append(LineEnding);
+        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
         inner(n);
         append('</'); append(n.getNodeName()); append('>');
-        if builder.insertWhitespace <> xqsiwNever then append(LineEnding);
+        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
@@ -4772,7 +4850,7 @@ begin
     else serializer.error('SEPM0016', v.toValue);
   end;
 
-  if not (params.normalizationForm in [unfNone, unfUnknown]) or (params.characterMaps <> nil) then begin
+  if params.hasNormalizationForm or (params.characterMaps <> nil) then begin
     interceptor.init;
     interceptor.params := @params;
     interceptor.serializer := @serializer;
@@ -4895,9 +4973,9 @@ var
           n := w^.toNode;
           if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
           case params.method of
-            xqsmXML: serializer.append(n.outerXML());
+            xqsmXML: serializeNodes(n, serializer, true, false);
            // 'xhtml':;
-            xqsmHTML: serializer.append(n.outerHTML());
+            xqsmHTML: serializeNodes(n, serializer, true, true);
             xqsmText: serializer.append(w^.toString);
           end;
           if not hasItemSeparator then wasNodeOrFirst := true;
@@ -4913,9 +4991,19 @@ var
 
 var temp: string;
   hasDoctypeSystem: Boolean;
+  interceptor: TSpecialStringHandler;
 begin
   serializer.init(@temp);
   serializer.standard := true;
+
+  if params.hasNormalizationForm or (params.characterMaps <> nil) then begin
+    interceptor.init;
+    interceptor.params := @params;
+    interceptor.serializer := @serializer;
+    interceptor.htmlNodes := params.method = xqsmHTML;
+    serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
+    serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
+  end;
 
   with params do begin
     hasItemSeparator := params.itemSeparator <> params.isAbsentMarker;

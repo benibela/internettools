@@ -328,12 +328,16 @@ type
 
   TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
   TXQSerializerOnString = procedure (const s: string) of object;
+  TXQSerializerOnNode = function (const n: TTreeNode): boolean of object;
+  TXQSerializerOnAttribute = function (const n: TTreeAttribute): boolean of object;
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     allowDuplicateNames: boolean;
     insertWhitespace: TXQSerializerInsertWhitespace;
 
     onInterceptAppendJSONString: TXQSerializerOnString;
+    onInterceptAppendXMLHTMLText: TXQSerializerOnNode;
+    onInterceptAppendXMLHTMLAttribute: TXQSerializerOnAttribute;
 
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
     procedure indent;
@@ -3356,6 +3360,9 @@ begin
   sequenceTag :=  'seq';
   elementTag := 'e';
   objectTag := 'object';
+
+  onInterceptAppendXMLHTMLAttribute := nil;
+  onInterceptAppendXMLHTMLText := nil;
 
   //this is basically a custom VMT on the stack
   onInterceptAppendJSONString := @appendJSONStringWithoutQuotes;

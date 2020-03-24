@@ -80,6 +80,8 @@ begin
 
   t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (numeric?) as anyAtomicType? return "T" default return "F" )', 'F F T');
 
+  t('serialize(<a>xyz</a>, map {"method": "xml", "use-character-maps": map { "a": "123", "y": "foo" } })', '<a>xfooz</a>');
+
   writeln('XQuery 3.1: ', count, ' completed');
   ps.free;
   xml.Free;

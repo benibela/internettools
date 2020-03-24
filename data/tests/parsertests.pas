@@ -75,7 +75,7 @@ var
     end;
     parents.free;
     if tp.getLastTree.outerXML() <> o then
-      raise Exception.Create('Parsing result invalid: '+tp.getLastTree.outerXML()+ ' != '+o);
+      raise Exception.Create('Parsing result invalid: '+tp.getLastTree.outerXML()+ ' != '+o + LineEnding + 'DefaultEncoding: ' + IntToStr(DefaultSystemCodePage));
   end;
 
 begin
