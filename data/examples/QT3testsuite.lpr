@@ -620,13 +620,13 @@ begin
     tcrPass: writeln('passed'); //todo
     tcrFail: begin
       writeln('FAILED');
-      writeln('      got: '+got+ ' expected: '+tc.expectedPrettier);
-      if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
+      writeln(' got: '+got+ LineEnding+' expected: '+tc.expectedPrettier);
+      if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrWrongError: begin
       writeln('wrong error');
-      writeln('      got: '+got+ ' expected: '+tc.expectedPrettier);
-      if printInputs then writeln('      Input: ', TTest(tc.tests[0]).test);
+      writeln(' got: '+got+ LineEnding+' expected: '+tc.expectedPrettier);
+      if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrNA: writeln('na');
     tcrDisputed: writeln('disputed');
@@ -1807,7 +1807,7 @@ begin
 
   testsets := TList.Create;
   environments := TStringList.Create;
-  treeCache := TXQHashmapStrOwningTreeDocument.Create;
+  treeCache.init();
 
   clr := TCommandLineReader.create;
   clr.declareString('mode', 'Query mode (xquery1, xquery3, xpath2, xpath3)', 'xquery1');
@@ -1925,7 +1925,7 @@ begin
   end;}
   logger.endXQTS(totalResults);
 
-  treeCache.Free
+  treeCache.done
 end.
 
 
