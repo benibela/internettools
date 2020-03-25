@@ -4444,7 +4444,7 @@ begin
   jsonNodeOutputMethod := 'xml';
   normalizationForm := unfUnknown;
   characterMaps := nil;
-  allowDuplicateNames := true;
+  allowDuplicateNames := false;
   cdataSectionElements := nil;
   suppressIndentation := nil;
 end;
@@ -4578,9 +4578,15 @@ var
 
   function valueBool: Boolean;
   begin
-    if pp.Value.kind = pvkBoolean then exit(pp.value.toBoolean);
-    if staticOptions and (pp.Value.kind = pvkString) then begin
-      exit(toSerializationBool(pp.value.toString));
+    case pp.Value.kind of
+      pvkBoolean: exit(pp.value.toBoolean);
+      pvkString:
+        if staticOptions then exit(toSerializationBool(pp.value.toString))
+        else if pp.Value.instanceOf(baseSchema.untypedAtomic) then
+          case trim(pp.Value.toString) of
+            'false': exit(false);
+            'true': exit(true);
+          end;
     end;
 
     result := false;
@@ -4599,6 +4605,20 @@ var
     if not staticOptions then ok := list.includeAll(pp.Value)
     else ok := list.includeAll(context, nil, pp.Value.toString);
     if not ok then raiseInvalidParameter();
+  end;
+  procedure setCharacterMaps;
+    procedure error;
+    begin
+      raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
+    end;
+
+  begin
+    if characterMaps = nil then new(characterMaps,init);
+    if pp.value.kind <> pvkObject then error;
+    for characterp in pp.value.getPropertyEnumerator do begin
+      if characterp.Value.kind <> pvkString then error;
+      characterMaps.include(characterp.Name, characterp.Value.toString);
+    end;
   end;
 
 begin
@@ -4636,12 +4656,7 @@ begin
                     else setStandalone(valueBool());
       'suppress-indentation': setQNameList(suppressIndentation);
       'undeclare-prefixes': valueBool(); //todo
-      'use-character-maps': begin
-        if characterMaps = nil then new(characterMaps,init);
-        if pp.value.kind <> pvkObject then raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
-        for characterp in pp.value.getPropertyEnumerator do
-          characterMaps.include(characterp.Name, characterp.Value.toString);
-      end;
+      'use-character-maps': setCharacterMaps();
       'version': version := valueString();
       #0'static-options': begin
         staticOptions := true;
@@ -5170,7 +5185,7 @@ var
   end;
 
 var temp: string;
-  hasDoctypeSystem: Boolean;
+  hasDoctypeSystem, isHTML5: Boolean;
   interceptor: TSpecialStringHandler;
 begin
   serializer.init(@temp);
@@ -5180,9 +5195,10 @@ begin
     if method in [xqsmHTML, xqsmXHTML] then begin
       if (htmlVersion = isAbsentMarker) then htmlVersion := version;
       if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
+      isHTML5 := (htmlVersion = '5.0') or (htmlVersion = '5');
       if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
         cdataSectionElements.exclude('');
-        if htmlVersion >= '5.0' then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
+        if isHTML5 then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
       end;
     end;
 
@@ -5223,7 +5239,7 @@ begin
           if not omitXmlDeclaration then
             serializer.appendXMLHeader(version, encoding, standalone);
         end;
-        if (htmlVersion = '5.0') and (not hasDoctypeSystem)
+        if isHTML5 and (not hasDoctypeSystem)
            and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
            and ( (method = xqsmXHTML) or ( (method = xqsmHTML) and (doctypePublic = isAbsentMarker) )) then begin
            if method = xqsmHTML then serializer.append('<!DOCTYPE html>')
