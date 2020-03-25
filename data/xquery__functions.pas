@@ -4276,8 +4276,33 @@ begin
     context.splitRawQName(namespace, localpart, kind);
     namespaceURL := namespaceGetURL(namespace);
     result := namespaceURL <> '';
-  end else if kind <> xqdnkUnknown then begin
+  end{ else if kind <> xqdnkUnknown then begin
     namespaceURL := namespaceGetURL(context.findNamespace('', kind));
+  end};
+end;
+
+procedure splitEQName(context: TXQEvaluationContext; node: TTreeNode; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown);
+var
+  namespace: TNamespace;
+  colon: SizeInt;
+  namespacePrefix: String;
+begin
+  localpart := xmlStrWhitespaceCollapse(eqname);
+  if strBeginsWith(localpart, 'Q{') then begin //EQName!
+    namespaceURL := strSplitGet('}', localpart);
+    delete(namespaceURL, 1, 2); //Q{ no more
+  end else begin
+    colon := pos(':', localpart);
+    if colon = 0 then namespacePrefix := ''
+    else begin
+      namespacePrefix := copy(localpart, 1, colon - 1);
+      delete(localpart, 1, colon);
+    end;
+    if node <> nil then begin
+      namespaceURL := node.getNamespaceURL(namespacePrefix);
+      if namespaceURL <> '' then exit;
+    end;
+    namespaceURL := namespaceGetURL(context.findNamespace(namespacePrefix, kind));
   end;
 end;
 
@@ -4293,7 +4318,7 @@ TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwn
   function contains(const namespace,local: string): boolean;
   procedure include(const namespace,local: string);
   function includeAll(const v: IXQValue): boolean;
-  function includeAll(const context: TXQEvaluationContext; const s: string): boolean;
+  function includeAll(const context: TXQEvaluationContext; node: TTreeNode; const s: string): boolean;
 end;
 PXQHashsetQName = ^TXQHashsetQName;
 class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
@@ -4334,19 +4359,19 @@ var
   pw: PIXQValue;
 begin
   for pw in v.GetEnumeratorPtrUnsafe do begin
-    if v.kind <> pvkQName then exit(false);
-    qname := v.toValue as TXQValueQName;
+    if pw^.kind <> pvkQName then exit(false);
+    qname := pw^.toValue as TXQValueQName;
     include(qname.url, qname.local);
   end;
   result := true;
 end;
 
-function TXQHashsetQName.includeAll(const context: TXQEvaluationContext; const s: string): boolean;
+function TXQHashsetQName.includeAll(const context: TXQEvaluationContext; node: TTreeNode; const s: string): boolean;
 var
   t, namespaceUrl, name: String;
 begin
   for t in strTrimAndNormalize(s, WHITE_SPACE).Split(' ') do begin
-    splitEQName(context, t, namespaceUrl, name, xqdnkElementType);
+    splitEQName(context, node, t, namespaceUrl, name, xqdnkElementType);
     include(namespaceUrl, name);
   end;
   result := true;
@@ -4510,7 +4535,7 @@ begin
        case paramNode.value of
          'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
          'byte-order-mark': ; //todo
-         'cdata-section-elements': needQNameList(cdataSectionElements).includeAll(context, paramNode.getAttribute('value'));
+         'cdata-section-elements': needQNameList(cdataSectionElements).includeAll(context, paramNode, paramNode.getAttribute('value'));
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
          'encoding':       setEncoding(paramNode.getAttribute('value'));
@@ -4526,7 +4551,7 @@ begin
          'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
          'standalone': setStandalone(paramNode.getAttribute('value'), false);
-         'suppress-indentation': needQNameList(suppressIndentation).includeAll(context, paramNode.getAttribute('value'));
+         'suppress-indentation': needQNameList(suppressIndentation).includeAll(context, paramNode, paramNode.getAttribute('value'));
          'undeclare-prefixes': ;//todo
          'use-character-maps': setCharacterMaps;
          'version':        version := paramNode.getAttribute('value');
@@ -4572,7 +4597,7 @@ var
   begin
     needQNameList(list);
     if not staticOptions then ok := list.includeAll(pp.Value)
-    else ok := list.includeAll(context, pp.Value.toString);
+    else ok := list.includeAll(context, nil, pp.Value.toString);
     if not ok then raiseInvalidParameter();
   end;
 
