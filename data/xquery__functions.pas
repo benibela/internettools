@@ -4262,29 +4262,127 @@ begin
   result := xqFunctionParse_Common(context, argc, args, 'html');
 end;
 
+function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown): boolean;
+var
+  namespace: TNamespace;
+begin
+  namespaceURL := '';
+  localpart := xmlStrWhitespaceCollapse(eqname);
+  result := true;
+  if strBeginsWith(localpart, 'Q{') then begin //EQName!
+    namespaceURL := strSplitGet('}', localpart);
+    delete(namespaceURL, 1, 2); //Q{ no more
+  end else if pos(':', localpart) > 0 then begin
+    context.splitRawQName(namespace, localpart, kind);
+    namespaceURL := namespaceGetURL(namespace);
+    result := namespaceURL <> '';
+  end else if kind <> xqdnkUnknown then begin
+    namespaceURL := namespaceGetURL(context.findNamespace('', kind));
+  end;
+end;
+
+
+type
+TTrackOwnedXQHashsetStr = record
+  class procedure addRef(o: PXQHashsetStr); static; inline;
+  class procedure release(o: PXQHashsetStr); static; inline;
+end;
+TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwnedXQHashsetStr>)
+  function contains(namespace: TNamespace; const local: string): boolean;
+  procedure include(namespace: TNamespace; const local: string);
+  function contains(const namespace,local: string): boolean;
+  procedure include(const namespace,local: string);
+  function includeAll(const v: IXQValue): boolean;
+  function includeAll(const context: TXQEvaluationContext; const s: string): boolean;
+end;
+PXQHashsetQName = ^TXQHashsetQName;
+class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
+begin
+  //empty
+end;
+class procedure TTrackOwnedXQHashsetStr.release(o: PXQHashsetStr);
+begin
+  dispose(o, done);
+end;
+function TXQHashsetQName.contains(namespace: TNamespace; const local: string): boolean;
+begin
+  result := contains(namespaceGetURL(namespace), local);
+end;
+procedure TXQHashsetQName.include(namespace: TNamespace; const local: string);
+begin
+  include(namespaceGetURL(namespace), local);
+end;
+function TXQHashsetQName.contains(const namespace, local: string): boolean;
+var
+  s: PXQHashsetStr;
+begin
+  s := getOrDefault(namespace);
+  result := assigned(s) and s.contains(local);
+end;
+procedure TXQHashsetQName.include(const namespace, local: string);
+var
+  ent: PHashMapEntity;
+begin
+  ent := findEntity(namespace, true);
+  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
+  PXQHashsetStr(ent.Value)^.include(local);
+end;
+
+function TXQHashsetQName.includeAll(const v: IXQValue): boolean;
+var
+  qname: TXQValueQName;
+  pw: PIXQValue;
+begin
+  for pw in v.GetEnumeratorPtrUnsafe do begin
+    if v.kind <> pvkQName then exit(false);
+    qname := v.toValue as TXQValueQName;
+    include(qname.url, qname.local);
+  end;
+  result := true;
+end;
+
+function TXQHashsetQName.includeAll(const context: TXQEvaluationContext; const s: string): boolean;
+var
+  t, namespaceUrl, name: String;
+begin
+  for t in strTrimAndNormalize(s, WHITE_SPACE).Split(' ') do begin
+    splitEQName(context, t, namespaceUrl, name, xqdnkElementType);
+    include(namespaceUrl, name);
+  end;
+  result := true;
+end;
+
+
 type
 TSerializationMethod = (xqsmXML, xqsmXHTML, xqsmHTML, xqsmText, xqsmJSON, xqsmAdaptive);
 TSerializationParams = record
   isAbsentMarker: string;
   method: TSerializationMethod;
-  version, encoding: string;
+  encoding: string;
   encodingCP: TSystemCodePage;
+  indent: TXQSerializerInsertWhitespace;
+  itemSeparator: string;
+  normalizationForm: TUnicodeNormalizationForm;
+  characterMaps: ^TXQHashmapStrStr;
+
+  //xml only
+  version: string;
   htmlVersion, doctypePublic, doctypeSystem: string;
   omitXmlDeclaration: boolean;
   standalone: TXMLDeclarationStandalone;
-  itemSeparator: string;
-  indent: TXQSerializerInsertWhitespace;
+  cdataSectionElements, suppressIndentation: PXQHashsetQName;
+
+
+  //json only
   jsonNodeOutputMethod: string;
-  normalizationForm: TUnicodeNormalizationForm;
-  characterMaps: ^TXQHashmapStrStr;
   allowDuplicateNames: boolean;
 
   procedure done;
 
   procedure setDefault(isFromMap: boolean);
-  procedure setFromNode(paramNode: TTreeNode; isStatic: boolean);
-  procedure setFromMap(const v: IXQValue);
-  procedure setFromXQValue(const v: IXQValue);
+  procedure setFromNode(const context: TXQEvaluationContext; paramNode: TTreeNode; isStatic: boolean);
+  procedure setFromMap(const context: TXQEvaluationContext;const v: IXQValue);
+  procedure setFromXQValue(const context: TXQEvaluationContext; const v: IXQValue);
 
   procedure setMethod(const s: string);
   procedure setStandalone(s: string; fromMap: boolean);
@@ -4292,11 +4390,15 @@ TSerializationParams = record
   procedure setNormalizationForm(const s: string);
   function hasNormalizationForm: boolean;
   procedure setEncoding(const s: string);
+  function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
 end;
+
 
 procedure TSerializationParams.done;
 begin
   if assigned(characterMaps) then Dispose(characterMaps,done);
+  if assigned(cdataSectionElements) then Dispose(cdataSectionElements,done);
+  if assigned(suppressIndentation) then Dispose(suppressIndentation,done);
 end;
 
 procedure TSerializationParams.setDefault(isFromMap: boolean);
@@ -4306,7 +4408,7 @@ begin
   if isFromMap then version := '1.0' else version := isAbsentMarker;
   encoding := 'UTF-8';
   encodingCP := CP_UTF8;
-  htmlVersion := '5.0';
+  htmlVersion := isAbsentMarker;
   doctypePublic := isAbsentMarker;
   doctypeSystem := isAbsentMarker;
   omitXmlDeclaration := true;
@@ -4318,6 +4420,8 @@ begin
   normalizationForm := unfUnknown;
   characterMaps := nil;
   allowDuplicateNames := true;
+  cdataSectionElements := nil;
+  suppressIndentation := nil;
 end;
 
 function toSerializationBool(const s:string; fromMap: boolean): boolean;
@@ -4330,7 +4434,7 @@ begin
 end;
 
 
-procedure TSerializationParams.setFromNode(paramNode: TTreeNode; isStatic: boolean);
+procedure TSerializationParams.setFromNode(const context: TXQEvaluationContext;paramNode: TTreeNode; isStatic: boolean);
   procedure error;
   begin
     raise EXQEvaluationException.create(IfThen(isStatic, 'XQST0109', 'SEPM0017'), 'Invalid serialization parameter: '+paramNode.outerXML());
@@ -4406,7 +4510,7 @@ begin
        case paramNode.value of
          'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
          'byte-order-mark': ; //todo
-         'cdata-section-elements': ; //todo
+         'cdata-section-elements': needQNameList(cdataSectionElements).includeAll(context, paramNode.getAttribute('value'));
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
          'encoding':       setEncoding(paramNode.getAttribute('value'));
@@ -4422,8 +4526,8 @@ begin
          'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
          'standalone': setStandalone(paramNode.getAttribute('value'), false);
-         'suppress-indentation': ;//todo
-         'undeclare-prefixes': ;//todov
+         'suppress-indentation': needQNameList(suppressIndentation).includeAll(context, paramNode.getAttribute('value'));
+         'undeclare-prefixes': ;//todo
          'use-character-maps': setCharacterMaps;
          'version':        version := paramNode.getAttribute('value');
          else error();
@@ -4433,7 +4537,7 @@ begin
    duplicateValueCheck.done;
 end;
 
-procedure TSerializationParams.setFromMap(const v: IXQValue);
+procedure TSerializationParams.setFromMap(const context: TXQEvaluationContext; const v: IXQValue);
 var
   pp, characterp: TXQProperty;
   staticOptions: boolean = false;
@@ -4462,6 +4566,15 @@ var
     if pp.Value.kind = pvkString then result := pp.value.toString
     else begin raiseInvalidParameter; result := ''; end
   end;
+  procedure setQNameList(var list: PXQHashsetQName);
+  var
+    ok: Boolean;
+  begin
+    needQNameList(list);
+    if not staticOptions then ok := list.includeAll(pp.Value)
+    else ok := list.includeAll(context, pp.Value.toString);
+    if not ok then raiseInvalidParameter();
+  end;
 
 begin
   for pp in v.getPropertyEnumerator do begin
@@ -4476,7 +4589,7 @@ begin
     case pp.Name of
       'allow-duplicate-names': allowDuplicateNames := valueBool();
       'byte-order-mark': valueBool(); //todo
-      'cdata-section-elements': ; //todo
+      'cdata-section-elements': setQNameList(cdataSectionElements);
       'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
       'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
       'encoding': setEncoding(valueString());
@@ -4489,14 +4602,14 @@ begin
       'indent': if valueBool() then indent := xqsiwIndent
                 else indent := xqsiwNever;
       'item-separator': itemSeparator := valueString();
-      'json-node-output-method': jsonNodeOutputMethod := valueString(); //todo
+      'json-node-output-method': jsonNodeOutputMethod := valueString();
       'media-type': valueString(); //todo
       'method': setMethod(valueString());
-      'normalization-form': setNormalizationForm(valueString()); //todo
+      'normalization-form': setNormalizationForm(valueString());
       'omit-xml-declaration': omitXmlDeclaration := valueBool();
       'standalone': if staticOptions and (pp.Value.toString = 'omit') then standalone := xdsOmit
                     else setStandalone(valueBool());
-      'suppress-indentation': ;
+      'suppress-indentation': setQNameList(suppressIndentation);
       'undeclare-prefixes': valueBool(); //todo
       'use-character-maps': begin
         if characterMaps = nil then new(characterMaps,init);
@@ -4511,22 +4624,22 @@ begin
         omitXmlDeclaration := false;
       end;
       'parameter-document': if staticOptions then
-        setFromNode(pp.Value.toNode, true);
+        setFromNode(context, pp.Value.toNode, true);
       else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
     end;
   end;
 end;
 
-procedure TSerializationParams.setFromXQValue(const v: IXQValue);
+procedure TSerializationParams.setFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
 begin
   case v.kind of
     pvkObject: begin
       setDefault(true);
-      setFromMap(v);
+      setFromMap(context, v);
     end;
     pvkNode: begin
       setDefault(false);
-      setFromNode(v.toNode, false);
+      setFromNode(context, v.toNode, false);
     end
     else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node')
     else setDefault(true);
@@ -4578,11 +4691,18 @@ begin
   if encodingCP = $FFFF then raiseXQEvaluationException('SESU0007', 'Unknown encoding: '+s);
 end;
 
+function TSerializationParams.needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
+begin
+  if list = nil then new(list,init);
+  result := list;
+end;
+
 type TSpecialStringHandler = object
   serializer: ^TXQSerializer;
   params: ^TSerializationParams;
-  htmlNodes: boolean;
+  htmlNodes, isUnicodeEncoding: boolean;
   function normalizeString(p: pchar; len: sizeint): string; overload;
+  function normalizeString(const s: string): string; inline; overload;
   procedure appendJSONStringWithoutQuotes(const s: string);
   procedure appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
   function appendXMLHTMLText(const n: TTreeNode): boolean;
@@ -4597,6 +4717,11 @@ end;
 function TSpecialStringHandler.normalizeString(p: pchar; len: sizeint): string;
 begin
   result := xquery__functions.normalizeString(strFromPchar(p, len), params^.normalizationForm)
+end;
+
+function TSpecialStringHandler.normalizeString(const s: string): string;
+begin
+  result := normalizeString(pchar(s), length(s));
 end;
 
 procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
@@ -4616,7 +4741,7 @@ var len: integer;
   entity: TXQHashmapStrStr.PHashMapEntity;
 begin
   if params^.characterMaps = nil then begin
-    serializer^.appendJSONStringWithoutQuotes(xquery__functions.normalizeString(s, params^.normalizationForm));
+    serializer^.appendJSONStringWithoutQuotes(normalizeString(s));
   end else begin
     needNormalization := params^.hasNormalizationForm;
     needEscaping := false;
@@ -4660,8 +4785,10 @@ var p, marker: PChar;
   end;
 var len: integer;
   entity: TXQHashmapStrStr.PHashMapEntity;
+  pend: pchar;
 begin
   p := pchar(s);
+  pend := p + length(s);
   marker := p;
   needNormalization := params.hasNormalizationForm;
   needEscaping := false;
@@ -4672,7 +4799,11 @@ begin
       marker := p + len;
       serializer^.append(string(entity^.Value));
     end else case p^ of
-      '<': needEscaping := true;
+      '<', '>', '&': needEscaping := true;
+      '''', '"': needEscaping := needEscaping or attrib;
+      #0..#$1F: needEscaping := true;
+      #$C2: needEscaping := needEscaping or ((p + 1 < pend) and ((p + 1)^ in [#$80..#$9F]));
+      #$E2: needEscaping := needEscaping or ((p + 2 < pend) and ((p + 1)^ = #$80) and ((p + 2)^ = #$A8));
     end;
     p := p + len;
   end;
@@ -4680,9 +4811,58 @@ begin
 end;
 
 function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode): boolean;
+  procedure appendXMLCDATATextASCII(const s: string);
+  var
+    p, marker: PChar;
+    procedure appendMarkedBlock;
+    begin
+      serializer.appendXMLCDATAText(marker, p - marker);
+    end;
+
+  var len: Integer;
+    pend, temp: PChar;
+  begin
+    p := pchar(s);
+    pend := p + length(s);
+    marker := p;
+    for len in s.enumerateUtf8CodePointLengths do begin
+      if len > 1 then begin
+        appendMarkedBlock;
+        temp := p;
+        serializer.appendHexEntity(strDecodeUTF8Character(temp, pend));
+        marker := p + len;
+      end;
+      p := p + len;
+    end;
+    appendMarkedBlock;
+  end;
+
+  procedure appendCDATA(const s: string);
+  begin
+    if isUnicodeEncoding then serializer.appendXMLCDATAText(s)
+    else appendXMLCDATATextASCII(s);
+  end;
+  procedure appendNormalizedCDATA(const s: string);
+  begin
+    appendCDATA(normalizeString(s));
+  end;
+
+var
+  parent: TTreeNode;
 begin
-  appendXMLHTMLCharacterMappedText(n.value, false);
-  result := true;
+  if assigned(params.cdataSectionElements) then begin
+    parent := n.getParent();
+    if assigned(parent) and params.cdataSectionElements.contains(parent.namespace, parent.value) then begin
+      if params^.hasNormalizationForm then appendNormalizedCDATA(n.value)
+      else appendCDATA(n.value);
+      exit(true);
+    end;
+  end;
+  if assigned(params^.characterMaps) then begin
+    appendXMLHTMLCharacterMappedText(n.value, false);
+    exit(true);
+  end;
+  result := false;
 end;
 
 function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
@@ -4704,7 +4884,7 @@ begin
   end;
 end;
 
-function serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean): RawByteString;
+procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean);
 var known: TNamespaceList;
 
   function htmlElementIsImplicitCDATA(const name: string): boolean;
@@ -4898,6 +5078,8 @@ begin
   result := xqvalue(temp);
 end;
 
+const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
+
 function serializeXMLHTMLText(var params: TSerializationParams; const v: IXQValue): IXQValue;
 var serializer: TXQSerializer;
 
@@ -4996,12 +5178,24 @@ begin
   serializer.init(@temp);
   serializer.standard := true;
 
-  if params.hasNormalizationForm or (params.characterMaps <> nil) then begin
+  with params do
+    if method in [xqsmHTML, xqsmXHTML] then begin
+      if (htmlVersion = isAbsentMarker) then htmlVersion := version;
+      if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
+      if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
+        cdataSectionElements.exclude('');
+        if htmlVersion >= '5.0' then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
+      end;
+    end;
+
+  if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) then begin
     interceptor.init;
     interceptor.params := @params;
     interceptor.serializer := @serializer;
     interceptor.htmlNodes := params.method = xqsmHTML;
-    serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
+    interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
+    if params.hasNormalizationForm or (params.characterMaps <> nil) then
+      serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
     serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
   end;
 
@@ -5018,10 +5212,7 @@ begin
     case params.method of
       xqsmXML, xqsmXHTML, xqsmHTML: begin
         //initialize missing default parameters
-        if (method = xqsmHTML) then begin
-          if (htmlVersion = isAbsentMarker) then htmlVersion := version;
-          if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
-        end else begin
+        if (method <> xqsmHTML) then begin
           if omitXmlDeclaration then
             if (standalone <> xdsOmit) or ( (version <> '1.0') and (version <> isAbsentMarker) and hasDoctypeSystem ) then
               raiseXQEvaluationException('SEPM0009', 'Invalid serialization parameter');
@@ -5065,7 +5256,7 @@ begin
   result := xqvalue(temp);
 end;
 
-function xqFunctionSerialize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSerialize(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   arg: IXQValue;
   params: TSerializationParams;
@@ -5074,7 +5265,7 @@ begin
   params.characterMaps := nil;
   //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
   arg := args[0];
-  if argc = 2 then params.setFromXQValue(args[1])
+  if argc = 2 then params.setFromXQValue(context, args[1])
   else params.setDefault(false);
 
   case params.method of
@@ -5086,14 +5277,14 @@ begin
   params.done
 end;
 
-function xqFunctionSerialize_Json(argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionSerialize_Json(const context: TXQEvaluationContext;argc: SizeInt; args: PIXQValue): IXQValue;
 var serializer: TXQSerializer;
     res: string;
   procedure setParams;
   var p: TSerializationParams;
   begin
     p.setDefault(false);
-    p.setFromXQValue(args[1]);
+    p.setFromXQValue(context, args[1]);
     serializer.insertWhitespace := p.indent;
   end;
 
@@ -5835,22 +6026,6 @@ begin
   result := week - firstweek + 1;
 end;
 
-function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string): boolean;
-var
-  namespace: TNamespace;
-begin
-  namespaceURL := '';
-  localpart := xmlStrWhitespaceCollapse(eqname);
-  result := true;
-  if strBeginsWith(localpart, 'Q{') then begin //EQName!
-    namespaceURL := strSplitGet('}', localpart);
-    delete(namespaceURL, 1, 2); //Q{ no more
-  end else if pos(':', localpart) > 0 then begin
-    context.splitRawQName(namespace, localpart, xqdnkUnknown);
-    namespaceURL := namespaceGetURL(namespace);
-    result := namespaceURL <> '';
-  end;
-end;
 
 
 function xqFunctionFormat_DateTimeC(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; allowDate, allowTime: boolean): IXQValue;
@@ -7730,7 +7905,7 @@ transform
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
-  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
+  pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
 
   //standard functions
@@ -7921,8 +8096,8 @@ transform
   fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
   fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
   {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
-  fn3.registerFunction('serialize', @xqFunctionSerialize).setVersionsShared([itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]);
-  fn3_1.registerFunction('serialize', @xqFunctionSerialize).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
+  fn3.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]);
+  fn3_1.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
   fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, dependencyNone).setVersionsShared([stringOrEmpty, stringOrEmpty],  [stringOrEmpty, stringt, stringOrEmpty]);
   fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, dependencyNone).setVersionsShared([stringOrEmpty, boolean],  [stringOrEmpty, stringt, boolean]);

@@ -55,7 +55,7 @@ type
     Size: int32;
     Entities:array of THashMapEntity;
     CellToEntityIndex: array of int32;
-    function getBaseValue(const Key:TKey):TBaseValue;
+    function getBaseValueOrDefault(const Key:TKey):TBaseValue;
     procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
     class function hash(const key: TKey): uint32; static;
     function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
@@ -67,17 +67,20 @@ type
     function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
     function exclude(const Key:TKey):boolean;
     function contains(const key: TKey): boolean;
-    property values[const Key:TKey]: TBaseValue read GetBaseValue write SetBaseValue; default;
+    property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
   end;
 
   generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<string,TXQVoid,TInfo>)
     procedure include(const Key:TKey; allowOverride: boolean=true);
   end;
   TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
+  PXQHashsetStr = ^TXQHashsetStr;
 
   TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
   generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
   protected
+    function get(const Key: string; const def: TValue): TValue; inline;
+    function getOrDefault(const Key: string): TValue; inline;
     function GetValue(const Key: string): TValue; inline;
   end;
 
@@ -95,7 +98,7 @@ type
   public
     procedure clear;
     destructor done;
-    procedure disposeAndNil(var map: PXQHashmapStrOwning);
+    class procedure disposeAndNil(var map: PXQHashmapStrOwning);
     procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
     //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
@@ -179,6 +182,10 @@ TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendXMLEmptyElement(const name: string);
   procedure appendXMLText(const s: string);
   procedure appendXMLAttrib(const s: string);
+  procedure appendXMLCDATAStart();
+  procedure appendXMLCDATAText(p: pchar; len: sizeint);
+  procedure appendXMLCDATAText(const s: string); inline;
+  procedure appendXMLCDATAEnd();
 end;
 
 type TJSONXHTMLStrBuilder = object(TXHTMLStrBuilder)
@@ -412,7 +419,7 @@ begin
   result := findEntity(key) <> nil;
 end;
 
-function TXQBaseHashmap.getBaseValue(const Key: TKey): TBaseValue;
+function TXQBaseHashmap.getBaseValueOrDefault(const Key: TKey): TBaseValue;
 var Entity:int32;
     Cell:uint32;
 begin
@@ -592,10 +599,23 @@ begin
   inherited include(key, default(TXQVoid), allowOverride);
 end;
 
+function TXQBaseHashmapStrPointerButNotPointer.get(const Key: string; const def: TValue): TValue;
+var
+  entity: PHashMapEntity;
+begin
+  entity := findEntity(key);
+  if entity = nil then result := def
+  else result := tvalue(entity^.Value);
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.getOrDefault(const Key: string): TValue;
+begin
+  result := get(key, default(tvalue));
+end;
 
 function TXQBaseHashmapStrPointerButNotPointer.GetValue(const Key: string): TValue;
 begin
-  result := TValue(GetBaseValue(key));
+  result := TValue(getBaseValueOrDefault(key));
 end;
 
 procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
@@ -643,7 +663,7 @@ begin
   clear;
 end;
 
-procedure TXQHashmapStrOwning.disposeAndNil(var map: PXQHashmapStrOwning);
+class procedure TXQHashmapStrOwning.disposeAndNil(var map: PXQHashmapStrOwning);
 begin
    if map <> nil then begin
      dispose(map,done);
@@ -853,6 +873,46 @@ begin
     end;
     i+=1;
   end;
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAStart();
+begin
+  append('<![CDATA[');
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAText(p: pchar; len: sizeint);
+var pendMinus2, marker: pchar;
+  procedure appendMarkedBlock;
+  begin
+    if p = marker then exit;
+    appendXMLCDATAStart();
+    append(marker, p - marker);
+    appendXMLCDATAEnd();
+  end;
+
+begin
+  if len = 0 then exit;
+  pendMinus2 := p + len - 2;
+  marker := p;
+  while p < pendMinus2 do begin
+    if {p+2 < pend and } (p^ = ']') and ((p + 1)^ = ']') and ((p + 2)^ = '>') then begin
+      inc(p, 2);
+      appendMarkedBlock;
+      marker := p;
+    end else inc(p);
+  end;
+  p := pendMinus2 + 2;
+  appendMarkedBlock;
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAText(const s: string);
+begin
+  appendXMLCDATAText(pointer(s), length(s));
+end;
+
+procedure TXHTMLStrBuilder.appendXMLCDATAEnd();
+begin
+  append(']]>');
 end;
 
 function htmlStrEscape(s: string; attrib: boolean): string;

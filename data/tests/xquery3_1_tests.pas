@@ -81,6 +81,9 @@ begin
   t('abs#1 ! (typeswitch (.) case function (anyAtomicType?) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (item()) as anyAtomicType? return "T" default return "F", typeswitch (.) case function (numeric?) as anyAtomicType? return "T" default return "F" )', 'F F T');
 
   t('serialize(<a>xyz</a>, map {"method": "xml", "use-character-maps": map { "a": "123", "y": "foo" } })', '<a>xfooz</a>');
+  t('serialize(<a>xyzä</a>, map {"method": "xml", "cdata-section-elements": QName("", "a") })', '<a><![CDATA[xyzä]]></a>');
+  t('serialize(<a>]]>]]>xy]]>zä]]>]]></a>, map {"method": "xml", "cdata-section-elements": QName("", "a") })', '<a>]]>]]><![CDATA[xy]]>]]><![CDATA[zä]]>]]>]]></a>');
+  t('serialize(<a>]]>]]>xy]]>zä]]>]]></a>, map {"method": "xml", "encoding": "us-ascii", "cdata-section-elements": QName("", "a") })', '<a>]]>]]><![CDATA[xy]]>]]><![CDATA[z]]>&#xE4;]]>]]></a>');
 
   writeln('XQuery 3.1: ', count, ' completed');
   ps.free;
