@@ -519,13 +519,23 @@ end;
  //** Str iterator. Preliminary. Interface might change at any time
 function strIterator(const s: RawByteString): TStrIterator;
 
-type TUTF8StringCodePointLengthEnumerator = record
-  FCurrent: integer;
-
+type TUTF8StringCodePointBlockEnumerator = record
+private
+  FCurrentByteLength: integer;
+  function getCurrentCodepoint: integer;
+public
   p, pend: pchar;
-  property Current: integer read FCurrent;
+  procedure init(const s: string);
+  property currentPos: pchar read p;
+  property current: integer read getCurrentCodepoint;
+  property currentByteLength: integer read FcurrentByteLength;
   function MoveNext: Boolean;
-  function GetEnumerator: TUTF8StringCodePointLengthEnumerator;
+  function GetEnumerator: TUTF8StringCodePointBlockEnumerator;
+public
+  markedPos: pchar;
+  procedure mark; inline;
+  procedure markNext; inline;
+  function markedByteLength: SizeInt; inline;
 end;
 
 
@@ -583,7 +593,6 @@ end;
     function lengthInUtf8CodePoints: sizeint;
 
     function enumerateUtf8CodePoints: TStrIterator;
-    function enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
   end;
 {$endif}
 
@@ -899,6 +908,7 @@ end;
 
 
 
+
 procedure TThreadedCall.Execute;
 begin
   proc();
@@ -1040,37 +1050,71 @@ begin
   result.pos := 1;
 end;
 
-function TUTF8StringCodePointLengthEnumerator.MoveNext: Boolean;
+
+function TUTF8StringCodePointBlockEnumerator.getCurrentCodepoint: integer;
+var
+  temp: PChar;
+begin
+  temp := p;
+  result := strDecodeUTF8Character(temp, pend)
+end;
+
+
+procedure TUTF8StringCodePointBlockEnumerator.init(const s: string);
+begin
+  p := pchar(s);
+  pend := p + length(s);
+  FCurrentByteLength := 0;
+  mark;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.MoveNext: Boolean;
 var
   b: Byte;
 begin
-  p := p + FCurrent;
+  p := p + FCurrentByteLength;
   result := p < pend;
   if result then begin
     b := pbyte(p)^;
     case b of
-      $00..$7F: FCurrent := 1;
+      $00..$7F: FCurrentByteLength := 1;
       $C2..$DF: begin
-        FCurrent := 2;
-        if (p + 1 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) then FCurrent := 1;
+        FCurrentByteLength := 2;
+        if (p + 1 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) then FCurrentByteLength := 1;
       end;
       $E0..$EF: begin
-        FCurrent := 3;
-        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) then FCurrent := 1;
+        FCurrentByteLength := 3;
+        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) then FCurrentByteLength := 1;
       end;
       $F0..$F4: begin
-        FCurrent := 4;
-        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) or ((pbyte(p + 3)^ and $C0) <> $80 ) then FCurrent := 1;
+        FCurrentByteLength := 4;
+        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) or ((pbyte(p + 3)^ and $C0) <> $80 ) then
+          FCurrentByteLength:= 1;
       end;
-      else FCurrent := 1;
+      else FCurrentByteLength := 1;
     end;
-  end;
+  end else FCurrentByteLength := 0;
 end;
 
-function TUTF8StringCodePointLengthEnumerator.GetEnumerator: TUTF8StringCodePointLengthEnumerator;
+function TUTF8StringCodePointBlockEnumerator.GetEnumerator: TUTF8StringCodePointBlockEnumerator;
 begin
   result := self;
-  result.FCurrent:=0;
+  result.FCurrentByteLength:=0;
+end;
+
+procedure TUTF8StringCodePointBlockEnumerator.mark;
+begin
+  markedPos := p;
+end;
+
+procedure TUTF8StringCodePointBlockEnumerator.markNext;
+begin
+  markedPos := p + FCurrentByteLength;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.markedByteLength: SizeInt;
+begin
+  result := p - markedPos;
 end;
 
 
@@ -5438,12 +5482,6 @@ begin
   result := strIterator(self);
 end;
 
-function TBBStringHelper.enumerateUtf8CodePointLengths: TUTF8StringCodePointLengthEnumerator;
-begin
-  result.FCurrent := 0;
-  result.p := pchar(self);
-  result.pend := result.p + self.length;
-end;
 
 {
 

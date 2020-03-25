@@ -4725,116 +4725,89 @@ begin
 end;
 
 procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
-var p, marker: PChar;
-    needNormalization, needEscaping: Boolean;
-  procedure appendMarkedBlock;
-  begin
-    if needNormalization or needEscaping then begin
-      serializer^.appendJSONStringWithoutQuotes(normalizeString(marker, p - marker));
-    end else begin
-      serializer^.append(marker, p - marker);
-    end;
-    needEscaping := false;
-  end;
-
-var len: integer;
+var needNormalization, needEscaping: Boolean;
+var enumerator: TUTF8StringCodePointBlockEnumerator;
   entity: TXQHashmapStrStr.PHashMapEntity;
+  hadNext: Boolean;
 begin
   if params^.characterMaps = nil then begin
     serializer^.appendJSONStringWithoutQuotes(normalizeString(s));
   end else begin
     needNormalization := params^.hasNormalizationForm;
     needEscaping := false;
-    p := pchar(s);
-    marker := p;
-    for len in s.enumerateUtf8CodePointLengths do begin
-      entity := params^.characterMaps.findEntity(p, len);
-      if entity <> nil then begin
-        appendMarkedBlock;
-        marker := p + len;
-        serializer^.append(string(entity^.Value));
-      end else case p^ of
+    enumerator.init(s);
+    repeat
+      hadNext := enumerator.MoveNext;
+      entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
+      if (not hadNext) or (entity <> nil) then begin
+        if needNormalization or needEscaping then serializer^.appendJSONStringWithoutQuotes(normalizeString(enumerator.markedPos, enumerator.markedByteLength))
+        else serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
+        needEscaping := false;
+        enumerator.markNext;
+        if entity <> nil then
+          serializer^.append(string(entity^.Value));
+      end else case enumerator.currentPos^ of
         #0..#31, '"', '\', '/': needEscaping := true;
       end;
-
-      p := p + len;
-    end;
-    appendMarkedBlock;
+    until not hadNext;
   end;
 end;
 
 procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
-var p, marker: PChar;
-    needNormalization, needEscaping: Boolean;
-  procedure appendMarkedBlock;
-  var
+var needNormalization, needEscaping: Boolean;
+var entity: TXQHashmapStrStr.PHashMapEntity;
+    enumerator: TUTF8StringCodePointBlockEnumerator;
+    hadNext: Boolean;
     temp: String;
-  begin
-    if needNormalization or needEscaping then begin
-      temp := normalizeString(marker, p - marker);
-      if attrib then begin
-        if htmlNodes then serializer^.appendHTMLAttrib(temp)
-        else serializer^.appendXMLAttrib(temp)
-      end else
-        if htmlNodes then serializer^.appendHTMLText(temp)
-        else serializer^.appendXMLText(temp)
-    end else begin
-      serializer^.append(marker, p - marker);
-    end;
-    needEscaping := false;
-  end;
-var len: integer;
-  entity: TXQHashmapStrStr.PHashMapEntity;
-  pend: pchar;
 begin
-  p := pchar(s);
-  pend := p + length(s);
-  marker := p;
   needNormalization := params.hasNormalizationForm;
   needEscaping := false;
-  for len in s.enumerateUtf8CodePointLengths do begin
-    entity := params^.characterMaps.findEntity(p, len);
-    if entity <> nil then begin
-      appendMarkedBlock;
-      marker := p + len;
-      serializer^.append(string(entity^.Value));
-    end else case p^ of
+  enumerator.init(s);
+  repeat
+    hadNext := enumerator.MoveNext;
+    entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
+    if (not hadNext) or (entity <> nil) then begin
+      if needNormalization or needEscaping then begin
+        temp := normalizeString(enumerator.markedPos, enumerator.markedByteLength);
+        if attrib then begin
+          if htmlNodes then serializer^.appendHTMLAttrib(temp)
+          else serializer^.appendXMLAttrib(temp)
+        end else
+          if htmlNodes then serializer^.appendHTMLText(temp)
+          else serializer^.appendXMLText(temp)
+      end else begin
+        serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
+      end;
+      needEscaping := false;
+
+      enumerator.markNext;
+      if entity <> nil then
+        serializer^.append(string(entity^.Value));
+    end else case enumerator.currentPos^ of
       '<', '>', '&': needEscaping := true;
       '''', '"': needEscaping := needEscaping or attrib;
       #0..#$1F: needEscaping := true;
-      #$C2: needEscaping := needEscaping or ((p + 1 < pend) and ((p + 1)^ in [#$80..#$9F]));
-      #$E2: needEscaping := needEscaping or ((p + 2 < pend) and ((p + 1)^ = #$80) and ((p + 2)^ = #$A8));
+      #$C2: needEscaping := needEscaping or (  (enumerator.currentByteLength = 2) and ((enumerator.currentPos + 1)^ in [#$80..#$9F]));
+      #$E2: needEscaping := needEscaping or ( (enumerator.currentByteLength = 3) and ((enumerator.currentPos + 1)^ = #$80) and ((enumerator.currentPos + 2)^ = #$A8));
     end;
-    p := p + len;
-  end;
-  appendMarkedBlock;
+  until not hadNext;
 end;
 
 function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode): boolean;
   procedure appendXMLCDATATextASCII(const s: string);
-  var
-    p, marker: PChar;
-    procedure appendMarkedBlock;
-    begin
-      serializer.appendXMLCDATAText(marker, p - marker);
-    end;
-
-  var len: Integer;
-    pend, temp: PChar;
+  var enumerator: TUTF8StringCodePointBlockEnumerator;
+    hadNext: Boolean;
   begin
-    p := pchar(s);
-    pend := p + length(s);
-    marker := p;
-    for len in s.enumerateUtf8CodePointLengths do begin
-      if len > 1 then begin
-        appendMarkedBlock;
-        temp := p;
-        serializer.appendHexEntity(strDecodeUTF8Character(temp, pend));
-        marker := p + len;
+    enumerator.init(s);
+    repeat
+      hadNext := enumerator.MoveNext;
+      if enumerator.currentByteLength <> 1 then begin
+        serializer.appendXMLCDATAText(enumerator.markedPos, enumerator.markedByteLength);
+        if enumerator.currentByteLength > 0 then
+          serializer.appendHexEntity(enumerator.current);
+        enumerator.markNext;
       end;
-      p := p + len;
-    end;
-    appendMarkedBlock;
+    until not hadNext;
   end;
 
   procedure appendCDATA(const s: string);
