@@ -580,6 +580,8 @@ end;
     function endsWithI(const s: string): boolean; inline;
     function containsI(const s: string): boolean; inline;
 
+    function isBlank: boolean; inline;
+
     function EncodeHex: String; inline;
     function DecodeHex: String; inline;
     function RemoveFromLeft(chopoff: SizeInt): String;
@@ -5454,6 +5456,17 @@ end;
 function TBBStringHelper.containsI(const s: string): boolean;
 begin
   result := striContains(self, s);
+end;
+
+function TBBStringHelper.isBlank: boolean;
+var
+  temp: Pointer;
+  len: SizeInt;
+begin
+  temp := pointer(self);
+  len := self.Length;
+  strlTrimLeft(temp, len, [#9,#10,#13,' ']);
+  result := len = 0;
 end;
 
 function TBBStringHelper.EncodeHex: String;
