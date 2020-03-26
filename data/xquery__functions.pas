@@ -4444,6 +4444,7 @@ TSerializationParams = record
   function hasNormalizationForm: boolean;
   procedure setEncoding(const s: string);
   function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
+  function isHTML5: boolean;
 end;
 
 
@@ -4768,6 +4769,11 @@ begin
   result := list;
 end;
 
+function TSerializationParams.isHTML5: boolean;
+begin
+  result := (htmlVersion = '5.0') or (htmlVersion = '5')
+end;
+
 type TSpecialStringHandler = object
   serializer: ^TXQSerializer;
   params: ^TSerializationParams;
@@ -4931,16 +4937,22 @@ end;
 type PSerializationParams = ^TSerializationParams;
 procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean; params: PSerializationParams);
 var known: TNamespaceList;
-    indentationAllowed: boolean;
-
+    indentationAllowed, xhtml, representsHTML, isHTML5: boolean;
   function htmlElementIsImplicitCDATA(const name: string): boolean;
   begin
     result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
   end;
 
+  function elementIsHTML(n: TTreeNode): boolean;
+  begin
+
+    result := (   (isHTML5 or html) and ( (n.namespace = nil) or (n.namespace.getURL = '') ) )
+             or ( (isHTML5 or xhtml) and ( n.namespace.getURL = XMLNamespaceUrl_XHTML) )
+  end;
+
   function htmlElementIsPhrasing(n: TTreeNode): boolean;
   begin
-    if (n.namespace = nil) or (n.namespace.getURL = '') or (n.namespace.getURL = XMLNamespaceUrl_XHTML) then begin
+    if elementIsHTML(n) then begin
       case lowercase(n.value) of
         'del', 'ins': if not n.hasChildren() then exit(true);
         'a': exit(true);
@@ -5005,15 +5017,43 @@ var known: TNamespaceList;
     exit(false);
   end;
 
+  function xhtmlElementIsExpectedEmpty(n: TTreeNode): boolean;
+  begin
+    if elementIsHTML(n) then
+      case lowercase(n.value) of
+        'area': exit(true);
+        'base': exit(true);
+        'br': exit(true);
+        'col': exit(true);
+        'embed': exit(true);
+        'hr': exit(true);
+        'img': exit(true);
+        'input': exit(true);
+        'link': exit(true);
+        'meta': exit(true);
+        'param': exit(true);
+
+        'isindex': exit(not isHTML5);
+        'basefont': exit(not isHTML5);
+        'frame': exit(not isHTML5);
+
+        'keygen': exit(isHTML5);
+        'source': exit(isHTML5);
+        'track': exit(isHTML5);
+        'wbr': exit(isHTML5);
+      end;
+    result := false;
+  end;
+
   function elementDescendantsMightBeIndented(n: TTreeNode): boolean;
   begin
     if Assigned(params.suppressIndentation) then begin
       if params.suppressIndentation.contains(n.namespace, n.value) then
         exit(false);
-      if html and params.suppressIndentation.contains(n.namespace, lowercase(n.value)) then
+      if representsHTML and params.suppressIndentation.contains(n.namespace, lowercase(n.value)) then
         exit(false);
     end;
-    if html then begin
+    if representsHTML then begin
       case lowercase(n.value) of
         'pre', 'script', 'style', 'title', 'textarea': exit(false);
       end;
@@ -5100,9 +5140,13 @@ var known: TNamespaceList;
               else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
             end;
 
-        if (n.next = reverse) and (not html or (TTreeParser.htmlElementIsChildless(value))) then begin
+        if (n.next = reverse)
+           and (not html or (TTreeParser.htmlElementIsChildless(value)))
+           and (not xhtml or xhtmlElementIsExpectedEmpty(n))
+           then begin
           if html then append('>')
-          else append('/>');
+          else if not xhtml then append('/>')
+          else append(' />');
           while known.count > oldnamespacecount do
             known.Delete(known.count-1);
           exit();
@@ -5131,7 +5175,7 @@ var known: TNamespaceList;
       while (sub <> nil) and indentationAllowed do begin
         case sub.typ of
           tetText: indentationAllowed := sub.value.IsBlank();
-          tetOpen: indentationAllowed := not (html and htmlElementIsPhrasing(sub));
+          tetOpen: indentationAllowed := not (representsHTML and htmlElementIsPhrasing(sub));
         end;
         sub := sub.getNextSibling();
       end;
@@ -5158,9 +5202,13 @@ var known: TNamespaceList;
     end;
     indentationAllowed := oldIndentationAllowed;
   end;
+
 begin
   if builder.insertWhitespace = xqsiwIndent then indentationAllowed := true and (base.typ <> tetText)
   else indentationAllowed := false;
+  xhtml := assigned(params) and (params.method = xqsmXHTML);
+  representsHTML := html or xhtml;
+  isHTML5 := representsHTML and (not assigned(params) or params.isHTML5);
 
   known := TNamespaceList.Create;
   if nodeSelf then outer(base)
@@ -5314,8 +5362,7 @@ var
           n := w^.toNode;
           if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
           case method of
-            xqsmXML: serializeNodes(n, serializer, true, false, @params);
-           // 'xhtml':;
+            xqsmXML, xqsmXHTML: serializeNodes(n, serializer, true, false, @params);
             xqsmHTML: serializeNodes(n, serializer, true, true, @params);
             xqsmText: serializer.append(w^.toString);
           end;
@@ -5331,7 +5378,7 @@ var
   end;
 
 var temp: string;
-  hasDoctypeSystem, isHTML5: Boolean;
+  hasDoctypeSystem: Boolean;
   interceptor: TSpecialStringHandler;
 begin
   serializer.init(@temp);
@@ -5341,7 +5388,6 @@ begin
     if method in [xqsmHTML, xqsmXHTML] then begin
       if (htmlVersion = isAbsentMarker) then htmlVersion := version;
       if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
-      isHTML5 := (htmlVersion = '5.0') or (htmlVersion = '5');
       if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
         cdataSectionElements.exclude('');
         if isHTML5 then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
@@ -5402,8 +5448,6 @@ begin
           serializer.append('"'+doctypeSystem+'">');
         end else if (method = xqsmHTML) and (doctypePublic <> isAbsentMarker) then
           serializer.append('<!DOCTYPE html PUBLIC "'+doctypePublic+'">');
-
-        if method = xqsmXHTML then method := xqsmXML;
       end;
       xqsmText: begin
         //encoding: string;
