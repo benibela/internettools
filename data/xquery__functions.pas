@@ -5023,7 +5023,7 @@ var known: TNamespaceList;
     oldIndentationAllowed := indentationAllowed;
     if indentationAllowed then begin
       if Assigned(params) then indentationAllowed := elementDescendantsMightBeIndented(n);
-      sub := n.next;
+      sub := n.getFirstChild();
       while (sub <> nil) and indentationAllowed do begin
         case sub.typ of
           tetText: indentationAllowed := sub.value.IsBlank();
@@ -5035,7 +5035,7 @@ var known: TNamespaceList;
       end;
     end;
 
-    sub := n.next;
+    sub := n.getFirstChild();
     while sub <> nil do begin
       if indentationAllowed and (sub.typ <> tetText) then begin
         builder.append(LineEnding);
