@@ -43,6 +43,16 @@ type
     end;
     PHashMapEntity = ^THashMapEntity;
     PValue = ^TBaseValue;
+    PXQBaseHashmap = ^TXQBaseHashmap;
+    TEntityEnumerator = object
+      map: PXQBaseHashmap;
+      entityId: SizeInt;
+      function currentEntity: PHashMapEntity; inline;
+      property current: PHashMapEntity read currentEntity;
+      function moveNext: boolean;
+      procedure init(amap: PXQBaseHashmap);
+    end;
+
   private
     //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
     function findCell(keydata: pchar; keylen: SizeUInt): UInt32;
@@ -68,20 +78,38 @@ type
     function exclude(const Key:TKey):boolean;
     function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
+    function getEnumerator: TEntityEnumerator;
   end;
 
-  generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<string,TXQVoid,TInfo>)
+  generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<TKey,TXQVoid,TInfo>)
+    type TKeyOnlyEnumerator = object(TEntityEnumerator)
+      function currentKey: TKey;
+      property current: TKey read currentKey;
+    end;
     procedure include(const Key:TKey; allowOverride: boolean=true);
+    function getEnumerator: TKeyOnlyEnumerator;
   end;
   TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
   PXQHashsetStr = ^TXQHashsetStr;
 
   TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
   generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
+    type
+      PXQBaseHashmapStrPointerButNotPointer = ^TXQBaseHashmapStrPointerButNotPointer;
+      PKeyPairEnumerator = ^TKeyPairEnumerator;
+      PKeyValuePair = PKeyPairEnumerator;
+      TKeyPairEnumerator = object(TEntityEnumerator)
+        function currentPair: PKeyValuePair; inline;
+        function key: string;
+        function value: TValue;
+        property current: PKeyValuePair read currentPair;
+      end;
   protected
     function get(const Key: string; const def: TValue): TValue; inline;
     function getOrDefault(const Key: string): TValue; inline;
     function GetValue(const Key: string): TValue; inline;
+  public
+    function getEnumerator: TKeyPairEnumerator;
   end;
 
   generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
@@ -243,6 +271,46 @@ const
 
 implementation
 uses math;
+
+
+function TXQBaseHashmap.TEntityEnumerator.currentEntity: PHashMapEntity;
+begin
+ result := @map^.Entities[entityId];
+end;
+
+function TXQBaseHashmap.TEntityEnumerator.moveNext: boolean;
+begin
+ inc(entityId);
+ while (entityId < map^.Size) and (pointer(map^.Entities[entityId].Key) = pointer(map^.DELETED_KEY)) do
+   inc(entityId);
+ result := entityId < map^.Size;
+end;
+
+procedure TXQBaseHashmap.TEntityEnumerator.init(amap: PXQBaseHashmap);
+begin
+ entityId := -1;
+ map := amap;
+end;
+
+function TXQHashset.TKeyOnlyEnumerator.currentKey: TKey;
+begin
+  result := map^.Entities[entityId].Key;
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.TKeyPairEnumerator.currentPair: PKeyValuePair;
+begin
+  result := @self;
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.TKeyPairEnumerator.key: string;
+begin
+  result := map^.Entities[entityId].Key;
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.TKeyPairEnumerator.value: TValue;
+begin
+ result := TValue(map^.Entities[entityId].Value);
+end;
 
 
 class procedure TXQDefaultTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
@@ -417,6 +485,11 @@ end;
 function TXQBaseHashmap.contains(const key: TKey): boolean;
 begin
   result := findEntity(key) <> nil;
+end;
+
+function TXQBaseHashmap.getEnumerator: TEntityEnumerator;
+begin
+  result.init(@self);
 end;
 
 function TXQBaseHashmap.getBaseValueOrDefault(const Key: TKey): TBaseValue;
@@ -599,6 +672,11 @@ begin
   inherited include(key, default(TXQVoid), allowOverride);
 end;
 
+function TXQHashset.getEnumerator: TKeyOnlyEnumerator;
+begin
+  result.init(@self);
+end;
+
 function TXQBaseHashmapStrPointerButNotPointer.get(const Key: string; const def: TValue): TValue;
 var
   entity: PHashMapEntity;
@@ -616,6 +694,11 @@ end;
 function TXQBaseHashmapStrPointerButNotPointer.GetValue(const Key: string): TValue;
 begin
   result := TValue(getBaseValueOrDefault(key));
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.getEnumerator: TKeyPairEnumerator;
+begin
+  result.init(@self);
 end;
 
 procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
