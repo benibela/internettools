@@ -192,6 +192,9 @@ end;
 
 TXMLDeclarationStandalone = (xdsOmit, xdsYes, xdsNo);
 TXHTMLStrBuilder = object(TStrBuilder)
+protected
+  procedure appendProcessingInstruction(const name, content: string);
+public
   procedure appendHexEntity(codepoint: integer);
 
   procedure appendHTMLText(inbuffer: pchar; len: SizeInt);
@@ -199,6 +202,7 @@ TXHTMLStrBuilder = object(TStrBuilder)
   procedure appendHTMLText(const s: string);
   procedure appendHTMLAttrib(const s: string);
   procedure appendHTMLElementAttribute(const name, value: string);
+  procedure appendHTMLProcessingInstruction(const name, content: string);
 
   procedure appendXMLHeader(const version, anencoding: string; standalone: TXMLDeclarationStandalone);
   procedure appendXMLElementStartOpen(const name: string);
@@ -774,6 +778,16 @@ begin
   result := strTrimAndNormalize(s, [#9,#$A,#$D,' ']);
 end;
 
+procedure TXHTMLStrBuilder.appendProcessingInstruction(const name, content: string);
+begin
+ append('<?');
+ append(name);
+ if content <> '' then begin
+   append(' ');
+   append(content);
+ end;
+end;
+
 procedure TXHTMLStrBuilder.appendHexEntity(codepoint: integer);
 begin
   append('&#x');
@@ -837,6 +851,12 @@ begin
   append('"');
 end;
 
+procedure TXHTMLStrBuilder.appendHTMLProcessingInstruction(const name, content: string);
+begin
+  appendProcessingInstruction(name, content);
+  append('>');
+end;
+
 procedure TXHTMLStrBuilder.appendXMLHeader(const version, anencoding: string; standalone: TXMLDeclarationStandalone);
 begin
   append('<?xml version="'+version+'" encoding="'+anencoding+'"');
@@ -883,12 +903,7 @@ end;
 
 procedure TXHTMLStrBuilder.appendXMLProcessingInstruction(const name, content: string);
 begin
-  append('<?');
-  append(name);
-  if content <> '' then begin
-    append(' ');
-    append(content);
-  end;
+  appendProcessingInstruction(name, content);
   append('?>');
 end;
 

@@ -5055,8 +5055,8 @@ var known: TNamespaceList;
         append('-->');
       end;
       tetProcessingInstruction:
-        if attributes <> nil then appendXMLProcessingInstruction(value, getAttribute(''))
-        else appendXMLProcessingInstruction(value, '');
+        if html then appendHTMLProcessingInstruction(value, getAttribute(''))
+        else appendXMLProcessingInstruction(value, getAttribute(''));
       tetOpen: begin
         oldnamespacecount:=known.Count;
         append('<');

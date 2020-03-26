@@ -33,7 +33,7 @@ uses
 
 
 type
-  TParsingOptions = set of (poRespectHTMLCDATAElements, poRespectProcessingInstructions);
+  TParsingOptions = set of (poRespectHTMLCDATAElements, poRespectHTMLProcessingInstructions, poRespectXMLProcessingInstructions);
   THTMLProperty=record
     name, value: pchar;
     nameLen, valueLen: longint;
@@ -99,7 +99,7 @@ procedure parseHTML(const html:string;
                     enterTagEvent: TEnterTagEvent; leaveTagEvent: TLeaveTagEvent;
                     textEvent: TTextEvent; commentEvent: TCommentEvent = nil);
 begin
-  parseML(html, [poRespectHTMLCDATAElements], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
+  parseML(html, [poRespectHTMLCDATAElements,poRespectHTMLProcessingInstructions], enterTagEvent, leaveTagEvent, textEvent, commentEvent);
 end;
 
 
@@ -119,13 +119,26 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
     while (pos<=htmlEnd) and  (pos^ in WHITE_SPACE) do inc(pos);
   end;
 
+  procedure readToProcessingInstrunctionEnd;
+  begin
+    if poRespectHTMLProcessingInstructions in options then begin
+      while (pos < htmlEnd) and ((pos+1)^ <> '>') do inc(pos);
+    end else
+      while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+  end;
+  procedure skipLastProcessingInstructionSymbols;
+  begin
+    if poRespectHTMLProcessingInstructions in options then inc(pos)
+    else inc(pos, 2);
+  end;
+
   procedure handleProcessingInstruction;
   begin
     inc(pos);
     marker := pos;
-    while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+    readToProcessingInstrunctionEnd;
     if Assigned(processingInstruction) then processingInstruction(marker, pos - marker, []);
-    inc(pos, 2);
+    skipLastProcessingInstructionSymbols;
     marker := pos;
   end;
   procedure handleDocType;
@@ -221,7 +234,7 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
                 end;
               end;
               '?': begin
-                while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
+                readToProcessingInstrunctionEnd;
               end;
               '-': begin
                 inc(pos);
@@ -299,7 +312,7 @@ begin
             inc(pos);
             marker:=pos;
           end;
-          else if (pos^ = '?') and (poRespectProcessingInstructions in options) then handleProcessingInstruction
+          else if (pos^ = '?') and ([poRespectHTMLCDATAElements, poRespectXMLProcessingInstructions] * options <> []) then handleProcessingInstruction
           else begin //tag start
             marker:=pos;
 

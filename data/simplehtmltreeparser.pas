@@ -2737,7 +2737,7 @@ begin
 
   //parse
   if FParsingModel = pmHTML then simplehtmlparser.parseHTML(FCurrentFile,@enterTag, @leaveTag, @readText, @readComment)
-  else simplehtmlparser.parseML(FCurrentFile,[poRespectProcessingInstructions],@enterTag, @leaveTag, @readText, @readComment, @processingInstruction);
+  else simplehtmlparser.parseML(FCurrentFile,[poRespectXMLProcessingInstructions],@enterTag, @leaveTag, @readText, @readComment, @processingInstruction);
 
   //close root element
   leaveTag(nil,0);
