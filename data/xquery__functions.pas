@@ -4306,6 +4306,10 @@ begin
 end;
 
 
+const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
+      XMLNamespaceURL_MathML = 'http://www.w3.org/1998/Math/MathML';
+      XMLNamespaceUrl_SVG = 'https://www.w3.org/2000/svg';
+
 type
 TTrackOwnedXQHashsetStr = record
   class procedure addRef(o: PXQHashsetStr); static; inline;
@@ -4318,6 +4322,7 @@ TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwn
   procedure include(const namespace,local: string);
   function includeAll(const v: IXQValue): boolean;
   function includeAll(const context: TXQEvaluationContext; node: TTreeNode; const s: string): boolean;
+  procedure addHTMLLowercaseQNames(html5: boolean);
 end;
 PXQHashsetQName = ^TXQHashsetQName;
 class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
@@ -4329,6 +4334,8 @@ class procedure TTrackOwnedXQHashsetStr.release(o: PXQHashsetStr);
 begin
   dispose(o, done);
 end;
+
+
 function TXQHashsetQName.contains(namespace: TNamespace; const local: string): boolean;
 begin
   result := contains(namespaceGetURL(namespace), local);
@@ -4375,6 +4382,27 @@ begin
     include(namespaceUrl, name);
   end;
   result := true;
+end;
+
+procedure TXQHashsetQName.addHTMLLowercaseQNames(html5: boolean);
+  procedure transformFromTo(from: PXQHashsetStr; tonamespace: string);
+  var str: string;
+  begin
+    if from = nil then exit;
+    for str in from^ do begin
+      Include(tonamespace, lowercase(str));
+    end;
+  end;
+
+var v: TXQHashsetQName.PKeyValuePair;
+begin
+  if html5 then begin
+    transformFromTo(getOrDefault(''), XMLNamespaceUrl_XHTML);
+    transformFromTo(getOrDefault(XMLNamespaceUrl_XHTML), '');
+  end;
+  for v in self do begin
+    transformFromTo(v.value, v.key);
+  end;
 end;
 
 
@@ -4910,13 +4938,89 @@ var known: TNamespaceList;
     result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
   end;
 
+  function htmlElementIsPhrasing(n: TTreeNode): boolean;
+  begin
+    if (n.namespace = nil) or (n.namespace.getURL = '') or (n.namespace.getURL = XMLNamespaceUrl_XHTML) then begin
+      case lowercase(n.value) of
+        'del', 'ins': if not n.hasChildren() then exit(true);
+        'a': exit(true);
+        'abbr': exit(true);
+        'area': exit(true); //only if a descendant of a map element
+        'audio': exit(true);
+        'b': exit(true);
+        'bdi': exit(true);
+        'bdo': exit(true);
+        'br': exit(true);
+        'button': exit(true);
+        'canvas': exit(true);
+        'cite': exit(true);
+        'code': exit(true);
+        'data': exit(true);
+        'datalist': exit(true);
+  //      'del': exit(true);
+        'dfn': exit(true);
+        'em': exit(true);
+        'embed': exit(true);
+        'i': exit(true);
+        'iframe': exit(true);
+        'img': exit(true);
+        'input': exit(true);
+  //      'ins': exit(true);
+        'kbd': exit(true);
+        'label': exit(true);
+        'link': if n.getFirstChild() <> nil then exit(true);
+        'map': exit(true);
+        'mark': exit(true);
+        'meta': exit(n.hasAttribute('itemprop'));
+        'meter': exit(true);
+        'noscript': exit(true);
+        'object': exit(true);
+        'output': exit(true);
+        'picture': exit(true);
+        'progress': exit(true);
+        'q': exit(true);
+        'ruby': exit(true);
+        's': exit(true);
+        'samp': exit(true);
+        'script': exit(true);
+        'select': exit(true);
+        'slot': exit(true);
+        'small': exit(true);
+        'span': exit(true);
+        'strong': exit(true);
+        'sub': exit(true);
+        'sup': exit(true);
+        'SVG svg': exit(true);
+        'template': exit(true);
+        'textarea': exit(true);
+        'time': exit(true);
+        'u': exit(true);
+        'var': exit(true);
+        'video': exit(true);
+        'wbr': exit(true);
+  //      'autonomous custom elements': exit(true);
+  //      'text': exit(true);
+      end;
+    end else if n.getNamespaceURL() = XMLNamespaceURL_MathML then exit(true);
+    exit(false);
+  end;
+
   function elementDescendantsMightBeIndented(n: TTreeNode): boolean;
   begin
-    if Assigned(params.suppressIndentation) then
+    if Assigned(params.suppressIndentation) then begin
       if params.suppressIndentation.contains(n.namespace, n.value) then
         exit(false);
+      if html and params.suppressIndentation.contains(n.namespace, lowercase(n.value)) then
+        exit(false);
+    end;
+    if html then begin
+      case lowercase(n.value) of
+        'pre', 'script', 'style', 'title', 'textarea': exit(false);
+      end;
+    end;
     result := true;
   end;
+
 
   function requireNamespace(n: TNamespace): string;
   begin //that function is useless the namespace should always be in known. But just for safety...
@@ -5027,6 +5131,7 @@ var known: TNamespaceList;
       while (sub <> nil) and indentationAllowed do begin
         case sub.typ of
           tetText: indentationAllowed := sub.value.IsBlank();
+          tetOpen: indentationAllowed := not (html and htmlElementIsPhrasing(sub));
         end;
         sub := sub.getNextSibling();
       end;
@@ -5131,7 +5236,6 @@ begin
   result := xqvalue(temp);
 end;
 
-const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
 
 function serializeXMLHTMLText(var params: TSerializationParams; const v: IXQValue): IXQValue;
 var serializer: TXQSerializer;
@@ -5242,6 +5346,7 @@ begin
         cdataSectionElements.exclude('');
         if isHTML5 then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
       end;
+      if assigned(suppressIndentation) then suppressIndentation.addHTMLLowercaseQNames(isHTML5);
     end;
 
   if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) then begin
