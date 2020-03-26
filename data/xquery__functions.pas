@@ -4283,7 +4283,6 @@ end;
 
 procedure splitEQName(context: TXQEvaluationContext; node: TTreeNode; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown);
 var
-  namespace: TNamespace;
   colon: SizeInt;
   namespacePrefix: String;
 begin
@@ -4324,6 +4323,7 @@ PXQHashsetQName = ^TXQHashsetQName;
 class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
 begin
   //empty
+  ignore(o);
 end;
 class procedure TTrackOwnedXQHashsetStr.release(o: PXQHashsetStr);
 begin
@@ -4566,6 +4566,7 @@ procedure TSerializationParams.setFromMap(const context: TXQEvaluationContext; c
 var
   pp, characterp: TXQProperty;
   staticOptions: boolean = false;
+  tempDoc: IXQValue;
   procedure raiseInvalidParameter(typeError: boolean = true);
   begin
     raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.Name, pp.Value);
@@ -4662,9 +4663,11 @@ begin
         staticOptions := true;
         allowDuplicateNames := false;
         omitXmlDeclaration := false;
+        tempDoc := v.getProperty('parameter-document');
+        if assigned(tempDoc) then setFromNode(context, tempDoc.toNode, true);
       end;
-      'parameter-document': if staticOptions then
-        setFromNode(context, pp.Value.toNode, true);
+      'parameter-document': if not staticOptions then
+        raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
       else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
     end;
   end;
@@ -4897,12 +4900,22 @@ begin
   end;
 end;
 
-procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean);
+type PSerializationParams = ^TSerializationParams;
+procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean; params: PSerializationParams);
 var known: TNamespaceList;
+    indentationAllowed: boolean;
 
   function htmlElementIsImplicitCDATA(const name: string): boolean;
   begin
     result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
+  end;
+
+  function elementDescendantsMightBeIndented(n: TTreeNode): boolean;
+  begin
+    if Assigned(params.suppressIndentation) then
+      if params.suppressIndentation.contains(n.namespace, n.value) then
+        exit(false);
+    result := true;
   end;
 
   function requireNamespace(n: TNamespace): string;
@@ -4986,16 +4999,13 @@ var known: TNamespaceList;
         if (n.next = reverse) and (not html or (TTreeParser.htmlElementIsChildless(value))) then begin
           if html then append('>')
           else append('/>');
-          if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
           while known.count > oldnamespacecount do
             known.Delete(known.count-1);
           exit();
         end;
         append('>');
-        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
         inner(n);
         append('</'); append(n.getNodeName()); append('>');
-        if builder.insertWhitespace = xqsiwIndent then append(LineEnding);
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
@@ -5006,17 +5016,47 @@ var known: TNamespaceList;
 
   procedure inner(n: TTreeNode);
   var sub: TTreeNode;
+    oldIndentationAllowed: Boolean;
+
   begin
     if not (n.typ in TreeNodesWithChildren) then exit;
-    sub := n.next;
-    while sub <> n.reverse do begin
-      outer(sub);
-      if not (sub.typ in TreeNodesWithChildren) then sub:=sub.next
-      else if sub.reverse = nil then raise ETreeParseException.Create('Failed to serialize, no closing tag for '+sub.value)
-      else sub := sub.reverse.next;
+    oldIndentationAllowed := indentationAllowed;
+    if indentationAllowed then begin
+      if Assigned(params) then indentationAllowed := elementDescendantsMightBeIndented(n);
+      sub := n.next;
+      while (sub <> nil) and indentationAllowed do begin
+        case sub.typ of
+          tetText: indentationAllowed := sub.value.IsBlank();
+        end;
+        sub := sub.getNextSibling();
+      end;
+      if indentationAllowed then begin
+        builder.indent;
+      end;
     end;
+
+    sub := n.next;
+    while sub <> nil do begin
+      if indentationAllowed and (sub.typ <> tetText) then begin
+        builder.append(LineEnding);
+        builder.appendIndent;
+      end;
+      if (not indentationAllowed) or (sub.typ <> tetText) then
+        outer(sub);
+      sub := sub.getNextSibling();
+    end;
+
+    if indentationAllowed then begin
+      builder.unindent;
+      builder.append(LineEnding);
+      builder.appendIndent;
+    end;
+    indentationAllowed := oldIndentationAllowed;
   end;
 begin
+  if builder.insertWhitespace = xqsiwIndent then indentationAllowed := true and (base.typ <> tetText)
+  else indentationAllowed := false;
+
   known := TNamespaceList.Create;
   if nodeSelf then outer(base)
   else inner(base);
@@ -5159,7 +5199,9 @@ var
   var
     w, m: PIXQValue;
     n: TTreeNode;
+    method: TSerializationMethod;
   begin
+    method := params.method;
     for w in v.GetEnumeratorPtrUnsafe do begin
       case w^.kind of
         pvkNode: begin
@@ -5167,10 +5209,10 @@ var
           //this might be incomplete
           n := w^.toNode;
           if n.typ in [tetAttribute] then raiseXQEvaluationException('SENR0001', 'Cannot serialize attribute');
-          case params.method of
-            xqsmXML: serializeNodes(n, serializer, true, false);
+          case method of
+            xqsmXML: serializeNodes(n, serializer, true, false, @params);
            // 'xhtml':;
-            xqsmHTML: serializeNodes(n, serializer, true, true);
+            xqsmHTML: serializeNodes(n, serializer, true, true, @params);
             xqsmText: serializer.append(w^.toString);
           end;
           if not hasItemSeparator then wasNodeOrFirst := true;
@@ -5233,6 +5275,8 @@ begin
 
           if version = isAbsentMarker then version := '1.1';
         end;
+
+        serializer.insertWhitespace := indent;
 
         //headers
         if (method <> xqsmHTML) then begin
@@ -5319,7 +5363,7 @@ begin
   serializer.init(@result);
   if insertLineBreaks then serializer.insertWhitespace := xqsiwIndent
   else serializer.insertWhitespace := xqsiwNever;
-  serializeNodes(node, serializer, includeSelf, html);
+  serializeNodes(node, serializer, includeSelf, html, nil);
   serializer.final;
 end;
 
