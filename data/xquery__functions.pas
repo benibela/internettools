@@ -4418,13 +4418,15 @@ TSerializationParams = record
   normalizationForm: TUnicodeNormalizationForm;
   characterMaps: ^TXQHashmapStrStr;
 
-  //xml only
+  //xml/html only
   version: string;
-  htmlVersion, doctypePublic, doctypeSystem: string;
+  doctypePublic, doctypeSystem: string;
   omitXmlDeclaration: boolean;
   standalone: TXMLDeclarationStandalone;
   cdataSectionElements, suppressIndentation: PXQHashsetQName;
 
+  htmlVersion, mediaType: string;
+  includeContentType: boolean;
 
   //json only
   jsonNodeOutputMethod: string;
@@ -4444,7 +4446,9 @@ TSerializationParams = record
   function hasNormalizationForm: boolean;
   procedure setEncoding(const s: string);
   function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
+
   function isHTML5: boolean;
+  function getContentType: string;
 end;
 
 
@@ -4476,6 +4480,8 @@ begin
   allowDuplicateNames := false;
   cdataSectionElements := nil;
   suppressIndentation := nil;
+  includeContentType := isFromMap;
+  mediaType := 'text/html';
 end;
 
 function toSerializationBool(const s:string; fromMap: boolean): boolean;
@@ -4570,12 +4576,12 @@ begin
          'encoding':       setEncoding(paramNode.getAttribute('value'));
          'escape-uri-attributes': ;//todo
          'html-version':   htmlVersion := paramNode.getAttribute('value');
-         'include-content-type': ;//todo
+         'include-content-type': includeContentType := toSerializationBool(paramNode.getAttribute('value'));
          'indent': if toSerializationBool(paramNode.getAttribute('value')) then indent := xqsiwIndent
                    else indent := xqsiwNever;
          'item-separator': itemSeparator := paramNode.getAttribute('value');
          'json-node-output-method': jsonNodeOutputMethod := paramNode.getAttribute('value');
-         'media-type': ;//todo
+         'media-type': mediaType := paramNode.getAttribute('value');
          'method':         setMethod(paramNode.getAttribute('value'));
          'normalization-form': setNormalizationForm(paramNode.getAttribute('value'));
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
@@ -4673,12 +4679,12 @@ begin
         if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64)
         else if staticOptions and (pp.Value.kind = pvkString) then htmlVersion := pp.Value.toString
         else raiseInvalidParameter;
-      'include-content-type': valueBool(); //todo
+      'include-content-type': includeContentType := valueBool();
       'indent': if valueBool() then indent := xqsiwIndent
                 else indent := xqsiwNever;
       'item-separator': itemSeparator := valueString();
       'json-node-output-method': jsonNodeOutputMethod := valueString();
-      'media-type': valueString(); //todo
+      'media-type': mediaType := valueString();
       'method': setMethod(valueString());
       'normalization-form': setNormalizationForm(valueString());
       'omit-xml-declaration': omitXmlDeclaration := valueBool();
@@ -4772,6 +4778,11 @@ end;
 function TSerializationParams.isHTML5: boolean;
 begin
   result := (htmlVersion = '5.0') or (htmlVersion = '5')
+end;
+
+function TSerializationParams.getContentType: string;
+begin
+  result := mediaType + '; charset=' + encoding;
 end;
 
 type TSpecialStringHandler = object
@@ -4936,8 +4947,10 @@ end;
 
 type PSerializationParams = ^TSerializationParams;
 procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean; params: PSerializationParams);
+type TIncludeContentType = (ictIgnore, ictSearchingForHead, ictRemoveOld);
 var known: TNamespaceList;
     indentationAllowed, xhtml, representsHTML, isHTML5: boolean;
+    includeContentType: TIncludeContentType;
   function htmlElementIsImplicitCDATA(const name: string): boolean;
   begin
     result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
@@ -5045,6 +5058,16 @@ var known: TNamespaceList;
     result := false;
   end;
 
+  function htmlElementIsHead(n: TTreeNode): boolean;
+  begin
+    result := elementIsHTML(n) and striEqual(n.value, 'head');
+  end;
+
+  function htmlElementIsMetaContentType(n: TTreeNode): boolean;
+  begin
+    result := elementIsHTML(n) and striEqual(n.value, 'meta') and striEqual(n.getAttribute('http-equiv'), 'content-type');
+  end;
+
   function elementDescendantsMightBeIndented(n: TTreeNode): boolean;
   begin
     if Assigned(params.suppressIndentation) then begin
@@ -5069,6 +5092,22 @@ var known: TNamespaceList;
     result := ' ' + n.serialize;
   end;
 
+  procedure appendContentTypeNow;
+  begin
+    if indentationAllowed then begin
+      builder.indent;
+      builder.append(LineEnding);
+      builder.appendIndent;
+    end;
+    builder.append('<meta http-equiv="Content-Type"');
+    builder.appendXMLElementAttribute('content', params.getContentType);
+    if xhtml then builder.append(' />')
+    else builder.append('>');
+    if indentationAllowed then
+      builder.unindent;
+    includeContentType := ictRemoveOld;
+  end;
+
   procedure inner(n: TTreeNode); forward;
 
   procedure outer(n: TTreeNode);
@@ -5076,6 +5115,7 @@ var known: TNamespaceList;
       oldnamespacecount: integer;
       i: Integer;
       temp: TNamespace;
+      includeContentTypeHere: Boolean;
   begin
     with n do with builder do
     case typ of
@@ -5098,6 +5138,7 @@ var known: TNamespaceList;
         if html then appendHTMLProcessingInstruction(value, getAttribute(''))
         else appendXMLProcessingInstruction(value, getAttribute(''));
       tetOpen: begin
+        if (includeContentType = ictRemoveOld) and (htmlElementIsMetaContentType(n)) then exit;
         oldnamespacecount:=known.Count;
         append('<');
         append(getNodeName());
@@ -5140,9 +5181,11 @@ var known: TNamespaceList;
               else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
             end;
 
+        includeContentTypeHere := (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
         if (n.next = reverse)
            and (not html or (TTreeParser.htmlElementIsChildless(value)))
            and (not xhtml or xhtmlElementIsExpectedEmpty(n))
+           and not includeContentTypeHere
            then begin
           if html then append('>')
           else if not xhtml then append('/>')
@@ -5152,6 +5195,7 @@ var known: TNamespaceList;
           exit();
         end;
         append('>');
+        if includeContentTypeHere then appendContentTypeNow;
         inner(n);
         append('</'); append(n.getNodeName()); append('>');
         while known.count > oldnamespacecount do
@@ -5209,6 +5253,8 @@ begin
   xhtml := assigned(params) and (params.method = xqsmXHTML);
   representsHTML := html or xhtml;
   isHTML5 := representsHTML and (not assigned(params) or params.isHTML5);
+  if representsHTML and assigned(params) and params.includeContentType then includeContentType := ictSearchingForHead
+  else includeContentType := ictIgnore;
 
   known := TNamespaceList.Create;
   if nodeSelf then outer(base)
