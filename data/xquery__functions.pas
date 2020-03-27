@@ -5212,6 +5212,25 @@ var known: TNamespaceList;
   procedure inner(n: TTreeNode); forward;
 
   procedure outer(n: TTreeNode);
+    procedure appendNodeName(n: TTreeNode);
+    begin
+      with builder do
+        if (n.namespace = nil) or (n.namespace.prefix = '') then append(n.value)
+        else begin
+          append(n.namespace.prefix);
+          append(':');
+          append(n.value);
+        end;
+    end;
+    procedure appendXMLElementEndTag2(n: TTreeNode);
+    begin
+      with builder do begin
+        append('</');
+        appendNodeName(n);
+        append('>');
+      end;
+    end;
+
   var attrib: TTreeAttribute;
       oldnamespacecount: integer;
       i: Integer;
@@ -5227,9 +5246,7 @@ var known: TNamespaceList;
         else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
         else appendHTMLText(value);
       end;
-      tetClose:
-        if (namespace = nil) or (namespace.getPrefix = '') then appendXMLElementEndTag(value)
-        else appendXMLElementEndTag(getNodeName());
+      tetClose: appendXMLElementEndTag2(n);
       tetComment: begin
         append('<!--');
         append(value);
@@ -5240,9 +5257,16 @@ var known: TNamespaceList;
         else appendXMLProcessingInstruction(value, getAttribute(''));
       tetOpen: begin
         if (includeContentType = ictRemoveOld) and (htmlElementIsMetaContentType(n)) then exit;
-        oldnamespacecount:=known.Count;
+        if known <> nil then begin
+          oldnamespacecount:=known.count;
+          n.getOwnNamespaces(known);
+        end else begin
+          oldnamespacecount:=0;
+          known := TNamespaceList.Create;
+          n.getAllNamespaces(known)
+        end;
         append('<');
-        append(getNodeName());
+        appendNodeName(n);
 
         {
         writeln(stderr,'--');
@@ -5251,8 +5275,6 @@ var known: TNamespaceList;
             if attrib.isNamespaceNode then
              writeln(stderr, value+': '+attrib.toNamespace.serialize);
         }
-        if oldnamespacecount = 0 then n.getAllNamespaces(known)
-        else n.getOwnNamespaces(known);
         for i:=oldnamespacecount to known.Count - 1 do
           if (known.items[i].getURL <> '') or
              undeclarePrefixes or
@@ -5279,8 +5301,13 @@ var known: TNamespaceList;
             if not attrib.isNamespaceNode then begin
               if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib) then begin
                 //empty
-              end else if html then appendHTMLElementAttribute(attrib.getNodeName(), attrib.realvalue)
-              else appendXMLElementAttribute(attrib.getNodeName(), attrib.realvalue);
+              end else begin
+                appendNodeName(attrib);
+                append('="');
+                if html then appendHTMLAttrib(attrib.realvalue)
+                else appendXMLAttrib(attrib.realvalue);
+                append('"');
+              end;
             end;
 
         includeContentTypeHere := (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
@@ -5292,14 +5319,13 @@ var known: TNamespaceList;
           if html then append('>')
           else if not xhtml then append('/>')
           else append(' />');
-          while known.count > oldnamespacecount do
-            known.Delete(known.count-1);
-          exit();
+        end else begin
+          append('>');
+          if includeContentTypeHere then appendContentTypeNow;
+          inner(n);
+          appendXMLElementEndTag2(n);
         end;
-        append('>');
-        if includeContentTypeHere then appendContentTypeNow;
-        inner(n);
-        append('</'); append(n.getNodeName()); append('>');
+
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
@@ -5359,7 +5385,7 @@ begin
   else includeContentType := ictIgnore;
   undeclarePrefixes := assigned(params) and params.undeclarePrefixes;
 
-  known := TNamespaceList.Create;
+  known := nil;
   if nodeSelf then outer(base)
   else inner(base);
   known.free;
