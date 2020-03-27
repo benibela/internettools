@@ -59,6 +59,7 @@ type
     function findCell(const Key: TKey): UInt32;
     procedure resize;
   protected
+  {$if FPC_FULLVERSION <= 30004} public{$endif}
     DELETED_KEY: TKey;
     RealSize: int32;
     LogSize: int32;
