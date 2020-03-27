@@ -4426,7 +4426,7 @@ TSerializationParams = record
   cdataSectionElements, suppressIndentation: PXQHashsetQName;
 
   htmlVersion, mediaType: string;
-  includeContentType: boolean;
+  includeContentType,escapeURIAttributes: boolean;
 
   //json only
   jsonNodeOutputMethod: string;
@@ -4481,6 +4481,7 @@ begin
   cdataSectionElements := nil;
   suppressIndentation := nil;
   includeContentType := isFromMap;
+  escapeURIAttributes := isFromMap;
   mediaType := 'text/html';
 end;
 
@@ -4574,7 +4575,7 @@ begin
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
          'encoding':       setEncoding(paramNode.getAttribute('value'));
-         'escape-uri-attributes': ;//todo
+         'escape-uri-attributes': escapeURIAttributes := toSerializationBool(paramNode.getAttribute('value'));
          'html-version':   htmlVersion := paramNode.getAttribute('value');
          'include-content-type': includeContentType := toSerializationBool(paramNode.getAttribute('value'));
          'indent': if toSerializationBool(paramNode.getAttribute('value')) then indent := xqsiwIndent
@@ -4674,7 +4675,7 @@ begin
       'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
       'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
       'encoding': setEncoding(valueString());
-      'escape-uri-attributes': valueBool(); //todo
+      'escape-uri-attributes': escapeURIAttributes := valueBool();
       'html-version':
         if pp.value.kind in [pvkInt64, pvkBigDecimal] then htmlVersion := inttostr(pp.value.toInt64)
         else if staticOptions and (pp.Value.kind = pvkString) then htmlVersion := pp.Value.toString
@@ -4792,6 +4793,7 @@ type TSpecialStringHandler = object
   function normalizeString(p: pchar; len: sizeint): string; overload;
   function normalizeString(const s: string): string; inline; overload;
   procedure appendJSONStringWithoutQuotes(const s: string);
+  procedure appendXMLHTMLAttributeText(const s:string);
   procedure appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
   function appendXMLHTMLText(const n: TTreeNode): boolean;
   function appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
@@ -4841,6 +4843,12 @@ begin
   end;
 end;
 
+procedure TSpecialStringHandler.appendXMLHTMLAttributeText(const s: string);
+begin
+  if htmlNodes then serializer^.appendHTMLAttrib(s)
+  else serializer^.appendXMLAttrib(s);
+end;
+
 procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
 var needNormalization, needEscaping: Boolean;
 var entity: TXQHashmapStrStr.PHashMapEntity;
@@ -4848,18 +4856,19 @@ var entity: TXQHashmapStrStr.PHashMapEntity;
     hadNext: Boolean;
     temp: String;
 begin
+  entity := nil;
   needNormalization := params.hasNormalizationForm;
   needEscaping := false;
   enumerator.init(s);
   repeat
     hadNext := enumerator.MoveNext;
-    entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
+    if assigned(params^.characterMaps) then
+      entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
     if (not hadNext) or (entity <> nil) then begin
       if needNormalization or needEscaping then begin
         temp := normalizeString(enumerator.markedPos, enumerator.markedByteLength);
         if attrib then begin
-          if htmlNodes then serializer^.appendHTMLAttrib(temp)
-          else serializer^.appendXMLAttrib(temp)
+          appendXMLHTMLAttributeText(temp);
         end else
           if htmlNodes then serializer^.appendHTMLText(temp)
           else serializer^.appendXMLText(temp)
@@ -4927,11 +4936,100 @@ begin
 end;
 
 function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
+  function isHTMLElement(n: TTreeNode): boolean;
+  begin
+    if (n.namespace = nil) or (n.namespace.getURL = '') then result := (params.method = xqsmHTML) or params.isHTML5
+    else if n.namespace.getURL = XMLNamespaceUrl_XHTML then result := (params.method = xqsmXHTML) or params.isHTML5
+    else result := false;
+  end;
+
+  function isURIAttribute(n: TTreeAttribute): boolean;
+  begin
+    if n.namespace = nil then
+      case lowercase(n.value) of
+        'action': case lowercase(n.getParent().value) of
+          'form': exit(true);
+                  end;
+        'archive': case lowercase(n.getParent().value) of
+          'object': exit(true);
+                  end;
+        'background': case lowercase(n.getParent().value) of
+          'body': exit(true);
+                  end;
+        'cite': case lowercase(n.getParent().value) of
+          'blockquote', 'del', 'ins', 'q': exit(true);
+                  end;
+        'classid': case lowercase(n.getParent().value) of
+          'object': exit(true);
+                  end;
+        'codebase': case lowercase(n.getParent().value) of
+          'applet', 'object': exit(true);
+                  end;
+        'data': case lowercase(n.getParent().value) of
+          'object': exit(true);
+                  end;
+        'datasrc': case lowercase(n.getParent().value) of
+          'button', 'div', 'input', 'object', 'select', 'span', 'table', 'textarea': exit(true);
+                  end;
+        'for': case lowercase(n.getParent().value) of
+          'script': exit(true);
+                  end;
+        'formaction': case lowercase(n.getParent().value) of
+          'button', 'input': exit(true);
+                  end;
+        'href': case lowercase(n.getParent().value) of
+          'a', 'area', 'base', 'link': exit(true);
+                  end;
+        'icon': case lowercase(n.getParent().value) of
+          'command': exit(true);
+                  end;
+        'longdesc': case lowercase(n.getParent().value) of
+          'frame', 'iframe', 'img': exit(true);
+                  end;
+        'manifest': case lowercase(n.getParent().value) of
+          'html': exit(true);
+                  end;
+        'name': case lowercase(n.getParent().value) of
+          'a': exit(true);
+                  end;
+        'poster': case lowercase(n.getParent().value) of
+          'video': exit(true);
+                  end;
+        'profile': case lowercase(n.getParent().value) of
+          'head': exit(true);
+                  end;
+        'src': case lowercase(n.getParent().value) of
+          'audio', 'embed', 'frame', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video': exit(true);
+                  end;
+        'usemap': case lowercase(n.getParent().value) of
+          'img', 'input', 'object': exit(true);
+                  end;
+{        'value': case lowercase(n.getParent().value) of
+          'input': exit(true);
+                 end;}
+      end;
+    result := false;
+  end;
+
+  procedure appendURIEscapedAttribute(n: TTreeAttribute);
+  var
+    temp: String;
+  begin
+    temp := TInternetAccess.urlEncodeData(xquery__functions.normalizeString(n.realvalue, unfNFC), ueXPathHTML4);
+    if params^.hasNormalizationForm or assigned(params^.characterMaps) then
+      appendXMLHTMLCharacterMappedText(temp, true)
+     else
+      appendXMLHTMLAttributeText(temp);
+  end;
+
 begin
   serializer.append(' ');
   serializer.append(n.getNodeName());
   serializer.append('="');
-  appendXMLHTMLCharacterMappedText(n.realvalue, true);
+  if params^.escapeURIAttributes and isHTMLElement(n.getParent()) and isURIAttribute(n) then
+    appendURIEscapedAttribute(n)
+   else
+    appendXMLHTMLCharacterMappedText(n.realvalue, true);
   serializer.append('"');
   result := true;
 end;
@@ -4958,7 +5056,7 @@ var known: TNamespaceList;
 
   function elementIsHTML(n: TTreeNode): boolean;
   begin
-
+    //since in HTML5 empty and xhtml namespace are the same; older versions treat them separately
     result := (   (isHTML5 or html) and ( (n.namespace = nil) or (n.namespace.getURL = '') ) )
              or ( (isHTML5 or xhtml) and ( n.namespace.getURL = XMLNamespaceUrl_XHTML) )
   end;
@@ -5431,25 +5529,29 @@ begin
   serializer.standard := true;
 
   with params do
-    if method in [xqsmHTML, xqsmXHTML] then begin
-      if (htmlVersion = isAbsentMarker) then htmlVersion := version;
-      if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
-      if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
-        cdataSectionElements.exclude('');
-        if isHTML5 then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
+    case method of
+      xqsmHTML, xqsmXHTML: begin
+        if (htmlVersion = isAbsentMarker) then htmlVersion := version;
+        if (htmlVersion = isAbsentMarker) then htmlVersion := '5.0';
+        if (method = xqsmHTML) and assigned(cdataSectionElements) then begin
+          cdataSectionElements.exclude('');
+          if isHTML5 then cdataSectionElements.exclude(XMLNamespaceUrl_XHTML);
+        end;
+        if assigned(suppressIndentation) then suppressIndentation.addHTMLLowercaseQNames(isHTML5);
       end;
-      if assigned(suppressIndentation) then suppressIndentation.addHTMLLowercaseQNames(isHTML5);
+      xqsmXML, xqsmText: params.escapeURIAttributes := false;
     end;
 
-  if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) then begin
+  if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) or params.escapeURIAttributes then begin
     interceptor.init;
     interceptor.params := @params;
     interceptor.serializer := @serializer;
     interceptor.htmlNodes := params.method = xqsmHTML;
     interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
-    if params.hasNormalizationForm or (params.characterMaps <> nil) then
+    if params.hasNormalizationForm or (params.characterMaps <> nil) or params.escapeURIAttributes then
       serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
-    serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
+    if params.hasNormalizationForm or assigned(params.characterMaps) or assigned(params.cdataSectionElements) then
+      serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
   end;
 
   with params do begin
