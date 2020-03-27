@@ -4421,7 +4421,7 @@ TSerializationParams = record
   //xml/html only
   version: string;
   doctypePublic, doctypeSystem: string;
-  omitXmlDeclaration: boolean;
+  omitXmlDeclaration, undeclarePrefixes: boolean;
   standalone: TXMLDeclarationStandalone;
   cdataSectionElements, suppressIndentation: PXQHashsetQName;
 
@@ -4483,6 +4483,7 @@ begin
   includeContentType := isFromMap;
   escapeURIAttributes := isFromMap;
   mediaType := 'text/html';
+  undeclarePrefixes := false;
 end;
 
 function toSerializationBool(const s:string; fromMap: boolean): boolean;
@@ -4588,7 +4589,7 @@ begin
          'omit-xml-declaration': omitXmlDeclaration := toSerializationBool(paramNode.getAttribute('value'));
          'standalone': setStandalone(paramNode.getAttribute('value'), false);
          'suppress-indentation': needQNameList(suppressIndentation).includeAll(context, paramNode, paramNode.getAttribute('value'));
-         'undeclare-prefixes': ;//todo
+         'undeclare-prefixes': undeclarePrefixes := toSerializationBool(paramNode.getAttribute('value'));
          'use-character-maps': setCharacterMaps;
          'version':        version := paramNode.getAttribute('value');
          else error();
@@ -4692,7 +4693,7 @@ begin
       'standalone': if staticOptions and (pp.Value.toString = 'omit') then standalone := xdsOmit
                     else setStandalone(valueBool());
       'suppress-indentation': setQNameList(suppressIndentation);
-      'undeclare-prefixes': valueBool(); //todo
+      'undeclare-prefixes': undeclarePrefixes := valueBool();
       'use-character-maps': setCharacterMaps();
       'version': version := valueString();
       #0'static-options': begin
@@ -5047,7 +5048,9 @@ type PSerializationParams = ^TSerializationParams;
 procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean; params: PSerializationParams);
 type TIncludeContentType = (ictIgnore, ictSearchingForHead, ictRemoveOld);
 var known: TNamespaceList;
-    indentationAllowed, xhtml, representsHTML, isHTML5: boolean;
+    indentationAllowed, undeclarePrefixes: boolean;
+    xhtml, representsHTML, isHTML5: boolean;
+
     includeContentType: TIncludeContentType;
   function htmlElementIsImplicitCDATA(const name: string): boolean;
   begin
@@ -5252,6 +5255,7 @@ var known: TNamespaceList;
         else n.getOwnNamespaces(known);
         for i:=oldnamespacecount to known.Count - 1 do
           if (known.items[i].getURL <> '') or
+             undeclarePrefixes or
              (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
                 and (isNamespaceUsed(known.items[i])
                      or ((known.items[i].getPrefix = '') and (isNamespaceUsed(nil))))) then begin
@@ -5353,6 +5357,7 @@ begin
   isHTML5 := representsHTML and (not assigned(params) or params.isHTML5);
   if representsHTML and assigned(params) and params.includeContentType then includeContentType := ictSearchingForHead
   else includeContentType := ictIgnore;
+  undeclarePrefixes := assigned(params) and params.undeclarePrefixes;
 
   known := TNamespaceList.Create;
   if nodeSelf then outer(base)
@@ -5573,6 +5578,8 @@ begin
               raiseXQEvaluationException('SEPM0009', 'Invalid serialization parameter');
 
           if version = isAbsentMarker then version := '1.1';
+
+          if undeclarePrefixes and (version = '1.0') then raiseXQEvaluationException('SEPM0010', 'Invalid serialization parameter');
         end;
 
         serializer.insertWhitespace := indent;
@@ -5618,7 +5625,6 @@ var
 
 begin
   params.characterMaps := nil;
-  //this is incomplete, but the options that it handles should be handled completely (except for some invalid value checking)
   arg := args[0];
   if argc = 2 then params.setFromXQValue(context, args[1])
   else params.setDefault(false);
