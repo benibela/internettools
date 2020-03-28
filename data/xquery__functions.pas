@@ -4308,7 +4308,7 @@ end;
 
 const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
       XMLNamespaceURL_MathML = 'http://www.w3.org/1998/Math/MathML';
-      XMLNamespaceUrl_SVG = 'https://www.w3.org/2000/svg';
+      XMLNamespaceUrl_SVG = 'http://www.w3.org/2000/svg';
 
 type
 TTrackOwnedXQHashsetStr = record
@@ -5041,10 +5041,12 @@ type PSerializationParams = ^TSerializationParams;
 procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean; params: PSerializationParams);
 type TIncludeContentType = (ictIgnore, ictSearchingForHead, ictRemoveOld);
 var known: TNamespaceList;
+    deadPrefixes: TNamespaceList;
     indentationAllowed, undeclarePrefixes: boolean;
     xhtml, representsHTML, isHTML5: boolean;
 
     includeContentType: TIncludeContentType;
+
   function htmlElementIsImplicitCDATA(const name: string): boolean;
   begin
     result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
@@ -5188,6 +5190,19 @@ var known: TNamespaceList;
     result := ' ' + n.serialize;
   end;
 
+  procedure killPrefixIfNecessary(n: TTreeNode; ns: TNamespace);
+  var a: TTreeAttribute;
+  begin
+    if ns.prefix = '' then exit;
+    case ns.url of
+      XMLNamespaceUrl_XHTML, XMLNamespaceUrl_SVG, XMLNamespaceURL_MathML: begin
+        for a in n.getEnumeratorAttributes do if a.namespace = ns then exit;
+        if n.isNamespaceUsed(nil) then exit;
+        deadPrefixes.add(ns);
+      end;
+    end;
+  end;
+
   procedure appendContentTypeNow;
   begin
     if indentationAllowed then begin
@@ -5210,7 +5225,7 @@ var known: TNamespaceList;
     procedure appendNodeName(n: TTreeNode);
     begin
       with builder do
-        if (n.namespace = nil) or (n.namespace.prefix = '') then append(n.value)
+        if (n.namespace = nil) or (n.namespace.prefix = '') or deadPrefixes.hasNamespace(n.namespace) then append(n.value)
         else begin
           append(n.namespace.prefix);
           append(':');
@@ -5232,6 +5247,7 @@ var known: TNamespaceList;
       temp: TNamespace;
       includeContentTypeHere: Boolean;
       isHTMLElement: boolean;
+      oldDeadPrefixCount: Int64;
   begin
     with n do with builder do
     case typ of
@@ -5256,6 +5272,7 @@ var known: TNamespaceList;
                          or (representsHTML and elementIsHTML(n));
         if isHTMLElement and (includeContentType = ictRemoveOld) and (htmlElementIsMetaContentType(n)) then exit;
 
+        oldDeadPrefixCount := deadPrefixes.count;
         if known <> nil then begin
           oldnamespacecount:=known.count;
           n.getOwnNamespaces(known);
@@ -5265,17 +5282,17 @@ var known: TNamespaceList;
           n.getAllNamespaces(known)
         end;
 
+        if isHTML5 then
+          for i:=oldnamespacecount to known.Count - 1 do
+            killPrefixIfNecessary(n, known.items[i]);
+
         append('<');
         appendNodeName(n);
-        {
-        writeln(stderr,'--');
-         if attributes <> nil then
-          for attrib in attributes do
-            if attrib.isNamespaceNode then
-             writeln(stderr, value+': '+attrib.toNamespace.serialize);
-        }
-        for i:=oldnamespacecount to known.Count - 1 do
-          if (known.items[i].getURL <> '') or
+
+        for i:=oldnamespacecount to known.Count - 1 do begin
+          if deadPrefixes.hasNamespace(known.items[i]) then begin
+            appendXMLElementAttribute('xmlns', known.items[i].url);
+          end else if (known.items[i].getURL <> '') or
              undeclarePrefixes or
              (known.hasNamespacePrefixBefore(known.items[i].getPrefix, oldnamespacecount)
                 and (isNamespaceUsed(known.items[i])
@@ -5283,6 +5300,8 @@ var known: TNamespaceList;
                        append(' ');
                        append(known.items[i].serialize);
                      end;
+
+        end;
 
         if namespace <> nil then append(requireNamespace(namespace))
         else if known.hasNamespacePrefix('', temp) then
@@ -5329,6 +5348,8 @@ var known: TNamespaceList;
 
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
+        while deadPrefixes.count > oldDeadPrefixCount do
+          deadPrefixes.Delete(deadPrefixes.count-1);
       end;
       tetDocument: inner(n, false);
       else; //should not happen
@@ -5387,9 +5408,11 @@ begin
   undeclarePrefixes := assigned(params) and params.undeclarePrefixes;
 
   known := nil;
+  deadPrefixes := TNamespaceList.Create;
   if nodeSelf then outer(base, representsHTML)
   else inner(base, elementIsHTML(base));
   known.free;
+  deadPrefixes.Free;
 end;
 
 
