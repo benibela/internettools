@@ -5265,7 +5265,7 @@ var known: TNamespaceList;
         append('-->');
       end;
       tetProcessingInstruction:
-        if parentIsHTMLElement then appendHTMLProcessingInstruction(value, getAttribute(''))
+        if parentIsHTMLElement and html then appendHTMLProcessingInstruction(value, getAttribute(''))
         else appendXMLProcessingInstruction(value, getAttribute(''));
       tetOpen: begin
         isHTMLElement := (parentIsHTMLElement and assigned(n.parent) and (n.parent.namespace = n.namespace))
@@ -5332,9 +5332,9 @@ var known: TNamespaceList;
         includeContentTypeHere := isHTMLElement and (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
         if (n.next = reverse)
            and not includeContentTypeHere
-           and (not isHTMLElement
-                or (html and TTreeParser.htmlElementIsChildless(value))
-                or (xhtml and xhtmlElementIsExpectedEmpty(n))
+           and (   (html and (not isHTMLElement or TTreeParser.htmlElementIsChildless(value)))
+                or (xhtml and isHTMLElement and xhtmlElementIsExpectedEmpty(n))
+                or not representsHTML
            ) then begin
           if not isHTMLElement then append('/>')
           else if html then append('>')
