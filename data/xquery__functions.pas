@@ -5162,6 +5162,7 @@ var known: TNamespaceList;
   end;
 
   function elementDescendantsMightBeIndented(n: TTreeNode; isHTMLElement: boolean): boolean;
+  var a: TTreeAttribute;
   begin
     if Assigned(params.suppressIndentation) then begin
       if params.suppressIndentation.contains(n.namespace, n.value) then
@@ -5173,7 +5174,9 @@ var known: TNamespaceList;
       case lowercase(n.value) of
         'pre', 'script', 'style', 'title', 'textarea': exit(false);
       end;
-    end;
+    end else for a in n.getEnumeratorAttributes do
+      if (a.value = 'space') and equalNamespaces(a.namespace, XMLNamespace_XML) and (a.realvalue = 'preserve') then
+        exit(false);
     result := true;
   end;
 
