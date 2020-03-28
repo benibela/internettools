@@ -34,7 +34,7 @@ TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwn
 end;
 PXQHashsetQName = ^TXQHashsetQName;
 TXQTwoLevelHashsetCaseInsensitiveASCII = object(specialize TXQHashmapStrCaseInsensitiveASCIIOwning<PXQHashsetStrCaseInsensitiveASCII, TTrackOwnedXQHashsetStr>)
-  function getOrCreate(const a: string): PXQHashsetStr;
+  function getOrCreate(const a: string): PXQHashsetStrCaseInsensitiveASCII;
   function contains(const a, b: string): boolean;
   procedure include(const a, b: string);
   procedure exclude(const a, b: string);
@@ -264,7 +264,7 @@ end;
 
 
 
-function TXQTwoLevelHashsetCaseInsensitiveASCII.getOrCreate(const a: string): PXQHashsetStr;
+function TXQTwoLevelHashsetCaseInsensitiveASCII.getOrCreate(const a: string): PXQHashsetStrCaseInsensitiveASCII;
 var
   ent: PHashMapEntity;
 begin
