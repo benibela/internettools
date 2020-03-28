@@ -28,11 +28,17 @@ uses
   classes, contnrs, SysUtils, bbutils;
 
 type
-  TXQDefaultTypeInfo = record
-    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+  TXQBaseTypeInfo = object
     class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
-    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
     class procedure createDeletionKey(out key: string); static;
+  end;
+  TXQDefaultTypeInfo = object(TXQBaseTypeInfo)
+    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
+  end;
+  TXQCaseInsensitiveTypeInfo = object(TXQBaseTypeInfo)
+    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
   end;
   TXQVoid = record end;
   //Hashmap based on Bero's FLRECacheHashMap
@@ -88,10 +94,13 @@ type
       property current: TKey read currentKey;
     end;
     procedure include(const Key:TKey; allowOverride: boolean=true);
+    procedure includeAll(keys: array of TKey);
     function getEnumerator: TKeyOnlyEnumerator;
   end;
   TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
   PXQHashsetStr = ^TXQHashsetStr;
+  TXQHashsetStrCaseInsensitiveASCII = specialize TXQHashset<string,TXQCaseInsensitiveTypeInfo>;
+  PXQHashsetStrCaseInsensitiveASCII = ^TXQHashsetStr;
 
   TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
   generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
@@ -318,15 +327,27 @@ begin
 end;
 
 
-class procedure TXQDefaultTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
+class procedure TXQBaseTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
 begin
   data := pointer(key);
   datalen := length(key);
 end;
 
+class procedure TXQBaseTypeInfo.createDeletionKey(out key: string);
+begin
+  key := #0'DELETED';
+end;
+
+
+
 class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
   result := (length(key)  = datalen) and CompareMem(data, pointer(key), datalen);
+end;
+
+class function TXQCaseInsensitiveTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
+begin
+  result := (length(key)  = datalen) and strliEqual(data, pointer(key), datalen);
 end;
 
 constructor TXQBaseHashmap.init;
@@ -354,6 +375,11 @@ begin
  SetLength(Entities,0);
  SetLength(CellToEntityIndex,0);
  Resize;
+end;
+
+class function TXQBaseHashmap.hash(const key: TKey): uint32;
+begin
+  result := TInfo.hash(pointer(key), length(key));
 end;
 
 function TXQBaseHashmap.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
@@ -675,6 +701,13 @@ end;
 procedure TXQHashset.include(const Key: TKey; allowOverride: boolean);
 begin
   inherited include(key, default(TXQVoid), allowOverride);
+end;
+
+procedure TXQHashset.includeAll(keys: array of TKey);
+var
+  i: SizeInt;
+begin
+  for i := 0 to high(keys) do include(keys[i]);
 end;
 
 function TXQHashset.getEnumerator: TKeyOnlyEnumerator;
@@ -1090,23 +1123,27 @@ begin
   result := result + (result shl 15);
 end;
 
-class procedure TXQDefaultTypeInfo.createDeletionKey(out key: string);
-begin
-  key := #0'DELETED';
-end;
-
-class function TXQBaseHashmap.hash(const key: TKey): uint32;
-begin
-  result := TInfo.hash(pointer(key), length(key));
-end;
 
 function nodeNameHash(const s: RawByteString): cardinal;
+begin
+  result := TXQCaseInsensitiveTypeInfo.hash(pointer(s), length(s));
+end;
+function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
+var
+  i: Integer;
+begin
+  for i := 1 to length(s) do if s[i] >= #128 then exit(0);
+  result := nodeNameHash(s);
+end;
+
+class function TXQCaseInsensitiveTypeInfo.hash(data: pchar; datalen: SizeUInt): uint32;
 var
   p, last: PByte;
 begin
-  if s = '' then exit(1);
-  p := pbyte(pointer(s));
-  last := p + length(s);
+  if datalen = 0 then exit(1);
+  //remember to update HTMLNodeNameHashs when changing anything here;
+  p := pbyte(data);
+  last := p + datalen;
   result := 0;
   while p < last do begin
     if p^ < 128  then begin //give the same hash independent of latin1/utf8 encoding and collation
@@ -1122,13 +1159,6 @@ begin
   result := result xor (result shr 11);
   result := result + (result shl 15);
   //remember to update HTMLNodeNameHashs when changing anything here;
-end;
-function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
-var
-  i: Integer;
-begin
-  for i := 1 to length(s) do if s[i] >= #128 then exit(0);
-  result := nodeNameHash(s);
 end;
 
 {$POP}

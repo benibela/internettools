@@ -11,6 +11,8 @@ procedure test(condition: boolean; name: string='');overload;
 procedure test(a, b: string; name: string = '');overload;
 procedure test(a, b: integer; name: string = '');overload;
 
+function str10ToLE(const s: string): string;
+
 var globalTestCount: integer = 0;
 implementation
 procedure test(condition: boolean; name: string='');overload;
@@ -49,6 +51,13 @@ begin
   if a <> b then
     raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
 end;
+
+function str10ToLE(const s: string): string;
+begin
+  result := StringReplace(s, #10, LineEnding, [rfReplaceAll]);
+end;
+
+
 
 end.
 
