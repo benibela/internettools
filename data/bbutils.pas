@@ -610,6 +610,7 @@ type
     end;
   private
     function getCapacity: SizeInt; inline;
+    procedure setCapacity(AValue: SizeInt);
   protected
     FBuffer: TArrayBuffer;
     FCount: SizeInt;
@@ -626,7 +627,7 @@ type
     procedure exchange(Index1, Index2: SizeInt);
     procedure expand;
     function toSharedArray: TArrayBuffer;
-    property capacity: SizeInt read getCapacity write setCount;
+    property capacity: SizeInt read getCapacity write setCapacity;
     property count: SizeInt read fcount write setCount;
   end;
 
@@ -647,11 +648,14 @@ type
       property Items[Index: SizeInt]: TElement read get write put; default;
   end;
   generic TCopyingPtrArrayList<TElement> = object(specialize TCopyingArrayList<TElement>)
+  public
+    function indexOf(const element: TElement): SizeInt;
+    function contains(const element: TElement): Boolean;
   end;
-  TPointerArrayList = specialize TCopyingArrayList<pointer>;
-  TObjectArrayList = specialize TCopyingArrayList<TObject>;
-  TSizeIntArrayList = specialize TCopyingArrayList<SizeInt>;
-  TStringArrayList = specialize TCopyingArrayList<String>;
+  TPointerArrayList = specialize TCopyingPtrArrayList<pointer>;
+  TObjectArrayList = specialize TCopyingPtrArrayList<TObject>;
+  TSizeIntArrayList = specialize TCopyingPtrArrayList<SizeInt>;
+  TStringArrayList = specialize TCopyingPtrArrayList<String>;
 
   generic TRecordArrayList<TElement> = object(specialize TBaseArrayList<TElement>)
     type TEnumerator = object(TBasePreEnumerator)
@@ -1335,9 +1339,17 @@ begin
   result := length(FBuffer)
 end;
 
+procedure TBaseArrayList.setCapacity(AValue: SizeInt);
+begin
+  SetLength(FBuffer, AValue);
+  if AValue < FCount then FCount := AValue;
+end;
+
 procedure TBaseArrayList.setCount(NewCount: SizeInt);
 begin
-  SetLength(FBuffer, NewCount);
+  if (NewCount > length(FBuffer))
+      or (2 * NewCount < length(FBuffer)) then
+     SetLength(FBuffer, NewCount);
   FCount := NewCount;
 end;
 
@@ -1415,6 +1427,7 @@ begin
   else SetLength(FBuffer, cap + 512);
 end;
 
+
 function TBaseArrayList.toSharedArray: TArrayBuffer;
 begin
   SetLength(FBuffer, fcount);
@@ -1491,6 +1504,20 @@ begin
   initEnumerator(result);
 end;
 
+function TCopyingPtrArrayList.indexOf(const element: TElement): SizeInt;
+var
+  i: SizeInt;
+begin
+  for i := 0 to FCount - 1 do
+    if FBuffer[i] = element then
+      exit(i);
+  result := -1;
+end;
+
+function TCopyingPtrArrayList.contains(const element: TElement): Boolean;
+begin
+  result := indexOf(element) >= 0;
+end;
 
 {$endif}
 
