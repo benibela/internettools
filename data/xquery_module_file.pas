@@ -762,15 +762,15 @@ begin
     module.registerFunction('delete', @delete, dependencyFiles).setVersionsShared([stringt, empty],  [stringt, boolean, empty]);
     lastfn := module.registerFunction('list', @list, dependencyFiles);
     lastfn.setVersionsShared(3);
-    lastfn.setVersionsShared([stringt, stringStar]);
-    lastfn.setVersionsShared([stringt, boolean, stringStar]);
-    lastfn.setVersionsShared([stringt, boolean, stringt, stringStar]);
+    lastfn.setVersionsShared(0, [stringt, stringStar]);
+    lastfn.setVersionsShared(1, [stringt, boolean, stringStar]);
+    lastfn.setVersionsShared(2, [stringt, boolean, stringt, stringStar]);
     module.registerFunction('move', @move, dependencyFiles).setVersionsShared([stringt, stringt, empty]);
     lastfn := module.registerFunction('read-binary', @read_binary, dependencyFiles);
     lastfn.setVersionsShared(3);
-    lastfn.setVersionsShared([stringt, base64Binary]);
-    lastfn.setVersionsShared([stringt, integer, base64Binary]);
-    lastfn.setVersionsShared([stringt, integer, integer, base64Binary]);
+    lastfn.setVersionsShared(0, [stringt, base64Binary]);
+    lastfn.setVersionsShared(1, [stringt, integer, base64Binary]);
+    lastfn.setVersionsShared(2, [stringt, integer, integer, base64Binary]);
     module.registerFunction('read-text', @read_text, dependencyFiles).setVersionsShared([stringt, stringt],  [stringt, stringt, stringt]);
     //[stringt, stringStar]
     module.registerInterpretedFunction('read-text-lines', '($file as xs:string) as xs:string*',                          'x:lines(file:read-text($file           ))');
