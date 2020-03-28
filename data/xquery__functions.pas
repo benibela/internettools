@@ -5298,6 +5298,7 @@ var known: TNamespaceList;
               if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement) then begin
                 //empty
               end else begin
+                append(' ');
                 appendNodeName(attrib);
                 append('="');
                 if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
