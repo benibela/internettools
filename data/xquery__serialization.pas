@@ -269,8 +269,8 @@ var
   ent: PHashMapEntity;
 begin
   ent := findEntity(a, true);
-  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
-  result := PXQHashsetStr(ent.Value);
+  if ent.Value = nil then new(PXQHashsetStrCaseInsensitiveASCII(ent.Value), init);
+  result := PXQHashsetStrCaseInsensitiveASCII(ent.Value);
 end;
 
 function TXQTwoLevelHashsetCaseInsensitiveASCII.contains(const a, b: string): boolean;
