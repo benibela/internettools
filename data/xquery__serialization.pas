@@ -33,13 +33,14 @@ TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwn
   procedure addHTMLLowercaseQNames(html5: boolean);
 end;
 PXQHashsetQName = ^TXQHashsetQName;
+{$if false}
 TXQTwoLevelHashsetCaseInsensitiveASCII = object(specialize TXQHashmapStrCaseInsensitiveASCIIOwning<PXQHashsetStrCaseInsensitiveASCII, TTrackOwnedXQHashsetStr>)
   function getOrCreate(const a: string): PXQHashsetStrCaseInsensitiveASCII;
   function contains(const a, b: string): boolean;
   procedure include(const a, b: string);
   procedure exclude(const a, b: string);
 end;
-
+{$endif}
 
 type
 TXQSerializationMethod = (xqsmXML, xqsmXHTML, xqsmHTML, xqsmText, xqsmJSON, xqsmAdaptive);
@@ -264,6 +265,7 @@ end;
 
 
 
+{$if false}
 function TXQTwoLevelHashsetCaseInsensitiveASCII.getOrCreate(const a: string): PXQHashsetStrCaseInsensitiveASCII;
 var
   ent: PHashMapEntity;
@@ -293,7 +295,7 @@ begin
   nestedSet := getOrCreate(a);
   if assigned(nestedSet) then nestedSet.exclude(b);
 end;
-
+{$endif}
 
 
 
@@ -835,8 +837,10 @@ var known: TNamespaceList;
   function elementIsPhrasing(n: TTreeNode): boolean;
   begin
     if elementIsHTML(n) then result := htmlElementIsPhrasing(n)
-    else if n.getNamespaceURL() = XMLNamespaceURL_MathML then result := true
-    else result := false
+    else case n.getNamespaceURL() of
+      XMLNamespaceURL_MathML, XMLNamespaceUrl_SVG: result := true
+      else result := false
+    end;
   end;
 
   function elementDescendantsMightBeIndented(n: TTreeNode; isHTMLElement: boolean): boolean;
@@ -849,9 +853,9 @@ var known: TNamespaceList;
         exit(false);
     end;
     if isHTMLElement then begin
-      if htmlElementIsFormattedWhitespace(n.value) then exit(false);
+      if htmlElementIsFormattedWhitespace(n) then exit(false);
     end else for a in n.getEnumeratorAttributes do
-      if (a.value = 'space') and equalNamespaces(a.namespace, XMLNamespace_XML) and (a.realvalue = 'preserve') then
+      if (a.hash = XMLAttributeNameHashs.space) and (a.value = 'space') and equalNamespaces(a.namespace, XMLNamespace_XML) and (a.realvalue = 'preserve') then
         exit(false);
     result := true;
   end;
@@ -1006,7 +1010,7 @@ var known: TNamespaceList;
         includeContentTypeHere := isHTMLElement and (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
         if (n.next = reverse)
            and not includeContentTypeHere
-           and (   (html and (not isHTMLElement or htmlElementIsChildless(value)))
+           and (   (html and (not isHTMLElement or htmlElementIsChildless(hash, value)))
                 or (xhtml and isHTMLElement and htmlElementIsExpectedEmpty(n, ishtml5))
                 or not representsHTML
            ) then begin

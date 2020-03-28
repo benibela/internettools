@@ -61,8 +61,9 @@ type
 
   private
     //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
-    function findCell(keydata: pchar; keylen: SizeUInt): UInt32;
-    function findCell(const Key: TKey): UInt32;
+    function findCell(keydata: pchar; keylen: SizeUInt): UInt32; inline;
+    function findCell(const Key: TKey): UInt32; inline;
+    function findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: UInt32): UInt32;
     procedure resize;
   protected
   {$if FPC_FULLVERSION <= 30004} public{$endif}
@@ -82,6 +83,7 @@ type
     procedure Clear;
     function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
     function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+    function findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
     function exclude(const Key:TKey):boolean;
     function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
@@ -157,6 +159,7 @@ type
   end;
 
 
+  {$if false}
   generic TXQBaseHashmapStrCaseInsensitivePointerButNotPointer<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue, TXQDefaultTypeInfo>)
   end;
   generic TXQHashmapStrCaseInsensitiveASCII<TValue> = object(specialize TXQBaseHashmapStrCaseInsensitivePointerButNotPointer<TValue>)
@@ -176,7 +179,7 @@ type
     procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
-
+  {$endif}
 
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
 type TFastInterfacedObject = class(TObject, IUnknown)
@@ -286,6 +289,7 @@ function urlHexDecode(s: string): string;
 
 function nodeNameHash(const s: RawByteString): cardinal;
 function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
+function nodeNameHash(p: pchar; len: sizeint): cardinal; inline;
 
 
 
@@ -408,10 +412,22 @@ begin
 end;
 
 function TXQBaseHashmap.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
-var HashCode,Mask,Step:uint32;
+begin
+ result := findCellWithHash(keydata, keylen, TInfo.hash(keydata, keylen));
+end;
+
+function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
+var data: pchar;
+    datalen: SizeUInt;
+begin
+  TInfo.keyToData(key, data, datalen);
+  result := findCell(data, datalen);
+end;
+
+function TXQBaseHashmap.findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: UInt32): UInt32;
+var Mask,Step:uint32;
     Entity:int32;
 begin
- HashCode:=TInfo.hash(keydata, keylen);
  Mask:=(2 shl LogSize)-1;
  Step:=((HashCode shl 1)+1) and Mask;
  if LogSize<>0 then begin
@@ -426,14 +442,6 @@ begin
   end;
   result:=(result+Step) and Mask;
  until false;
-end;
-
-function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
-var data: pchar;
-    datalen: SizeUInt;
-begin
-  TInfo.keyToData(key, data, datalen);
-  result := findCell(data, datalen);
 end;
 
 procedure TXQBaseHashmap.resize;
@@ -518,6 +526,17 @@ var Entity:int32;
 begin
  result:=nil;
  Cell:=FindCell(data, keylen);
+ Entity:=CellToEntityIndex[Cell];
+ if Entity>=0 then
+  result:=@Entities[Entity];
+end;
+
+function TXQBaseHashmap.findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
+var Entity:int32;
+    Cell:uint32;
+begin
+ result:=nil;
+ Cell:=findCellWithHash(data, keylen, ahash);
  Entity:=CellToEntityIndex[Cell];
  if Entity>=0 then
   result:=@Entities[Entity];
@@ -827,6 +846,7 @@ end;
 
 //default case insensitive maps
 
+{$if false}
 procedure TXQHashmapStrCaseInsensitiveASCII.SetValue(const Key: string; const AValue: TValue);
 begin
   SetBaseValue(key, pointer(avalue));
@@ -871,7 +891,7 @@ destructor TXQHashmapStrCaseInsensitiveASCIIOwning.done;
 begin
   clear;
 end;
-
+{$endif}
 
 
 //string functions
@@ -1216,6 +1236,11 @@ var
 begin
   for i := 1 to length(s) do if s[i] >= #128 then exit(0);
   result := nodeNameHash(s);
+end;
+
+function nodeNameHash(p: pchar; len: sizeint): cardinal;
+begin
+ result := TXQCaseInsensitiveTypeInfo.hash(p, len);
 end;
 
 class function TXQCaseInsensitiveTypeInfo.hash(data: pchar; datalen: SizeUInt): uint32;

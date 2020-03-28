@@ -2225,7 +2225,7 @@ begin
       bpmInBody: if repairMissingStartTags and (striEqual(tag, 'body') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
       bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
     end;
-    FAutoCloseTag:=htmlElementIsChildless(tag);
+    FAutoCloseTag:=htmlElementIsChildless(nodeNameHash(tag), tag);
     if striEqual(tag, 'table') and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, 'table') then
       leaveTag(tagName, tagNameLen);
   end;
@@ -2355,7 +2355,7 @@ begin
     end;
 
     name := strFromPchar(tagName, tagNameLen);
-    if (FParsingModel = pmHTML) and htmlElementIsChildless(name) then begin
+    if (FParsingModel = pmHTML) and htmlElementIsChildless(nodeNameHash(name), name) then begin
       parenDelta := 0;
       last := FCurrentElement;
       weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
