@@ -4790,14 +4790,14 @@ end;
 type TSpecialStringHandler = object
   serializer: ^TXQSerializer;
   params: ^TSerializationParams;
-  htmlNodes, isUnicodeEncoding: boolean;
+  isUnicodeEncoding: boolean;
   function normalizeString(p: pchar; len: sizeint): string; overload;
   function normalizeString(const s: string): string; inline; overload;
   procedure appendJSONStringWithoutQuotes(const s: string);
-  procedure appendXMLHTMLAttributeText(const s:string);
-  procedure appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
-  function appendXMLHTMLText(const n: TTreeNode): boolean;
-  function appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
+  procedure appendXMLHTMLAttributeText(const s:string; html: boolean);
+  procedure appendXMLHTMLCharacterMappedText(const s: string; attrib, html: boolean);
+  function appendXMLHTMLText(const n: TTreeNode; html: boolean): boolean;
+  function appendXMLHTMLAttribute(const n: TTreeAttribute; html: boolean): boolean;
   procedure init;
 end;
 procedure TSpecialStringHandler.init;
@@ -4844,13 +4844,13 @@ begin
   end;
 end;
 
-procedure TSpecialStringHandler.appendXMLHTMLAttributeText(const s: string);
+procedure TSpecialStringHandler.appendXMLHTMLAttributeText(const s: string; html: boolean);
 begin
-  if htmlNodes then serializer^.appendHTMLAttrib(s)
+  if html then serializer^.appendHTMLAttrib(s)
   else serializer^.appendXMLAttrib(s);
 end;
 
-procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib: boolean);
+procedure TSpecialStringHandler.appendXMLHTMLCharacterMappedText(const s: string; attrib, html: boolean);
 var needNormalization, needEscaping: Boolean;
 var entity: TXQHashmapStrStr.PHashMapEntity;
     enumerator: TUTF8StringCodePointBlockEnumerator;
@@ -4869,9 +4869,9 @@ begin
       if needNormalization or needEscaping then begin
         temp := normalizeString(enumerator.markedPos, enumerator.markedByteLength);
         if attrib then begin
-          appendXMLHTMLAttributeText(temp);
+          appendXMLHTMLAttributeText(temp, html);
         end else
-          if htmlNodes then serializer^.appendHTMLText(temp)
+          if html then serializer^.appendHTMLText(temp)
           else serializer^.appendXMLText(temp)
       end else begin
         serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
@@ -4891,7 +4891,7 @@ begin
   until not hadNext;
 end;
 
-function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode): boolean;
+function TSpecialStringHandler.appendXMLHTMLText(const n: TTreeNode; html: boolean): boolean;
   procedure appendXMLCDATATextASCII(const s: string);
   var enumerator: TUTF8StringCodePointBlockEnumerator;
     hadNext: Boolean;
@@ -4930,20 +4930,13 @@ begin
     end;
   end;
   if assigned(params^.characterMaps) then begin
-    appendXMLHTMLCharacterMappedText(n.value, false);
+    appendXMLHTMLCharacterMappedText(n.value, false, html);
     exit(true);
   end;
   result := false;
 end;
 
-function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): boolean;
-  function isHTMLElement(n: TTreeNode): boolean;
-  begin
-    if (n.namespace = nil) or (n.namespace.getURL = '') then result := (params.method = xqsmHTML) or params.isHTML5
-    else if n.namespace.getURL = XMLNamespaceUrl_XHTML then result := (params.method = xqsmXHTML) or params.isHTML5
-    else result := false;
-  end;
-
+function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute; html: boolean): boolean;
   function isURIAttribute(n: TTreeAttribute): boolean;
   begin
     if n.namespace = nil then
@@ -5018,19 +5011,19 @@ function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute): 
   begin
     temp := TInternetAccess.urlEncodeData(xquery__functions.normalizeString(n.realvalue, unfNFC), ueXPathHTML4);
     if params^.hasNormalizationForm or assigned(params^.characterMaps) then
-      appendXMLHTMLCharacterMappedText(temp, true)
+      appendXMLHTMLCharacterMappedText(temp, true, html)
      else
-      appendXMLHTMLAttributeText(temp);
+      appendXMLHTMLAttributeText(temp, html);
   end;
 
 begin
   serializer.append(' ');
   serializer.append(n.getNodeName());
   serializer.append('="');
-  if params^.escapeURIAttributes and isHTMLElement(n.getParent()) and isURIAttribute(n) then
+  if params^.escapeURIAttributes and html and isURIAttribute(n) then
     appendURIEscapedAttribute(n)
    else
-    appendXMLHTMLCharacterMappedText(n.realvalue, true);
+    appendXMLHTMLCharacterMappedText(n.realvalue, true, html);
   serializer.append('"');
   result := true;
 end;
@@ -5057,14 +5050,14 @@ var known: TNamespaceList;
     result := simplehtmlparser.htmlElementIsCDATA(pchar(name), length(name));
   end;
 
-  function elementIsHTML(n: TTreeNode): boolean;
+   function elementIsHTML(n: TTreeNode): boolean;
   begin
     //since in HTML5 empty and xhtml namespace are the same; older versions treat them separately
     result := (   (isHTML5 or html) and ( (n.namespace = nil) or (n.namespace.getURL = '') ) )
              or ( (isHTML5 or xhtml) and ( n.namespace.getURL = XMLNamespaceUrl_XHTML) )
   end;
 
-  function htmlElementIsPhrasing(n: TTreeNode): boolean;
+  function elementIsPhrasing(n: TTreeNode): boolean;
   begin
     if elementIsHTML(n) then begin
       case lowercase(n.value) of
@@ -5133,43 +5126,42 @@ var known: TNamespaceList;
 
   function xhtmlElementIsExpectedEmpty(n: TTreeNode): boolean;
   begin
-    if elementIsHTML(n) then
-      case lowercase(n.value) of
-        'area': exit(true);
-        'base': exit(true);
-        'br': exit(true);
-        'col': exit(true);
-        'embed': exit(true);
-        'hr': exit(true);
-        'img': exit(true);
-        'input': exit(true);
-        'link': exit(true);
-        'meta': exit(true);
-        'param': exit(true);
+    case lowercase(n.value) of
+      'area': exit(true);
+      'base': exit(true);
+      'br': exit(true);
+      'col': exit(true);
+      'embed': exit(true);
+      'hr': exit(true);
+      'img': exit(true);
+      'input': exit(true);
+      'link': exit(true);
+      'meta': exit(true);
+      'param': exit(true);
 
-        'isindex': exit(not isHTML5);
-        'basefont': exit(not isHTML5);
-        'frame': exit(not isHTML5);
+      'isindex': exit(not isHTML5);
+      'basefont': exit(not isHTML5);
+      'frame': exit(not isHTML5);
 
-        'keygen': exit(isHTML5);
-        'source': exit(isHTML5);
-        'track': exit(isHTML5);
-        'wbr': exit(isHTML5);
-      end;
+      'keygen': exit(isHTML5);
+      'source': exit(isHTML5);
+      'track': exit(isHTML5);
+      'wbr': exit(isHTML5);
+    end;
     result := false;
   end;
 
   function htmlElementIsHead(n: TTreeNode): boolean;
   begin
-    result := elementIsHTML(n) and striEqual(n.value, 'head');
+    result := striEqual(n.value, 'head');
   end;
 
   function htmlElementIsMetaContentType(n: TTreeNode): boolean;
   begin
-    result := elementIsHTML(n) and striEqual(n.value, 'meta') and striEqual(n.getAttribute('http-equiv'), 'content-type');
+    result := striEqual(n.value, 'meta') and striEqual(n.getAttribute('http-equiv'), 'content-type');
   end;
 
-  function elementDescendantsMightBeIndented(n: TTreeNode): boolean;
+  function elementDescendantsMightBeIndented(n: TTreeNode; isHTMLElement: boolean): boolean;
   begin
     if Assigned(params.suppressIndentation) then begin
       if params.suppressIndentation.contains(n.namespace, n.value) then
@@ -5177,7 +5169,7 @@ var known: TNamespaceList;
       if representsHTML and params.suppressIndentation.contains(n.namespace, lowercase(n.value)) then
         exit(false);
     end;
-    if representsHTML then begin
+    if isHTMLElement then begin
       case lowercase(n.value) of
         'pre', 'script', 'style', 'title', 'textarea': exit(false);
       end;
@@ -5209,9 +5201,9 @@ var known: TNamespaceList;
     includeContentType := ictRemoveOld;
   end;
 
-  procedure inner(n: TTreeNode); forward;
+  procedure inner(n: TTreeNode; insideHTMLElement: boolean); forward;
 
-  procedure outer(n: TTreeNode);
+  procedure outer(n: TTreeNode; parentIsHTMLElement: boolean);
     procedure appendNodeName(n: TTreeNode);
     begin
       with builder do
@@ -5236,13 +5228,14 @@ var known: TNamespaceList;
       i: Integer;
       temp: TNamespace;
       includeContentTypeHere: Boolean;
+      isHTMLElement: boolean;
   begin
     with n do with builder do
     case typ of
       tetText: begin
-        if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n) then begin
+        if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n, parentIsHTMLElement) then begin
           //empty
-        end else if not html then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
+        end else if not parentIsHTMLElement then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
         else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
         else appendHTMLText(value);
       end;
@@ -5253,10 +5246,13 @@ var known: TNamespaceList;
         append('-->');
       end;
       tetProcessingInstruction:
-        if html then appendHTMLProcessingInstruction(value, getAttribute(''))
+        if parentIsHTMLElement then appendHTMLProcessingInstruction(value, getAttribute(''))
         else appendXMLProcessingInstruction(value, getAttribute(''));
       tetOpen: begin
-        if (includeContentType = ictRemoveOld) and (htmlElementIsMetaContentType(n)) then exit;
+        isHTMLElement := (parentIsHTMLElement and assigned(n.parent) and (n.parent.namespace = n.namespace))
+                         or (representsHTML and elementIsHTML(n));
+        if isHTMLElement and (includeContentType = ictRemoveOld) and (htmlElementIsMetaContentType(n)) then exit;
+
         if known <> nil then begin
           oldnamespacecount:=known.count;
           n.getOwnNamespaces(known);
@@ -5265,9 +5261,9 @@ var known: TNamespaceList;
           known := TNamespaceList.Create;
           n.getAllNamespaces(known)
         end;
+
         append('<');
         appendNodeName(n);
-
         {
         writeln(stderr,'--');
          if attributes <> nil then
@@ -5299,42 +5295,43 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in getEnumeratorAttributes do
             if not attrib.isNamespaceNode then begin
-              if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib) then begin
+              if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement) then begin
                 //empty
               end else begin
                 appendNodeName(attrib);
                 append('="');
-                if html then appendHTMLAttrib(attrib.realvalue)
+                if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
                 else appendXMLAttrib(attrib.realvalue);
                 append('"');
               end;
             end;
 
-        includeContentTypeHere := (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
+        includeContentTypeHere := isHTMLElement and (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
         if (n.next = reverse)
-           and (not html or (TTreeParser.htmlElementIsChildless(value)))
-           and (not xhtml or xhtmlElementIsExpectedEmpty(n))
            and not includeContentTypeHere
-           then begin
-          if html then append('>')
-          else if not xhtml then append('/>')
+           and (not isHTMLElement
+                or (html and TTreeParser.htmlElementIsChildless(value))
+                or (xhtml and xhtmlElementIsExpectedEmpty(n))
+           ) then begin
+          if not isHTMLElement then append('/>')
+          else if html then append('>')
           else append(' />');
         end else begin
           append('>');
           if includeContentTypeHere then appendContentTypeNow;
-          inner(n);
+          inner(n, isHTMLElement);
           appendXMLElementEndTag2(n);
         end;
 
         while known.count > oldnamespacecount do
           known.Delete(known.count-1);
       end;
-      tetDocument: inner(n);
+      tetDocument: inner(n, false);
       else; //should not happen
     end;
   end;
 
-  procedure inner(n: TTreeNode);
+  procedure inner(n: TTreeNode; insideHTMLElement: boolean);
   var sub: TTreeNode;
     oldIndentationAllowed: Boolean;
 
@@ -5342,12 +5339,12 @@ var known: TNamespaceList;
     if not (n.typ in TreeNodesWithChildren) then exit;
     oldIndentationAllowed := indentationAllowed;
     if indentationAllowed then begin
-      if Assigned(params) then indentationAllowed := elementDescendantsMightBeIndented(n);
+      if Assigned(params) then indentationAllowed := elementDescendantsMightBeIndented(n, insideHTMLElement);
       sub := n.getFirstChild();
       while (sub <> nil) and indentationAllowed do begin
         case sub.typ of
           tetText: indentationAllowed := sub.value.IsBlank();
-          tetOpen: indentationAllowed := not (representsHTML and htmlElementIsPhrasing(sub));
+          tetOpen: indentationAllowed := not (insideHTMLElement and elementIsPhrasing(sub));
         end;
         sub := sub.getNextSibling();
       end;
@@ -5363,7 +5360,7 @@ var known: TNamespaceList;
         builder.appendIndent;
       end;
       if (not indentationAllowed) or (sub.typ <> tetText) then
-        outer(sub);
+        outer(sub, insideHTMLElement);
       sub := sub.getNextSibling();
     end;
 
@@ -5386,8 +5383,8 @@ begin
   undeclarePrefixes := assigned(params) and params.undeclarePrefixes;
 
   known := nil;
-  if nodeSelf then outer(base)
-  else inner(base);
+  if nodeSelf then outer(base, representsHTML)
+  else inner(base, elementIsHTML(base));
   known.free;
 end;
 
@@ -5577,7 +5574,6 @@ begin
     interceptor.init;
     interceptor.params := @params;
     interceptor.serializer := @serializer;
-    interceptor.htmlNodes := params.method = xqsmHTML;
     interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
     if params.hasNormalizationForm or (params.characterMaps <> nil) or params.escapeURIAttributes then
       serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
