@@ -100,10 +100,11 @@ type
   TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
   PXQHashsetStr = ^TXQHashsetStr;
   TXQHashsetStrCaseInsensitiveASCII = specialize TXQHashset<string,TXQCaseInsensitiveTypeInfo>;
-  PXQHashsetStrCaseInsensitiveASCII = ^TXQHashsetStr;
+  PXQHashsetStrCaseInsensitiveASCII = ^TXQHashsetStrCaseInsensitiveASCII;
 
-  TXQBaseHashmapStrPointer = specialize TXQBaseHashmap<string,pointer,TXQDefaultTypeInfo>;
-  generic TXQBaseHashmapStrPointerButNotPointer<TValue> = object(TXQBaseHashmapStrPointer)
+  generic TXQBaseHashmapStrPointer<TInfo> = object(specialize TXQBaseHashmap<string, pointer, TInfo>)
+  end;
+  generic TXQBaseHashmapStrPointerButNotPointer<TValue, TInfo> = object(specialize TXQBaseHashmapStrPointer<TInfo>)
     type
       PXQBaseHashmapStrPointerButNotPointer = ^TXQBaseHashmapStrPointerButNotPointer;
       PKeyPairEnumerator = ^TKeyPairEnumerator;
@@ -122,14 +123,16 @@ type
     function getEnumerator: TKeyPairEnumerator;
   end;
 
-  generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  generic TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue, TXQDefaultTypeInfo>)
+  end;
+  generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>)
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
   public
     procedure include(const Key: string; const Value: TValue; allowOverride: boolean=true);
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
   end;
-  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue>)
+  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = object(specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>)
   type PXQHashmapStrOwning = ^TXQHashmapStrOwning;
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
@@ -152,6 +155,28 @@ type
   TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
   TXQHashmapStrStr = object(specialize TXQHashmapStrOwning<string, TXQDefaultOwnershipTracker>)
   end;
+
+
+  generic TXQBaseHashmapStrCaseInsensitivePointerButNotPointer<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue, TXQDefaultTypeInfo>)
+  end;
+  generic TXQHashmapStrCaseInsensitiveASCII<TValue> = object(specialize TXQBaseHashmapStrCaseInsensitivePointerButNotPointer<TValue>)
+  protected
+    procedure SetValue(const Key: string; const AValue: TValue); inline;
+  public
+    procedure include(const Key: string; const Value: TValue; allowOverride: boolean=true);
+    property Values[const Key:string]: TValue read GetValue write SetValue; default;
+  end;
+  generic TXQHashmapStrCaseInsensitiveASCIIOwning<TValue, TOwnershipTracker> = object(specialize TXQBaseHashmapStrCaseInsensitivePointerButNotPointer<TValue>)
+  type PXQHashmapStrCaseInsensitiveASCIIOwning = ^TXQHashmapStrCaseInsensitiveASCIIOwning;
+  protected
+    procedure SetValue(const Key: string; const AValue: TValue); inline;
+  public
+    procedure clear;
+    destructor done;
+    procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
+    property Values[const Key:string]: TValue read GetValue write SetValue; default;
+  end;
+
 
 //** A simple refcounted object like TInterfacedObject, but faster, because it assumes you never convert it to an interface in constructor or destructor
 type TFastInterfacedObject = class(TObject, IUnknown)
@@ -739,6 +764,12 @@ begin
   result.init(@self);
 end;
 
+
+
+
+
+//default maps
+
 procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
 begin
   SetBaseValue(key, pointer(avalue));
@@ -793,6 +824,57 @@ begin
 end;
 
 
+
+//default case insensitive maps
+
+procedure TXQHashmapStrCaseInsensitiveASCII.SetValue(const Key: string; const AValue: TValue);
+begin
+  SetBaseValue(key, pointer(avalue));
+end;
+
+procedure TXQHashmapStrCaseInsensitiveASCII.include(const Key: string; const Value: TValue; allowOverride: boolean);
+begin
+  inherited include(key, pointer(value), allowOverride);
+end;
+
+
+procedure TXQHashmapStrCaseInsensitiveASCIIOwning.include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
+var
+  ent: PHashMapEntity;
+begin
+  ent := findEntity(key, true);
+  if ent^.Value = pointer(AValue) then exit;
+  if ent^.Value <> nil then begin
+    if not allowOverride then exit;
+    TOwnershipTracker.release(TValue(ent^.Value));
+  end;
+  TOwnershipTracker.addRef(avalue);
+  ent^.Value:=pointer(avalue);
+end;
+
+procedure TXQHashmapStrCaseInsensitiveASCIIOwning.SetValue(const Key: string; const AValue: TValue);
+begin
+  include(key, avalue, true);
+end;
+
+procedure TXQHashmapStrCaseInsensitiveASCIIOwning.clear;
+var
+  i: SizeInt;
+begin
+ for i := 0 to high(Entities) do
+   if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
+     TOwnershipTracker.Release(TValue(Entities[i].Value));
+  inherited;
+end;
+
+destructor TXQHashmapStrCaseInsensitiveASCIIOwning.done;
+begin
+  clear;
+end;
+
+
+
+//string functions
 
 
 

@@ -4314,8 +4314,11 @@ type
 TTrackOwnedXQHashsetStr = record
   class procedure addRef(o: PXQHashsetStr); static; inline;
   class procedure release(o: PXQHashsetStr); static; inline;
+  class procedure addRef(o: PXQHashsetStrCaseInsensitiveASCII); static; inline;
+  class procedure release(o: PXQHashsetStrCaseInsensitiveASCII); static; inline;
 end;
 TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwnedXQHashsetStr>)
+  function getOrCreate(const namespace: string): PXQHashsetStr;
   function contains(namespace: TNamespace; const local: string): boolean;
   procedure include(namespace: TNamespace; const local: string);
   function contains(const namespace,local: string): boolean;
@@ -4325,6 +4328,14 @@ TXQHashsetQName = object(specialize TXQHashmapStrOwning<PXQHashsetStr, TTrackOwn
   procedure addHTMLLowercaseQNames(html5: boolean);
 end;
 PXQHashsetQName = ^TXQHashsetQName;
+TXQTwoLevelHashsetCaseInsensitiveASCII = object(specialize TXQHashmapStrCaseInsensitiveASCIIOwning<PXQHashsetStrCaseInsensitiveASCII, TTrackOwnedXQHashsetStr>)
+  function getOrCreate(const a: string): PXQHashsetStr;
+  function contains(const a, b: string): boolean;
+  procedure include(const a, b: string);
+  procedure exclude(const a, b: string);
+end;
+
+
 class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStr);
 begin
   //empty
@@ -4335,6 +4346,24 @@ begin
   dispose(o, done);
 end;
 
+class procedure TTrackOwnedXQHashsetStr.addRef(o: PXQHashsetStrCaseInsensitiveASCII);
+begin
+  ignore(o);
+end;
+
+class procedure TTrackOwnedXQHashsetStr.release(o: PXQHashsetStrCaseInsensitiveASCII);
+begin
+  dispose(o, done);
+end;
+
+function TXQHashsetQName.getOrCreate(const namespace: string): PXQHashsetStr;
+var
+  ent: PHashMapEntity;
+begin
+  ent := findEntity(namespace, true);
+  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
+  result := PXQHashsetStr(ent.Value);
+end;
 
 function TXQHashsetQName.contains(namespace: TNamespace; const local: string): boolean;
 begin
@@ -4352,12 +4381,8 @@ begin
   result := assigned(s) and s.contains(local);
 end;
 procedure TXQHashsetQName.include(const namespace, local: string);
-var
-  ent: PHashMapEntity;
 begin
-  ent := findEntity(namespace, true);
-  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
-  PXQHashsetStr(ent.Value)^.include(local);
+  getOrCreate(namespace).include(local);
 end;
 
 function TXQHashsetQName.includeAll(const v: IXQValue): boolean;
@@ -4404,6 +4429,41 @@ begin
     transformFromTo(v.value, v.key);
   end;
 end;
+
+
+
+
+function TXQTwoLevelHashsetCaseInsensitiveASCII.getOrCreate(const a: string): PXQHashsetStr;
+var
+  ent: PHashMapEntity;
+begin
+  ent := findEntity(a, true);
+  if ent.Value = nil then new(PXQHashsetStr(ent.Value), init);
+  result := PXQHashsetStr(ent.Value);
+end;
+
+function TXQTwoLevelHashsetCaseInsensitiveASCII.contains(const a, b: string): boolean;
+var
+  nestedSet: PXQHashsetStr;
+begin
+  nestedSet := getOrDefault(a);
+  result := assigned(nestedSet) and nestedSet.contains(b);
+end;
+
+procedure TXQTwoLevelHashsetCaseInsensitiveASCII.include(const a, b: string);
+begin
+  getOrCreate(a).include(b);
+end;
+
+procedure TXQTwoLevelHashsetCaseInsensitiveASCII.exclude(const a, b: string);
+var
+  nestedSet: PXQHashsetStr;
+begin
+  nestedSet := getOrCreate(a);
+  if assigned(nestedSet) then nestedSet.exclude(b);
+end;
+
+
 
 
 type
@@ -8744,6 +8804,5 @@ end;
 
 initialization
   GlobalNodeSerializationCallback := @GlobalNodeSerializationCallbackImpl;
-
 end.
 
