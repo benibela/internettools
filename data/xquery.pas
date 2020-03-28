@@ -76,6 +76,7 @@ type
   IXQValue=interface;
   PIXQValue = ^IXQValue;
   TXQVArray = array of IXQValue;
+  TXQValueObject = class;
   TXQValueFunction = class;
   TXQCollation=class;
   TXQVariableChangeLog=class;
@@ -192,6 +193,8 @@ type
     emptyOrderSpec: TXQTermFlowerOrderEmpty;
 
     copyNamespacePreserve, copyNamespaceInherit: boolean;
+
+    serializationOptions: IXQValue;
 
     //extensions
     defaultTypeNamespace: TNamespace; //**< Extension: default type namespace. Behaves like the default element type namespace, but does not change the namespace of constructed elements. (default is http://www.w3.org/2001/XMLSchema)
@@ -498,6 +501,7 @@ type
     procedure jsonSerialize(var serializer: TXQSerializer);
     procedure xmlSerialize(var serializer: TXQSerializer);
     procedure adaptiveSerialize(var serializer: TXQSerializer);
+    function serialize(const context: TXQEvaluationContext): string;
     function stringifyNodes: IXQValue; //preliminary
     function hasNodes: boolean;
 
@@ -580,6 +584,7 @@ type
     procedure jsonSerialize(var serializer: TXQSerializer); virtual;
     procedure xmlSerialize(var serializer: TXQSerializer); virtual;
     procedure adaptiveSerialize(var serializer: TXQSerializer); virtual;
+    function serialize(const context: TXQEvaluationContext): string;
     function stringifyNodes: IXQValue; virtual;
     function hasNodes: boolean; virtual;
 
@@ -943,7 +948,7 @@ type
 
   { TXQValuePropertyEnumerator }
 
-  TXQValueObject = class;
+
   TXQValuePropertyEnumerator = class(TXQPropertyEnumeratorInternal)
   private
     tempobj: TXQValueObject;
@@ -3263,6 +3268,9 @@ public
   false: (cachedTypes: array[1..81] of TXQTermSequenceType);
 end;
 var globalTypes: TXQGlobalTypes;
+
+type TXQGlobalSerializationCallback = function (const context: TXQEvaluationContext; const value: IXQValue): string;
+var globalSerializationCallback: TXQGlobalSerializationCallback;
 
 implementation
 uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta;
@@ -6285,6 +6293,7 @@ begin
     if result.temporaryNodes <> nil then result.temporaryNodes.release;
     result.temporaryNodes := temporaryNodes;
     if temporaryNodes <> nil then temporaryNodes.addRef;
+    result.serializationOptions:=serializationOptions;
   end;
 end;
 

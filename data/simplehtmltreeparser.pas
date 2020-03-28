@@ -375,8 +375,6 @@ private
   function htmlTagWeight(s:string): integer;
   class function htmlElementClosesPTag(const s: string): boolean; static;
 public
-  class function htmlElementIsChildless(const s:string): boolean; static;
-public
   treeNodeClass: TTreeNodeClass; //**< Class of the tree nodes. You can subclass TTreeNode if you need to store additional data at every node
   globalNamespaces: TNamespaceList;
   allowTextAtRootLevel: boolean;
@@ -423,43 +421,12 @@ function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 function isInvalidUTF8(const s: string): boolean;
 
 
-type HTMLNodeNameHashs = object
-  const a = $820103F0;
-  const img = $4FACAFC2;
-  const br = $2CF50F7A;
-  const td = $A664EDFC;
-  const tr = $B93B93AD;
-  const th = $1483CA3C;
-  const table = $57CFB523;
-  const thead = $2D298F5C;
-  const tbody = $BB316BB0;
-  const p = $B7656EB4;
-
-  //invisible
-  const area = $B61A9737;
-  const base = $36BAA821;
-  const basefont = $C997A27A;
-  const datalist = $41BB801A;
-  const head = $FB1A74A6;
-  const link = $21E329D3;
-  const meta = $53F6A414;
-  const noembed = $35DC71D8;
-  const noframes = $8EF9275D;
-  const param = $EA036F5E;
-  const rp = $065D2F8B;
-  const script = $75469FD3;
-  const source = $B04BAA1E;
-  const style = $244E4D3D;
-  const template = $08F14C20;
-  const track = $AB8D6A26;
-  const title = $FE8D4719;
-end;
 
 type TSerializationCallback = function (node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
 var GlobalNodeSerializationCallback: TSerializationCallback;
 
 implementation
-uses xquery, xquery.internals.common;
+uses xquery, xquery.internals.common, htmlInformation;
 
 type THTMLOmittedEndTagInfo = class
   siblings, parents, additionallyclosed: TStringArray;
@@ -2565,32 +2532,6 @@ begin
   if striequal(s, '') then exit(100); //force closing of root element
 end;
 
-class function TTreeParser.htmlElementIsChildless(const s: string): boolean;
-begin
-  //elements that should/must not have children
-  //area, base, basefont, bgsound, br, col, command, embed, frame, hr, img, input, keygen, link, meta, param, source, track or wbr
-  if s = '' then exit(false);
-  case s[1] of
-    'a', 'A': result := striequal(s,'area');
-    'b', 'B': result := striequal(s,'base') or striequal(s,'basefont') or striequal(s,'bgsound') or striequal(s,'br') ;
-    'c', 'C': result := striequal(s,'col') or striequal(s,'command');
-    'e', 'E': result := striequal(s,'embed');
-    'f', 'F': result := striequal(s,'frame');
-    'h', 'H': result := striequal(s,'hr') ;
-    'i', 'I': result := striequal(s,'img') or striequal(s,'input') or striequal(s,'isindex');
-    'k', 'K': result := striequal(s,'keygen') ;
-    'l', 'L': result := striequal(s,'link') ;
-    'm', 'M': result := striequal(s,'meta') ;
-    'p', 'P': result := striequal(s,'param') ;
-    's', 'S': result := striequal(s,'source') ;
-    't', 'T': result := striequal(s,'track');
-    'w', 'W': result := striequal(s,'wbr');
-    else result := false;
-  end;
-  //elements listed above, not being void are probably (??) deprecated?
-  //void elements: area, base, br, col, command, embed, hr, img, input, keygen, link, meta, param, source, track, wbr
-
-end;
 
 class function TTreeParser.htmlElementClosesPTag(const s: string): boolean;
 begin

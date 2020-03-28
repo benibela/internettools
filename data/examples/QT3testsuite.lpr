@@ -91,6 +91,7 @@ TTestCaseResultValue = record
   value: IXQValue;
   error: string;
   result: TTestCaseResult;
+  serialization: string;
 end;
 
 TTestCase = class
@@ -101,6 +102,7 @@ TTestCase = class
   constructor create(e: TTreeNode);
   function run: TTestCaseResultValue;
   procedure importModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
+  function resultToString(const resultValue: TTestCaseResultValue): string;
 end;
 
 { TModule }
@@ -122,15 +124,16 @@ TResult = class
   assertions: TList;
   constructor create(e: TTreeNode);
   function hasSerializationAssertion: boolean;
-  function check(errorCode: string=''): TTestCaseResult;
+  function check(const testResult: TTestCaseResultValue; errorCode: string=''): TTestCaseResult;
   function expectError: boolean;
 end;
 
 { TAssertion }
 
 TAssertion = class
-  function check(errorCode: string): TTestCaseResult; virtual; abstract;
+  function check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; virtual; abstract;
   function expectError: boolean; virtual; abstract;
+  function isSerializationAssertion: boolean; virtual; abstract;
 end;
 
 { TAssertionList }
@@ -139,8 +142,9 @@ TAssertionList = class(TAssertion)
   kind: (alkAnyOf, alkAllOf, alkNeither);
   list: TList;
   constructor create();
-  function check(errorCode: string): TTestCaseResult; override;
+  function check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; override;
   function expectError: boolean; override;
+  function isSerializationAssertion: boolean; override;
 end;
 TAssertionAssertKind = (aakAssert, aakEq, aakCount, aakDeepEq, aakPermutation, aakXml, aakSerializationMatches, aakSerializationError, aakEmpty, aakType, aakTrue, aakFalse, aakStringValue, aakError);
 
@@ -152,9 +156,10 @@ TAssertionAssert = class(TAssertion)
   normalizeSpace, ignorePrefixes: boolean;
   flags: string;
   constructor create(akind: TAssertionAssertKind; avalue: string);
-  function check(errorCode: string): TTestCaseResult; override;
+  function check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; override;
   function expectError: boolean; override;
   function regexFlags: TWrappedRegExprFlags;
+  function isSerializationAssertion: boolean; override;
 end;
 
 
@@ -405,11 +410,6 @@ begin
 end;
 
 procedure THTMLLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
-  function got: string;
-  begin
-    if resultValue.error = '' then result := resultValue.value.toXQuery
-    else result := resultValue.error;
-  end;
 var
   n: String;
 begin
@@ -421,11 +421,11 @@ begin
   case resultValue.result of
     tcrPass: bufferTestSet.add('<tr class="passed" >'+n+'<td colspan="4">passed</td>');
     tcrFail: begin
-      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+trimLines(htmlStrEscape(got))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+trimLines(htmlStrEscape(tc.resultToString(resultValue)))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
       if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrWrongError: begin
-      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+trimLines(htmlStrEscape(got))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+trimLines(htmlStrEscape(tc.resultToString(resultValue)))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
       if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrNA: bufferTestSet.add('<tr class="correctNA" >'+n+'<td colspan="4">n/a</td>');
@@ -606,32 +606,31 @@ begin
 end;
 
 procedure TTextLogger.endTestCase(tc: TTestCase; const resultValue: TTestCaseResultValue);
-  function got: string;
-  begin
-    if resultValue.error = '' then result := resultValue.value.toXQuery
-    else result := resultValue.error;
-  end;
 begin
   if not logAllTestCases then begin
     if not testCasesToLog[resultValue.result] then exit;
+    writeln;
     write(tc.name,': ');
   end;
   case resultValue.result of
     tcrPass: writeln('passed'); //todo
     tcrFail: begin
       writeln('FAILED');
-      writeln(' got: '+got+ LineEnding+' expected: '+tc.expectedPrettier);
+      writeln(' got: '+tc.resultToString(resultValue)+ LineEnding+' expected: '+tc.expectedPrettier);
       if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrWrongError: begin
       writeln('wrong error');
-      writeln(' got: '+got+ LineEnding+' expected: '+tc.expectedPrettier);
+      writeln(' got: '+tc.resultToString(resultValue)+ LineEnding+' expected: '+tc.expectedPrettier);
       if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrNA: writeln('na');
     tcrDisputed: writeln('disputed');
     tcrTooBig: writeln('too big') ;
     tcrNotRun: writeln('not run');
+  end;
+  if not logAllTestCases then begin
+    writeln('----------------------------------------------------------------------------------------------------------');
   end;
 end;
 
@@ -652,18 +651,18 @@ end;
 
 { TAssertionList }
 
-constructor TAssertionList.create;
+constructor TAssertionList.create();
 begin
   list := tlist.Create;
 end;
 
-function TAssertionList.check(errorCode: string): TTestCaseResult;
+function TAssertionList.check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult;
 var
   i: Integer;
 begin
   result := tcrFail;
   for i := 0 to list.Count - 1 do begin
-    result := TAssertion(list[i]).check(errorCode);
+    result := TAssertion(list[i]).check(testResult, errorCode);
     if kind = alkNeither then begin
       case result of
         tcrPass: result := tcrFail;
@@ -689,6 +688,15 @@ begin
     result := TAssertion(list[i]).expectError;
     if not result then exit;
   end;
+end;
+
+function TAssertionList.isSerializationAssertion: boolean;
+var
+  a: Pointer;
+begin
+  for a in list do
+    if TAssertion(a).isSerializationAssertion then exit(true);
+  exit(false);
 end;
 
 { TModule }
@@ -849,10 +857,10 @@ begin
   compareTree.free;
 end;
 
-function TAssertionAssert.check(errorCode: string): TTestCaseResult;
+function TAssertionAssert.check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult;
   function res: IXQValue;
   begin
-    result := xq.VariableChangelog.get('result');
+    result := testResult.value; // xq.VariableChangelog.get('result');
   end;
   function deepEqual(const a,b: IXQValue): boolean;
   var context: TXQEvaluationContext;
@@ -913,13 +921,9 @@ begin
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
     aakSerializationMatches: begin
       result := tcrFail;
-      case res.kind of
-        pvkNode: str := res.toNode.outerXML();
-        else str := res.toString;
-      end;
       regex := wregexprParse(value, regexflags);
       try
-        result := OK[wregexprMatches(regex, str)]
+        result := OK[wregexprMatches(regex, testResult.serialization)]
       finally
         wregexprFree(regex);
       end;
@@ -970,6 +974,11 @@ begin
     end;
 end;
 
+function TAssertionAssert.isSerializationAssertion: boolean;
+begin
+   result := kind in [aakSerializationError, aakSerializationMatches]
+end;
+
 constructor TResult.create(e: TTreeNode);
 begin
   assertions := TList.Create;
@@ -981,16 +990,16 @@ var
   i: Integer;
 begin
   for i := 0 to assertions.Count - 1 do
-    if (tassertion(assertions[i]) is TAssertionAssert) and (TAssertionAssert(assertions[i]).kind in [aakSerializationError, aakSerializationMatches]) then
+    if tassertion(assertions[i]).isSerializationAssertion then
       exit(true);
   exit(false);
 end;
 
-function TResult.check(errorCode: string=''): TTestCaseResult;
+function TResult.check(const testResult: TTestCaseResultValue; errorCode: string=''): TTestCaseResult;
 begin
   if assertions.Count <> 1 then
     raise Exception.Create('Invalid assertion count in result');
-  result := TAssertion(assertions[0]).check(errorCode);
+  result := TAssertion(assertions[0]).check(testResult, errorCode);
 end;
 
 function TResult.expectError: boolean;
@@ -1069,6 +1078,7 @@ function TTestCase.run: TTestCaseResultValue;
 var
   i: Integer;
   contexttree: TTreeNode;
+  query: ixquery;
 begin
   result.error := '';
   result.value := nil;
@@ -1109,19 +1119,19 @@ begin
   if tests.Count <> 1 then raise Exception.Create('invalid test count');
   try
     if Results.Count <> 1 then raise Exception.Create('invalid result count');
-    if tresult(results[0]).hasSerializationAssertion and not TTest(tests[0]).test.Contains('http://www.w3.org/2010/xslt-xquery-serialization') then
-      with TTest(tests[0]) do begin
-        test := 'declare namespace xxxxoutput = "http://www.w3.org/2010/xslt-xquery-serialization";'
-                + 'declare option xxxxoutput:method "xml";'
-                + test;
-      end;
-    result.value := xq.parseQuery(TTest(tests[0]).test, config.version).evaluate(contexttree);
+    query := xq.parseQuery(TTest(tests[0]).test, config.version);
+    result.value := query.evaluate(contexttree);
     xq.VariableChangelog.add('result', result.value);
+    if tresult(results[0]).hasSerializationAssertion or (ttest(tests[0]).test.Contains('http://www.w3.org/2010/xslt-xquery-serialization'))  then begin
+      //if xq.StaticContext.serializationOptions <> nil then
+      //writeln(xq.StaticContext.serializationOptions.toXQuery);
+      result.serialization := result.value.serialize(xq.staticContext.sender.getEvaluationContext((query as txquery).getStaticContext));
+    end;
     //todo:. modules,
   except
     on e: EXQException do begin
       result.error := e.errorCode +': '+e.Message;
-      result.result := TResult(results[0]).check(ifthen(e.namespace.getURL <> XMLNamespaceURL_XQTErrors, 'Q{'+e.namespace.getURL+'}', '') + e.errorCode);
+      result.result := TResult(results[0]).check(result, ifthen(e.namespace.getURL <> XMLNamespaceURL_XQTErrors, 'Q{'+e.namespace.getURL+'}', '') + e.errorCode);
     end;
     on e: ETreeParseException do begin
       result.error := 'XML-PARSING-FAILED: '+e.Message;
@@ -1129,7 +1139,7 @@ begin
     end;
   end;
   if result.error = '' then
-    result.result := TResult(results[0]).check;
+    result.result := TResult(results[0]).check(result);
 end;
 
 procedure TTestCase.importModule(sender: TObject; context: TXQStaticContext; const namespace: string; const at: array of string);
@@ -1139,6 +1149,13 @@ begin
   for i := 0 to modules.Count-1 do
     if (TModule(modules[i]).uri = namespace) and (FileExists(TModule(modules[i]).fn)) then
       xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
+end;
+
+function TTestCase.resultToString(const resultValue: TTestCaseResultValue): string;
+begin
+  if resultValue.error <> '' then result := resultValue.error
+  else if (results.Count > 0) and (TResult(results[0]).hasSerializationAssertion) then result := 'serialized:' + LineEnding + resultValue.serialization
+  else result := resultValue.value.toXQuery
 end;
 
 { TDependency }

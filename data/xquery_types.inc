@@ -452,6 +452,11 @@ begin
   if withType then serializer.append(')');
 end;
 
+function TXQValue.serialize(const context: TXQEvaluationContext): string;
+begin
+  result := globalSerializationCallback(context, self);
+end;
+
 
 function TXQValue.stringifyNodes: IXQValue;
 begin

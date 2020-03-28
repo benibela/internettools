@@ -3926,7 +3926,6 @@ var
   serializationOptions: TXQValueObject = nil;
 
 
-
   namespaceMode: TXQNamespaceMode;
 
   oldDecimalFormatCount: integer;
@@ -4154,7 +4153,6 @@ begin
               end;
             end;
             'http://www.w3.org/2010/xslt-xquery-serialization': begin
-              requireModule; //this could be omitted, but then needs more complex handling of injecting fn:serialize
               if serializationOptions = nil then begin
                 serializationOptions := TXQValueObject.create();
                 serializationOptions.setMutable(#0'static-options', xqvalueTrue); //mark the map as wrapping statically given options
@@ -4197,11 +4195,10 @@ begin
       resultmodule.push(parsePrimaryLevel);
       if resultmodule.children[high(resultmodule.children)] = nil then //huh? module only, no main expression
         raiseSyntaxError('A main module must have a query body, it cannot only declare functions/variables (add ; ())');
-      if serializationOptions <> nil then begin
-        resultmodule.children[high(resultmodule.children)] := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'serialize', [resultmodule.children[high(resultmodule.children)], TXQTermConstant.create(serializationOptions)]);
-      end;
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
     declarationDuplicateChecker.free;
+    if serializationOptions <> nil then
+      staticContext.serializationOptions := serializationOptions;
   except
     if staticContext.decimalNumberFormats <> nil then
       for oldDecimalFormatCount := staticContext.decimalNumberFormats.Count - 1 downto oldDecimalFormatCount do begin
