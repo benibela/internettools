@@ -275,7 +275,7 @@ end;
 
 function TXQTwoLevelHashsetCaseInsensitiveASCII.contains(const a, b: string): boolean;
 var
-  nestedSet: PXQHashsetStr;
+  nestedSet: PXQHashsetStrCaseInsensitiveASCII;
 begin
   nestedSet := getOrDefault(a);
   result := assigned(nestedSet) and nestedSet.contains(b);
@@ -288,7 +288,7 @@ end;
 
 procedure TXQTwoLevelHashsetCaseInsensitiveASCII.exclude(const a, b: string);
 var
-  nestedSet: PXQHashsetStr;
+  nestedSet: PXQHashsetStrCaseInsensitiveASCII;
 begin
   nestedSet := getOrCreate(a);
   if assigned(nestedSet) then nestedSet.exclude(b);
