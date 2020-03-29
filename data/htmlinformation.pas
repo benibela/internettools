@@ -369,9 +369,6 @@ begin
       HTMLNodeNameHashs.base: result := striequal(n.getParent().value, 'base');
       HTMLNodeNameHashs.link: result := striequal(n.getParent().value, 'link');
     end;
-    HTMLNodeNameHashs.icon: if striequal(n.value, 'icon') then case n.getParent().hash  of
-      HTMLNodeNameHashs.command: result := striequal(n.getParent().value, 'command');
-    end;
     HTMLNodeNameHashs.longdesc: if striequal(n.value, 'longdesc') then case n.getParent().hash  of
       HTMLNodeNameHashs.frame: result := striequal(n.getParent().value, 'frame');
       HTMLNodeNameHashs.iframe: result := striequal(n.getParent().value, 'iframe');
@@ -406,9 +403,9 @@ begin
       HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input');
       HTMLNodeNameHashs.&object: result := striequal(n.getParent().value, 'object');
     end;
-{        HTMLNodeNameHashs.value: if striequal(n.value, 'value') then case n.getParent().hash  of
-      HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input');
-   end;}
+    HTMLNodeNameHashs.value: if striequal(n.value, 'value') then case n.getParent().hash  of
+      HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input') and striequal(n.getParent().getAttribute('type'), 'url');
+    end;
    end;
 end;
 
