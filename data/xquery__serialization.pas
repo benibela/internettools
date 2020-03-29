@@ -70,7 +70,7 @@ TXQSerializationParams = record
   allowDuplicateNames: boolean;
 
   //custom
-  standardMode: boolean;
+  standardMode, allowEncodingConversion: boolean;
 
   procedure done;
 
@@ -104,7 +104,7 @@ procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: 
 function serializeWithContextDefaults(const context: TXQEvaluationContext; const value: IXQValue): string;
 function serialize(const context: TXQEvaluationContext; const value: IXQValue; const serializationParams: IXQValue = nil): string;
 procedure serialize(var serializer: TXQSerializer; const value: IXQValue; var serializationParams: TXQSerializationParams);
-function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): string;
+function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): RawByteString;
 
 implementation
 uses
@@ -342,6 +342,7 @@ begin
   undeclarePrefixes := false;
 
   standardMode := true;
+  allowEncodingConversion := false;
 end;
 
 function toSerializationBool(const s:string; fromMap: boolean): boolean;
@@ -1370,7 +1371,26 @@ begin
 end;
 
 procedure serialize(var serializer: TXQSerializer; const value: IXQValue; var serializationParams: TXQSerializationParams);
+  procedure serializeWithEncodingChange;
+  var temp: string;
+      tempserializer: TXQSerializer;
+      temp2: RawByteString;
+  begin
+    serializationParams.allowEncodingConversion := false;
+    tempserializer.init(@temp);
+    serialize(tempserializer, value, serializationParams);
+    tempserializer.final;
+    serializationParams.allowEncodingConversion := true;
+    if serializationParams.byteOrderMark then serializer.appendBOM(serializationParams.encodingCP);
+    temp2 := strConvert(temp, CP_UTF8, serializationParams.encodingCP);
+    serializer.append(pointer(temp2), length(temp2)); //append pchar, so it is not converted back to utf-8
+  end;
+
 begin
+  if serializationParams.allowEncodingConversion and (serializationParams.encodingCP <> CP_UTF8) then begin
+    serializeWithEncodingChange;
+    exit;
+  end;
   serializer.standard := serializationParams.standardMode;
   case serializationParams.method of
     xqsmJSON: serializeJSON(serializer, value, serializationParams);
@@ -1379,7 +1399,7 @@ begin
   end;
 end;
 
-function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): string;
+function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): RawByteString;
 var serializer: TXQSerializer;
 begin
   serializer.init(@result);

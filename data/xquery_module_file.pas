@@ -33,6 +33,7 @@ implementation
 uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
   , internetaccess //it does not need internet access itself, just the URI encoding function there
   , xquery.internals.common, xquery.internals.lclexcerpt
+  , xquery__serialization
   {$ifdef unix},BaseUnix{$endif}
   {$ifdef windows},windows{$endif}
     ;
@@ -293,18 +294,18 @@ begin
   result := xqvalue();
 end;
 
-function writeOrAppendSerialized({%H-}argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
+function writeOrAppendSerialized(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
 var
-  temp: TXQueryEngine;
-  data: IXQValue;
+  params: TXQSerializationParams;
+  tempdata: RawByteString;
 begin
-  temp := TXQueryEngine.create;
-  temp.VariableChangelog.add('data', args[1]);
-  if argc = 3 then temp.VariableChangelog.add('args', args[2])
-  else temp.VariableChangelog.add('args', xqvalue());
-  data := temp.evaluateXQuery3('serialize($data, $args)'); //todo call serialization directly, handle encoding
-  temp.free;
-  result := writeOrAppendSomething(args[0], append, data.toString);
+  if argc = 3 then params.initFromXQValue(context, args[2])
+  else params.initFromXQValue(context, nil);
+  params.allowEncodingConversion := true;
+  tempdata := serialize(args[1], params);
+  params.done;
+
+  result := writeOrAppendSomething(args[0], append, tempdata);
 end;
 
 function writeOrAppendText({%H-}argc: SizeInt; args: PIXQValue; append: boolean; text: string): IXQValue;
@@ -323,8 +324,7 @@ end;
 
 function append(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  ignore(context);
-  result := writeOrAppendSerialized(argc, args, true);
+  result := writeOrAppendSerialized(context, argc, args, true);
 end;
 function append_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -344,8 +344,7 @@ end;
 
 function write(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  ignore(context);
-  result := writeOrAppendSerialized(argc, args, false);
+  result := writeOrAppendSerialized(context, argc, args, false);
 end;
 function write_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
