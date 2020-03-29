@@ -49,6 +49,7 @@ TXQSerializationParams = record
   method: TXQSerializationMethod;
   encoding: string;
   encodingCP: TSystemCodePage;
+  byteOrderMark: boolean;
   indent: TXQSerializerInsertWhitespace;
   itemSeparator: string;
   normalizationForm: TUnicodeNormalizationForm;
@@ -68,12 +69,16 @@ TXQSerializationParams = record
   jsonNodeOutputMethod: string;
   allowDuplicateNames: boolean;
 
+  //custom
+  standardMode: boolean;
+
   procedure done;
 
-  procedure setDefault(isFromMap: boolean);
+  procedure initDefault(isFromMap: boolean);
+  procedure initFromXQValue(const context: TXQEvaluationContext; const v: IXQValue);
+
   procedure setFromNode(const context: TXQEvaluationContext; paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const context: TXQEvaluationContext;const v: IXQValue);
-  procedure setFromXQValue(const context: TXQEvaluationContext; const v: IXQValue);
 
   procedure setMethod(const s: string);
   procedure setStandalone(s: string; fromMap: boolean);
@@ -91,13 +96,15 @@ const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
       XMLNamespaceURL_MathML = 'http://www.w3.org/1998/Math/MathML';
       XMLNamespaceUrl_SVG = 'http://www.w3.org/2000/svg';
 
-function serializeJSON(const params: TXQSerializationParams; const v: IXQValue): string;
-function serializeAdaptive(const params: TXQSerializationParams; const v: IXQValue): string;
-function serializeXMLHTMLText(var params: TXQSerializationParams; const v: IXQValue): string;
+procedure serializeJSON(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
+procedure serializeAdaptive(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
+procedure serializeXMLHTMLText(var serializer: TXQSerializer; const v: IXQValue; var params: TXQSerializationParams);
 type PSerializationParams = ^TXQSerializationParams;
 procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: boolean; html: boolean; params: PSerializationParams);
 function serializeWithContextDefaults(const context: TXQEvaluationContext; const value: IXQValue): string;
 function serialize(const context: TXQEvaluationContext; const value: IXQValue; const serializationParams: IXQValue = nil): string;
+procedure serialize(var serializer: TXQSerializer; const value: IXQValue; var serializationParams: TXQSerializationParams);
+function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): string;
 
 implementation
 uses
@@ -307,13 +314,14 @@ begin
   if assigned(suppressIndentation) then Dispose(suppressIndentation,done);
 end;
 
-procedure TXQSerializationParams.setDefault(isFromMap: boolean);
+procedure TXQSerializationParams.initDefault(isFromMap: boolean);
 begin
   isAbsentMarker := #0;
   method := xqsmXML;
   if isFromMap then version := '1.0' else version := isAbsentMarker;
   encoding := 'UTF-8';
   encodingCP := CP_UTF8;
+  byteOrderMark := false;
   htmlVersion := isAbsentMarker;
   doctypePublic := isAbsentMarker;
   doctypeSystem := isAbsentMarker;
@@ -332,6 +340,8 @@ begin
   escapeURIAttributes := isFromMap;
   mediaType := 'text/html';
   undeclarePrefixes := false;
+
+  standardMode := true;
 end;
 
 function toSerializationBool(const s:string; fromMap: boolean): boolean;
@@ -419,7 +429,7 @@ begin
        checkNoAttributes(paramNode, true);
        case paramNode.value of
          'allow-duplicate-names': allowDuplicateNames := toSerializationBool(paramNode.getAttribute('value'));
-         'byte-order-mark': ; //todo
+         'byte-order-mark': byteOrderMark := toSerializationBool(paramNode.getAttribute('value'));
          'cdata-section-elements': needQNameList(cdataSectionElements).includeAll(context, paramNode, paramNode.getAttribute('value'));
          'doctype-public': doctypePublic := paramNode.getAttribute('value');
          'doctype-system': doctypeSystem := paramNode.getAttribute('value');
@@ -519,7 +529,7 @@ begin
     end;
     case pp.Name of
       'allow-duplicate-names': allowDuplicateNames := valueBool();
-      'byte-order-mark': valueBool(); //todo
+      'byte-order-mark': byteOrderMark := valueBool();
       'cdata-section-elements': setQNameList(cdataSectionElements);
       'doctype-public': begin doctypePublic := valueString(); if doctypePublic = '' then doctypePublic := isAbsentMarker; end;
       'doctype-system': begin doctypeSystem := valueString(); if doctypeSystem = '' then doctypeSystem := isAbsentMarker; end;
@@ -558,19 +568,22 @@ begin
   end;
 end;
 
-procedure TXQSerializationParams.setFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
+procedure TXQSerializationParams.initFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
 begin
-  case v.kind of
+  if v = nil then initDefault(false)
+  else case v.kind of
     pvkObject: begin
-      setDefault(true);
+      initDefault(true);
       setFromMap(context, v);
     end;
     pvkNode: begin
-      setDefault(false);
+      initDefault(false);
       setFromNode(context, v.toNode, false);
     end
-    else if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node')
-    else setDefault(true);
+    else begin
+      initDefault(true);
+      if v.getSequenceCount > 0 then raiseXPTY0004TypeError(v, 'serialize params must be map() or node')
+    end;
   end;
 end;
 
@@ -664,33 +677,54 @@ begin
 end;
 
 procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
-var needNormalization, needEscaping: Boolean;
-var enumerator: TUTF8StringCodePointBlockEnumerator;
-  entity: TXQHashmapStrStr.PHashMapEntity;
-  hadNext: Boolean;
-begin
-  if params^.characterMaps = nil then begin
-    serializer^.appendJSONStringWithoutQuotes(normalizeString(s));
-  end else begin
-    needNormalization := params^.hasNormalizationForm;
-    needEscaping := false;
-    enumerator.init(s);
-    repeat
-      hadNext := enumerator.MoveNext;
-      entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
-      if (not hadNext) or (entity <> nil) then begin
-        if needNormalization or needEscaping then serializer^.appendJSONStringWithoutQuotes(normalizeString(enumerator.markedPos, enumerator.markedByteLength))
-        else serializer^.append(enumerator.markedPos, enumerator.markedByteLength);
-        needEscaping := false;
-        enumerator.markNext;
-        if entity <> nil then
-          serializer^.append(string(entity^.Value));
-      end else case enumerator.currentPos^ of
-        #0..#31, '"', '\', '/': needEscaping := true;
-      end;
-    until not hadNext;
+  procedure appendToSerializer(var serializer: TXQSerializer);
+  var needNormalization, needEscaping: Boolean;
+  var enumerator: TUTF8StringCodePointBlockEnumerator;
+    entity: TXQHashmapStrStr.PHashMapEntity;
+    hadNext: Boolean;
+  begin
+    if params^.characterMaps = nil then begin
+      serializer.appendJSONStringWithoutQuotes(normalizeString(s));
+    end else begin
+      needNormalization := params^.hasNormalizationForm;
+      needEscaping := false;
+      enumerator.init(s);
+      repeat
+        hadNext := enumerator.MoveNext;
+        entity := params^.characterMaps.findEntity(enumerator.currentPos, enumerator.currentByteLength);
+        if (not hadNext) or (entity <> nil) then begin
+          if needNormalization or needEscaping then serializer.appendJSONStringWithoutQuotes(normalizeString(enumerator.markedPos, enumerator.markedByteLength))
+          else serializer.append(enumerator.markedPos, enumerator.markedByteLength);
+          needEscaping := false;
+          enumerator.markNext;
+          if entity <> nil then
+            serializer.append(string(entity^.Value));
+        end else case enumerator.currentPos^ of
+          #0..#31, '"', '\', '/': needEscaping := true;
+        end;
+      until not hadNext;
+    end;
   end;
+
+  procedure appendReEncoded();
+  var temp: string;
+      subserializer: TXQSerializer;
+      cp: Integer;
+  begin
+    subserializer.init(@temp);
+    appendToSerializer(subserializer);
+    subserializer.final;
+    for cp in temp.enumerateUtf8CodePoints do begin
+      if cp <= $7F then serializer.append(chr(cp))
+      else serializer.appendJSONStringUnicodeEscape(cp);
+    end;
+  end;
+
+begin
+  if isUnicodeEncoding then appendToSerializer(serializer^)
+  else appendReEncoded();
 end;
+
 
 procedure TSpecialStringHandler.appendXMLHTMLAttributeText(const s: string; html: boolean);
 begin
@@ -1095,15 +1129,10 @@ end;
 
 
 
-function serializeJSON(const params: TXQSerializationParams; const v: IXQValue): string;
-var serializer: TXQSerializer;
-  temp, temp2: string;
+procedure serializeJSON(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
+var
   interceptor: TSpecialStringHandler;
-  cp: Integer;
 begin
-  serializer.init(@temp);
-  serializer.standard := true;
-
   serializer.allowDuplicateNames := params.allowDuplicateNames;
   serializer.insertWhitespace := params.indent;
   case params.jsonNodeOutputMethod of
@@ -1114,38 +1143,25 @@ begin
     else serializer.error('SEPM0016', v.toValue);
   end;
 
-  if params.hasNormalizationForm or (params.characterMaps <> nil) then begin
+  if params.hasNormalizationForm or (params.characterMaps <> nil) or not isUnicodeEncoding(params.encodingCP) then begin
     interceptor.init;
     interceptor.params := @params;
     interceptor.serializer := @serializer;
+    interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
     serializer.onInterceptAppendJSONString := @interceptor.appendJSONStringWithoutQuotes;
   end;
 
   v.jsonSerialize(serializer);
-  serializer.final;
 
-  if not isUnicodeEncoding(params.encodingCP) then begin
-    serializer.init(@temp2);
-    for cp in temp.enumerateUtf8CodePoints do begin
-      if cp <= $7F then serializer.append(chr(cp))
-      else serializer.appendJSONStringUnicodeEscape(cp);
-    end;
-    serializer.final;
-    temp := temp2;
-  end;
-
-  result := temp;
+  serializer.onInterceptAppendJSONString := nil;
 end;
 
-function serializeAdaptive(const params: TXQSerializationParams; const v: IXQValue): string;
-var serializer: TXQSerializer;
-  temp, itemSeparator: string;
+procedure serializeAdaptive(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
+var
+  itemSeparator: string;
   w: PIXQValue;
   first: Boolean;
 begin
-  serializer.init(@temp);
-  serializer.standard := true;
-
   serializer.nodeFormat:=tnsXML;
   serializer.insertWhitespace := params.indent;
   serializer.insertWhitespace := xqsiwNever;
@@ -1158,14 +1174,10 @@ begin
     w^.adaptiveSerialize(serializer);
     first := false;
   end;
-  serializer.final;
-  result := temp;
 end;
 
 
-function serializeXMLHTMLText(var params: TXQSerializationParams; const v: IXQValue): string;
-var serializer: TXQSerializer;
-
+procedure serializeXMLHTMLText(var serializer: TXQSerializer; const v: IXQValue; var params: TXQSerializationParams);
 var firstElement: TTreeNode = nil;
 
   function findRootNodeCount(const v: IXQValue): integer;
@@ -1255,13 +1267,10 @@ var
     end;
   end;
 
-var temp: string;
+var
   hasDoctypeSystem: Boolean;
   interceptor: TSpecialStringHandler;
 begin
-  serializer.init(@temp);
-  serializer.standard := true;
-
   with params do
     case method of
       xqsmHTML, xqsmXHTML: begin
@@ -1342,8 +1351,8 @@ begin
   wasNodeOrFirst := true;
   add(v);
 
-  serializer.final;
-  result := temp;
+  serializer.onInterceptAppendXMLHTMLAttribute := nil;
+  serializer.onInterceptAppendXMLHTMLText := nil;
 end;
 
 function serializeWithContextDefaults(const context: TXQEvaluationContext; const value: IXQValue): string;
@@ -1355,17 +1364,27 @@ function serialize(const context: TXQEvaluationContext; const value: IXQValue; c
 var
   params: TXQSerializationParams;
 begin
-  params.characterMaps := nil;
-  if serializationParams <> nil then params.setFromXQValue(context, serializationParams)
-  else params.setDefault(false);
-
-  case params.method of
-    xqsmJSON: result := serializeJSON(params, value);
-    xqsmAdaptive: result := serializeAdaptive(params, value);
-    else result := serializeXMLHTMLText(params, value);
-  end;
-
+  params.initFromXQValue(context, serializationParams);
+  result := serialize(value, params);
   params.done
+end;
+
+procedure serialize(var serializer: TXQSerializer; const value: IXQValue; var serializationParams: TXQSerializationParams);
+begin
+  serializer.standard := serializationParams.standardMode;
+  case serializationParams.method of
+    xqsmJSON: serializeJSON(serializer, value, serializationParams);
+    xqsmAdaptive: serializeAdaptive(serializer, value, serializationParams);
+    else serializeXMLHTMLText(serializer, value, serializationParams);
+  end;
+end;
+
+function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): string;
+var serializer: TXQSerializer;
+begin
+  serializer.init(@result);
+  serialize(serializer, value, serializationParams);
+  serializer.final;
 end;
 
 initialization

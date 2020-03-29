@@ -4269,9 +4269,9 @@ var serializer: TXQSerializer;
   procedure setParams;
   var p: TXQSerializationParams;
   begin
-    p.setDefault(false);
-    p.setFromXQValue(context, args[1]);
+    p.initFromXQValue(context, args[1]);
     serializer.insertWhitespace := p.indent;
+    p.done;
   end;
 
 begin
