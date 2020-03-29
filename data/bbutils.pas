@@ -564,6 +564,7 @@ public
   procedure appendHexNumber(number: integer);
   procedure appendHexNumber(number, digits: integer);
   procedure appendNumber(number: Int64);
+  procedure appendBOM(codepage: TSystemCodePage);
   procedure chop(removedCount: SizeInt);
 end;
 
@@ -1306,6 +1307,25 @@ var s: shortstring;
 begin
   Str(number, s);
   append(@s[1], length(s));
+end;
+
+type TEncodingBOMs = class
+  const UTF8 = #$ef#$bb#$bf;
+  const UTF16 =  #$ff#$fe;
+  const UTF16BE =  #$fe#$ff;
+  const UTF32 =  #$ff#$fe#00#00;
+  const UTF32BE =  #00#00#$fe#$ff;
+end;
+
+procedure TStrBuilder.appendBOM(codepage: TSystemCodePage);
+begin
+  case codepage of
+     CP_UTF8: append(TEncodingBOMs.UTF8);
+     CP_UTF16: append(TEncodingBOMs.UTF16);
+     CP_UTF16BE: append(TEncodingBOMs.UTF16BE);
+     CP_UTF32: append(TEncodingBOMs.UTF32);
+     CP_UTF32BE: append(TEncodingBOMs.UTF32BE);
+  end;
 end;
 
 
@@ -3129,21 +3149,22 @@ begin
 end;
 {$ENDIF}
 
+
 function strEncodingFromBOMRemove(var str: RawByteString): TSystemCodePage;
 begin
-  if strbeginswith(str,#$ef#$bb#$bf) then begin
+  if strbeginswith(str,TEncodingBOMs.UTF8) then begin
     delete(str,1,3);
     result:=CP_UTF8;
-  end else if strbeginswith(str,#$fe#$ff) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF16BE) then begin
     delete(str,1,2);
     result:=CP_UTF16BE;
-  end else if strbeginswith(str,#$ff#$fe) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF16) then begin
     delete(str,1,2);
     result:=CP_UTF16;
-  end else if strbeginswith(str,#00#00#$fe#$ff) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF32BE) then begin
     delete(str,1,4);
     result:=CP_UTF32BE;
-  end else if strbeginswith(str,#$ff#$fe#00#00) then begin
+  end else if strbeginswith(str,TEncodingBOMs.UTF32) then begin
     delete(str,1,4);
     result:=CP_UTF32;
   end else result := CP_NONE;
