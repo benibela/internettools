@@ -1945,7 +1945,10 @@ begin
   if node <> nil then begin
     case node.typ of
       tetAttribute: if serializer.standard then serializer.error('SENR0001', 'Attribute', self)
-                    else adaptiveSerialize(serializer);
+                    else case serializer.nodeFormat of
+                      tnsText: serializer.appendJSONString(toString);
+                      else serializer.appendJSONString(node.getNodeName()+'="'+(node as TTreeAttribute).realvalue+'"');
+                    end
       else
         case serializer.nodeFormat of
           tnsText: serializer.appendJSONString(toString);
