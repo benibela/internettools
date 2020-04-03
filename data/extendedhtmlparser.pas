@@ -711,7 +711,7 @@ THtmlTemplateParser=class
     function replaceEnclosedExpressions(str:string):string;
 
     function debugMatchings(const width: integer): string;
-    function debugMatchings(const width: integer; includeText: boolean; includeAttributes: array of string): string;
+    function debugMatchings(const width: integer; includeText: boolean; includeElements, includeAttributes: array of string): string;
     function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables (variableChangeLog is usually faster)
@@ -2355,10 +2355,10 @@ end;
 
 function THtmlTemplateParser.debugMatchings(const width: integer): string;
 begin
-  result := debugMatchings(width, true, ['*']);
+  result := debugMatchings(width, true, ['th'], ['*']);
 end;
 
-function THtmlTemplateParser.debugMatchings(const width: integer; includeText: boolean; includeAttributes: array of string): string;
+function THtmlTemplateParser.debugMatchings(const width: integer; includeText: boolean; includeElements, includeAttributes: array of string): string;
 var res: TStringArray;
     template: TTemplateElement;
     html: TTreeNode;
@@ -2366,6 +2366,7 @@ var res: TStringArray;
     tsl, hsl: TStringArray;
     templateIndent, htmlIndent: integer;
     tempTemplateIndent, tempHTMLIndent: String;
+    inIncludeOverrideElement: integer = 0;
 
   procedure updateIndentation(element: TTreeNode; var count: integer; var cache: string);
   begin
@@ -2376,7 +2377,10 @@ var res: TStringArray;
 
   function htmlToString(): string;
   begin
-    if (length(includeAttributes) = 1) and (includeAttributes[0] = '*') then result := html.toString
+    if (html.typ in [tetOpen, tetClose]) and arrayContains(includeElements, html.value) then
+      if html.typ = tetOpen then inc(inIncludeOverrideElement)
+      else dec(inIncludeOverrideElement);
+    if (inIncludeOverrideElement > 0) or ( (length(includeAttributes) = 1) and (includeAttributes[0] = '*') ) then result := html.toString
     else result := html.toString(includeText, includeAttributes);
   end;
 
