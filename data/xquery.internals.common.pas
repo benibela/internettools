@@ -445,8 +445,9 @@ begin
 end;
 
 procedure TXQBaseHashmap.resize;
-var NewLogSize,NewSize,OldSize,Counter:int32;
-    OldEntities:array of THashMapEntity;
+var NewLogSize,NewSize,OldSize,Counter, Entity:int32;
+  Cell: UInt32;
+  tempPtrSized: pointer;
 begin
  OldSize := Size;
  NewLogSize:=0;
@@ -461,16 +462,30 @@ begin
  Size:=0;
  RealSize:=0;
  LogSize:=NewLogSize;
- OldEntities:=Entities;
- Entities:=nil;
- SetLength(Entities,2 shl LogSize);
  SetLength(CellToEntityIndex,2 shl LogSize);
  for Counter:=0 to length(CellToEntityIndex)-1 do begin
   CellToEntityIndex[Counter]:=ENT_EMPTY;
  end;
+
+ //quick reinsertation
+ Entity := 0;
  for Counter:=0 to OldSize-1 do
-  if pointer(OldEntities[Counter].Key) <> pointer(DELETED_KEY) then
-    include(OldEntities[Counter].Key, OldEntities[Counter].Value);
+  with Entities[counter] do begin
+   if pointer(Key) <> pointer(DELETED_KEY) then begin
+     Cell := FindCell(Key);
+     CellToEntityIndex[Cell]:=Entity;
+     if Entity <> Counter then begin
+       tempPtrSized := pointer(key);
+       pointer(key) := pointer(Entities[Entity].Key);
+       pointer(Entities[Entity].Key) := tempPtrSized;
+       Entities[Entity].Value := Value;
+     end;
+     inc(Entity);
+   end;
+  end;
+ Size := Entity;
+ RealSize := Size;
+ SetLength(Entities,2 shl LogSize);
  //remove old data (not really needed)
  for Counter:=Size to min(OldSize - 1, high(Entities)) do begin
    Entities[Counter].Key:=default(TKey);
