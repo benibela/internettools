@@ -2327,6 +2327,7 @@ type
     constructor Create(asStaticContext: TXQStaticContext; aterm: TXQTerm = nil);
     function evaluate(const tree: TTreeNode = nil): IXQValue;
     function evaluate(var context: TXQEvaluationContext): IXQValue;
+    function evaluateInConstContext(const context: TXQEvaluationContext): IXQValue;
     function evaluate(const contextItem: IXQValue): IXQValue;
 
     function clone: IXQuery;
@@ -7115,6 +7116,16 @@ begin
   finally
     context.temporaryVariables.popTo(stackSize);
   end;
+end;
+
+function TXQuery.evaluateInConstContext(const context: TXQEvaluationContext): IXQValue;
+var
+  temp: TXQStaticContext;
+begin
+  temp := context.staticContext;
+  //this can still destroy temporaryNodes. But it does not seem to matter?
+  result := evaluate((PXQEvaluationContext(@context))^);
+  (PXQEvaluationContext(@context))^.staticContext := temp;
 end;
 
 function TXQuery.evaluate(const contextItem: IXQValue): IXQValue;

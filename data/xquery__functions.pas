@@ -2399,7 +2399,7 @@ begin
   end;
   term := context.staticContext.sender.parseTermH(args[0].toString, model);
   try
-    result := term.evaluate(PXQEvaluationContext(@context)^);
+    result := term.evaluateInConstContext(context);
   finally
     term.free;
   end;
