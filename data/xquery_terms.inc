@@ -3349,7 +3349,11 @@ begin
   if namespaceCheck <> xqnmNone then begin
     queryCommand.namespaceURLOrPrefix:=namespaceURLOrPrefix;
     case namespaceCheck of
-      xqnmPrefix: Include(queryCommand.matching, qmCheckNamespacePrefix);
+      xqnmPrefix: if (namespaceURLOrPrefix <> '') or (tneaAttribute <> queryCommand.typ) then
+          Include(queryCommand.matching, qmCheckNamespacePrefix)
+        else
+          Include(queryCommand.matching, qmCheckNamespaceURL);
+
       xqnmURL: Include(queryCommand.matching, qmCheckNamespaceURL);
     end;
   end

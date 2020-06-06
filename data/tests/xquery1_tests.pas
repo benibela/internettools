@@ -962,6 +962,7 @@ begin
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; attribute foobar { } instance of attribute(foobar)', 'true');
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; attribute foobar { } instance of attribute(pre2:foobar)', 'false');
   m('declare namespace pre1 = "pp1"; declare namespace pre2 = "pp2"; declare default element namespace "pp2"; attribute foobar { } instance of attribute(pre1:foobar)', 'false');
+  m('declare default element namespace "xxx"; <a b="foo"/>/@b', 'foo');
   t('attribute foobar { } instance of attribute(*)', 'true');
   t('attribute foobar { } instance of attribute(*, xs:untypedAtomic)', 'true');
   t('attribute foobar { } instance of attribute(*, xs:integer)', 'false');
