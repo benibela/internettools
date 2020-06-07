@@ -2796,6 +2796,9 @@ end;
 var
   oldUnicode2AnsiMoveProc : procedure(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
   oldAnsi2UnicodeMoveProc : procedure(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);
+  {$ifdef windows}
+  oldAnsi2WideMoveProc : procedure(source:pchar;cp : TSystemCodePage;var dest:widestring;len:SizeInt);
+  {$endif}
 
 procedure myUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt);
 begin
@@ -2819,6 +2822,27 @@ begin
   end;
 end;
 
+{$ifdef windows}
+procedure myAnsi2WideMoveProc(source:pchar;cp : TSystemCodePage;var dest:WideString;len:SizeInt);
+var temp: UnicodeString;
+begin
+  if len = 0 then begin
+    dest := '';
+    exit;
+  end;
+  case strActualEncoding(cp) of
+    CP_UTF32, CP_UTF32BE,
+    CP_UTF16, CP_UTF16BE,
+    CP_UTF8,
+    CP_WINDOWS1252, CP_LATIN1: begin
+      strAnsi2UnicodeMoveProc(source, cp, temp, len);
+      setlength(dest, length(temp));
+      move(temp[1], dest[1], length(temp) * sizeof(temp[1])); //todo: do not make copy
+    end else oldAnsi2WideMoveProc(source, cp, dest, len);
+  end;
+end;
+{$endif}
+
 procedure registerFallbackUnicodeConversion;
 begin
   {$ifdef FPC_HAS_CPSTRING}
@@ -2826,6 +2850,13 @@ begin
   oldAnsi2UnicodeMoveProc := widestringmanager.Ansi2UnicodeMoveProc;
   widestringmanager.Unicode2AnsiMoveProc := @myUnicode2AnsiMoveProc;
   widestringmanager.Ansi2UnicodeMoveProc := @myAnsi2UnicodeMoveProc;
+  widestringmanager.Wide2AnsiMoveProc := @myUnicode2AnsiMoveProc;
+  {$ifdef windows}
+  oldAnsi2WideMoveProc := widestringmanager.Ansi2WideMoveProc;
+  widestringmanager.Ansi2WideMoveProc := @myAnsi2WideMoveProc;
+  {$else}
+  widestringmanager.Ansi2WideMoveProc := @myAnsi2UnicodeMoveProc;
+  {$endif}
   {$endif}
 end;
 
