@@ -121,7 +121,7 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
   procedure readToProcessingInstrunctionEnd;
   begin
     if poRespectHTMLProcessingInstructions in options then begin
-      while (pos < htmlEnd) and ((pos+1)^ <> '>') do inc(pos);
+      while (pos < htmlEnd) and ((pos)^ <> '>') do inc(pos);
     end else
       while (pos < htmlEnd) and ((pos^ <> '?') or ((pos+1)^ <> '>')) do inc(pos);
   end;
