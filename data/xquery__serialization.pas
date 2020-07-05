@@ -933,6 +933,7 @@ var known: TNamespaceList;
   end;
 
   procedure inner(n: TTreeNode; insideHTMLElement: boolean); forward;
+  procedure innerDocument(n: TTreeNode); forward;
 
   procedure outer(n: TTreeNode; parentIsHTMLElement: boolean);
     procedure appendNodeName(n: TTreeNode);
@@ -1064,28 +1065,60 @@ var known: TNamespaceList;
         while deadPrefixes.count > oldDeadPrefixCount do
           deadPrefixes.Delete(deadPrefixes.count-1);
       end;
-      tetDocument: inner(n, false);
+      tetDocument: innerDocument(n);
       else; //should not happen
     end;
+  end;
+
+  function elementAndChildrenMightBeIndented(n: TTreeNode; insideHTMLElement: boolean): boolean;
+  var
+    sub: TTreeNode;
+  begin
+    result := true;
+    if Assigned(params) then result := elementDescendantsMightBeIndented(n, insideHTMLElement);
+    sub := n.getFirstChild();
+    while (sub <> nil) and result do begin
+      case sub.typ of
+        tetText: result := sub.value.IsBlank();
+        tetOpen: result := not (insideHTMLElement and elementIsPhrasing(sub));
+      end;
+      sub := sub.getNextSibling();
+    end;
+  end;
+
+  procedure innerDocument(n: TTreeNode);
+  const insideHTMLElement = false;
+  var
+    sub: TTreeNode;
+    oldIndentationAllowed: Boolean;
+    first: boolean = true;
+  begin
+    oldIndentationAllowed := indentationAllowed;
+    indentationAllowed := indentationAllowed and elementAndChildrenMightBeIndented(n, insideHTMLElement);
+    sub := n.getFirstChild();
+    while sub <> nil do begin
+      if (not indentationAllowed) or (sub.typ <> tetText) then begin
+        if indentationAllowed then begin
+          if not first then builder.append(LineEnding);
+          first := false;
+          builder.appendIndent;
+        end;
+        outer(sub, insideHTMLElement);
+      end;
+      sub := sub.getNextSibling();
+    end;
+    //if indentationAllowed then builder.append(LineEnding); without this there is no line break between multiple documents in a sequence, however with it there is a pointless break after the sequence
+    indentationAllowed := oldIndentationAllowed;
   end;
 
   procedure inner(n: TTreeNode; insideHTMLElement: boolean);
   var sub: TTreeNode;
     oldIndentationAllowed: Boolean;
-
   begin
     if not (n.typ in TreeNodesWithChildren) then exit;
     oldIndentationAllowed := indentationAllowed;
-    if indentationAllowed then begin
-      if Assigned(params) then indentationAllowed := elementDescendantsMightBeIndented(n, insideHTMLElement);
-      sub := n.getFirstChild();
-      while (sub <> nil) and indentationAllowed do begin
-        case sub.typ of
-          tetText: indentationAllowed := sub.value.IsBlank();
-          tetOpen: indentationAllowed := not (insideHTMLElement and elementIsPhrasing(sub));
-        end;
-        sub := sub.getNextSibling();
-      end;
+    if indentationAllowed  then begin
+      indentationAllowed := elementAndChildrenMightBeIndented(n, insideHTMLElement);
       if indentationAllowed then begin
         builder.indent;
       end;
