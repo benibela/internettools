@@ -2287,9 +2287,11 @@ var
   namespaceUrl: string;
   namespacePrefix: string;
   local: string;
+  lastException: EXQParsingException;
 begin
   expect('{');
   result := TXQTermTryCatch.Create(parseOptionalExpr31);
+  lastException := errorTracking.pendingException;
   try
     while nextTokenIs('catch') do begin
       SetLength(result.catches, length(result.catches) + 1);
@@ -2305,6 +2307,9 @@ begin
       if not nextTokenIs('{') then raiseSyntaxError('{ expected');
       result.catches[high(result.catches)].expr := parseOptionalExpr31;
     end;
+    if length(result.catches) = 0 then expect('catch');
+    if errorTracking.pendingException <> lastException then
+      errorTracking.pendingException.Message := errorTracking.pendingException.Message + LineEnding + 'Syntax: try { ... } catch err:ERRORID { ... }';
   except
     result.free;
     raise;
