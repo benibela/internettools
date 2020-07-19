@@ -136,7 +136,7 @@ type
     function nilToLast: pchar;
   end;
 
-  TCriticalSectionHelper = record helper for TRTLCriticalSection
+  TCriticalSectionHelper = {$ifdef FPC_FULLVERSION >= 030200}type{$else}record{$endif} helper for TRTLCriticalSection
     procedure init;
     procedure enter;
     procedure leave;
