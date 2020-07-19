@@ -1493,9 +1493,11 @@ begin
   t('let $x := <y xmlns=""><x/></y> / *:x return outer-xml(<a xmlns="ANS">{$x}</a>)', '<a xmlns="ANS"><x xmlns=""/></a>');
   t('let $x := <y xmlns=""><x foo="bar"/></y> / *:x return outer-xml(<a xmlns="ANS">{$x}</a>)', '<a xmlns="ANS"><x xmlns="" foo="bar"/></a>');
   t('let $y := <y xmlns=""><x foo="bar"/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns="" foo="bar"/></a>');
-  t('let $y := <y xmlns="" xmlns:abc="def"><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" xmlns:abc="def" foo="bar"/></a>');
+  t('let $y := <y xmlns="" xmlns:abc="def"><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns:abc="def" xmlns="" foo="bar"/></a>');
   t('let $y := <y xmlns=""><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" foo="bar"/></a>');
   m('declare default element namespace "abc"; let $y := <y><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="abc" foo="bar"/></a>');
+  m('declare copy-namespaces preserve, inherit; let $b := <b/>, $a := <a xmlns="A">{$b}</a> return outer-xml(<r>{$a//*:b}</r>)', '<r><b/></r>' );
+  m('declare copy-namespaces preserve, inherit; declare namespace x = "y"; let $b := <x:b/>, $a := <x:a xmlns:x="A">{$b}</x:a> return outer-xml(<r>{$a//*:b}</r>)', '<r><x:b xmlns:x="y"/></r>' );
   t('let $y := <y><x foo="bar" xmlns:foo="..."/></y> return outer-xml(<a xmlns="ANS">{$y // *:x}</a>)', '<a xmlns="ANS"><x xmlns:foo="..." xmlns="" foo="bar"/></a>');
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><child2 attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><child2 xmlns:foo="http://www.example.com/parent2" xmlns="" attr="child"/></new>'); //XQTS test
   t('outer-xml(for $x in <parent2 xmlns:foo="http://www.example.com/parent2" foo:attr2="attr2"><foo:child2 attr="child"/></parent2> return <new xmlns="http://www.example.com">{$x//*:child2}</new>)', '<new xmlns="http://www.example.com"><foo:child2 xmlns:foo="http://www.example.com/parent2" attr="child"/></new>'); //unprefixed attributes are in no ns

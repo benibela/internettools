@@ -1642,8 +1642,20 @@ begin
       if overrides then a.realvalue:=n.getURL;
       exit;
     end;
-  if n.getPrefix = '' then addAttribute('xmlns', n.getURL)
-  else addAttribute(n.getPrefix, n.getURL).namespace := XMLNamespace_XMLNS;
+  if n.getPrefix = '' then begin
+    if (namespace = nil) or (namespace.getPrefix = '') then begin
+      if not overrides then exit;
+      //todo?: if document <> inl then document.add(n)
+      //namespace := n;
+    end;
+    addAttribute('xmlns', n.getURL)
+  end else begin
+    if (namespace <> nil) and (namespace.getPrefix = n.getPrefix) then begin
+      if not overrides then exit;
+      //namespace := n;
+    end;
+    addAttribute(n.getPrefix, n.getURL).namespace := XMLNamespace_XMLNS;
+  end;
 end;
 
 procedure TTreeNode.addChild(child: TTreeNode);
