@@ -33,6 +33,10 @@ uses
     {$IFDEF USE_SOROKINS_DREGEX},dregexpr{$ENDIF}    //supplied in this unit
     {$IFDEF USE_FLRE},FLRE{$ENDIF} //FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   ;
+
+{$IFDEF USE_SOROKINS_REGEX}{$IF FPC_FULLVERSION = 030200}
+{$ERROR Default regexpr cannot be used with fpc 3.2.0 due to not accepting empty input string}
+{$endif}{$endif}
 {$IFDEF USE_SOROKINS_DREGEX}
 {$DEFINE USE_SOROKINS_REGEX}
 {$ENDIF}
