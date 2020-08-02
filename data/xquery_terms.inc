@@ -2930,13 +2930,8 @@ begin
     resultSeq := TXQVList.create();
     for v in func.GetEnumeratorPtrUnsafe do begin
       case v^.kind of
-        pvkObject: begin
-          sl := TStringList.Create;
-          sl.CaseSensitive := true;
-          (v^ as TXQValueObject).enumerateKeys(sl);
-          resultSeq.add(xqvalue(sl));
-          sl.free;
-        end;
+        pvkObject:
+          resultSeq.add(v.enumeratePropertyKeys());
         pvkArray: begin
           ara := v^ as TXQValueJSONArray;;
           for i := 0 to ara.seq.Count-1 do

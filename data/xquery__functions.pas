@@ -1341,7 +1341,7 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
     end;
   end;
 
-var temp: IXQValue;
+var
   v: PIXQValue;
   sname: string;
   svalue: string;
@@ -6647,17 +6647,12 @@ end;
 
 function xqFunctionMapSize({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue((argv[0] as TXQValueObject).size);
+  result := xqvalue(argv[0].getPropertyCount);
 end;
 
 function xqFunctionMapKeys({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
-var
-  keys: TStringList;
 begin
-  keys := TStringList.Create;
-  (argv[0] as TXQValueObject).enumerateKeys(keys);
-  result := xqvalue(keys);
-  keys.free;
+  result := argv[0].enumeratePropertyKeys();
 end;
 
 function xqFunctionMapContains({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
@@ -6743,7 +6738,7 @@ var f: TXQBatchFunctionCall;
     l: TXQVList;
     pp: TXQProperty;
 begin
-  l := TXQVList.create((argv[0] as TXQValueObject).size);
+  l := TXQVList.create(argv[0].getPropertyCount);
   result := TXQValueSequence.create(l);
   with f do begin
     init(context, argv[1]);

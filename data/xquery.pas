@@ -529,6 +529,12 @@ type
 
     //**Same as toFloat, but throws an exception if the conversion is not invalid
     function toFloatChecked(scontext: TXQStaticContext): xqfloat;
+
+    //internally used
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr);
+    function enumeratePropertyKeys(): IXQValue;
+    function enumeratePropertyValues: IXQValue;
+    function getPropertyCount: integer;
   end;
 
 
@@ -608,6 +614,11 @@ type
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
+  public
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); virtual;
+    function enumeratePropertyKeys: IXQValue; virtual;
+    function enumeratePropertyValues: IXQValue;       virtual;
+    function getPropertyCount: integer; virtual;
   end;
 
   { TXQValueUndefined }
@@ -1001,8 +1012,9 @@ type
 
     function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
 
-    procedure enumerateKeys(sl: TStringList);
-    function enumerateValues: IXQValue;
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+    function getPropertyCount: integer; override;
 
     function toBooleanEffective: boolean; override;
 
@@ -2785,6 +2797,7 @@ public
   function xqvalue(sl: TStringList): IXQValue; //**< Creates a sequence of strings (does *not* free the list)
   function xqvalue(const sl: array of string): IXQValue; //**< Creates a sequence of untyped strings
   function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
+  function xqvalue(const s: TXQHashsetStr): IXQValue; //**< Creates a sequence
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
   procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
@@ -4019,6 +4032,18 @@ begin
   resseq := TXQValueSequence.create(length(sl));
   for i := 0 to high(sl) do
     resseq.add(sl[i]);
+  result := resseq;
+  xqvalueSeqSqueeze(result);
+end;
+
+function xqvalue(const s: TXQHashsetStr): IXQValue;
+var
+  resseq: TXQValueSequence;
+  k: string;
+begin
+  resseq := TXQValueSequence.create(s.Count);
+  for k in s do
+    resseq.add(xqvalue(k));
   result := resseq;
   xqvalueSeqSqueeze(result);
 end;
@@ -6154,7 +6179,7 @@ begin
   if data <> nil then t += ' ; got: ' + data.toXQuery();
   raise EXQEvaluationException.create(code, t);
 end;
-procedure raiseInternalError(const s: string);
+procedure raiseInternalError(const s: string); noreturn;
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error: ' + s);
 end;
@@ -8682,7 +8707,7 @@ var oldnode,newnode: TTreeNode;
 procedure jsoniqDescendants(const node: IXQValue; const searchedProperty: string);
 var
   seq: TXQVList;
-  obj: TXQValueObject;
+  obj: TXQValue;
   temp: TXQValue;
   tempprop: TXQProperty;
   tempvi: PIXQValue;
@@ -8695,10 +8720,10 @@ begin
         jsoniqDescendants(seq[i], searchedProperty);
     end;
     pvkObject: begin
-      obj := (node as TXQValueObject);
+      obj := node.toValue;
       if searchedProperty <> '' then begin
         if obj.hasProperty(searchedProperty, @temp) then newList.add(temp);
-      end else newList.add(obj.enumerateValues);
+      end else newList.add(obj.enumeratePropertyValues);
 
       for tempprop in obj.getPropertyEnumerator do
         jsoniqDescendants(tempprop.Value, searchedProperty);
@@ -8869,10 +8894,10 @@ begin
                     end;
                   end else begin
                     //get all properties
-                    if tempKind = pvkObject then newList.add((n^ as TXQValueObject).enumerateValues())
+                    if tempKind = pvkObject then newList.add(n^.enumeratePropertyValues())
                     else for pv in (n^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do begin
                       if pv^.kind <> pvkObject then raise EXQEvaluationException.create('pxp:JSON', 'The / operator can only be applied to xml nodes, json objects and jsson arrays of only objects. Got array containing "'+pv^.toXQuery()+'"');
-                      newList.add((pv^ as TXQValueObject).enumerateValues());
+                      newList.add(pv^.enumeratePropertyValues());
                     end;
                   end;
                 end;

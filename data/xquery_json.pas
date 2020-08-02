@@ -48,7 +48,7 @@ uses
 
 implementation
 
-uses jsonscanner, simplehtmltreeparser, bbutils, xquery.namespaces;
+uses jsonscanner, simplehtmltreeparser, bbutils, xquery.namespaces, xquery.internals.common;
 
 
 function xqFunctionIsNull({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -148,15 +148,13 @@ end;
 function xqFunctionKeys({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
-  res: TStringList;
+  keyset: TXQHashsetStr;
 begin
-  res := TStringList.Create;
-  res.CaseSensitive := True;
+  keyset.init;
   for v in args[0] do
-    if v is TXQValueObject then
-      (v as TXQValueObject).enumerateKeys(res);
-  result := xqvalue(res);
-  res.free;
+    if v.kind = pvkObject then v.enumeratePropertyKeys(keyset);
+  result := xqvalue(keyset);
+  keyset.done;
 end;
 
 

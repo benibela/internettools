@@ -225,6 +225,31 @@ begin
   result := typeAnnotation.derivedFrom(typ);
 end;
 
+procedure TXQValue.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+begin
+  raiseInternalError('enumeratePropertyKeys called on non-object');
+end;
+
+function TXQValue.enumeratePropertyKeys: IXQValue;
+var keyset: TXQHashsetStr;
+begin
+  keyset.init;
+  enumeratePropertyKeys(keyset);
+  result := xqvalue(keyset);
+  keyset.done;
+end;
+
+function TXQValue.enumeratePropertyValues: IXQValue;
+begin
+  raiseInternalError('enumeratePropertyValues called on non-object');
+  result := nil
+end;
+
+function TXQValue.getPropertyCount: integer;
+begin
+  raiseInternalError('getPropertyCount called on non-object');
+end;
+
 function TXQValue.toDecimal: BigDecimal;
 begin
   if not tryStrToBigDecimal(toString, @result) then
@@ -2096,41 +2121,22 @@ begin
 end;
 
 function TXQValueObject.Size: SizeInt;
-var
-  temp: TStringList;
+  function countProto: sizeint;
+  var temp: TXQHashsetStr;
+  begin
+    temp.init;
+    enumeratePropertyKeys(temp);
+    result := temp.Count;
+    temp.done;
+  end;
 begin
   if prototype = nil then result := values.count
-  else begin
-    temp := TStringList.Create;
-    enumerateKeys(temp);
-    result := temp.Count;
-    temp.free;
-  end;
+  else result := countProto();
 end;
 
 procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);
-(*var point: integer;
-  temp: String;
-  old: TXQValue;
-  i: Integer;
-  base: String;     *)
 begin
   values.add(name, v);
-(*
-  point := pos('.', name);
-  if Point = 0 then values.add(name, v)
-  else begin
-    temp := name;
-    base := strSplitGet('.', temp);
-    i := values.indexOf(base);
-    if i < 0 then begin
-      if not hasProperty(base, @old) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
-      values.add(base, old.clone);
-      i := values.count-1;
-    end;
-    if not (values.get(i) is TXQValueObject) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object property '+temp+' to assign to '+name);
-    (values.get(i) as TXQValueObject).setMutable(temp, v);
-  end;*)
 end;
 
 function TXQValueObject.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
@@ -2167,24 +2173,17 @@ begin
   result.values.add(props^, newValue);
 end;
 
-procedure TXQValueObject.enumerateKeys(sl: TStringList);
+procedure TXQValueObject.enumeratePropertyKeys(var keyset: TXQHashsetStr);
 var
-  obj: TXQValueObject;
   i: Integer;
-  oldcount: Integer;
 begin
   //this does not add keys to sl that are already contained in sl. (so you can combine keys of multiple objects)
-  obj := self;
-  oldcount := sl.count;
-  while obj <> nil do begin
-    for i := obj.values.count - 1 downto 0 do
-      if sl.IndexOf(obj.values.getName(i)) < 0 then
-        sl.Insert(oldcount, obj.values.getName(i)); //TODO: optimize
-    obj := obj.prototype as TXQValueObject;
-  end;
+  if prototype <> nil then prototype.enumeratePropertyKeys(keyset);
+  for i := 0 to values.count - 1 do
+    keyset.include(values.getName(i))
 end;
 
-function TXQValueObject.enumerateValues: IXQValue;
+function TXQValueObject.enumeratePropertyValues: IXQValue;
 var
   prop: TXQProperty;
   tempSeq: TXQValueSequence;
@@ -2194,6 +2193,11 @@ begin
     tempSeq.add(prop.Value);
   result := tempSeq;
   xqvalueSeqSqueeze(result);
+end;
+
+function TXQValueObject.getPropertyCount: integer;
+begin
+  Result:=size;
 end;
 
 

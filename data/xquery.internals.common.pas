@@ -71,6 +71,7 @@ type
     RealSize: int32;
     LogSize: int32;
     Size: int32;
+    FCount: int32;
     Entities:array of THashMapEntity;
     CellToEntityIndex: array of int32;
     function getBaseValueOrDefault(const Key:TKey):TBaseValue;
@@ -88,6 +89,7 @@ type
     function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
     function getEnumerator: TEntityEnumerator;
+    property Count: int32 read FCount;
   end;
 
   generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<TKey,TXQVoid,TInfo>)
@@ -385,6 +387,7 @@ begin
  RealSize:=0;
  LogSize:=0;
  Size:=0;
+ FCount:=0;
  Entities:=nil;
  CellToEntityIndex:=nil;
  Resize;
@@ -401,6 +404,7 @@ begin
  RealSize:=0;
  LogSize:=0;
  Size:=0;
+ FCount := 0;
  SetLength(Entities,0);
  SetLength(CellToEntityIndex,0);
  Resize;
@@ -512,6 +516,7 @@ begin
  end;
  Entity:=Size;
  inc(Size);
+ inc(FCount);
  if Entity<(2 shl LogSize) then begin
   CellToEntityIndex[Cell]:=Entity;
   inc(RealSize);
@@ -568,6 +573,7 @@ begin
   Entities[Entity].Key:=DELETED_KEY;
   Entities[Entity].Value:=default(TBaseValue);
   CellToEntityIndex[Cell]:=ENT_DELETED;
+  dec(FCount);
   result:=true;
  end;
 end;
