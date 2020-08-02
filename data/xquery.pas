@@ -2689,8 +2689,8 @@ public
     function evaluateCSS3(expression: string; const contextItem: IXQValue): IXQValue;
 
     //** Evaluates an expression with a certain tree element as current node.
-    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
-    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue;
+    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue; overload;
+    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue; overload;
     class function evaluateStaticXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
     class function evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue;
     class function evaluateStaticXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
