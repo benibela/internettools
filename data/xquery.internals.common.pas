@@ -302,6 +302,7 @@ var raiseXQEvaluationExceptionCallback: TRaiseXQEvaluationExceptionCallback = ni
 procedure raiseXQEvaluationException(const code, message: string); overload; noreturn;
 
 type xqfloat = double;
+     SizeInt64 = Int64; //at least SizeInt and Int64. If there are ever 128 bit systems, it would need to be changed for them.
 function xqround(const f: xqfloat): Int64;
 
 const

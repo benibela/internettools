@@ -6363,7 +6363,7 @@ end;
 function xqFunctionArraySubarray(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   a: TXQValueJSONArray;
-  p, len: SizeInt;
+  p, len: SizeInt64;
   iter: TXQValueEnumeratorPtrUnsafe;
   list: TXQVList;
 begin
