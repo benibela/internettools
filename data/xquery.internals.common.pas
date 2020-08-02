@@ -110,11 +110,18 @@ type
   end;
   generic TXQBaseHashmapStrPointerButNotPointer<TValue, TInfo> = object(specialize TXQBaseHashmapStrPointer<TInfo>)
     type
+      TKeyValuePairOption = record
+        entity: PHashMapEntity;
+        function key: string; inline;
+        function value: TValue; inline;
+        function isAssigned: boolean; inline;
+      end;
+      //todo: rename tkeypair -> tkeyvaluepairs
       PXQBaseHashmapStrPointerButNotPointer = ^TXQBaseHashmapStrPointerButNotPointer;
       PKeyPairEnumerator = ^TKeyPairEnumerator;
       PKeyValuePair = PKeyPairEnumerator;
       TKeyPairEnumerator = object(TEntityEnumerator)
-        function currentPair: PKeyValuePair; inline;
+        function currentPair: PKeyValuePair; inline; //todo: probably better if this returns a TKeyValuePairOption
         function key: string;
         function value: TValue;
         property current: PKeyValuePair read currentPair;
@@ -123,6 +130,7 @@ type
     function get(const Key: string; const def: TValue): TValue; inline;
     function getOrDefault(const Key: string): TValue; inline;
     function GetValue(const Key: string): TValue; inline;
+    function findKeyValuePair(const Key: string): TKeyValuePairOption;
   public
     function getEnumerator: TKeyPairEnumerator;
   end;
@@ -144,6 +152,8 @@ type
     procedure clear;
     destructor done;
     class procedure disposeAndNil(var map: PXQHashmapStrOwning);
+    procedure assign(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
+    procedure includeAll(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
     procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
     //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
@@ -317,6 +327,7 @@ const
 
 implementation
 uses math;
+
 
 
 function TXQBaseHashmap.TEntityEnumerator.currentEntity: PHashMapEntity;
@@ -781,6 +792,23 @@ begin
   result.init(@self);
 end;
 
+
+
+function TXQBaseHashmapStrPointerButNotPointer.TKeyValuePairOption.key: string;
+begin
+  result := entity^.key
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.TKeyValuePairOption.value: TValue;
+begin
+ result := TValue(entity^.value)
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.TKeyValuePairOption.isAssigned: boolean;
+begin
+  result := entity <> nil;
+end;
+
 function TXQBaseHashmapStrPointerButNotPointer.get(const Key: string; const def: TValue): TValue;
 var
   entity: PHashMapEntity;
@@ -798,6 +826,11 @@ end;
 function TXQBaseHashmapStrPointerButNotPointer.GetValue(const Key: string): TValue;
 begin
   result := TValue(getBaseValueOrDefault(key));
+end;
+
+function TXQBaseHashmapStrPointerButNotPointer.findKeyValuePair(const Key: string): TKeyValuePairOption;
+begin
+  result.entity := findEntity(key)
 end;
 
 function TXQBaseHashmapStrPointerButNotPointer.getEnumerator: TKeyPairEnumerator;
@@ -862,6 +895,19 @@ begin
      dispose(map,done);
      map := nil;
    end;
+end;
+
+procedure TXQHashmapStrOwning.assign(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
+begin
+  clear;
+  includeAll(other);
+end;
+
+procedure TXQHashmapStrOwning.includeAll(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
+var p: PKeyPairEnumerator;
+begin
+  for p in other do
+   include(p^.key, p^.value);
 end;
 
 
