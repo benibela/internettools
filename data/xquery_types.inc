@@ -2092,7 +2092,7 @@ begin
 
   inc(idx);
   while true do begin
-    while (idx < vars.count) and (visitedProperties.IndexOf(vars.getName(idx)) >= 0) do
+    while (idx < vars.count) and visitedProperties.contains(vars.getName(idx)) do
       inc(idx);
     if idx < vars.count then break;
     tempobj := tempobj.prototype as TXQValueObject;
@@ -2102,7 +2102,7 @@ begin
   end;
 //  if tempobj = nil then exit(false);
   result := true;
-  visitedProperties.Add(vars.getName(idx));
+  visitedProperties.include(vars.getName(idx));
 end;
 
 function TXQValuePropertyEnumerator.GetEnumerator: TXQValuePropertyEnumerator;
@@ -2116,17 +2116,14 @@ begin
   prop.enum := self;
   vars := obj.values;
   tempobj := obj;
-  if tempobj.prototype <> nil then begin
-    visitedProperties := TStringList.Create; //todo: get a hashmap
-    visitedProperties.Sorted:=true;
-  end;
+  if tempobj.prototype <> nil then new(visitedProperties, init);
   idx := -1;
 end;
 
 destructor TXQValuePropertyEnumerator.destroy;
 begin
   prop.Free;
-  visitedProperties.Free;
+  if visitedProperties <> nil then dispose(visitedProperties);
   inherited destroy;
 end;
 

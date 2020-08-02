@@ -972,7 +972,7 @@ type
   private
     tempobj: TXQValueObject;
     prop: TXQProperty;
-    visitedProperties: TStringList;
+    visitedProperties: PXQHashsetStr;
     function GetCurrent: TXQProperty;
   public
     function MoveNext: Boolean;
