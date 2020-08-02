@@ -401,6 +401,7 @@ const XMLNamespace_Output = 'http://www.w3.org/2010/xslt-xquery-serialization';
           if characterMaps.contains(character) then error('SEPM0018');
           characterMaps.include(character, mapString);
         end;
+        else;
       end;
     end;
   end;
@@ -1081,6 +1082,7 @@ var known: TNamespaceList;
       case sub.typ of
         tetText: result := sub.value.IsBlank();
         tetOpen: result := not (insideHTMLElement and elementIsPhrasing(sub));
+        else;
       end;
       sub := sub.getNextSibling();
     end;
@@ -1242,6 +1244,7 @@ var firstElement: TTreeNode = nil;
               if firstElement = nil then firstElement := n;
               if result > 1 then exit();
             end;
+            else;
           end;
           n := n.getNextSibling();
         end;
@@ -1289,6 +1292,7 @@ var
             xqsmXML, xqsmXHTML: serializeNodes(n, serializer, true, false, @params);
             xqsmHTML: serializeNodes(n, serializer, true, true, @params);
             xqsmText: serializer.append(w^.toString);
+            else;
           end;
           if not hasItemSeparator then wasNodeOrFirst := true;
         end;
@@ -1317,6 +1321,7 @@ begin
         if assigned(suppressIndentation) then suppressIndentation.addHTMLLowercaseQNames(isHTML5);
       end;
       xqsmXML, xqsmText: params.escapeURIAttributes := false;
+      else;
     end;
 
   if params.hasNormalizationForm or (params.characterMaps <> nil) or assigned(params.cdataSectionElements) or params.escapeURIAttributes then begin
@@ -1378,7 +1383,7 @@ begin
       xqsmText: begin
         //encoding: string;
       end;
-      //xqsmJSON, xqsmAdaptive: ;
+      xqsmJSON, xqsmAdaptive: ;
     end;
   end;
 

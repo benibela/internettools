@@ -1045,6 +1045,7 @@ begin
         end;
         setCookie(domain, strUnescapeHex(path, '%'), name, value, flags);
       end;
+      else;
     end;
 end;
 

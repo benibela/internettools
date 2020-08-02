@@ -151,7 +151,7 @@ begin
   result := xqtvaContinue;
   for i := 0 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
 end;
 
@@ -178,7 +178,7 @@ begin
   tempvar := globalUnnamedVariable;
   for i := 0 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
     visitor.declare(@tempvar);
   end;
   for i := high(children) downto 0 do
@@ -231,11 +231,11 @@ begin
     xqtvaNoRecursion: ;
     else result := term^.visitchildren(self);
   end;
-  //case result of xqtvaAbort: exit; end;
+  //if result = xqtvaAbort then exit;
 
   parent := theparent;
   result := leave(term);
-  //case result of xqtvaAbort: exit; end;
+  //if result = xqtvaAbort then exit;
 end;
 
 procedure TXQTerm_Visitor.declare(v: PXQTermVariable; theparent: TXQTerm);
@@ -254,7 +254,7 @@ function TXQTerm_Visitor.simpleTermVisitNoRecurse(term: PXQTerm; theparent: TXQT
 begin
   parent := theparent;
   result := visit(term);
-  case result of xqtvaAbort: exit;  end;
+  if result = xqtvaAbort then exit;
 
   parent := theparent;
   result := leave(term);
@@ -988,23 +988,24 @@ begin
         if TXQTermSequenceType(children[i]).instanceOf(ta, context) then exit(true);
       exit(false);
     end;
-  end;
-  count := ta.getSequenceCount;
-  if ((count = 0) and not allowNone) or
-     ((count > 1) and not allowMultiple) then
-    exit(false);
-  if (count = 0) then
-    exit(true);
-  //compare item type
-  if kind = tikAny then
-    exit(true);
-  if kind = tikElementTest then
-    exit(elementTest);
-  result := true;
-  for v in ta.GetEnumeratorPtrUnsafe do begin
-    result := result and instanceOfSingleType(v^);
-    if not result then exit;
-  end;
+    else
+      count := ta.getSequenceCount;
+      if ((count = 0) and not allowNone) or
+         ((count > 1) and not allowMultiple) then
+        exit(false);
+      if (count = 0) then
+        exit(true);
+      //compare item type
+      if kind = tikAny then
+        exit(true);
+      if kind = tikElementTest then
+        exit(elementTest);
+      result := true;
+      for v in ta.GetEnumeratorPtrUnsafe do begin
+        result := result and instanceOfSingleType(v^);
+        if not result then exit;
+      end;
+  end
 end;
 
 function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
@@ -1353,17 +1354,17 @@ function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visit
       exit(visitor.simpleTermVisit(@children[pos], self));
     if objInheritsFrom(children[pos + 1], TXQTermSequenceType) then begin
       result := visitor.simpleTermVisit(@children[pos+1], self);
-      case result of xqtvaAbort: exit; end;
+      if result = xqtvaAbort then exit;
       typeDelta:=1;
     end else typeDelta:=0;
 
     result := visitor.simpleTermVisit(@children[pos+1+typeDelta], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.declare(@children[pos], self);
 
     result := visitSomeEvery(pos+2+typeDelta);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.undeclare(@children[pos], self);
   end;
@@ -1442,10 +1443,10 @@ end;
 function TXQTermFlowerLet.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
   //todo: visit loopvar, too?
   visitor.declare(@loopvar);
@@ -1561,10 +1562,10 @@ end;
 function TXQTermFlowerWindow.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
 
   startCondition.visitchildren(visitor, self);
@@ -1659,15 +1660,15 @@ var
   j: Integer;
 begin
   result := visitor.simpleTermVisit(@expr, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
 
   if sequenceTyp <> nil then begin
     result := visitor.simpleTermVisit(@sequenceTyp, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
 
   result := visitor.simpleTermVisit(@pattern, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
 
   for j := 0 to high(pattern.vars) do
     visitor.declare(@pattern.vars[j]);
@@ -2611,7 +2612,7 @@ begin
     visitor.simpleTermVisit(@children[i], self);
 
   result := visitor.simpleTermVisit(@children[high(children)],self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
 
   visitor.parent := self;
   for i := high(children) - 1 downto 0 do
@@ -2965,11 +2966,11 @@ var
   i: Integer;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   tempvar := globalUnnamedVariable;
   for i := 1 to high(children) do begin
     result := visitor.simpleTermVisit(@children[i], self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
     visitor.declare(@tempvar);
   end;
   for i := high(children) downto 1 do
@@ -3030,11 +3031,13 @@ begin
         case evilkids[i].kind of
           pvkNode: evilkids[i] := xqvalue(evilkids[i].toString);
           pvkString: if evilkids[i].instanceOf(baseSchema.untypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
+          else;
         end;
     end else if xqofCastUntypedToDouble in op.flags then
       for i := 0 to 1 do
         case evilkids[i].kind of
           pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
+          else;
         end;
     op.checkOrConvertTypes(@evilkids[0], 2, context, self);
   end;
@@ -3151,7 +3154,7 @@ begin
     if path[i].requiredType <> nil then visitor.simpleTermVisit(@path[i].requiredType, self);
     for j := 0 to high(path[i].filters) do begin
       result := visitor.simpleTermVisit(@path[i].filters[j], self);
-      case result of xqtvaAbort: exit; end;
+      if result = xqtvaAbort then exit;
     end;
   end;
 end;
@@ -3347,6 +3350,8 @@ begin
           Include(queryCommand.matching, qmCheckNamespaceURL);
 
       xqnmURL: Include(queryCommand.matching, qmCheckNamespaceURL);
+
+      xqnmNone:;
     end;
   end
 end;
@@ -3603,14 +3608,14 @@ begin
     if variable <> nil then visitor.declare(@variable, self);
     if typ <> nil then begin
       result := visitor.simpleTermVisit(@typ, self);
-      case result of xqtvaAbort: exit; end;
+      if result = xqtvaAbort then exit;
     end;
     result := visitor.simpleTermVisit(@expr, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
     if variable <> nil then visitor.undeclare(@variable, self);
   end else begin
     result := visitor.simpleTermVisit(@pattern, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.parent := self;
     with pattern do
@@ -3618,7 +3623,7 @@ begin
         visitor.declare(@vars[j]);
 
     result := visitor.simpleTermVisit(@expr, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
 
     visitor.parent := self;
     with pattern do
@@ -3735,7 +3740,7 @@ end;
 function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   Result:=inherited visitchildren(visitor);
 end;
 
@@ -3986,6 +3991,7 @@ var
               end;
           end;
         end;
+        else;
       end;
       addNodeAsKid;
     end;
@@ -4326,7 +4332,7 @@ function TXQTermConstructor.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Vis
 begin
   if nameValue <> nil then begin
     result := visitor.simpleTermVisit(@nameValue, self);
-    case result of xqtvaAbort: exit; end;
+    if result = xqtvaAbort then exit;
   end;
   result := inherited visitchildren(visitor);
 end;
@@ -4623,13 +4629,13 @@ begin
         visitor.declare(@varDef.variable);
         if length(varDef.children) > 0 then begin
           result := visitor.simpleTermVisit(@children[i], self);
-          case result of xqtvaAbort: exit; end;
+          if result = xqtvaAbort then exit;
           visitor.parent := self;
         end;
       end;
       for i := parameterCount to high(children) do begin
         result := visitor.simpleTermVisit(@children[i], self);
-        case result of xqtvaAbort: exit; end;
+        if result = xqtvaAbort then exit;
       end;
       visitor.parent := self;
       for i := parameterCount - 1 downto 0 do
@@ -4926,13 +4932,13 @@ var
   i: Integer;
 begin
   result := visitor.simpleTermVisit(@body, self);
-  case result of xqtvaAbort: exit; end;
+  if result = xqtvaAbort then exit;
   for i := 0 to high(infoVars) do
     visitor.declare(PXQTermVariable(@infoVars[i]));
 
   for i := 0 to high(catches) do begin
     result := visitor.simpleTermVisit(@catches[i].expr, self);
-    case result of xqtvaAbort: break; end;
+    if result = xqtvaAbort then break;
   end;
   for i := high(infoVars) downto 0 do
     visitor.undeclare(PXQTermVariable(@infoVars[i]));

@@ -914,6 +914,7 @@ begin
     case (typeAnnotation as TXSNumericType).subType of
       xsstDouble: result := FloatToBigDecimal(double(value), bdffShortest);
       xsstFloat: result := FloatToBigDecimal(single(value), bdffShortest);
+      else;
     end;
   except
     on EConvertError do raise EXQEvaluationException.Create('FOAR0002', 'Float ' + toXQuery()+  ' cannot be cast to decimal');
@@ -947,6 +948,7 @@ begin
     case (typeAnnotation as TXSNumericType).subType of
       xsstDouble: result := doubleToString(double(value));
       xsstFloat: result := singleToString(single(value)); //this can overflow
+      else;
     end;
   except
     on EConvertError do exit('internal float: '+FloatToStr(value));
@@ -1606,6 +1608,7 @@ begin
     xqdttDate:      begin value.year := 1989; value.month := 12; value.day := 30; end;
     xqdttTime:      begin value.hour := 0; value.min := 0; value.seconds := 0; value.microsecs := 0; end;
     xqdttYearMonth: begin value.year := 0; value.month := 0;   end;
+    xqdttNone:;
   end;
 end;
 
@@ -1689,12 +1692,12 @@ begin
   case getSequenceCount of
     0: exit(false);
     1: exit(seq[0].toBooleanEffective);
-    else begin
+    else
       case seq[0].kind of
         pvkNode, pvkObject, pvkArray: exit(true);
+        else raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
       end;
-      raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
-    end;
+
   end;
 end;
 
@@ -2123,7 +2126,7 @@ end;
 destructor TXQValuePropertyEnumerator.destroy;
 begin
   prop.Free;
-  if visitedProperties <> nil then dispose(visitedProperties);
+  if visitedProperties <> nil then dispose(visitedProperties, done);
   inherited destroy;
 end;
 

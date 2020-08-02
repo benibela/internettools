@@ -583,6 +583,7 @@ begin
           case subType of
             xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
             xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+            else;
           end;
         exit;
       end;
@@ -594,6 +595,7 @@ begin
         case subType of
           xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
           xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+          else;
         end;
     end;
   end;
@@ -622,6 +624,7 @@ begin
       pattern = [\-+]?[0-9]+}
       xsfMaxInclusive: if (v > TXSConstrainingFacetValue(constrainingFacets[i]).value.toDecimal) then exit(false);
       xsfMinInclusive: if (v < TXSConstrainingFacetValue(constrainingFacets[i]).value.toDecimal) then exit(false);
+      else;
     end;
 end;
 
@@ -837,6 +840,7 @@ begin
       xsfExplicitTimezone:
         if (v.timezone <> high(Integer)) <> (constrainingFacets[i].fixed) then
           exit(false);
+      else;
     end;
 
 end;
@@ -878,6 +882,7 @@ begin
     dtprFailure: exit(xsceFORG0001);
     dtprFailureValueTooHigh: exit(xsceFODT0001);
     dtprFailureValueTooHigh2: exit(xsceFODT0002);
+    else;
   end;
   if not constraintsSatisfied(tvd) then exit(xsceFORG0001);
   result := xsceNoError;

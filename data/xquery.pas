@@ -619,14 +619,14 @@ type
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
     procedure raiseInternalErrorObjectExpected(const functionname: string);
   public
-    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); virtual;
+    procedure enumeratePropertyKeys(var {%H-}keyset: TXQHashsetStr); virtual;
     function enumeratePropertyKeys: IXQValue; virtual;
     function enumeratePropertyValues: IXQValue;       virtual;
     procedure prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
     function setImmutable(const name, value: IXQValue): TXQValueObject; overload;
-    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; virtual;
+    function setImmutable(const {%H-}name: string; const {%H-}v: IXQValue): TXQValueObject; virtual;
     function setImmutable(const name: string; const s: string): TXQValueObject;   virtual;
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue; virtual;
+    function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): TXQValue; virtual;
   end;
 
   { TXQValueUndefined }
@@ -3413,12 +3413,10 @@ end;
 procedure TXQSerializer.appendJSONArrayStart;
 begin
   inherited appendJSONArrayStart;
-  case insertWhitespace of
-    xqsiwIndent: begin
-      indent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    indent;
+    append(LineEnding);
+    appendIndent;
   end;
 end;
 
@@ -3437,12 +3435,10 @@ end;
 
 procedure TXQSerializer.appendJSONArrayEnd;
 begin
-  case insertWhitespace of
-    xqsiwIndent: begin
-      unindent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    unindent;
+    append(LineEnding);
+    appendIndent;
   end;
   inherited appendJSONArrayEnd;
 end;
@@ -3450,12 +3446,10 @@ end;
 procedure TXQSerializer.appendJSONObjectStart;
 begin
   inherited appendJSONObjectStart;
-  case insertWhitespace of
-    xqsiwIndent: begin
-      indent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    indent;
+    append(LineEnding);
+    appendIndent;
   end;
 end;
 
@@ -3473,12 +3467,10 @@ end;
 
 procedure TXQSerializer.appendJSONObjectEnd;
 begin
-  case insertWhitespace of
-    xqsiwIndent: begin
-      unindent;
-      append(LineEnding);
-      appendIndent;
-    end;
+  if insertWhitespace = xqsiwIndent then begin
+    unindent;
+    append(LineEnding);
+    appendIndent;
   end;
   inherited appendJSONObjectEnd;
 end;
@@ -4991,6 +4983,7 @@ begin
           case pa.kind of
             pvkFunction: raiseFOTY0015(pa^);
             pvkObject, pvkArray: exit(false);
+            else ;
           end;
           if collation = nil then
             collation := context.staticContext.nodeCollation;
@@ -5028,7 +5021,7 @@ end;
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
   temp: BigDecimal;
-  temp64: Int64;
+  temp64: SizeInt64;
 begin
   case args[1].kind of
     pvkInt64: from := args[1].toInt64;
@@ -5096,6 +5089,7 @@ begin
     case args[i].kind of
       pvkSequence: if args[i].getSequenceCount > 1 then raiseXPTY0004TypeError(args[i], 'singleton');
       pvkFunction: raiseFOTY0013TypeError(args[i]);
+      else;
     end;
     temp+=args[i].toString;
   end;
@@ -6756,6 +6750,7 @@ begin
     end;
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+    else;
   end;
   case bk of
     pvkUndefined: exit(-2);
@@ -6765,6 +6760,7 @@ begin
     end;
     pvkNull: exit(1);
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
+    else;
   end;
   if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then

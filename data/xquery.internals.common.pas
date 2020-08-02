@@ -374,12 +374,12 @@ end;
 
 class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
-  result := (length(key)  = datalen) and CompareMem(data, pointer(key), datalen);
+  result := (SizeUInt(length(key))  = datalen) and CompareMem(data, pointer(key), datalen);
 end;
 
 class function TXQCaseInsensitiveTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
-  result := (length(key)  = datalen) and strliEqual(data, pointer(key), datalen);
+  result := (SizeUInt(length(key))  = datalen) and strliEqual(data, pointer(key), datalen);
 end;
 
 constructor TXQBaseHashmap.init;
