@@ -2242,7 +2242,7 @@ begin
   end;
   result := prototype <> nil;
   if not result then exit;
-  result := (prototype as TXQValueObject).hasProperty(name, value);
+  result := prototype.hasProperty(name, value);
 end;
 
 function TXQValueObject.clone: IXQValue;
