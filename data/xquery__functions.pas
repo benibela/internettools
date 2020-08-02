@@ -6645,6 +6645,41 @@ begin
   end;
 end;
 
+function xqFunctionMapNewMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
+var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
+  value: TXQValue;
+  pv: PIXQValue;
+  resobj: TXQValueMap;
+  pprop: TXQProperty;
+  tempseq: TXQValueSequence;
+begin
+  if argc >= 2 then begin
+    if argv[1].hasProperty('duplicates', @value) then
+      duplicates.setFromString(value.toString);
+  end;
+  //if argv[0].getSequenceCount = 1 then exit(argv[0]);
+  resobj := TXQValueMap.create();
+  result := resobj;
+  for pv in argv[0].GetEnumeratorPtrUnsafe do begin
+    for pprop in pv^.getPropertyEnumerator do begin
+      if resobj.hasProperty(pprop.Name, @value) then begin
+        case duplicates of
+          xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+          xqmdrUseFirst: ;
+          xqmdrUseLast: resobj.setMutable(pprop.Name, pprop.Value);
+          xqmdrCombine: begin
+            tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+            tempseq.add(value);
+            tempseq.add(pprop.Value);
+            resobj.setMutable(pprop.Name, tempseq);
+          end;
+        end;
+      end else resobj.setMutable(pprop.Name, pprop.Value);
+    end;
+  end;
+end;
+
+
 function xqFunctionMapSize({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
   result := xqvalue(argv[0].Size);
@@ -7139,6 +7174,7 @@ transform
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   TXQueryEngine.registerNativeModule(fnmap);
   fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
+  fnmap.registerFunction('new-merge', @xqFunctionMapNewMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
   fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
   fnmap.registerFunction('keys', @xqFunctionMapKeys).setVersionsShared([map, atomicStar]);
   fnmap.registerFunction('contains', @xqFunctionMapContains).setVersionsShared([map, atomic, boolean]);

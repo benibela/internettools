@@ -2088,8 +2088,10 @@ end;
 function TXQValuePropertyEnumerator.MoveNext: Boolean;
 begin
   if visitedProperties = nil then begin
-    inc(idx);
-    result := idx < vars.count;
+    if vars <> nil then begin
+      inc(idx);
+      result := idx < vars.count;
+    end else result := hashmapEnumerator.moveNext;
     exit;
   end;
 
@@ -2117,9 +2119,11 @@ constructor TXQValuePropertyEnumerator.create(obj: TXQValueObject);
 begin
   prop := TXQProperty.Create;
   prop.enum := self;
-  vars := obj.values;
-  tempobj := obj;
-  if tempobj.prototype <> nil then new(visitedProperties, init);
+  if obj.ClassType <> TXQValueMap then begin;
+    vars := obj.values;
+    tempobj := obj;
+    if tempobj.prototype <> nil then new(visitedProperties, init);
+  end else hashmapEnumerator := (obj as txqvaluemap).mapdata.getEnumerator;
   idx := -1;
 end;
 
@@ -2382,6 +2386,124 @@ end;
 function TXQValueObject.getPropertyEnumerator: TXQValuePropertyEnumerator;
 begin
   result := TXQValuePropertyEnumerator.Create(self);
+end;
+
+
+
+constructor TXQValueMap.create();
+begin
+  inherited;
+  mapdata.init;
+end;
+
+destructor TXQValueMap.Destroy;
+begin
+  mapdata.done;
+  mapdata := default(TXQHashmapStrOwningXQValue);
+  inherited Destroy;
+end;
+
+class function TXQValueMap.newinstance: tobject;
+var hackmethod: TMethod;
+begin
+  hackMethod.Data := self;
+  hackMethod.Code := @TObject.newinstance;
+  result := TNewinstanceFunc(hackMethod)();
+end;
+
+procedure TXQValueMap.FreeInstance;
+begin
+  inherited FreeInstance;
+end;
+
+function TXQValueMap.Size: SizeInt;
+begin
+  Result:=mapdata.Size;
+end;
+
+function TXQValueMap.hasProperty(const name: string; value: PXQValue): boolean;
+var
+  p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  p := mapdata.findKeyValuePair(name);
+  if p.isAssigned and assigned(value) then value^ := p.value;
+end;
+
+function TXQValueMap.getProperty(const name: string): IXQValue;
+var
+  p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  p := mapdata.findKeyValuePair(name);
+  if p.isAssigned then result := p.value
+  else result := xqvalue();
+end;
+
+function TXQValueMap.getPropertyEnumerator: TXQValuePropertyEnumerator;
+begin
+  result := TXQValuePropertyEnumerator.Create(self);
+end;
+
+procedure TXQValueMap.setMutable(const name: string; const v: IXQValue);
+begin
+  mapdata.include(name, v.toValue);
+end;
+
+function TXQValueMap.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
+var
+  Resmap: TXQValueMap;
+begin
+  Resmap:=clone as TXQValueMap;
+  resmap.setMutable(name, v);
+  result := resmap
+end;
+
+procedure TXQValueMap.setMutable(const name: string; const s: string);
+begin
+  setMutable(name, xqvalue(s));
+end;
+
+function TXQValueMap.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
+var
+  oldValue: TXQValue;
+  newValue: IXQValue;
+begin
+  if len = 1 then
+    exit(setImmutable(props^, v));
+
+  if not hasProperty(props^, @oldValue) then
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
+  if oldValue.kind in [pvkArray, pvkObject] then
+    newValue := oldValue.setImmutable(props + 1, len - 1, v)
+  else
+   raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
+
+  result := setImmutable(props^, newValue);
+end;
+
+procedure TXQValueMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+var p: TXQHashmapStrOwningXQValue.PKeyPairEnumerator;
+begin
+  for p in mapdata do
+    keyset.include(p.key);
+end;
+
+function TXQValueMap.enumeratePropertyValues: IXQValue;
+var p: TXQHashmapStrOwningXQValue.PKeyPairEnumerator;
+  tempseq: TXQValueSequence;
+begin
+  tempseq := TXQValueSequence.create(mapdata.Count);
+  for p in mapdata do
+    tempseq.add(p.value);
+  result := tempseq;
+end;
+
+function TXQValueMap.clone: IXQValue;
+var
+  resmap: TXQValueMap;
+begin
+  resmap := TXQValueMap.create;
+  resmap.mapdata.assign(mapdata);
+  Result:=resmap
 end;
 
 

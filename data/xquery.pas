@@ -629,6 +629,13 @@ type
     function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): TXQValue; virtual;
   end;
 
+  TXQValueOwnershipTracker = record
+    class procedure addRef(v: TXQValue); static; inline;
+    class procedure release(v: TXQValue); static; inline;
+  end;
+
+  TXQHashmapStrOwningXQValue = specialize TXQHashmapStrOwning<TXQValue, TXQValueOwnershipTracker>;
+
   { TXQValueUndefined }
   //**undefined/empty sequence
   TXQValueUndefined = class (TXQValue)
@@ -951,6 +958,7 @@ type
   TXQPropertyEnumeratorInternal = class
     vars: TXQVariableChangeLog;
     idx: integer;
+    hashmapEnumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
   end;
 
   { TXQProperty }
@@ -958,8 +966,8 @@ type
   TXQProperty = class
   private
     enum: TXQPropertyEnumeratorInternal;
-    function GetName: string; inline;
-    function GetValue: IXQValue; inline;
+    function GetName: string;
+    function GetValue: IXQValue;
   public
     property Name: string read GetName;
     property Value: IXQValue read GetValue;
@@ -1034,8 +1042,45 @@ type
     function hasNodes: boolean; override;
   end;
 
-  { TXQValueJSONArray }
-  //** Experimental type for a JSON array of other IXQValue
+  //** Experimental String Hash map
+  TXQValueMap = class (TXQValueObject)
+    mapdata: TXQHashmapStrOwningXQValue;
+
+    constructor create(); reintroduce; virtual;
+    destructor Destroy; override;
+
+    class function newinstance : tobject;override;
+    procedure FreeInstance; override;
+
+
+    //class function classKind: TXQValueKind; override;
+
+    function Size: SizeInt; override;
+    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+    function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
+
+
+    procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
+    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
+    procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
+
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject; override;
+
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+
+    //function toBooleanEffective: boolean; override;
+
+    function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
+    //function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
+
+    //function stringifyNodes: IXQValue; override;
+    //function hasNodes: boolean; override;
+  end;
+
+
+  //** JSON array of other IXQValue
   TXQValueJSONArray = class (TXQValueJSONIQItem)
     seq: TXQVList;
 
@@ -3361,6 +3406,17 @@ begin
 end;
 
 
+class procedure TXQValueOwnershipTracker.addRef(v: TXQValue);
+begin
+  v._AddRef;
+end;
+
+class procedure TXQValueOwnershipTracker.release(v: TXQValue);
+begin
+  v._Release;
+end;
+
+
 procedure TXQParsingOptions.SetAllowJSON(AValue: boolean);
 begin
   if avalue then begin
@@ -4916,13 +4972,19 @@ end;
 function TXQProperty.GetName: string;
 begin
   with enum do
-    result := vars.getName(idx);
+    if vars <> nil then
+      result := vars.getName(idx)
+    else
+      result := hashmapEnumerator.key;
 end;
 
 function TXQProperty.GetValue: IXQValue;
 begin
   with enum do
-    result := vars.get(idx);
+    if vars <> nil then
+      result := vars.get(idx)
+    else
+      result := hashmapEnumerator.value;
 end;
 
 function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
