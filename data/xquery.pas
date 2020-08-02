@@ -534,7 +534,10 @@ type
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr);
     function enumeratePropertyKeys(): IXQValue;
     function enumeratePropertyValues: IXQValue;
-    function getPropertyCount: integer;
+    function setImmutable(const name, value: IXQValue): TXQValueObject;  //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const v: IXQValue): TXQValueObject;  //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const s: string): TXQValueObject;    //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
+
   end;
 
 
@@ -614,11 +617,16 @@ type
   protected
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
+    procedure raiseInternalErrorObjectExpected(const functionname: string);
   public
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); virtual;
     function enumeratePropertyKeys: IXQValue; virtual;
     function enumeratePropertyValues: IXQValue;       virtual;
-    function getPropertyCount: integer; virtual;
+    procedure prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
+    function setImmutable(const name, value: IXQValue): TXQValueObject; overload;
+    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; virtual;
+    function setImmutable(const name: string; const s: string): TXQValueObject;   virtual;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue; virtual;
   end;
 
   { TXQValueUndefined }
@@ -1006,15 +1014,13 @@ type
 
 
     procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
-    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
     procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
-    function setImmutable(const name: string; const s: string): TXQValueObject; //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
 
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject; override;
 
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
     function enumeratePropertyValues: IXQValue;       override;
-    function getPropertyCount: integer; override;
 
     function toBooleanEffective: boolean; override;
 
@@ -1026,8 +1032,6 @@ type
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
-
-    class procedure prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess); static;
   end;
 
   { TXQValueJSONArray }
@@ -1052,7 +1056,7 @@ type
 
     function clone: IXQValue; override;
 
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
@@ -5128,11 +5132,10 @@ begin
   if not hasVariable(variable, oldObj, namespaceURL) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Failed to find object variable '+variable+LineEnding+'(when changing properties: '+strJoin(props, len, '.')+')');
 
-
-  if not (oldObj is TXQValueObject) then begin
-    if not (oldObj is TXQValueJSONArray) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
-    newValue := (oldObj as TXQValueJSONArray).setImmutable(props, len, value);
-  end else newValue := (oldObj as TXQValueObject).setImmutable(props, len, value);
+  case oldObj.kind of
+    pvkArray, pvkObject: newValue := oldObj.toValue.setImmutable(props, len, value);
+    else raise EXQEvaluationException.Create('pxp:OBJECT', 'Variable '+variable+' is not an object or array, but '+oldObj.toXQuery()+LineEnding+'(when changing properites: '+strJoin(props, len, '.')+')');
+  end;
 
   reserve(count + 1);
 

@@ -1285,25 +1285,6 @@ begin
   raise EHTMLParseMatchingException.Create(message);
 end;
 
-{procedure THtmlTemplateParser.defineXQVariable(sender: TObject; const variable: string; const value: IXQValue);
-var
-  base: string;
-  varname: string;
-  temp: IXQValue;
-begin
-  if not FVariableLog.splitName(variable,base,varname) or not FVariableLog.allowPropertyDotNotation then begin
-    FVariableLog.defineVariable(sender, variable, value);
-    exit;
-  end;
-  if FVariableLog.hasVariable(base, nil) or not FOldVariableLog.hasVariable(base, nil) then begin
-    FVariableLog.defineVariable(sender, variable, value);
-    exit;
-  end;
-  temp := FOldVariableLog.get(base);
-  if not (temp is TXQValueObject) then raise EXQEvaluationException.create('pxp:OBJECT', 'Set object property, but variable is no object');
-  FVariableLog.defineVariable(sender, base, (temp as TXQValueObject).setImmutable(varname, value));
-end;}
-
 function THtmlTemplateParser.GetVariableLogCondensed: TXQVariableChangeLog;
 begin
   if FVariableLogCondensed = nil then FVariableLogCondensed := FVariableLog.condensed;
@@ -1318,19 +1299,6 @@ begin
   end;
   result := FVariables;
 end;
-
-{function THtmlTemplateParser.evaluateXQVariable(sender: TObject; const variable: string; var value: IXQValue): boolean;
-var
-  temp: TXQValue;
-begin
-  ignore(sender);
-  temp := nil;
-  if not FVariableLog.hasVariableOrObject(variable, @temp) then
-    if not FOldVariableLog.hasVariableOrObject(variable, @temp) then exit(false);
-  if temp <> nil then value := temp
-  else value := xqvalue();
-  result := true;
-end;}
 
 type TXQCollationRawStrBoolFunction = function (const a,b: RawByteString): boolean;
 type TXQCollationStrBoolFunction = function (const a,b: string): boolean;
@@ -2325,7 +2293,7 @@ begin
       if pos('.', temp) = 0 then tempxqvalue := FVariableLog.get(temp)
       else begin
         tempxqvalue := FVariableLog.get(strSplitGet('.', temp));
-        while (temp <> '') and (tempxqvalue is TXQValueObject) do
+        while (temp <> '') and (tempxqvalue.kind = pvkObject) do
           tempxqvalue := tempxqvalue.getProperty(strSplitGet('.', temp));
       end;
 

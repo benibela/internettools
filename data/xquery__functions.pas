@@ -6647,7 +6647,7 @@ end;
 
 function xqFunctionMapSize({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue(argv[0].getPropertyCount);
+  result := xqvalue(argv[0].Size);
 end;
 
 function xqFunctionMapKeys({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
@@ -6695,7 +6695,7 @@ end;
 
 function xqFunctionMapPut({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := (argv[0] as TXQValueObject).setImmutable(argv[1].toString, argv[2]);
+  result := argv[0].setImmutable(argv[1], argv[2]);
 end;
 
 function xqFunctionMapEntry({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
@@ -6738,7 +6738,7 @@ var f: TXQBatchFunctionCall;
     l: TXQVList;
     pp: TXQProperty;
 begin
-  l := TXQVList.create(argv[0].getPropertyCount);
+  l := TXQVList.create(argv[0].Size);
   result := TXQValueSequence.create(l);
   with f do begin
     init(context, argv[1]);

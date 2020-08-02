@@ -285,8 +285,6 @@ begin
     if v^.kind = pvkObject then
        seq.add(v^.getProperty(propname));
   xqvalueSeqSqueezed(result, seq)
-//  if not (obj is TXQValueObject) then raiseEvaluationError('pxp:OBJ', 'Expected object, got: '+obj.toString);
-//  result := (obj as TXQValueObject).getProperty(propname);
 end;
 
 function TXQTermReadObjectProperty.getContextDependencies: TXQContextDependencies;
@@ -2901,7 +2899,6 @@ var
   index: IXQValue;
   ara: TXQValueJSONArray;
   i, stackSize: Integer;
-  sl: TStringList;
   resultSeq: TXQVList;
   v: PIXQValue;
   funcref: TXQValueFunction;

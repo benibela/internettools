@@ -225,9 +225,14 @@ begin
   result := typeAnnotation.derivedFrom(typ);
 end;
 
+procedure TXQValue.raiseInternalErrorObjectExpected(const functionname: string);
+begin
+  raiseInternalError('Function ' + functionname+ ' can only be called on an object, but was called on ' + toXQuery);
+end;
+
 procedure TXQValue.enumeratePropertyKeys(var keyset: TXQHashsetStr);
 begin
-  raiseInternalError('enumeratePropertyKeys called on non-object');
+  raiseInternalErrorObjectExpected('enumeratePropertyKeys');
 end;
 
 function TXQValue.enumeratePropertyKeys: IXQValue;
@@ -241,13 +246,46 @@ end;
 
 function TXQValue.enumeratePropertyValues: IXQValue;
 begin
-  raiseInternalError('enumeratePropertyValues called on non-object');
+  raiseInternalErrorObjectExpected('enumeratePropertyValues');
   result := nil
 end;
 
-function TXQValue.getPropertyCount: integer;
+
+procedure TXQValue.prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
+var h: IXQValue;
+  value: String;
+  name: RawByteString;
 begin
-  raiseInternalError('getPropertyCount called on non-object');
+  url := getProperty('url').toString;
+  method := getProperty('method').toString;
+  post := getProperty('post').toString;
+  for h in getProperty('headers') do begin
+    value := h.toString;
+    name := strSplitGet(':', value);
+    internet.additionalHeaders.Values[trim(name)] := trim(value);
+  end;
+end;
+
+function TXQValue.setImmutable(const name, value: IXQValue): TXQValueObject;
+begin
+  result := setImmutable(name.toString, value);
+end;
+
+function TXQValue.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
+begin
+  raiseInternalErrorObjectExpected('setImmutable');
+  result := nil;
+end;
+
+function TXQValue.setImmutable(const name: string; const s: string): TXQValueObject;
+begin
+  result := setImmutable(xqvalue(name), xqvalue(s));
+end;
+
+function TXQValue.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue;
+begin
+  raiseInternalErrorObjectExpected('setImmutable (or array)');
+  result := nil;
 end;
 
 function TXQValue.toDecimal: BigDecimal;
@@ -620,7 +658,7 @@ var tempContext: TXQEvaluationContext;
     case v.kind of
       pvkObject: begin
          tempHeaders := defaultInternet.additionalHeaders.Text;
-         TXQValueObject.prepareInternetRequest(v, method, uri, post, defaultInternet);
+         v.toValue.prepareInternetRequest(method, uri, post, defaultInternet);
          data := internetaccess.httpRequest(method, uri, post);
          defaultInternet.additionalHeaders.Text := tempHeaders;
          resseq.add(dataToXQV (data, uri, defaultInternet.getLastContentType));
@@ -2150,11 +2188,6 @@ begin
   setMutable(name,xqvalue(s));
 end;
 
-function TXQValueObject.setImmutable(const name: string; const s: string): TXQValueObject;
-begin
-  result := setImmutable(name,xqvalue(s));
-end;
-
 function TXQValueObject.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
 var
   oldValue: TXQValue;
@@ -2165,9 +2198,10 @@ begin
 
   if not hasProperty(props^, @oldValue) then
     raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
-  if objInheritsFrom(oldValue, TXQValueObject) then newValue := TXQValueObject(oldValue).setImmutable(props + 1, len - 1, v)
-  else if objInheritsFrom(oldValue, TXQValueJSONArray) then newValue := TXQValueJSONArray(oldValue).setImmutable(props + 1, len - 1, v)
-  else raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
+  if oldValue.kind in [pvkArray, pvkObject] then
+    newValue := oldValue.setImmutable(props + 1, len - 1, v)
+  else
+   raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
 
   result := cloneLinked;
   result.values.add(props^, newValue);
@@ -2194,12 +2228,6 @@ begin
   result := tempSeq;
   xqvalueSeqSqueeze(result);
 end;
-
-function TXQValueObject.getPropertyCount: integer;
-begin
-  Result:=size;
-end;
-
 
 function TXQValueObject.toBooleanEffective: boolean;
 begin
@@ -2340,20 +2368,6 @@ begin
   else result := false;
 end;
 
-class procedure TXQValueObject.prepareInternetRequest(const obj: IXQValue; out method, url, post: string; internet: TInternetAccess);
-var h: IXQValue;
-  value: String;
-  name: RawByteString;
-begin
-  url := obj.getProperty('url').toString;
-  method := obj.getProperty('method').toString;
-  post := obj.getProperty('post').toString;
-  for h in obj.getProperty('headers') do begin
-    value := h.toString;
-    name := strSplitGet(':', value);
-    internet.additionalHeaders.Values[trim(name)] := trim(value);
-  end;
-end;
 
 function TXQValueObject.getProperty(const name: string): IXQValue;
 var
@@ -2454,11 +2468,13 @@ begin
   result := seqr;
 end;
 
-function TXQValueJSONArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueJSONArray;
+function TXQValueJSONArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue;
 var
   newValue: IXQValue;
   i: Integer;
   idx: Integer;
+  resultArray: TXQValueJSONArray;
+  resseq: TXQVList;
 begin
   idx := StrToInt(props^);
   if idx < 0 then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
@@ -2467,20 +2483,19 @@ begin
     newValue := v
   else if (idx > seq.Count) then
     raise EXQEvaluationException.Create('pxp:Array', 'Element index'+props^+' not found, when assigning to '+strJoin(props, len, '.'))
-  else if seq[idx-1] is TXQValueObject then
-    newValue := (seq[idx-1] as TXQValueObject).setImmutable(props + 1, len - 1, v)
-  else if seq[idx-1] is TXQValueJSONArray then
-    newValue := (seq[idx-1] as TXQValueJSONArray).setImmutable(props + 1, len - 1, v)
+  else if seq[idx-1].kind in [pvkArray, pvkObject] then
+    newValue := seq[idx-1].toValue.setImmutable(props + 1, len - 1, v)
   else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+props^+' to assign to '+strJoin(props, len, '.'));
 
-
-  result := TXQValueJSONArray.create(seq.Count);
-  if idx = 0 then result.seq.add(newValue);
+  resultArray := TXQValueJSONArray.create(seq.Count);
+  resseq := resultArray.seq;
+  if idx = 0 then resseq.add(newValue);
   idx -= 1;
   for i := 0 to seq.Count - 1 do
-    if i <> idx  then result.seq.add(seq[i])
-    else result.seq.add(newValue);
-  if idx >= seq.Count then result.seq.add(newValue); //e.g. $a(1000) := ..
+    if i <> idx  then resseq.add(seq[i])
+    else resseq.add(newValue);
+  if idx >= seq.Count then resseq.add(newValue); //e.g. $a(1000) := ..
+  result := resultArray;
 end;
 
 procedure TXQValueJSONArray.jsonSerialize(var serializer: TXQSerializer);
