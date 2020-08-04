@@ -1,5 +1,5 @@
 {
-Copyright (C) 2017         Benito van der Zander (BeniBela)
+Copyright (C) 2017 - 2020  Benito van der Zander (BeniBela)
                            benito@benibela.de
                            www.benibela.de
 
@@ -57,6 +57,26 @@ type
 
 
   {$ifdef HAS_TYPEHELPERS}
+  (**
+  An array view represents a subsequence of an array.
+
+  The view is read-only and can only shrink.
+  All functions work with any pointer, such that pointers outside the view either give an empty view or keep the view unchanged.
+
+  Function Move* remove elements from the beginning, functions Cut* remove elements from the end, i.e.:
+
+  |--------cutBefore(x)--------||-----------------------moveTo(x)-----------------|
+  ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
+  |-------------------cutAfter(x)--------------------||-------moveAfter(x)--------|
+
+
+  Function View* return a new view. To and From are inclusive, while Until and Behind are exclusive, i.e.:
+
+  |--------viewUntil(x)--------||-----------------------viewFrom(x)---------------|
+  ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
+  |--------------------viewTo(x)---------------------||-------viewBehind(x)-------|
+
+  *)
   generic TArrayView<TElement> = object
     type PElement = ^TElement;
   protected
