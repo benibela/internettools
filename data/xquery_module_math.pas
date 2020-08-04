@@ -246,6 +246,7 @@ var
   b: xqfloat;
   procedure chooseInfinityOr0;
   begin
+    {$if defined(cpui386) or defined(CPUX86_64)}ClearExceptions(false);{$endif}
     if ((b > 0) = (IsInfinite(a) or (abs(a) > 1)))  then begin
       if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then result := xqv(getNegInf)
       else result := xqv(getPosInf);
@@ -279,6 +280,7 @@ begin
     on EOverflow do chooseInfinityOr0;
     on EDivByZero do chooseInfinityOr0;
     on EMathError do begin
+      {$if defined(cpui386) or defined(CPUX86_64)}ClearExceptions(false);{$endif}
       if a = -1 then result := xqv(1)
       else if (a < 0) and (frac(b) <> 0) then result := xqv(NaN) //gets imaginary
       else chooseInfinityOr0;
