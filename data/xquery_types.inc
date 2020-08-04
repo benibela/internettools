@@ -2413,7 +2413,7 @@ end;
 
 procedure TXQValueMap.FreeInstance;
 begin
-  inherited FreeInstance;
+  Freemem(pointer(self));
 end;
 
 function TXQValueMap.Size: SizeInt;
