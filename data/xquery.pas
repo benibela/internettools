@@ -914,15 +914,8 @@ type
     destructor Destroy; override;
   end;
 
-  //** Type for jsoniq structured-item()
-  TXQValueJSONIQStructuredItem = class(TXQValue)
-
-  end;
-
-  { TXQValueNode }
-
   //** Type for a node
-  TXQValueNode = class (TXQValueJSONIQStructuredItem)
+  TXQValueNode = class (TXQValue)
   private
     fnode: TTreeNode;
     procedure setNode(AValue: TTreeNode);
@@ -992,12 +985,6 @@ type
     destructor destroy; override;
   end;
 
-
-  //** Type corresponding to jsoniq json-item()
-  TXQValueJSONIQItem = class (TXQValueJSONIQStructuredItem)
-
-  end;
-
   { TXQValueObject }
 
   //**(Experimental) object type.
@@ -1005,7 +992,7 @@ type
   //**The objects can be used mutable and immutable. If used immutable, they still appear mutable, but every change creates a new object
   //**that is linked to the previous objects (i.e. has the old object as prototype). @br
   //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
-  TXQValueObject = class (TXQValueJSONIQItem)
+  TXQValueObject = class (TXQValue)
     values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume they are unique
     prototype: IXQValue;
 
@@ -1081,7 +1068,7 @@ type
 
 
   //** JSON array of other IXQValue
-  TXQValueJSONArray = class (TXQValueJSONIQItem)
+  TXQValueJSONArray = class (TXQValue)
     seq: TXQVList;
 
     constructor create(takeList: TXQVList); reintroduce; virtual;
