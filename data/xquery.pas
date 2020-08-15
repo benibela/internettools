@@ -1021,9 +1021,6 @@ type
 
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
-
-    function stringifyNodes: IXQValue; override;
-    function hasNodes: boolean; override;
   end;
 
   //** Experimental String Hash map

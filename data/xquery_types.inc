@@ -619,13 +619,40 @@ end;
 
 
 function TXQValue.stringifyNodes: IXQValue;
+  function objectStringifiedNodes: IXQValue;
+  var
+    prop: TXQProperty;
+    newObj: TXQValueObject;
+  begin
+    newObj := TXQValueObject.create();
+    for prop in getPropertyEnumerator do
+      newObj.setMutable(prop.Name, prop.Value.stringifyNodes);
+    result := newObj;
+  end;
+
 begin
-  result := self;
+  case kind of
+    pvkObject: result := objectStringifiedNodes;
+    else result := self;
+  end;
 end;
 
 function TXQValue.hasNodes: boolean;
+  function objectHasNodes: boolean;
+  var
+    prop: TXQProperty;
+  begin
+    result := false;
+    for prop in getPropertyEnumerator do
+      if prop.Value.hasNodes then
+        exit(true);
+  end;
+
 begin
-  result := false;
+  case kind of
+    pvkObject: result := objectHasNodes;
+    else result := false;
+  end;
 end;
 
 function TXQValue.clone: IXQValue;
@@ -2363,25 +2390,6 @@ function TXQValueObject.cloneLinked: TXQValueObject;
 begin
   result := TXQValueObject.create();
   result.prototype := self;
-end;
-
-
-function TXQValueObject.stringifyNodes: IXQValue;
-var obj: TXQValueObject;
-  i: Integer;
-begin
-  if prototype <> nil then obj := prototype.stringifyNodes as TXQValueObject
-  else obj := TXQValueObject.create();
-  for i:=0 to values.count-1 do
-    obj.values.add(values.getName(i), values.get(i).stringifyNodes);
-  result := obj;
-end;
-
-function TXQValueObject.hasNodes: boolean;
-begin
-  if values.hasNodes then result := true
-  else if prototype <> nil then result := prototype.hasNodes
-  else result := false;
 end;
 
 
