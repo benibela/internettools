@@ -663,7 +663,7 @@ begin
   result := 0;
   for i := high(a.digits)  downto max(0, - a.exponent) do
     result := result * ELEMENT_OVERFLOW - a.digits[i]; //create negative value (as it has a larger range by 1)
-  if a.exponent > 0 then
+  if (a.exponent > 0) and (result <> 0) then
     for i := 1 to a.exponent do
       result := result * ELEMENT_OVERFLOW;
   if not a.signed then result := -result;
@@ -678,7 +678,7 @@ begin
   result := 0;
   for i := high(a.digits)  downto max(0, - a.exponent) do
     result := result * ELEMENT_OVERFLOW - a.digits[i]; //create negative value (as it has a larger range by 1)
-  if a.exponent > 0 then
+  if (a.exponent > 0) and (result <> 0) then
     for i := 1 to a.exponent do
       result := result * ELEMENT_OVERFLOW;
   if not a.signed then result := -result;
