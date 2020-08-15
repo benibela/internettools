@@ -456,60 +456,124 @@ end;
 function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
 var
   pure: Boolean;
-  temp: BigDecimal;
-  tempd: xqfloat;
-  errCode: TBigDecimalErrorCode;
+  procedure slowPath;
+  var
+    temp: BigDecimal;
+    errCode: TBigDecimalErrorCode;
+    tempd: xqfloat;
+  begin
+    result := xsceFORG0001;
+    if ((length(v) = 3) and (v[1] in ['N','I'])) or ((length(v) = 4) and (v[3] = 'N')) then begin
+      if pure then exit();
+      if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
+      case v of
+        'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNaN);
+        'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getPosInf);
+        '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNegInf);
+        else exit();
+      end;
+      result := xsceNoError;
+      exit;
+    end;
+    if pure and striContains(v, 'e') then exit();
+    if (subType = xsstInteger) and (strContains(v, '.')) then exit();
+
+    if not TryStrToBigDecimal(v, @temp, @errCode) then begin
+      if errCode = bdceParsingTooBig then result := xsceFOAR0002;
+      exit;
+    end;
+    if not constraintsSatisfied(temp) then exit;
+    result := xsceNoError;
+    if (outv <> nil) then
+      case subType of
+        xsstInteger, xsstDecimal:
+          if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
+          else outv^ := TXQValueDecimal.create(self, temp);
+        xsstFloat, xsstDouble: begin
+          try
+            if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
+            else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
+            else tempd := single(BigDecimalToExtended(temp));
+            {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
+            outv^ := TXQValueFloat.create(self, tempd);
+          except
+            on EOverflow do outv^ := TXQValueFloat.create(self, getPosInf);
+            on EUnderflow do outv^ := TXQValueFloat.create(self, getNegInf);
+          end;
+        end;
+      end
+      {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);
+      if not result then exit;
+      if length(constrainingFacets) > 0 then
+        if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
+      if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v)
+      else if v[tempexp+1] = '-' then tempe := 0
+      else if v[1]= '-' then tempe := getNegInf
+      else tempe := getPosInf;}
+  end;
+
+var
 {  tempintstart, tempintend, tempdot, tempexp: integer;
   tempe: Extended;}
+  firstDigit, secondDigit: integer;
+  tempi: int64;
+  tempd: xqfloat;
+  valcode: integer;
 begin
   result := xsceFORG0001;
-  pure := subType in  [xsstInteger, xsstDecimal];
-  if ((length(v) = 3) and (v[1] in ['N','I'])) or ((length(v) = 4) and (v[3] = 'N')) then begin
-    if pure then exit(xsceFORG0001);
-    if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
-    case v of
-      'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNaN);
-      'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getPosInf);
-      '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNegInf);
-      else exit(xsceFORG0001);
+  //quick check for short numbers
+  if length(v) < 3 then begin
+    case length(v) of
+      1: begin
+           firstDigit := ord(v[1]) - ord('0');
+           if firstDigit in [0..9] then
+             result := tryCreateValue(firstDigit, outv);
+         end;
+      2: begin
+           firstDigit := ord(v[1]) - ord('0');
+           secondDigit := ord(v[2]) - ord('0');
+           case v[1] of
+             '0'..'9': case v[2] of
+               '0'..'9': result := tryCreateValue( firstDigit * 10 + secondDigit, outv);
+               '.': if subType <> xsstInteger then result := tryCreateValue( firstDigit , outv);
+               //'e', 'E': ;
+             end;
+             '.': if secondDigit in [0..9] then
+                    if subType <> xsstInteger then
+                      result := tryCreateValue( secondDigit / 10, outv);
+             '+': if secondDigit in [0..9] then
+                    result := tryCreateValue( secondDigit , outv);
+             '-': case secondDigit of
+                0: if subType in [xsstInteger, xsstDecimal] then result := tryCreateValue( 0, outv)
+                   else result := tryCreateValue( xqfloat( -0.0 ), outv);
+                1..9: result := tryCreateValue( - secondDigit , outv);
+             end;
+         end;
+      end;
     end;
-    exit(xsceNoError);
-  end;
-  if pure and striContains(v, 'e') then exit();
-  if (subType = xsstInteger) and (strContains(v, '.')) then exit();
-
-  if not TryStrToBigDecimal(v, @temp, @errCode) then begin
-    if errCode = bdceParsingTooBig then result := xsceFOAR0002;
     exit;
   end;
-  if not constraintsSatisfied(temp) then exit;
-  result := xsceNoError;
-  if (outv <> nil) then
-    case subType of
-      xsstInteger, xsstDecimal:
-        if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
-        else outv^ := TXQValueDecimal.create(self, temp);
-      xsstFloat, xsstDouble: begin
-        try
-          if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
-          else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
-          else tempd := single(BigDecimalToExtended(temp));
-          {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
-          outv^ := TXQValueFloat.create(self, tempd);
-        except
-          on EOverflow do outv^ := TXQValueFloat.create(self, getPosInf);
-          on EUnderflow do outv^ := TXQValueFloat.create(self, getNegInf);
-        end;
+
+  //use fpc's parsers (but make sure it does not accept invalid formats)
+  pure := subType in  [xsstInteger, xsstDecimal];
+  if (v[1] in ['0'..'9','+','-','.']) and (v[2] in ['0'..'9','.','e','E']) and (v[3] in ['0'..'9','.','e','E']) then begin
+    if pure then begin
+      val(v, tempi, valcode);
+      if valcode = 0 then
+        exit(tryCreateValue(tempi, outv));
+    end else begin
+      val(v, tempd, valcode);
+      if valcode = 0 then begin
+        if v[length(v)] in ['e', 'E'] then exit(xsceFORG0001);
+        if (length(constrainingFacets) = 0) and (subType = xsstDouble) then begin
+          if outv <> nil then outv^ := TXQValueFloat.create(self, tempd);
+          exit(xsceNoError);
+        end else exit(tryCreateValue(tempd, outv))
       end;
-    end
-    {result := TryStrDecodeDecimal(v, tempintstart, tempintend, tempdot, tempexp);
-    if not result then exit;
-    if length(constrainingFacets) > 0 then
-      if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
-    if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v)
-    else if v[tempexp+1] = '-' then tempe := 0
-    else if v[1]= '-' then tempe := getNegInf
-    else tempe := getPosInf;}
+    end;
+  end;
+
+  slowPath;
 end;
 
 function TXSNumericType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
