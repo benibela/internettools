@@ -1361,7 +1361,7 @@ begin
    end;
 end;
 
-procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValueObject; defaultValue: string = '');
+procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValue; defaultValue: string = '');
 var
   temp: TXQValue;
   value, filename, contenttype, headers: String;
@@ -1598,7 +1598,7 @@ end;
 
 
 function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-  function combineHttpEncoded(obj: TXQValueObject): IXQValue;
+  function combineHttpEncoded(obj: TXQValue): IXQValue;
   var temp: TXQVArray = nil;
       propName, oldUrl, prefix: String;
       newEncoded: IXQValue;
@@ -1645,7 +1645,7 @@ var
   h: PIXQValue;
   multipart, tempstr: String;
   mime: TMIMEMultipartData;
-  obj: TXQValueObject;
+  obj: TXQValueMapLike;
   tempSeq: TXQValueSequence;
   procedure mimeCombine;
   var
@@ -1668,7 +1668,7 @@ var
       j := mime.getFormDataIndex(specialNames[i]);
       temps := '';
       if j >= 0 then temps := mime.data[j].data;
-      addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i] as TXQValueObject, temps);
+      addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i].toValue, temps);
       if j >= 0 then begin
         mime.data[j] := mime.data[high(mime.data)];
         SetLength(mime.data, length(mime.data) - 1);
@@ -1678,13 +1678,13 @@ var
 
 begin
   requiredArgCount(argc, 2);
-  if args[0] is TXQValueObject then begin
+  if args[0].kind  = pvkObject then begin
     multipart := getMultipartHeader(args[0]);
-    obj := args[0].toValue as TXQValueObject;
+    obj := args[0].toValue as TXQValueMapLike;
   end else begin
     multipart:='';
     obj := TXQValueObject.create();
-    obj.setMutable('url', args[0].toString);
+    TXQValueObject(obj).setMutable('url', args[0].toString);
     result := obj;
   end;
 

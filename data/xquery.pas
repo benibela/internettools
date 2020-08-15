@@ -988,7 +988,7 @@ type
     class function classKind: TXQValueKind; override;
     function toBooleanEffective: boolean; override;
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload;
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload; override;
   end;
 
   //**(Experimental) object type.
