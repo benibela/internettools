@@ -266,18 +266,18 @@ begin
   end;
 end;
 
-function TXQValue.setImmutable(const name, value: IXQValue): TXQValueObject;
+function TXQValue.setImmutable(const name, value: IXQValue): TXQValueMapLike;
 begin
   result := setImmutable(name.toString, value);
 end;
 
-function TXQValue.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
+function TXQValue.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
 begin
   raiseInternalErrorObjectExpected('setImmutable');
   result := nil;
 end;
 
-function TXQValue.setImmutable(const name: string; const s: string): TXQValueObject;
+function TXQValue.setImmutable(const name: string; const s: string): TXQValueMapLike;
 begin
   result := setImmutable(xqvalue(name), xqvalue(s));
 end;
@@ -2239,13 +2239,13 @@ begin
   result := self;
 end;
 
-constructor TXQValuePropertyEnumerator.create(obj: TXQValueObject);
+constructor TXQValuePropertyEnumerator.create(obj: TXQValueMapLike);
 begin
   prop := TXQProperty.Create;
   prop.enum := self;
   if obj.ClassType <> TXQValueMap then begin;
-    vars := obj.values;
-    tempobj := obj;
+    tempobj := TXQValueObject(obj);
+    vars := tempobj.values;
     if tempobj.prototype <> nil then new(visitedProperties, init);
   end else hashmapEnumerator := (obj as txqvaluemap).mapdata.getEnumerator;
   idx := -1;
@@ -2261,7 +2261,50 @@ end;
 
 
 
-{ TXQValueObject }
+class function TXQValueMapLike.classKind: TXQValueKind;
+begin
+  Result:=pvkObject;
+end;
+
+function TXQValueMapLike.toBooleanEffective: boolean;
+begin
+  Result:=true;
+  //xpath 3.1:
+  //todo  raise EXQEvaluationException.create('FORG0006', 'Object cannot be used as boolean');
+end;
+
+function TXQValueMapLike.cloneLinked: TXQValueObject;
+begin
+  result := TXQValueObject.create();
+  result.prototype := self;
+end;
+
+function TXQValueMapLike.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike;
+var
+  oldValue: TXQValue;
+  newValue: IXQValue;
+begin
+  if len = 1 then
+    exit(setImmutable(props^, v));
+
+  if not hasProperty(props^, @oldValue) then
+    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
+  if oldValue.kind in [pvkArray, pvkObject] then
+    newValue := oldValue.setImmutable(props + 1, len - 1, v)
+  else
+   raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
+
+  if ClassType = TXQValueObject then begin
+    result := cloneLinked;
+    TXQValueObject(result).values.add(props^, newValue);
+  end else
+    result := setImmutable(props^, newValue);
+end;
+
+
+
+
+
 
 constructor TXQValueObject.create();
 begin
@@ -2281,10 +2324,6 @@ begin
   inherited Destroy;
 end;
 
-class function TXQValueObject.classKind: TXQValueKind;
-begin
-  Result:=pvkObject;
-end;
 
 function TXQValueObject.Size: SizeInt;
   function countProto: sizeint;
@@ -2316,25 +2355,6 @@ begin
   setMutable(name,xqvalue(s));
 end;
 
-function TXQValueObject.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
-var
-  oldValue: TXQValue;
-  newValue: IXQValue;
-begin
-  if len = 1 then
-    exit(setImmutable(props^, v));
-
-  if not hasProperty(props^, @oldValue) then
-    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
-  if oldValue.kind in [pvkArray, pvkObject] then
-    newValue := oldValue.setImmutable(props + 1, len - 1, v)
-  else
-   raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
-
-  result := cloneLinked;
-  result.values.add(props^, newValue);
-end;
-
 procedure TXQValueObject.enumeratePropertyKeys(var keyset: TXQHashsetStr);
 var
   i: Integer;
@@ -2357,10 +2377,6 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
-function TXQValueObject.toBooleanEffective: boolean;
-begin
-  result := true;
-end;
 
 function TXQValueObject.hasProperty(const name: string; value: PXQValue): boolean;
 var
@@ -2384,12 +2400,6 @@ begin
   else result := prototype.clone(); //removes the prototype link (necessary for example)
   for i:=0 to values.count-1 do
     (result as TXQValueObject).values.add(values.getName(i), values.get(i));
-end;
-
-function TXQValueObject.cloneLinked: TXQValueObject;
-begin
-  result := TXQValueObject.create();
-  result.prototype := self;
 end;
 
 
@@ -2468,7 +2478,7 @@ begin
   mapdata.include(name, v.toValue);
 end;
 
-function TXQValueMap.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
+function TXQValueMap.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
 var
   Resmap: TXQValueMap;
 begin
@@ -2482,23 +2492,6 @@ begin
   setMutable(name, xqvalue(s));
 end;
 
-function TXQValueMap.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject;
-var
-  oldValue: TXQValue;
-  newValue: IXQValue;
-begin
-  if len = 1 then
-    exit(setImmutable(props^, v));
-
-  if not hasProperty(props^, @oldValue) then
-    raise EXQEvaluationException.Create('pxp:OBJECT', 'Property '+props^+' not found, when assigning to '+strJoin(props, len, '.'));
-  if oldValue.kind in [pvkArray, pvkObject] then
-    newValue := oldValue.setImmutable(props + 1, len - 1, v)
-  else
-   raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
-
-  result := setImmutable(props^, newValue);
-end;
 
 procedure TXQValueMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);
 var p: TXQHashmapStrOwningXQValue.PKeyPairEnumerator;
@@ -2516,6 +2509,7 @@ begin
     tempseq.add(p.value);
   result := tempseq;
 end;
+
 
 function TXQValueMap.clone: IXQValue;
 var

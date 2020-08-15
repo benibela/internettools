@@ -77,6 +77,7 @@ type
   PIXQValue = ^IXQValue;
   TXQVArray = array of IXQValue;
   TXQValueObject = class;
+  TXQValueMapLike = class;
   TXQValueFunction = class;
   TXQCollation=class;
   TXQVariableChangeLog=class;
@@ -534,9 +535,9 @@ type
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr);
     function enumeratePropertyKeys(): IXQValue;
     function enumeratePropertyValues: IXQValue;
-    function setImmutable(const name, value: IXQValue): TXQValueObject;  //**< Creates a new object with the same values as the current one and changes a property of it
-    function setImmutable(const name: string; const v: IXQValue): TXQValueObject;  //**< Creates a new object with the same values as the current one and changes a property of it
-    function setImmutable(const name: string; const s: string): TXQValueObject;    //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike;  //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;  //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const s: string): TXQValueMapLike;    //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
 
   end;
 
@@ -623,9 +624,9 @@ type
     function enumeratePropertyKeys: IXQValue; virtual;
     function enumeratePropertyValues: IXQValue;       virtual;
     procedure prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
-    function setImmutable(const name, value: IXQValue): TXQValueObject; overload;
-    function setImmutable(const {%H-}name: string; const {%H-}v: IXQValue): TXQValueObject; virtual;
-    function setImmutable(const name: string; const s: string): TXQValueObject;   virtual;
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike; overload;
+    function setImmutable(const {%H-}name: string; const {%H-}v: IXQValue): TXQValueMapLike; virtual;
+    function setImmutable(const name: string; const s: string): TXQValueMapLike;   virtual;
     function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): TXQValue; virtual;
   end;
 
@@ -966,8 +967,6 @@ type
     property Value: IXQValue read GetValue;
   end;
 
-  { TXQValuePropertyEnumerator }
-
 
   TXQValuePropertyEnumerator = class(TXQPropertyEnumeratorInternal)
   private
@@ -981,18 +980,23 @@ type
 
     function GetEnumerator: TXQValuePropertyEnumerator;
 
-    constructor create(obj: TXQValueObject);
+    constructor create(obj: TXQValueMapLike);
     destructor destroy; override;
   end;
 
-  { TXQValueObject }
+  TXQValueMapLike = class (TXQValue)
+    class function classKind: TXQValueKind; override;
+    function toBooleanEffective: boolean; override;
+    function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
+    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload;
+  end;
 
   //**(Experimental) object type.
   //**Every object obj has properties obj.something which are arbitrary TXQValue-s and a prototype from which it inherits all properties. @br
   //**The objects can be used mutable and immutable. If used immutable, they still appear mutable, but every change creates a new object
   //**that is linked to the previous objects (i.e. has the old object as prototype). @br
   //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
-  TXQValueObject = class (TXQValue)
+  TXQValueObject = class (TXQValueMapLike)
     values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume they are unique
     prototype: IXQValue;
 
@@ -1000,7 +1004,6 @@ type
     constructor createTakingVariableLog(log: TXQVariableChangeLog);
     destructor Destroy; override;
 
-    class function classKind: TXQValueKind; override;
 
     function Size: SizeInt; override;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
@@ -1012,19 +1015,14 @@ type
     function setImmutable(const name: string; const v: IXQValue): TXQValueObject; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
     procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
 
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject; override;
-
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
     function enumeratePropertyValues: IXQValue;       override;
 
-    function toBooleanEffective: boolean; override;
-
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
-    function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
   end;
 
   //** Experimental String Hash map
-  TXQValueMap = class (TXQValueObject)
+  TXQValueMap = class (TXQValueMapLike)
     mapdata: TXQHashmapStrOwningXQValue;
 
     constructor create(); reintroduce; virtual;
@@ -1033,9 +1031,6 @@ type
     class function newinstance : tobject;override;
     procedure FreeInstance; override;
 
-
-    //class function classKind: TXQValueKind; override;
-
     function Size: SizeInt; override;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
@@ -1043,21 +1038,14 @@ type
 
 
     procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
-    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
     procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
 
-    function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueObject; override;
 
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
     function enumeratePropertyValues: IXQValue;       override;
 
-    //function toBooleanEffective: boolean; override;
-
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
-    //function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
-
-    //function stringifyNodes: IXQValue; override;
-    //function hasNodes: boolean; override;
   end;
 
 
@@ -3385,6 +3373,7 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
+
 
 
 class procedure TXQValueOwnershipTracker.addRef(v: TXQValue);
