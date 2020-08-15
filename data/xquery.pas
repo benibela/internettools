@@ -1022,9 +1022,6 @@ type
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
     function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
 
-    procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
-    procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
-    procedure adaptiveSerialize(var serializer: TXQSerializer); override;
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
   end;

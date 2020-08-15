@@ -495,24 +495,121 @@ begin
   serializer.final;
 end;
 
+
+
+
 procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
+  procedure objectJsonSerialize(var serializer: TXQSerializer);
+  var
+    prop: TXQProperty;
+    first: Boolean;
+    nameCheck: ^TXQHashmapStrStr;
+  begin
+    if serializer.allowDuplicateNames then nameCheck := nil
+    else new(nameCheck,init);
+    first := true;
+    try
+      with serializer do begin
+        for prop in getPropertyEnumerator do begin
+          if not first then appendJSONObjectComma
+          else begin
+            first := false;
+            appendJSONObjectStart;
+          end;
+          if assigned(nameCheck) then begin
+            if nameCheck.contains(prop.name) then
+              raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
+            nameCheck.include(prop.Name, '');
+          end;
+          appendJSONObjectKeyColon(prop.Name);
+          prop.Value.jsonSerialize(serializer);
+        end;
+        if not first then appendJSONObjectEnd
+        else appendJSONEmptyObject;
+      end;
+    finally
+      if assigned(nameCheck) then nameCheck^.done;
+    end;
+  end;
+
 begin
-  serializer.appendJSONString(toString);
+  case kind of
+    pvkObject: objectJsonSerialize(serializer);
+    else serializer.appendJSONString(toString);
+  end;
 end;
 
 procedure TXQValue.xmlSerialize(var serializer: TXQSerializer);
+  procedure objectXmlSerialize(var serializer: TXQSerializer);
+  var
+    first: Boolean;
+    prop: TXQProperty;
+    tempName: String;
+  begin
+    first := true;
+    with serializer do begin
+      for prop in getPropertyEnumerator do begin
+        if first then begin
+          appendXMLElementStartTag(objectTag);
+          first := false;
+        end;
+        tempName := prop.name;
+        if TXSSchema.isValidNCName(tempName) then
+          appendXMLElementStartTag(tempName)
+        else begin
+          appendXMLElementStartOpen('_');
+          appendXMLElementAttribute('key', tempName);
+          appendXMLElementStartClose();
+          tempName := '_';
+        end;
+        prop.Value.xmlSerialize(serializer);
+        appendXMLElementEndTag(tempName);
+      end;
+      if first then appendXMLEmptyElement(objectTag) //no properties
+      else appendXMLElementEndTag(objectTag);
+    end;
+  end;
 begin
-  serializer.appendXMLText(toString);
+  case kind of
+    pvkObject: objectXmlSerialize(serializer);
+    else serializer.appendXMLText(toString);
+  end;
 end;
 
 procedure TXQValue.adaptiveSerialize(var serializer: TXQSerializer);
+  procedure objectAdaptiveSerialize(var serializer: TXQSerializer);
+  var
+    prop: TXQProperty;
+    first: Boolean;
+  begin
+    first := true;
+    with serializer do begin
+      append('map');
+      for prop in getPropertyEnumerator do begin
+        if not first then appendJSONObjectComma
+        else begin
+          first := false;
+          appendJSONObjectStart;
+        end;
+        appendXQueryString(prop.Name);
+        append(':');
+        prop.Value.adaptiveSerialize(serializer);
+      end;
+      if not first then appendJSONObjectEnd
+      else appendJSONEmptyObject;
+    end;
+  end;
 var
   withType: Boolean;
 begin
-  withType := not (typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]));
-  if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
-  serializer.appendXQueryString(toString);
-  if withType then serializer.append(')');
+  case kind of
+    pvkObject: objectAdaptiveSerialize(serializer);
+    else
+      withType := not (typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.anyURI]));
+      if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
+      serializer.appendXQueryString(toString);
+      if withType then serializer.append(')');
+  end;
 end;
 
 function TXQValue.serialize(const context: TXQEvaluationContext): string;
@@ -2268,91 +2365,6 @@ begin
   result.prototype := self;
 end;
 
-procedure TXQValueObject.jsonSerialize(var serializer: TXQSerializer);
-var
-  prop: TXQProperty;
-  first: Boolean;
-  nameCheck: ^TXQHashmapStrStr;
-begin
-  if serializer.allowDuplicateNames then nameCheck := nil
-  else new(nameCheck,init);
-  first := true;
-  try
-    with serializer do begin
-      for prop in getPropertyEnumerator do begin
-        if not first then appendJSONObjectComma
-        else begin
-          first := false;
-          appendJSONObjectStart;
-        end;
-        if assigned(nameCheck) then begin
-          if nameCheck.contains(prop.name) then
-            raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
-          nameCheck.include(prop.Name, '');
-        end;
-        appendJSONObjectKeyColon(prop.Name);
-        prop.Value.jsonSerialize(serializer);
-      end;
-      if not first then appendJSONObjectEnd
-      else appendJSONEmptyObject;
-    end;
-  finally
-    if assigned(nameCheck) then nameCheck^.done;
-  end;
-end;
-
-procedure TXQValueObject.xmlSerialize(var serializer: TXQSerializer);
-var
-  first: Boolean;
-  prop: TXQProperty;
-  tempName: String;
-begin
-  first := true;
-  with serializer do begin
-    for prop in getPropertyEnumerator do begin
-      if first then begin
-        appendXMLElementStartTag(objectTag);
-        first := false;
-      end;
-      tempName := prop.name;
-      if TXSSchema.isValidNCName(tempName) then
-        appendXMLElementStartTag(tempName)
-      else begin
-        appendXMLElementStartOpen('_');
-        appendXMLElementAttribute('key', tempName);
-        appendXMLElementStartClose();
-        tempName := '_';
-      end;
-      prop.Value.xmlSerialize(serializer);
-      appendXMLElementEndTag(tempName);
-    end;
-    if first then appendXMLEmptyElement(objectTag) //no properties
-    else appendXMLElementEndTag(objectTag);
-  end;
-end;
-
-procedure TXQValueObject.adaptiveSerialize(var serializer: TXQSerializer);
-var
-  prop: TXQProperty;
-  first: Boolean;
-begin
-  first := true;
-  with serializer do begin
-    append('map');
-    for prop in getPropertyEnumerator do begin
-      if not first then appendJSONObjectComma
-      else begin
-        first := false;
-        appendJSONObjectStart;
-      end;
-      appendXQueryString(prop.Name);
-      append(':');
-      prop.Value.adaptiveSerialize(serializer);
-    end;
-    if not first then appendJSONObjectEnd
-    else appendJSONEmptyObject;
-  end;
-end;
 
 function TXQValueObject.stringifyNodes: IXQValue;
 var obj: TXQValueObject;
