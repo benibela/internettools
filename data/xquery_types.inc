@@ -433,9 +433,9 @@ end;
 
 function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
 var
-  temp: TXQValueObject;
   i: Integer;
-  tempp: IXQValue;
+  prop: TXQProperty;
+  first: Boolean;
 begin
   case self.kind of
     pvkSequence: begin
@@ -458,13 +458,12 @@ begin
     end;
     pvkObject: begin
       result := 'object: {';
-      tempp := self.clone; //need temporary variable to keep the reference count > 0
-      temp := tempp as TXQValueObject;
-      if temp.values.count > 0 then begin
-        result += temp.values.getName(0)+': '+temp.values.get(0).debugAsStringWithTypeAnnotation(textOnly){%H-};
-        for i:=1 to temp.values.count-1 do
-          result += ', '+temp.values.getName(i)+': '+temp.values.get(i).debugAsStringWithTypeAnnotation(textOnly){%H-};
-      end;
+      first := true;
+      for prop in getPropertyEnumerator do
+        if first then begin
+          result += prop.Name+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
+          first := false
+        end else result += ', '+prop.Name+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
       result += '}';
     end;
     pvkNode: if textOnly then result := typeName+': '+toString else result := typeName + ': '+toNode.outerXML();

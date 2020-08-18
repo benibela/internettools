@@ -1443,7 +1443,7 @@ var replaceNames, replaceValues: TStringArray;
           else if multipart then begin
             replaced := arrayIndexOf(specialReplaceNames, n);
             if replaced >= 0 then begin
-              addSpecialValue(context.staticContext, mime, n, specialReplaceValues[replaced] as TXQValueObject, v);
+              addSpecialValue(context.staticContext, mime, n, specialReplaceValues[replaced].toValue, v);
               used.Add(n);
               exit;
             end;
@@ -1482,7 +1482,7 @@ var replaceNames, replaceValues: TStringArray;
           addToRequest(replaceNames[i], replaceValues[i], false);
       for i:=0 to high(specialReplaceNames) do
         if used.IndexOf(specialReplaceNames[i]) < 0 then
-          addSpecialValue(context.staticContext, mime, specialReplaceNames[i], specialReplaceValues[i] as TXQValueObject, '');
+          addSpecialValue(context.staticContext, mime, specialReplaceNames[i], specialReplaceValues[i].toValue, '');
       used.free;
 
       value := form.getAttribute('action', cmp);
