@@ -181,6 +181,7 @@ begin
   t('serialize(["äxyz"""], map {"method": "json", "use-character-maps": map { "y": "foo" } })', '["äxfooz\""]');
   t('serialize(["äxyz"""], map {"method": "json", "encoding": "us-ascii" })', '["\u00E4xyz\""]');
 
+  t('let $map := map:merge((1 to 30)!map{string():.}) return ($map2 := $map, $map2("x") := 123, $map2?foo)!count(.)', '1 1');
 
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;

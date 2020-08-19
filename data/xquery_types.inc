@@ -2432,8 +2432,8 @@ function TXQValueStringMapPendingUpdate.getProperty(const name: string): IXQValu
 var
   temp: TXQValue;
 begin
-  hasProperty(name, @temp);
-  result := temp
+  if hasProperty(name, @temp) then result := temp
+  else result := xqvalue()
 end;
 
 procedure TXQValueStringMapPendingUpdate.setMutable(const name: string; const v: IXQValue);
