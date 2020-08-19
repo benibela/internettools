@@ -76,7 +76,6 @@ type
   IXQValue=interface;
   PIXQValue = ^IXQValue;
   TXQVArray = array of IXQValue;
-  TXQValueObject = class;
   TXQValueMapLike = class;
   TXQValueFunction = class;
   TXQCollation=class;
@@ -615,7 +614,8 @@ type
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;virtual; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; virtual;
-  protected
+  //for internal use:
+  public
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
     function instanceOf(const typ: TXSType): boolean;  //**< If the XPath expression "self instance of typ" should return true
     procedure raiseInternalErrorObjectExpected(const functionname: string);
@@ -948,31 +948,29 @@ type
     //for internal use
     class function nodeTypeAnnotation(tn: TTreeNode): TXSType; static;
   end;
-
+                                                               {
   TXQPropertyEnumeratorInternal = class
     vars: TXQVariableChangeLog;
     idx: integer;
     hashmapEnumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
-  end;
+  end;                                                        }
 
   { TXQProperty }
 
-  TXQProperty = class
+  TXQProperty = TXQHashmapStrOwningXQValue.PKeyValuePair;{
   private
     enum: TXQPropertyEnumeratorInternal;
     function GetName: string;
-    function GetValue: IXQValue;
+    function GetValue: TXQValue;
   public
     property Name: string read GetName;
-    property Value: IXQValue read GetValue;
-  end;
+    property Value: TXQValue read GetValue;
+  end;}
 
 
-  TXQValuePropertyEnumerator = class(TXQPropertyEnumeratorInternal)
+  TXQValuePropertyEnumerator = class//(TXQPropertyEnumeratorInternal)
   private
-    tempobj: TXQValueObject;
-    prop: TXQProperty;
-    visitedProperties: PXQHashsetStr;
+    hashmapEnumerators: array[0..1] of TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
     function GetCurrent: TXQProperty;
   public
     function MoveNext: Boolean;
@@ -987,42 +985,12 @@ type
   TXQValueMapLike = class (TXQValue)
     class function classKind: TXQValueKind; override;
     function toBooleanEffective: boolean; override;
-    function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
+    //function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
     function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload; override;
   end;
 
-  //**(Experimental) object type.
-  //**Every object obj has properties obj.something which are arbitrary TXQValue-s and a prototype from which it inherits all properties. @br
-  //**The objects can be used mutable and immutable. If used immutable, they still appear mutable, but every change creates a new object
-  //**that is linked to the previous objects (i.e. has the old object as prototype). @br
-  //**(Having the objects immutable, is necessary for the template matcher, so that it can correctly rollback all changes)
-  TXQValueObject = class (TXQValueMapLike)
-    values: TXQVariableChangeLog; //todo: can there be multiple properties with the same name? some parts assume they are unique
-    prototype: IXQValue;
-
-    constructor create(); reintroduce; virtual;
-    constructor createTakingVariableLog(log: TXQVariableChangeLog);
-    destructor Destroy; override;
-
-
-    function Size: SizeInt; override;
-    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
-    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
-
-
-    procedure setMutable(const name: string; const v: IXQValue); //**< Changes a property
-    function setImmutable(const name: string; const v: IXQValue): TXQValueObject; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
-    procedure setMutable(const name: string; const s: string); //**< Changes a property (string wrapper)
-
-    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
-    function enumeratePropertyValues: IXQValue;       override;
-
-    function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
-  end;
-
   //** Experimental String Hash map
-  TXQValueMap = class (TXQValueMapLike)
+  TXQValueStringMap = class (TXQValueMapLike)
     mapdata: TXQHashmapStrOwningXQValue;
 
     constructor create(); reintroduce; virtual;
@@ -1038,9 +1006,9 @@ type
 
 
     procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
-    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
     procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
 
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
 
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
     function enumeratePropertyValues: IXQValue;       override;
@@ -1048,6 +1016,26 @@ type
     function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
   end;
 
+  TXQValueStringMapPendingUpdate = class(TXQValueStringMap)
+    prototype: IXQValue; //txqvaluestringmap
+    constructor create(); reintroduce; virtual;
+    constructor create(p: TXQValueStringMap); reintroduce; virtual;
+    destructor Destroy; override;
+
+    function Size: SizeInt; override;
+    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+
+    procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
+    procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
+
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override;
+
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+
+    function clone: IXQValue; override;
+  end;
 
   //** JSON array of other IXQValue
   TXQValueJSONArray = class (TXQValue)
@@ -2930,6 +2918,7 @@ type
 
     procedure addObjectModification(const variable: string; value: IXQValue; const namespaceURL: string; const props: PString; len: SizeInt);
 
+    function toStringMap: TXQValueStringMap;
   protected
     shared: boolean;
     varCount, historyCount: integer;
@@ -3373,6 +3362,7 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
+
 
 
 
@@ -4939,23 +4929,6 @@ begin
   result := varstorage[i].value;
 end;
 
-function TXQProperty.GetName: string;
-begin
-  with enum do
-    if vars <> nil then
-      result := vars.getName(idx)
-    else
-      result := hashmapEnumerator.key;
-end;
-
-function TXQProperty.GetValue: IXQValue;
-begin
-  with enum do
-    if vars <> nil then
-      result := vars.get(idx)
-    else
-      result := hashmapEnumerator.value;
-end;
 
 function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
 begin
@@ -5003,7 +4976,7 @@ begin
         if pa.kind <> pvkObject then exit(false);
         if pa.Size <> pb.Size then exit(false);
         for pp in pa.getPropertyEnumerator do
-          if not pb.hasProperty(pp.Name, @tempv) then exit(false)
+          if not pb.hasProperty(pp.key, @tempv) then exit(false)
           else if not xqvalueDeep_equal(context, pp.Value, tempv, collation) then exit(false);
       end
       else begin
@@ -5171,6 +5144,15 @@ begin
   varstorage[count].propertyChange := true;
 
   inc(varcount);
+end;
+
+function TXQVariableChangeLog.toStringMap: TXQValueStringMap;
+var
+  i: Integer;
+begin
+  result := TXQValueStringMap.create();
+  for i := 0 to count - 1 do
+    result.setMutable(getName(i), get(i));
 end;
 
 procedure TXQVariableChangeLog.add(const name: string; const value: string);
@@ -5898,12 +5880,12 @@ var containerStack: array of TXQValue;
         parsingPhase := jppArrayExpectComma;
       end;
       jppObjectExpectValue: begin
-        if currentContainer.ClassType <> TXQValueObject then raiseError();
+        if currentContainer.ClassType <> TXQValueStringMap then raiseError();
         parsingPhase := jppObjectExpectComma;
-        if (duplicateResolve <> xqmdrUseLast) and TXQValueObject(currentContainer).hasProperty(objectKey, nil) then
+        if (duplicateResolve <> xqmdrUseLast) and TXQValueStringMap(currentContainer).hasProperty(objectKey, nil) then
           if duplicateResolve = xqmdrUseFirst then exit
           else raiseError('Duplicate key', 'FOJS0003');
-        TXQValueObject(currentContainer).setMutable(objectKey, v);
+        TXQValueStringMap(currentContainer).setMutable(objectKey, v);
       end;
       jppRoot: begin
         hadResult := (result <> nil);
@@ -6041,7 +6023,7 @@ begin
         end;
         //tkColon,                 // ':'
         tkCurlyBraceOpen: begin
-          pushValue(pushContainer(TXQValueObject.create()));
+          pushValue(pushContainer(TXQValueStringMap.create()));
           setCurrentContainer;
           case nextToken of
             tkCurlyBraceClose: popContainer;
@@ -6087,7 +6069,7 @@ begin
     if containerCount > 0 then begin
       for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
         if containerStack[i].ClassType = TXQValueJSONArray then TXQValueJSONArray(containerStack[i]).seq.clear
-        else TXQValueObject(containerStack[i]).values.clear;
+        else TXQValueStringMap(containerStack[i]).mapdata.clear;
       raiseError('unclosed');
     end;
 

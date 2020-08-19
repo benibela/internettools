@@ -466,7 +466,7 @@ var
   tempDoc: IXQValue;
   procedure raiseInvalidParameter(typeError: boolean = true);
   begin
-    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.Name, pp.Value);
+    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.key, pp.Value);
   end;
 
   function toSerializationBool(const s:string): boolean; overload;
@@ -515,7 +515,7 @@ var
     if pp.value.kind <> pvkObject then error;
     for characterp in pp.value.getPropertyEnumerator do begin
       if characterp.Value.kind <> pvkString then error;
-      characterMaps.include(characterp.Name, characterp.Value.toString);
+      characterMaps.include(characterp.key, characterp.Value.toString);
     end;
   end;
 
@@ -524,12 +524,12 @@ begin
     case pp.Value.getSequenceCount of
       0: continue;
       1: ; //fine
-      else case pp.Name of
+      else case pp.key of
         'cdata-section-elements', 'suppress-indentation': ; //fine
         else raiseXPTY0004TypeError(v, 'Invalid parameter');
       end;
     end;
-    case pp.Name of
+    case pp.key of
       'allow-duplicate-names': allowDuplicateNames := valueBool();
       'byte-order-mark': byteOrderMark := valueBool();
       'cdata-section-elements': setQNameList(cdataSectionElements);

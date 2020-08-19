@@ -1385,7 +1385,7 @@ begin
 
   jsonItem := TXSType.Create('json-item()', baseSchema.structuredItem);  jsonItem.schema := self;
   array_ := TXSSimpleType.Create('array()', jsonItem, TXQValueJSONArray);
-  object_ := TXSSimpleType.Create('object()', jsonItem, TXQValueObject);
+  object_ := TXSSimpleType.Create('object()', jsonItem, TXQValueMapLike);
 //  jsonItem, array_, object_: TXSType;
 end;
 

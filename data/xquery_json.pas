@@ -66,21 +66,21 @@ end;
 
 
 function xqFunctionObject({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var resobj: TXQValueObject;
+var resobj: TXQValueStringMap;
     procedure merge(another: TXQValue);
     var
       p: TXQProperty;
     begin
       for p in another.getPropertyEnumerator do begin
-        if resobj.hasProperty(p.Name,nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
-        resobj.values.add(p.Name, p.Value);
+        if resobj.hasProperty(p^.key,nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
+        resobj.setMutable(p^.key, p^.Value);
       end;
     end;
 
 var v: IXQValue;
   i: Integer;
 begin
-  resobj := TXQValueObject.create();
+  resobj := TXQValueStringMap.create();
   try
     for i := 0 to argc-1 do
       for v in args[i] do begin

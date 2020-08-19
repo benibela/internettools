@@ -3928,7 +3928,7 @@ var
   temp: String;
   annotations: TXQAnnotations;
   marker: PChar;
-  serializationOptions: TXQValueObject = nil;
+  serializationOptions: TXQValueStringMap = nil;
 
 
   namespaceMode: TXQNamespaceMode;
@@ -4159,7 +4159,7 @@ begin
             end;
             'http://www.w3.org/2010/xslt-xquery-serialization': begin
               if serializationOptions = nil then begin
-                serializationOptions := TXQValueObject.create();
+                serializationOptions := TXQValueStringMap.create();
                 serializationOptions.setMutable(#0'static-options', xqvalueTrue); //mark the map as wrapping statically given options
               end;
               if serializationOptions.hasProperty(token, nil) then

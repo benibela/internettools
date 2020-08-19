@@ -2468,8 +2468,6 @@ function xqFunctionMatches(const context: TXQEvaluationContext; argc: sizeint; a
 var temp: THtmlTemplateParser;
     template, html: IXQValue;
     cols: TXQVariableChangeLog;
-    tempobj: TXQValueObject;
-    i: Integer;
     list: TXQVList;
 begin
   requiredArgCount(argc, 2);
@@ -2499,12 +2497,9 @@ begin
           try
             if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
               list.add(cols.get(0))
-            else begin
-              tempobj := TXQValueObject.create();
-              for i := 0 to cols.count - 1 do
-                tempobj.setMutable(cols.getName(i), cols.get(i));
-              list.add(tempobj);
-            end;
+            else
+             list.add(cols.toStringMap);
+
           finally
             cols.free;
           end;

@@ -461,9 +461,9 @@ begin
       first := true;
       for prop in getPropertyEnumerator do
         if first then begin
-          result += prop.Name+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
+          result += prop.key+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
           first := false
-        end else result += ', '+prop.Name+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
+        end else result += ', '+prop.key+': '+prop.Value.debugAsStringWithTypeAnnotation(textOnly){%H-};
       result += '}';
     end;
     pvkNode: if textOnly then result := typeName+': '+toString else result := typeName + ': '+toNode.outerXML();
@@ -516,11 +516,11 @@ procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
             appendJSONObjectStart;
           end;
           if assigned(nameCheck) then begin
-            if nameCheck.contains(prop.name) then
+            if nameCheck.contains(prop.key) then
               raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
-            nameCheck.include(prop.Name, '');
+            nameCheck.include(prop.key, '');
           end;
-          appendJSONObjectKeyColon(prop.Name);
+          appendJSONObjectKeyColon(prop.key);
           prop.Value.jsonSerialize(serializer);
         end;
         if not first then appendJSONObjectEnd
@@ -552,7 +552,7 @@ procedure TXQValue.xmlSerialize(var serializer: TXQSerializer);
           appendXMLElementStartTag(objectTag);
           first := false;
         end;
-        tempName := prop.name;
+        tempName := prop.key;
         if TXSSchema.isValidNCName(tempName) then
           appendXMLElementStartTag(tempName)
         else begin
@@ -590,7 +590,7 @@ procedure TXQValue.adaptiveSerialize(var serializer: TXQSerializer);
           first := false;
           appendJSONObjectStart;
         end;
-        appendXQueryString(prop.Name);
+        appendXQueryString(prop.key);
         append(':');
         prop.Value.adaptiveSerialize(serializer);
       end;
@@ -621,11 +621,11 @@ function TXQValue.stringifyNodes: IXQValue;
   function objectStringifiedNodes: IXQValue;
   var
     prop: TXQProperty;
-    newObj: TXQValueObject;
+    newObj: TXQValueStringMap;
   begin
-    newObj := TXQValueObject.create();
+    newObj := TXQValueStringMap.create();
     for prop in getPropertyEnumerator do
-      newObj.setMutable(prop.Name, prop.Value.stringifyNodes);
+      newObj.setMutable(prop.key, prop.Value.stringifyNodes);
     result := newObj;
   end;
 
@@ -2205,32 +2205,19 @@ end;
 
 function TXQValuePropertyEnumerator.GetCurrent: TXQProperty;
 begin
-  result := prop;
+  result := hashmapEnumerators[0].current;
 end;
 
 function TXQValuePropertyEnumerator.MoveNext: Boolean;
 begin
-  if visitedProperties = nil then begin
-    if vars <> nil then begin
-      inc(idx);
-      result := idx < vars.count;
-    end else result := hashmapEnumerator.moveNext;
-    exit;
+  result :=  hashmapEnumerators[0].moveNext;
+  if not result then begin
+    if hashmapEnumerators[1].map <> nil then begin
+      hashmapEnumerators[0] := hashmapEnumerators[1];
+      hashmapEnumerators[1].map := nil;
+      result := hashmapEnumerators[0].moveNext;
+    end;
   end;
-
-  inc(idx);
-  while true do begin
-    while (idx < vars.count) and visitedProperties.contains(vars.getName(idx)) do
-      inc(idx);
-    if idx < vars.count then break;
-    tempobj := tempobj.prototype as TXQValueObject;
-    if tempobj = nil then exit(false);
-    idx := 0;
-    vars := tempobj.values;
-  end;
-//  if tempobj = nil then exit(false);
-  result := true;
-  visitedProperties.include(vars.getName(idx));
 end;
 
 function TXQValuePropertyEnumerator.GetEnumerator: TXQValuePropertyEnumerator;
@@ -2240,20 +2227,17 @@ end;
 
 constructor TXQValuePropertyEnumerator.create(obj: TXQValueMapLike);
 begin
-  prop := TXQProperty.Create;
-  prop.enum := self;
-  if obj.ClassType <> TXQValueMap then begin;
-    tempobj := TXQValueObject(obj);
-    vars := tempobj.values;
-    if tempobj.prototype <> nil then new(visitedProperties, init);
-  end else hashmapEnumerator := (obj as txqvaluemap).mapdata.getEnumerator;
-  idx := -1;
+  if (obj.ClassType = TXQValueStringMapPendingUpdate)
+     and (TXQValueStringMapPendingUpdate(obj).prototype <> nil)
+     then begin
+    hashmapEnumerators[0] := (TXQValueStringMapPendingUpdate(obj).prototype as txqvaluestringmap).mapdata.getEnumerator;
+    hashmapEnumerators[1] := TXQValueStringMapPendingUpdate(obj).mapdata.getEnumerator;
+  end else
+    hashmapEnumerators[0] := (obj as TXQValueStringMap).mapdata.getEnumerator;
 end;
 
 destructor TXQValuePropertyEnumerator.destroy;
 begin
-  prop.Free;
-  if visitedProperties <> nil then dispose(visitedProperties, done);
   inherited destroy;
 end;
 
@@ -2272,12 +2256,6 @@ begin
   //todo  raise EXQEvaluationException.create('FORG0006', 'Object cannot be used as boolean');
 end;
 
-function TXQValueMapLike.cloneLinked: TXQValueObject;
-begin
-  result := TXQValueObject.create();
-  result.prototype := self;
-end;
-
 function TXQValueMapLike.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike;
 var
   oldValue: TXQValue;
@@ -2293,11 +2271,7 @@ begin
   else
    raise EXQEvaluationException.Create('pxp:OBJECT', 'Need object or array property '+props^+' to assign to '+strJoin(props, len, '.'));
 
-  if ClassType = TXQValueObject then begin
-    result := cloneLinked;
-    TXQValueObject(result).values.add(props^, newValue);
-  end else
-    result := setImmutable(props^, newValue);
+  result := setImmutable(props^, newValue);
 end;
 
 
@@ -2305,134 +2279,22 @@ end;
 
 
 
-constructor TXQValueObject.create();
+
+
+constructor TXQValueStringMap.create();
 begin
   inherited create(baseJSONiqSchema.object_);
-  values:= TXQVariableChangeLog.create();
-end;
-
-constructor TXQValueObject.createTakingVariableLog(log: TXQVariableChangeLog);
-begin
-  values := log;
-end;
-
-destructor TXQValueObject.Destroy;
-begin
-  values.Free;
-  prototype := nil;
-  inherited Destroy;
-end;
-
-
-function TXQValueObject.Size: SizeInt;
-  function countProto: sizeint;
-  var temp: TXQHashsetStr;
-  begin
-    temp.init;
-    enumeratePropertyKeys(temp);
-    result := temp.Count;
-    temp.done;
-  end;
-begin
-  if prototype = nil then result := values.count
-  else result := countProto();
-end;
-
-procedure TXQValueObject.setMutable(const name: string; const v: IXQValue);
-begin
-  values.add(name, v);
-end;
-
-function TXQValueObject.setImmutable(const name: string; const v: IXQValue): TXQValueObject;
-begin
-  result := cloneLinked;
-  result.setMutable(name, v);
-end;
-
-procedure TXQValueObject.setMutable(const name: string; const s: string);
-begin
-  setMutable(name,xqvalue(s));
-end;
-
-procedure TXQValueObject.enumeratePropertyKeys(var keyset: TXQHashsetStr);
-var
-  i: Integer;
-begin
-  //this does not add keys to sl that are already contained in sl. (so you can combine keys of multiple objects)
-  if prototype <> nil then prototype.enumeratePropertyKeys(keyset);
-  for i := 0 to values.count - 1 do
-    keyset.include(values.getName(i))
-end;
-
-function TXQValueObject.enumeratePropertyValues: IXQValue;
-var
-  prop: TXQProperty;
-  tempSeq: TXQValueSequence;
-begin
-  tempSeq := TXQValueSequence.create(values.count);
-  for prop in getPropertyEnumerator do
-    tempSeq.add(prop.Value);
-  result := tempSeq;
-  xqvalueSeqSqueeze(result);
-end;
-
-
-function TXQValueObject.hasProperty(const name: string; value: PXQValue): boolean;
-var
-  i: Integer;
-begin
-  i := values.indexOf(name);
-  if i >= 0 then begin
-    if value <> nil then value^ := values.get(i).toValue;
-    exit(true);
-  end;
-  result := prototype <> nil;
-  if not result then exit;
-  result := prototype.hasProperty(name, value);
-end;
-
-function TXQValueObject.clone: IXQValue;
-var
-  i: Integer;
-begin
-  if prototype = nil then result := TXQValueObject.create()
-  else result := prototype.clone(); //removes the prototype link (necessary for example)
-  for i:=0 to values.count-1 do
-    (result as TXQValueObject).values.add(values.getName(i), values.get(i));
-end;
-
-
-function TXQValueObject.getProperty(const name: string): IXQValue;
-var
-  temp: TXQValue;
-begin
-  temp := nil;
-  hasProperty(name, @temp);
-  if temp = nil then exit(xqvalue());
-  result := temp;
-end;
-
-function TXQValueObject.getPropertyEnumerator: TXQValuePropertyEnumerator;
-begin
-  result := TXQValuePropertyEnumerator.Create(self);
-end;
-
-
-
-constructor TXQValueMap.create();
-begin
-  inherited;
   mapdata.init;
 end;
 
-destructor TXQValueMap.Destroy;
+destructor TXQValueStringMap.Destroy;
 begin
   mapdata.done;
   mapdata := default(TXQHashmapStrOwningXQValue);
   inherited Destroy;
 end;
 
-class function TXQValueMap.newinstance: tobject;
+class function TXQValueStringMap.newinstance: tobject;
 var hackmethod: TMethod;
 begin
   hackMethod.Data := self;
@@ -2440,25 +2302,26 @@ begin
   result := TNewinstanceFunc(hackMethod)();
 end;
 
-procedure TXQValueMap.FreeInstance;
+procedure TXQValueStringMap.FreeInstance;
 begin
   Freemem(pointer(self));
 end;
 
-function TXQValueMap.Size: SizeInt;
+function TXQValueStringMap.Size: SizeInt;
 begin
   Result:=mapdata.Size;
 end;
 
-function TXQValueMap.hasProperty(const name: string; value: PXQValue): boolean;
+function TXQValueStringMap.hasProperty(const name: string; value: PXQValue): boolean;
 var
   p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
 begin
   p := mapdata.findKeyValuePair(name);
-  if p.isAssigned and assigned(value) then value^ := p.value;
+  result := p.isAssigned;
+  if result and assigned(value) then value^ := p.value;
 end;
 
-function TXQValueMap.getProperty(const name: string): IXQValue;
+function TXQValueStringMap.getProperty(const name: string): IXQValue;
 var
   p: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
 begin
@@ -2467,39 +2330,48 @@ begin
   else result := xqvalue();
 end;
 
-function TXQValueMap.getPropertyEnumerator: TXQValuePropertyEnumerator;
+function TXQValueStringMap.getPropertyEnumerator: TXQValuePropertyEnumerator;
 begin
   result := TXQValuePropertyEnumerator.Create(self);
 end;
 
-procedure TXQValueMap.setMutable(const name: string; const v: IXQValue);
+procedure TXQValueStringMap.setMutable(const name: string; const v: IXQValue);
 begin
   mapdata.include(name, v.toValue);
 end;
 
-function TXQValueMap.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+function TXQValueStringMap.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+const SMALL_SIZE_FULL_COPY = 4;
 var
-  Resmap: TXQValueMap;
+  Resmap: TXQValueStringMap;
+  resmapupdate: TXQValueStringMapPendingUpdate;
 begin
-  Resmap:=clone as TXQValueMap;
-  resmap.setMutable(name, v);
-  result := resmap
+  if (Size <= SMALL_SIZE_FULL_COPY) or hasProperty(name, nil) then begin
+    resmap := TXQValueStringMap.create;
+    resmap.mapdata.assign(mapdata);
+    resmap.setMutable(name, v);
+    result := resmap
+  end else begin
+    resmapupdate := TXQValueStringMapPendingUpdate.create(self);
+    resmapupdate.mapdata.include(name, v.toValue);
+    result := resmapupdate
+  end;
 end;
 
-procedure TXQValueMap.setMutable(const name: string; const s: string);
+procedure TXQValueStringMap.setMutable(const name: string; const s: string);
 begin
   setMutable(name, xqvalue(s));
 end;
 
 
-procedure TXQValueMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+procedure TXQValueStringMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);
 var p: TXQHashmapStrOwningXQValue.PKeyPairEnumerator;
 begin
   for p in mapdata do
     keyset.include(p.key);
 end;
 
-function TXQValueMap.enumeratePropertyValues: IXQValue;
+function TXQValueStringMap.enumeratePropertyValues: IXQValue;
 var p: TXQHashmapStrOwningXQValue.PKeyPairEnumerator;
   tempseq: TXQValueSequence;
 begin
@@ -2510,14 +2382,143 @@ begin
 end;
 
 
-function TXQValueMap.clone: IXQValue;
+function TXQValueStringMap.clone: IXQValue;
 var
-  resmap: TXQValueMap;
+  resmap: TXQValueStringMap;
 begin
-  resmap := TXQValueMap.create;
+  resmap := TXQValueStringMap.create;
   resmap.mapdata.assign(mapdata);
   Result:=resmap
 end;
+
+
+
+
+
+
+
+
+
+constructor TXQValueStringMapPendingUpdate.create();
+begin
+  inherited;
+end;
+
+constructor TXQValueStringMapPendingUpdate.create(p: TXQValueStringMap);
+begin
+  inherited create;
+  prototype := p
+end;
+
+destructor TXQValueStringMapPendingUpdate.Destroy;
+begin
+  prototype := nil;
+  inherited Destroy;
+end;
+
+function TXQValueStringMapPendingUpdate.Size: SizeInt;
+begin
+  result := inherited size;
+  if prototype <> nil then result += prototype.Size;
+end;
+
+function TXQValueStringMapPendingUpdate.hasProperty(const name: string; value: PXQValue): boolean;
+begin
+  Result:=inherited hasProperty(name, value);
+  if not result and assigned(prototype) then result := prototype.hasProperty(name, value);
+end;
+
+function TXQValueStringMapPendingUpdate.getProperty(const name: string): IXQValue;
+var
+  temp: TXQValue;
+begin
+  hasProperty(name, @temp);
+  result := temp
+end;
+
+procedure TXQValueStringMapPendingUpdate.setMutable(const name: string; const v: IXQValue);
+  procedure internalClone;
+  var temp: TXQHashmapStrOwningXQValue;
+  begin
+    temp.init;
+    temp.assign((prototype.toValue as TXQValueStringMap).mapdata);
+    temp.includeAll(mapdata);
+    mapdata.assign(temp);
+    temp.done;
+    prototype := nil
+  end;
+
+begin
+{var
+  pair: TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+begin
+  pair := mapdata.findKeyValuePair(name);
+  if pair.isAssigned then
+    mapdata.include(name, v.toValue) //pair.value := v;
+  else if (prototype  nil) or not (prototype.hasProperty(name, nil)) then include}
+  if assigned(prototype) and prototype.hasProperty(name, nil) then
+    internalClone;
+  mapdata.include(name, v.toValue)
+end;
+
+procedure TXQValueStringMapPendingUpdate.setMutable(const name: string; const s: string);
+begin
+  setMutable(name, xqvalue(s))
+end;
+
+function TXQValueStringMapPendingUpdate.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
+const SMALL_UPDATE_COUNT = 4;
+var
+  resmap: TXQValueStringMap;
+begin
+  if prototype = nil then
+    result := inherited
+  else begin
+    if (mapdata.Count <= SMALL_UPDATE_COUNT) and not prototype.hasProperty(name, nil) then begin
+      resmap := TXQValueStringMapPendingUpdate.create(prototype.toValue as TXQValueStringMap);
+      resmap.mapdata.assign(mapdata);
+    end else begin
+      resmap := txqvaluestringmap.create();
+      resmap.mapdata.assign((prototype as txqvaluestringmap).mapdata);
+      resmap.mapdata.includeAll(mapdata);
+    end;
+    resmap.mapdata.include(name, v.toValue);
+    result := resmap
+  end;
+end;
+
+procedure TXQValueStringMapPendingUpdate.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+begin
+  if prototype <> nil then prototype.enumeratePropertyKeys(keyset);
+  inherited enumeratePropertyKeys(keyset);
+end;
+
+function TXQValueStringMapPendingUpdate.enumeratePropertyValues: IXQValue;
+var
+  seq: TXQValueSequence = nil;
+  p: TXQHashmapStrOwningXQValue.PKeyPairEnumerator;
+begin
+  if prototype <> nil then begin
+    result := prototype.enumeratePropertyValues;
+    if result is TXQValueSequence then seq := result as TXQValueSequence;
+  end else result := nil;
+  for p in mapdata do
+    xqvalueSeqConstruct(result, seq, p^.value);
+end;
+
+function TXQValueStringMapPendingUpdate.clone: IXQValue;
+var
+  resmap: TXQValueStringMapPendingUpdate;
+begin
+  resmap := TXQValueStringMapPendingUpdate.create;
+  resmap.prototype := prototype;
+  resmap.mapdata.assign(mapdata);
+  Result:=resmap
+end;
+
+
+
+
 
 
 { TXQValueJSONArray }

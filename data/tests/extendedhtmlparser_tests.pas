@@ -86,7 +86,7 @@ var i:longint;
            end;
   end;
 var previoushtml, temp: string;
-  tempobj: TXQValueObject;
+  tempobj: TXQValueStringMap;
     procedure t(const template, html, expected: string);
     begin
       inc(globalTestCount);
@@ -889,7 +889,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
 
 
   extParser.variableChangeLog.clear;
-  tempobj := TXQValueObject.create();
+  tempobj := TXQValueStringMap.create();
   tempobj.setMutable('a', xqvalue('Hallo'));
   tempobj.setMutable('b', xqvalue(17));
   extParser.variableChangeLog.add('test', tempobj);
@@ -901,7 +901,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   extParser.parseTemplate('<a/>');
   extParser.parseHTML('<a/>');
 
-  tempobj := TXQValueObject.create();
+  tempobj := TXQValueStringMap.create();
   tempobj.setMutable('a', xqvalue('Hallo2'));
   tempobj.setMutable('b', xqvalue(18));
   extParser.variableChangeLog.add('test', tempobj);
@@ -1006,12 +1006,12 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"a": "<a>1x</a>"}');
   extParser.parseTemplate('<a>{$obj.b := .}</a>');
   extParser.parseHTML('<a>2y</a>');
-  cmp(extParser.variables.Values['obj'].toXQuery(), '{"b": "<a>2y</a>", "a": "<a>1x</a>"}');
-  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"b": "<a>2y</a>", "a": "<a>1x</a>"}');
+  cmp(extParser.variables.Values['obj'].toXQuery(), '{"a": "<a>1x</a>", "b": "<a>2y</a>"}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"a": "<a>1x</a>", "b": "<a>2y</a>"}');
   extParser.parseTemplate('<a>{$obj.c := concat($obj.b, .)}</a>');
   extParser.parseHTML('<a>3z</a>');
-  cmp(extParser.variables.Values['obj'].toXQuery(), '{"c": "2y3z", "b": "<a>2y</a>", "a": "<a>1x</a>"}');
-  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"c": "2y3z", "b": "<a>2y</a>", "a": "<a>1x</a>"}');
+  cmp(extParser.variables.Values['obj'].toXQuery(), '{"a": "<a>1x</a>", "b": "<a>2y</a>", "c": "2y3z"}');
+  cmp(extParser.VariableChangeLogCondensed.Values['obj'].toXQuery(), '{"a": "<a>1x</a>", "b": "<a>2y</a>", "c": "2y3z"}');
 
 
 

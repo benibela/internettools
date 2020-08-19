@@ -1332,9 +1332,9 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
   begin
     for p in v.getPropertyEnumerator do begin
       if p.Value.kind <> pvkObject then
-        addPair(p.Name, p.Value.toString)
+        addPair(p.key, p.Value.toString)
        else begin
-         arrayAdd(specialNames, p.Name);
+         arrayAdd(specialNames, p.key);
          setlength(specialValues, length(specialValues) + 1);
          specialValues[high(specialValues)] := p.Value;
        end;
@@ -1420,7 +1420,7 @@ var replaceNames, replaceValues: TStringArray;
       header: string;
       post: Boolean;
       encoding: TSystemCodePage;
-      resultobj: TXQValueObject;
+      resultobj: TXQValueStringMap;
 
       procedure addPair(n: string; v: string);
       begin
@@ -1487,7 +1487,7 @@ var replaceNames, replaceValues: TStringArray;
 
       value := form.getAttribute('action', cmp);
 
-      resultobj := TXQValueObject.create();
+      resultobj := TXQValueStringMap.create();
       result := resultobj;
 
       resultobj.setMutable('method', method);
@@ -1681,10 +1681,11 @@ begin
   if args[0].kind  = pvkObject then begin
     multipart := getMultipartHeader(args[0]);
     obj := args[0].toValue as TXQValueMapLike;
+    result := obj
   end else begin
     multipart:='';
-    obj := TXQValueObject.create();
-    TXQValueObject(obj).setMutable('url', args[0].toString);
+    obj := TXQValueStringMap.create();
+    TXQValueStringMap(obj).setMutable('url', args[0].toString);
     result := obj;
   end;
 
@@ -1694,7 +1695,7 @@ begin
   end else begin
     mime.parse(args[0].getProperty('post').toString, multipart);
     mimeCombine();
-    obj := obj.setImmutable('post', mime.compose(tempstr, multipart));
+    result := result.setImmutable('post', mime.compose(tempstr, multipart));
 
     if tempstr <> multipart then begin
       headers := obj.getProperty('headers');
@@ -1705,14 +1706,13 @@ begin
         if not striBeginsWith(tempstr, 'Content-Type') then
           tempSeq.add(h^);
       end;
-      obj := obj.setImmutable('headers', tempSeq);
+      result := result.setImmutable('headers', tempSeq);
     end;
-    result := obj;
   end;
 end;
 
 function xqFunctionRequest_decode(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var paramobj: TXQValueObject;
+var paramobj: TXQValueStringMap;
   procedure addParam(const name, value: string);
   var tempseq: TXQValueSequence;
       v: txqvalue;
@@ -1731,7 +1731,7 @@ var paramobj: TXQValueObject;
     specialValues: TXQVArray;
     i: Integer;
   begin
-    if paramobj = nil then paramobj := TXQValueObject.create();
+    if paramobj = nil then paramobj := TXQValueStringMap.create();
     urlEncodingFromValue(q, @context.staticContext.nodeCollation.equal, false, CP_NONE, names, values, specialNames, specialValues);
     for i := 0 to high(names) do
       addParam(names[i], values[i]);
@@ -1740,7 +1740,7 @@ var paramobj: TXQValueObject;
   var mime: TMIMEMultipartData;
     i: Integer;
   begin
-    if paramobj = nil then paramobj := TXQValueObject.create();
+    if paramobj = nil then paramobj := TXQValueStringMap.create();
     mime.parse(data, boundary);
     for i := 0 to high(mime.data) do
       addParam(mime.data[i].getFormDataName, mime.data[i].data);
@@ -1749,12 +1749,10 @@ var paramobj: TXQValueObject;
 var
   url, multipart: String;
   decoded: TDecodedUrl;
-  resobj: TXQValueObject;
-
-
+  resobj: TXQValueStringMapPendingUpdate;
 begin
   requiredArgCount(argc, 1);
-  resobj := TXQValueObject.create();
+  resobj := TXQValueStringMapPendingUpdate.create();
   result := resobj;
   paramobj := nil;
   if args[0].kind = pvkObject then begin
@@ -1811,7 +1809,7 @@ var resseq: TXQValueSequence;
     n: TTreeNode;
     tempv: IXQValue;
     resolvedUri: RawByteString;
-    tempobj: TXQValueObject;
+    tempobj: TXQValueStringMapPendingUpdate;
   begin
     for iv in seq.GetEnumeratorPtrUnsafe do
       case iv^.kind of
@@ -1856,9 +1854,9 @@ var resseq: TXQValueSequence;
           if not tempv.isUndefined then begin
             resolvedUri := strResolveURI(tempv.toString, baseUri);
             if resolvedUri <> tempv.toString then begin
-              tempobj := TXQValueObject.create();
+              tempobj := TXQValueStringMapPendingUpdate.create();
               tempobj.prototype := iv^;
-              tempobj.values.add('url', resolvedUri);
+              tempobj.setMutable('url', resolvedUri);
               resseq.add(tempobj);
             end else resseq.add(iv^);
           end else resseq.add(iv^);
@@ -2470,13 +2468,13 @@ function xqFunctionObject(const context: TXQEvaluationContext; argc: SizeInt; ar
 var
   seq: TXQVList;
   i: Integer;
-  obj: TXQValueObject;
+  obj: TXQValueStringMap;
   v: IXQValue;
 begin
   if assigned(context.staticContext.sender.OnWarningDeprecated) then
     context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'object() function is DEPRECATED.');
   requiredArgCount(argc, 0, 1);
-  obj := TXQValueObject.create();
+  obj := TXQValueStringMap.create();
   if argc = 1 then begin
     v := args[0];
     if (v.kind <> pvkSequence) or (v.getSequenceCount mod 2 = 1) then raise EXQEvaluationException.Create('pxp:OBJECT', 'Argument to object constructor must be a sequence with an even number of elements');
@@ -4369,7 +4367,7 @@ type
       function clone: TXQTerm; override;
     end;
 
-function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: TRandomNumberGenerator): TXQValueObject;
+function makeRandomNumberGenerator(const context: TXQEvaluationContext; const state: TRandomNumberGenerator): TXQValueStringMap;
 var newstate: TRandomNumberGenerator;
   function makeFunction(mode: TXQTermRNGMode): TXQValueFunction;
   var
@@ -4396,7 +4394,7 @@ var newstate: TRandomNumberGenerator;
 
 begin
   newstate := state;
-  result := TXQValueObject.create();
+  result := TXQValueStringMap.create();
   result.setMutable('number', xqvalue(newstate.nextDouble));
   result.setMutable('next', makeFunction(xqtrngmNext));
   result.setMutable('permute', makeFunction(xqtrngmPermute));
@@ -6615,7 +6613,7 @@ function xqFunctionMapMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
 var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
   value: TXQValue;
   pv: PIXQValue;
-  resobj: TXQValueObject;
+  resobj: TXQValueStringMap;
   pprop: TXQProperty;
   tempseq: TXQValueSequence;
 begin
@@ -6624,57 +6622,23 @@ begin
       duplicates.setFromString(value.toString);
   end;
   if argv[0].getSequenceCount = 1 then exit(argv[0]);
-  resobj := TXQValueObject.create();
+  resobj := TXQValueStringMap.create();
   result := resobj;
   for pv in argv[0].GetEnumeratorPtrUnsafe do begin
     for pprop in pv^.getPropertyEnumerator do begin
-      if resobj.hasProperty(pprop.Name, @value) then begin
+      if resobj.hasProperty(pprop.key, @value) then begin
         case duplicates of
           xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
           xqmdrUseFirst: ;
-          xqmdrUseLast: resobj.setMutable(pprop.Name, pprop.Value);
+          xqmdrUseLast: resobj.setMutable(pprop.key, pprop.Value);
           xqmdrCombine: begin
             tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
             tempseq.add(value);
             tempseq.add(pprop.Value);
-            resobj.setMutable(pprop.Name, tempseq);
+            resobj.setMutable(pprop.key, tempseq);
           end;
         end;
-      end else resobj.setMutable(pprop.Name, pprop.Value);
-    end;
-  end;
-end;
-
-function xqFunctionMapNewMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
-var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
-  value: TXQValue;
-  pv: PIXQValue;
-  resobj: TXQValueMap;
-  pprop: TXQProperty;
-  tempseq: TXQValueSequence;
-begin
-  if argc >= 2 then begin
-    if argv[1].hasProperty('duplicates', @value) then
-      duplicates.setFromString(value.toString);
-  end;
-  //if argv[0].getSequenceCount = 1 then exit(argv[0]);
-  resobj := TXQValueMap.create();
-  result := resobj;
-  for pv in argv[0].GetEnumeratorPtrUnsafe do begin
-    for pprop in pv^.getPropertyEnumerator do begin
-      if resobj.hasProperty(pprop.Name, @value) then begin
-        case duplicates of
-          xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
-          xqmdrUseFirst: ;
-          xqmdrUseLast: resobj.setMutable(pprop.Name, pprop.Value);
-          xqmdrCombine: begin
-            tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
-            tempseq.add(value);
-            tempseq.add(pprop.Value);
-            resobj.setMutable(pprop.Name, tempseq);
-          end;
-        end;
-      end else resobj.setMutable(pprop.Name, pprop.Value);
+      end else resobj.setMutable(pprop.key, pprop.Value);
     end;
   end;
 end;
@@ -6712,7 +6676,7 @@ begin
           mapFind(outseq, key, pw^);
       pvkObject:
         for pp in pv^.getPropertyEnumerator do begin
-          if pp.Name = key then outseq.addInArray(pp.Value)
+          if pp.key = key then outseq.addInArray(pp.Value)
           else mapFind(outseq, key, pp.Value);
         end;
     end;
@@ -6735,23 +6699,23 @@ end;
 
 function xqFunctionMapEntry({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  obj: TXQValueObject;
+  obj: TXQValueStringMap;
 begin
-  obj := TXQValueObject.create();
+  obj := TXQValueStringMap.create();
   obj.setMutable(argv[0].toString, argv[1]);
   result := obj;
 end;
 
 function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  obj: TXQValueObject;
+  obj: TXQValueStringMap;
   pp: TXQProperty;
   keys: array of String = nil;
   i: Integer;
   pv: PIXQValue;
   keep: Boolean;
 begin
-  obj := TXQValueObject.create();
+  obj := TXQValueStringMap.create();
   SetLength(keys, argv[1].getSequenceCount);
   i := 0;
   for pv in argv[1].GetEnumeratorPtrUnsafe do begin
@@ -6761,9 +6725,9 @@ begin
   for pp in argv[0].getPropertyEnumerator do begin
     keep := true;
     for i := 0 to high(keys) do
-      if keys[i] = pp.Name then keep := false;
+      if keys[i] = pp.key then keep := false;
     if keep then
-      obj.setMutable(pp.Name, pp.Value);
+      obj.setMutable(pp.key, pp.Value);
   end;
   result := obj;
 end;
@@ -6778,7 +6742,7 @@ begin
   with f do begin
     init(context, argv[1]);
     for pp in argv[0].getPropertyEnumerator do begin
-      l.add(call2(xqvalue(pp.Name), pp.Value));
+      l.add(call2(xqvalue(pp.key), pp.Value));
     end;
     done;
   end;
@@ -7174,7 +7138,6 @@ transform
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   TXQueryEngine.registerNativeModule(fnmap);
   fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
-  fnmap.registerFunction('new-merge', @xqFunctionMapNewMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
   fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
   fnmap.registerFunction('keys', @xqFunctionMapKeys).setVersionsShared([map, atomicStar]);
   fnmap.registerFunction('contains', @xqFunctionMapContains).setVersionsShared([map, atomic, boolean]);

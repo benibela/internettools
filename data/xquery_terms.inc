@@ -4356,11 +4356,11 @@ function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext
   end;
 
 var
-  obj: TXQValueObject;
+  obj: TXQValueStringMap;
   i: Integer;
   v: IXQValue;
 begin
-  obj := TXQValueObject.create();
+  obj := TXQValueStringMap.create();
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
