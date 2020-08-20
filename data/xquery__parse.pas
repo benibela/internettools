@@ -2555,6 +2555,9 @@ begin
   end;
   resobj := TXQTermJSONObjectConstructor.create();
   resobj.objectsRestrictedToJSONTypes := not standard and (options.JSONObjectMode = xqjomJSONiq);
+  if standard then resobj.duplicateCheck := xqjodStandard
+  else if options.JSONObjectMode = xqjomJSONiq then resobj.duplicateCheck := xqjodJSONiq
+  else resobj.duplicateCheck := xqjodAllowDuplicates;
   result := resobj;
   try
     skipWhitespaceAndComment();

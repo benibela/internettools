@@ -2274,6 +2274,7 @@ type
   TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
     optionals: array of boolean;
     objectsRestrictedToJSONTypes: boolean;
+    duplicateCheck: (xqjodAllowDuplicates, xqjodStandard, xqjodJSONiq);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
     function clone: TXQTerm; override;

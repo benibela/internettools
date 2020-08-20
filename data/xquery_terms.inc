@@ -4354,20 +4354,30 @@ function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext
       exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
     result := v;
   end;
+  procedure duplicateError;
+  begin
+    raise EXQEvaluationException.create(IfThen(duplicateCheck = xqjodJSONiq, 'jerr:JNDY0003', 'XQDY0137'), 'Encountered duplicate keys when constructing map object', nil, result, self);
+  end;
 
 var
   obj: TXQValueStringMap;
-  i: Integer;
+  i: integer;
+  skippedOptionals: Integer = 0;
   v: IXQValue;
 begin
   obj := TXQValueStringMap.create();
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
-    if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then continue;
+    if (length(optionals) > i) and (optionals[i]) and (v.getSequenceCount = 0) then begin
+      inc(skippedOptionals);
+      continue;
+    end;
     if objectsRestrictedToJSONTypes then v := transformValue(v);
     obj.setMutable(children[i*2].evaluate(context).toString, v);
   end;
+  if (duplicateCheck <> xqjodAllowDuplicates) and (obj.Size + skippedOptionals <> length(children) div 2) then
+    duplicateError();
   result := obj;
 end;
 
