@@ -30,7 +30,8 @@ uses
 type
   TXQBaseTypeInfo = object
     class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
-    class procedure createDeletionKey(out key: string); static;
+//    class procedure markKeyAsDeleted(var key: string); static;
+//    class function isKeyDeleted(const p: ppointer): boolean; static; inline;
   end;
   TXQDefaultTypeInfo = object(TXQBaseTypeInfo)
     class function hash(data: pchar; datalen: SizeUInt): uint32; static;
@@ -64,14 +65,13 @@ type
     function findCell(keydata: pchar; keylen: SizeUInt): UInt32; inline;
     function findCell(const Key: TKey): UInt32; inline;
     function findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: UInt32): UInt32;
-    procedure resize;
+    procedure grow;
   protected
   {$if FPC_FULLVERSION <= 30004} public{$endif}
-    DELETED_KEY: TKey;
-    RealSize: int32;
+    //RealSize: int32;
     LogSize: int32;
     Size: int32;
-    FCount: int32;
+    //FCount: int32;
     Entities:array of THashMapEntity;
     CellToEntityIndex: array of int32;
     function getBaseValueOrDefault(const Key:TKey):TBaseValue;
@@ -89,7 +89,7 @@ type
     function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
     function getEnumerator: TEntityEnumerator;
-    property Count: int32 read FCount;
+    property Count: int32 read Size;
   end;
 
   generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<TKey,TXQVoid,TInfo>)
@@ -317,6 +317,7 @@ function xqround(const f: xqfloat): Int64;
 
 const
   ENT_EMPTY=-1;
+  ENT_VALIDSTART=0;
   ENT_DELETED=-2;
 
 {$ifdef FPC} //hide this from pasdoc, since it cannot parse external
@@ -328,6 +329,22 @@ const
 implementation
 uses math;
 
+{var globalStringDeletionKey: string = #0'DELETED';
+    globalStringDeletionKeyP: pointer;
+
+class procedure TXQBaseTypeInfo.markKeyAsDeleted(var key: string);
+begin
+  key := #0'DELETED';
+end;
+
+class function TXQBaseTypeInfo.isKeyDeleted(const p: ppointer): boolean;
+begin
+//  result := pointer(key) = pointer(globalStringDeletionKey)
+   result := p^ = globalStringDeletionKeyP
+end;}
+
+
+
 
 
 function TXQBaseHashmap.TEntityEnumerator.currentEntity: PHashMapEntity;
@@ -338,8 +355,8 @@ end;
 function TXQBaseHashmap.TEntityEnumerator.moveNext: boolean;
 begin
  inc(entityId);
- while (entityId < map^.Size) and (pointer(map^.Entities[entityId].Key) = pointer(map^.DELETED_KEY)) do
-   inc(entityId);
+// while (entityId < map^.Size) and tinfo.isKeyDeleted(@map^.Entities[entityId].Key) do
+//   inc(entityId);
  result := entityId < map^.Size;
 end;
 
@@ -376,10 +393,7 @@ begin
   datalen := length(key);
 end;
 
-class procedure TXQBaseTypeInfo.createDeletionKey(out key: string);
-begin
-  key := #0'DELETED';
-end;
+
 
 
 
@@ -395,14 +409,10 @@ end;
 
 constructor TXQBaseHashmap.init;
 begin
- Tinfo.createDeletionKey(DELETED_KEY);
- RealSize:=0;
  LogSize:=0;
  Size:=0;
- FCount:=0;
  Entities:=nil;
  CellToEntityIndex:=nil;
- Resize;
 end;
 
 destructor TXQBaseHashmap.done;
@@ -413,13 +423,10 @@ end;
 
 procedure TXQBaseHashmap.Clear;
 begin
- RealSize:=0;
  LogSize:=0;
  Size:=0;
- FCount := 0;
  SetLength(Entities,0);
  SetLength(CellToEntityIndex,0);
- Resize;
 end;
 
 class function TXQBaseHashmap.hash(const key: TKey): uint32;
@@ -444,12 +451,13 @@ function TXQBaseHashmap.findCellWithHash(keydata: pchar; keylen: SizeUInt; HashC
 var Mask,Step:uint32;
     Entity:int32;
 begin
- Mask:=(2 shl LogSize)-1;
- Step:=((HashCode shl 1)+1) and Mask;
  if LogSize<>0 then begin
   result:=HashCode shr (32-LogSize);
+  Mask:=(2 shl LogSize)-1;
+  Step:=((HashCode shl 1)+1) and Mask;
  end else begin
   result:=0;
+  exit
  end;
  repeat
   Entity:=CellToEntityIndex[result];
@@ -460,14 +468,15 @@ begin
  until false;
 end;
 
-procedure TXQBaseHashmap.resize;
+procedure TXQBaseHashmap.grow;
 var NewLogSize,NewSize,OldSize,Counter, Entity:int32;
   Cell: UInt32;
   tempPtrSized: pointer;
 begin
  OldSize := Size;
+ NewSize := Size;
+ //set NewLogSize to number of digits in binary representation of NewSize
  NewLogSize:=0;
- NewSize:=RealSize;
  while NewSize<>0 do begin
   NewSize:=NewSize shr 1;
   inc(NewLogSize);
@@ -475,8 +484,8 @@ begin
  if NewLogSize<1 then begin
   NewLogSize:=1;
  end;
+ //resize CellToEntityIndex to 2^NewLogSize (two to four times larger than size e.g. size=7 -> log=3 -> new length 16; size=8 -> log=4 -> new length 32  )
  Size:=0;
- RealSize:=0;
  LogSize:=NewLogSize;
  SetLength(CellToEntityIndex,2 shl LogSize);
  for Counter:=0 to length(CellToEntityIndex)-1 do begin
@@ -487,7 +496,7 @@ begin
  Entity := 0;
  for Counter:=0 to OldSize-1 do
   with Entities[counter] do begin
-   if pointer(Key) <> pointer(DELETED_KEY) then begin
+   //if not tinfo.isKeyDeleted(@Key) then begin
      Cell := FindCell(Key);
      CellToEntityIndex[Cell]:=Entity;
      if Entity <> Counter then begin
@@ -497,10 +506,9 @@ begin
        Entities[Entity].Value := Value;
      end;
      inc(Entity);
-   end;
+   //end;
   end;
  Size := Entity;
- RealSize := Size;
  SetLength(Entities,2 shl LogSize);
  //remove old data (not really needed)
  for Counter:=Size to min(OldSize - 1, high(Entities)) do begin
@@ -514,42 +522,41 @@ var Entity:int32;
     Cell:uint32;
 begin
  result:=nil;
- while RealSize>=(1 shl LogSize) do begin
-  Resize;
+ if Size+1>=(1 shl LogSize) then begin
+   grow;
+   assert(size < 1 shl LogSize);
  end;
  Cell:=FindCell(Key);
  Entity:=CellToEntityIndex[Cell];;
  if Entity>=0 then begin
   result:=@Entities[Entity];
   if not allowOverride then exit;
-  result^.Key:=Key;
-  result^.Value:=Value;
-  exit;
+ end else begin
+   Entity:=Size;
+   inc(Size);
+   assert(Entity<2 shl LogSize);
+   CellToEntityIndex[Cell]:=Entity;
+   result:=@Entities[Entity];
  end;
- Entity:=Size;
- inc(Size);
- inc(FCount);
- if Entity<(2 shl LogSize) then begin
-  CellToEntityIndex[Cell]:=Entity;
-  inc(RealSize);
-  result:=@Entities[Entity];
-  result^.Key:=Key;
-  result^.Value:=Value;
- end;
+ result^.Key:=Key;
+ result^.Value:=Value;
 end;
 
 function TXQBaseHashmap.findEntity(const Key:TKey;CreateIfNotExist:boolean=false):PHashMapEntity;
 var Entity:int32;
     Cell:uint32;
 begin
- result:=nil;
  Cell:=FindCell(Key);
- Entity:=CellToEntityIndex[Cell];
- if Entity>=0 then begin
-  result:=@Entities[Entity];
- end else if CreateIfNotExist then begin
-  result:=include(Key,default(TBaseValue));
+ if CellToEntityIndex <> nil then begin
+   Entity:=CellToEntityIndex[Cell];
+   if Entity>=0 then
+    exit(@Entities[Entity]);
  end;
+
+ if CreateIfNotExist then
+   result:=include(Key,default(TBaseValue))
+  else
+   result:=nil;
 end;
 
 function TXQBaseHashmap.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
@@ -558,9 +565,11 @@ var Entity:int32;
 begin
  result:=nil;
  Cell:=FindCell(data, keylen);
- Entity:=CellToEntityIndex[Cell];
- if Entity>=0 then
-  result:=@Entities[Entity];
+ if CellToEntityIndex <> nil then begin
+   Entity:=CellToEntityIndex[Cell];
+   if Entity>=0 then
+    result:=@Entities[Entity];
+ end;
 end;
 
 function TXQBaseHashmap.findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
@@ -569,23 +578,34 @@ var Entity:int32;
 begin
  result:=nil;
  Cell:=findCellWithHash(data, keylen, ahash);
- Entity:=CellToEntityIndex[Cell];
- if Entity>=0 then
-  result:=@Entities[Entity];
+ if CellToEntityIndex <> nil then begin
+   Entity:=CellToEntityIndex[Cell];
+   if Entity>=0 then
+    result:=@Entities[Entity];
+ end;
 end;
 
 function TXQBaseHashmap.exclude(const Key:TKey):boolean;
 var Entity:int32;
     Cell:uint32;
+    i: sizeint;
 begin
  result:=false;
  Cell:=FindCell(Key);
+ if CellToEntityIndex = nil then exit;
  Entity:=CellToEntityIndex[Cell];
  if Entity>=0 then begin
-  Entities[Entity].Key:=DELETED_KEY;
-  Entities[Entity].Value:=default(TBaseValue);
+  //tinfo.markKeyAsDeleted(Entities[Entity].Key);
+  Entities[Entity]:=default(THashMapEntity);
+  dec(Size);
+  if entity < size then begin
+    move(Entities[Entity + 1], Entities[Entity], sizeof(THashMapEntity) * (Size - Entity));
+    FillChar(Entities[Size], SizeOf(THashMapEntity), 0);
+    for i := 0 to high(CellToEntityIndex) do
+     if CellToEntityIndex[i] > entity then
+      dec(CellToEntityIndex[i]);
+  end;
   CellToEntityIndex[Cell]:=ENT_DELETED;
-  dec(FCount);
   result:=true;
  end;
 end;
@@ -605,12 +625,12 @@ var Entity:int32;
     Cell:uint32;
 begin
  Cell:=FindCell(Key);
- Entity:=CellToEntityIndex[Cell];
- if Entity>=0 then begin
-  result:=Entities[Entity].Value;
- end else begin
-  result:=default(TBaseValue);
+ if CellToEntityIndex <> nil then begin
+   Entity:=CellToEntityIndex[Cell];
+   if Entity>=0 then
+    exit(Entities[Entity].Value);
  end;
+ result:=default(TBaseValue);
 end;
 
 procedure TXQBaseHashmap.setBaseValue(const Key: TKey; const Value: TBaseValue);
@@ -878,8 +898,8 @@ procedure TXQHashmapStrOwning.clear;
 var
   i: SizeInt;
 begin
- for i := 0 to high(Entities) do
-   if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
+ for i := 0 to size - 1 do
+   if {not TXQDefaultTypeInfo.isKeyDeleted(@Entities[i].Key) and }( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
      TOwnershipTracker.Release(TValue(Entities[i].Value));
   inherited;
 end;
@@ -898,6 +918,8 @@ begin
 end;
 
 procedure TXQHashmapStrOwning.assign(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
+var
+  i: int32;
 begin
   clear;
   includeAll(other);
@@ -949,8 +971,8 @@ procedure TXQHashmapStrCaseInsensitiveASCIIOwning.clear;
 var
   i: SizeInt;
 begin
- for i := 0 to high(Entities) do
-   if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
+ for i := 0 to size - 1 do
+   //if (pointer(Entities[i].Key) <> pointer(DELETED_KEY)) and ( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
      TOwnershipTracker.Release(TValue(Entities[i].Value));
   inherited;
 end;
@@ -1524,7 +1546,8 @@ begin
   fcount := 0;
 end;
 
-
+initialization
+  //globalStringDeletionKeyP := pointer(globalStringDeletionKey);
 
 end.
 
