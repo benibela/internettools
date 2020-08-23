@@ -955,6 +955,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     sub: PIXQValue;
     fun: TXQValueFunction;
     i: Integer;
+    pp: TXQProperty;
   begin
     result := true;
     for sub in ta.GetEnumeratorPtrUnsafe do begin
@@ -975,7 +976,11 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           case length(arguments) of
             0: result := true;
             2: begin
-              if not (arguments[high(arguments)].isItemStar()) then exit(false);
+              if not (arguments[high(arguments)].isItemStar()) then begin
+                for pp in sub.getPropertyEnumerator do
+                  if not arguments[high(arguments)].instanceOf(pp.value) then
+                    exit(false);
+              end;
               with arguments[0] do begin
                 if (allowNone) or (allowMultiple) then exit();
                 case kind of
