@@ -3033,12 +3033,21 @@ end;
 
 function xqFunctionCollection(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var url: string;
+  td: TTreeDocument;
+  pv: PIXQValue;
 begin
   if (argc = 0) or (args[0].isUndefined) then url := ''
   else url := strResolveURI(args[0].toString, context.staticContext.baseURI);
   result := nil;
-  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnCollection) then context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
+  td := context.staticContext.needTemporaryNodes.documentCache[url];
+  if td <> nil then
+    result := xqvalue(td);
+  if Assigned(context.staticContext.sender) and assigned(context.staticContext.sender.OnCollection) then
+    context.staticContext.sender.OnCollection(context.staticContext.sender, url, result);
   if result = nil then raise EXQEvaluationException.create('FODC0002', 'No collection entry for ' + url);
+  for pv in result.GetEnumeratorPtrUnsafe do
+    if (pv.kind = pvkNode) and ( pv.toNode is TTreeDocument) then
+      context.staticContext.needTemporaryNodes.documentCache[TTreeDocument(pv.toNode).documentURI] := TTreeDocument(pv.toNode);
 end;
 
 function xqFunctionUri_Collection(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
