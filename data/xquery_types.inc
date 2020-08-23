@@ -2341,7 +2341,7 @@ begin
 end;
 
 function TXQValueStringMap.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
-const SMALL_SIZE_FULL_COPY = 4;
+const SMALL_SIZE_FULL_COPY = 7;
 var
   Resmap: TXQValueStringMap;
   resmapupdate: TXQValueStringMapPendingUpdate;
@@ -2467,7 +2467,7 @@ begin
 end;
 
 function TXQValueStringMapPendingUpdate.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
-const SMALL_UPDATE_COUNT = 4;
+const SMALL_UPDATE_COUNT = 7;
 var
   resmap: TXQValueStringMap;
 begin
