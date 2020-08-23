@@ -1769,7 +1769,7 @@ type
   { TXQTermType }
 
   type
-  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest, tikUnion);
+  TXQTypeInformationKind = (tikNone, tikAny, tikAtomic, tikFunctionTest, tikElementTest, tikArrayTest, tikMapTest, tikJSONiqTest, tikUnion);
 
   { TXQTermSequenceType }
 
@@ -1777,7 +1777,7 @@ type
     name: string;
     allowNone, allowMultiple: boolean;
     kind: TXQTypeInformationKind;
-    atomicTypeInfo: TXSType; //only for tikAtomic (or tikFunctionTest during parsing)
+    atomicTypeInfo: TXSType; //used for tikAtomic (or tikFunctionTest during parsing) or tikJSONiqTest
     nodeMatching: TXQPathMatchingStep; //only for tikElementTest
     arguments: array of TXQTermSequenceType; //only for tikFunctionTest, last is return type
 
@@ -3363,6 +3363,7 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
+
 
 
 
@@ -7370,6 +7371,39 @@ end;
 { TXQAbstractFunctionInfo }
 
 class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm);
+  procedure checkSequenceCount;
+  begin
+    case result.getSequenceCount of
+    0:  if not typ.allowNone then term.raiseTypeError0004('Expected value, but got empty sequence.');
+    1: ; //ok
+    else if (not typ.allowMultiple) then
+      term.raiseTypeError0004('Expected singleton', result);
+    end;
+  end;
+
+  procedure convertFunctionTestSequence;
+  var
+    temp: IXQValue;
+    seq: TXQVList;
+    pv: PIXQValue;
+  begin
+    checkSequenceCount;
+    temp := result;
+    seq := TXQVList.create(temp.getSequenceCount);
+    result := TXQValueSequence.create(seq);
+    for pv in temp.GetEnumeratorPtrUnsafe do begin
+      case pv.kind of
+        pvkFunction:
+          if context.staticContext.strictTypeChecking then seq.add(typ.functionCoercion(pv^))
+          else seq.add(pv^);
+        pvkArray, pvkObject:
+          seq.add(typ.functionCoercion(pv^));
+        else
+          term.raiseTypeError0004('Expected function', pv^);
+      end;
+    end;
+    xqvalueSeqSqueeze(result);
+  end;
 
   function conversionSingle(const w: IXQValue): IXQValue;
   var
@@ -7377,18 +7411,6 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
     errCode: String;
   begin
     result := w;
-    if typ.kind = tikFunctionTest then begin
-      case w.kind of
-        pvkFunction:
-          if context.staticContext.strictTypeChecking then result := typ.functionCoercion(w);
-        pvkArray, pvkObject:
-          result := typ.functionCoercion(w);
-        else
-          term.raiseTypeError0004('Expected function', result);
-      end;
-      exit;
-    end;
-
     t := result.typeAnnotation;
     if t.derivedFrom(baseSchema.node) then begin
       result := xqvalueAtomize(result);
@@ -7415,33 +7437,34 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
     temp: IXQValue;
     p: PIXQValue;
   begin
-    case result.getSequenceCount of
-    0:  if not typ.allowNone then term.raiseTypeError0004('Expected value, but got empty sequence.')
-        else exit;
-    1: ; //later
-    else if (not typ.allowMultiple) then
-      term.raiseTypeError0004('Expected singleton', result);
-  end;
-  case typ.kind of
-    tikAtomic, tikFunctionTest: begin
-      if result.kind <> pvkSequence then begin
-        result := conversionSingle(result);
-        exit;
+    case typ.kind of
+      tikAtomic: begin
+        case result.kind of
+          pvkSequence: begin
+            temp := result;
+            seq := TXQVList.create(temp.getSequenceCount);
+            result := TXQValueSequence.create(seq);
+            for p in temp.GetEnumeratorPtrUnsafe do
+              seq.add(conversionSingle(p^));
+          end;
+          else result := conversionSingle(result);
+        end;
+        checkSequenceCount;
       end;
-      temp := result;
-      seq := TXQVList.create(temp.getSequenceCount);
-      result := TXQValueSequence.create(seq);
-      for p in temp.GetEnumeratorPtrUnsafe do
-        seq.add(conversionSingle(p^));
+      else begin
+        checkSequenceCount;
+        //if typ.kind <> tikAny then
+        term.raiseTypeError0004('Expected '+typ.serialize, result);
+      end;
     end;
-    tikNone, tikElementTest: term.raiseTypeError0004('Expected '+typ.serialize, result);
-  end;
   end;
 
 begin
   if typ = nil then exit;
-  if (typ.kind <> tikFunctionTest) and typ.instanceOf(result, context) then exit;
-  convert;
+  if typ.kind <> tikFunctionTest then begin
+    if typ.instanceOf(result, context) then exit;
+    convert;
+  end else convertFunctionTestSequence;
 end;
 
 class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean;

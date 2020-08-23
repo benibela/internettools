@@ -1296,8 +1296,7 @@ begin
 
        'array': begin
          if hadNoNamespace and (options.AllowJSONiqTests or (parsingModel in PARSING_MODEL3_1)) then begin
-           Result.kind:=tikAtomic;
-           result.atomicTypeInfo := baseJSONiqSchema.array_;
+           Result.kind:=tikArrayTest;
            expect('(');
            skipWhitespaceAndComment();
            case pos^ of
@@ -1311,8 +1310,7 @@ begin
 
        'map': if hadNoNamespace then begin
          require3_1();
-         Result.kind:=tikAtomic;
-         result.atomicTypeInfo := baseJSONiqSchema.object_;
+         Result.kind:=tikMapTest;
          expect('(');
          skipWhitespaceAndComment();
          case pos^ of
@@ -1330,9 +1328,9 @@ begin
            if hadNoNamespace and options.AllowJSONiqTests then begin
              expect('('); expect(')');
              case word of
-               'json-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
-               'structured-item': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseSchema.structuredItem; end;
-               'object': begin Result.kind:=tikAtomic; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
+               'json-item': begin Result.kind:=tikJSONiqTest; result.atomicTypeInfo := baseJSONiqSchema.jsonItem; end;
+               'structured-item': begin Result.kind:=tikJSONiqTest; result.atomicTypeInfo := baseSchema.structuredItem; end;
+               'object': begin Result.kind:=tikJSONiqTest; result.atomicTypeInfo := baseJSONiqSchema.object_; end;
                else raiseSyntaxError('WTF??');
              end;
            end else raiseSyntaxError('Need JSONiq');

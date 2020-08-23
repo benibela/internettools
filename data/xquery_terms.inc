@@ -791,7 +791,7 @@ begin
   case kind of
     tikNone: exit( 'empty-sequence()' );
     tikAny: result := 'item()';
-    tikAtomic: begin
+    tikAtomic, tikJSONiqTest: begin
       if atomicTypeInfo = nil then exit(name + '(TYPE NOT FOUND)');
       if atomicTypeInfo.schema <> baseSchema then result := 'Q{' + atomicTypeInfo.schema.url + '}'
       else result :=  '';
@@ -805,6 +805,9 @@ begin
         result += '| ' + (children[i] as TXQTermSequenceType).serialize;
       delete(result, 1, 2);
     end;
+    tikArrayTest: result := 'array';
+    tikMapTest: result := 'map';
+    else result := 'unknown type';
   end;
   if allowNone and allowMultiple then result += '*'
   else if allowMultiple then result += '+'
@@ -914,6 +917,15 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           exit(false);
       end;
     end;
+    result := true;
+  end;
+  function checkJSONiqStructuredItem: boolean;
+  var
+    v: PIXQValue;
+  begin
+    for v in ta.GetEnumeratorPtrUnsafe do
+      if not v.typeAnnotation.derivedFrom(atomicTypeInfo) then
+        exit(false);
     result := true;
   end;
 
@@ -1029,10 +1041,9 @@ begin
   case kind of
     tikNone: result := ta.isUndefined;
     tikAny: result := checkSequenceCount;
-    tikAtomic:
-      if (atomicTypeInfo = baseJSONiqSchema.array_) then result := checkSequenceCount and checkArrayMembers
-      else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkSequenceCount and checkMap
-      else result := checkAtomicSequence;
+    tikAtomic: result := checkAtomicSequence;
+    tikArrayTest: result := checkSequenceCount and checkArrayMembers;
+    tikMapTest: result := checkSequenceCount and checkMap;
     tikFunctionTest: exit(checkSequenceCount and checkFunctionTestSequence);
     tikElementTest: exit(checkSequenceCount and elementTest);
     tikUnion: begin
@@ -1040,6 +1051,7 @@ begin
         if TXQTermSequenceType(children[i]).instanceOf(ta, context) then exit(true);
       exit(false);
     end;
+    tikJSONiqTest: result := checkSequenceCount and checkJSONiqStructuredItem;
   end
 end;
 
@@ -1116,13 +1128,13 @@ begin
           //subtype-assertions(AnnotationsA, AnnotationsB) is not defined (??)
           exit(true);
         end;
-        tikAtomic: if (atomicTypeInfo = baseJSONiqSchema.object_) or (atomicTypeInfo = baseJSONiqSchema.array_) then begin
+        tikArrayTest, tikMapTest, tikJSONiqTest: begin
           case length(tb.arguments) of
             0: exit(true);
             2: ;
             else exit(false);
           end;
-          if atomicTypeInfo = baseJSONiqSchema.object_ then begin
+          if (kind = tikMapTest) or ((kind = tikJSONiqTest) and (atomicTypeInfo = baseJSONiqSchema.object_)) then begin
             tempExpectedKeyType := baseSchema.anyAtomicType;
             tempExpectedValueChild := 1;
           end else begin
@@ -1137,6 +1149,30 @@ begin
           exit(false);
         end;
       end;
+    tikArrayTest: begin
+      if length(tb.children) = 0 then begin
+        if kind = tikArrayTest then exit(true);
+        if (kind = tikJSONiqTest) and (atomicTypeInfo = baseJSONiqSchema.array_) then exit(true);
+      end;
+      if (kind <> tikArrayTest) or (length(children) = 0) then exit(false);
+      exit( TXQTermSequenceType(children[0]).subtypeOf( TXQTermSequenceType(tb.children[0]) ) );
+    end;
+    tikMapTest: begin
+      if length(tb.children) = 0 then begin
+        if kind = tikMapTest then exit(true);
+        if (kind = tikJSONiqTest) and (atomicTypeInfo = baseJSONiqSchema.object_) then exit(true);
+      end;
+      if (kind <> tikMapTest) or (length(children) = 0) then exit(false);
+      exit( //(TXQTermSequenceType(tb.children[0]).subtypeItemTypeOf( TXQTermSequenceType(children[0]) ))
+        (TXQTermSequenceType(children[0]).subtypeItemTypeOf( TXQTermSequenceType(tb.children[0]) )) //this is how it is described in the standard and it passes the tests, but should it not be the opposite order?
+        and (TXQTermSequenceType(children[1]).subtypeOf( TXQTermSequenceType(tb.children[1]) ))
+      );
+    end;
+    tikJSONiqTest: case kind of
+      tikArrayTest: exit(tb.atomicTypeInfo = baseJSONiqSchema.array_);
+      tikMapTest: exit(tb.atomicTypeInfo = baseJSONiqSchema.object_);
+      tikJSONiqTest: exit(atomicTypeInfo.derivedFrom(tb.atomicTypeInfo))
+    end;
   end;
   exit(false);
 end;
