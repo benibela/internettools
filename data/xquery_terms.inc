@@ -964,11 +964,13 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
 
   function checkFunctionTestSequence: boolean;
   var
-    sub: PIXQValue;
+    sub, pw: PIXQValue;
     fun: TXQValueFunction;
     i: Integer;
     pp: TXQProperty;
+    returnType: TXQTermSequenceType;
   begin
+    if length(arguments) > 0 then returnType := arguments[high(arguments)];
     result := true;
     for sub in ta.GetEnumeratorPtrUnsafe do begin
       case sub.kind of
@@ -978,8 +980,8 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
           for i := 0 to high(fun.parameters) do
             if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
-          if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
-          else result := arguments[high(arguments)].isItemStar();
+          if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(returnType)
+          else result := returnType.isItemStar();
         end;
         pvkArray, pvkObject: begin
           result := false;
@@ -988,10 +990,19 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           case length(arguments) of
             0: result := true;
             2: begin
-              if not (arguments[high(arguments)].isItemStar()) then begin
-                for pp in sub.getPropertyEnumerator do
-                  if not arguments[high(arguments)].instanceOf(pp.value) then
-                    exit(false);
+              if not (returnType.isItemStar()) then begin
+                case sub.kind of
+                  pvkObject: begin
+                    if not returnType.allowNone then exit();
+                    for pp in sub.getPropertyEnumerator do
+                      if not returnType.instanceOf(pp.value) then
+                        exit();
+                  end;
+                  pvkArray:
+                    for pw in sub.GetEnumeratorMembersPtrUnsafe do
+                      if not returnType.instanceOf(pw^) then
+                        exit();
+                end;
               end;
               with arguments[0] do begin
                 if (allowNone) or (allowMultiple) then exit();
