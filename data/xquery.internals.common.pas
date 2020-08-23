@@ -922,14 +922,23 @@ var
   i: int32;
 begin
   clear;
-  includeAll(other);
+  LogSize:=other.LogSize;
+  Size:=other.Size;
+  Entities:=other.Entities;
+  CellToEntityIndex:=other.CellToEntityIndex;
+  SetLength(entities, length(Entities));
+  SetLength(CellToEntityIndex, length(CellToEntityIndex));
+  for i := 0 to size - 1 do
+    if Entities[i].Value <> nil then TOwnershipTracker.addRef(TValue(Entities[i].Value));
 end;
 
 procedure TXQHashmapStrOwning.includeAll(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
 var p: PKeyPairEnumerator;
 begin
-  for p in other do
-   include(p^.key, p^.value);
+  if size > 0 then begin
+    for p in other do
+      include(p^.key, p^.value);
+  end else assign(other);
 end;
 
 
