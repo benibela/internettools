@@ -868,88 +868,130 @@ begin
 end;
 
 function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
-
-
-  function instanceOfSingleType(const sub: IXQValue): boolean;
-    function checkArrayMembers: boolean;
-    var
-      pv: PIXQValue;
-    begin
-      for pv in (sub as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do
-        if not TXQTermSequenceType(children[0]).instanceOf(pv^) then
-          exit(false);
-      result := true;
+  function checkSequenceCount: boolean;
+  begin
+    case ta.getSequenceCount of
+      0: result := allowNone;
+      1: result := true;
+      else result := allowMultiple;
     end;
-    function checkMap: boolean;
-    var
-      pp: TXQProperty;
-      notEmpty: Boolean;
-    begin
-      notEmpty := false;
-      for pp in sub.getPropertyEnumerator do begin
-        notEmpty := true;
-        if not TXQTermSequenceType(children[1]).instanceOf(pp.Value) then
+  end;
+
+  function checkArrayMembers: boolean;
+  var
+    v, w: PIXQValue;
+    memberTypeNeedsChecking: Boolean;
+  begin
+    memberTypeNeedsChecking := length(children) > 0;
+    for v in ta.GetEnumeratorPtrUnsafe do begin
+      if v.kind <> pvkArray then exit(false);
+      if memberTypeNeedsChecking then
+        for w in v.GetEnumeratorMembersPtrUnsafe do
+          if not TXQTermSequenceType(children[0]).instanceOf(w^) then
+            exit(false);
+    end;
+    result := true;
+  end;
+  function checkMap: boolean;
+  var
+    pp: TXQProperty;
+    notEmpty, propertyTypeNeedsChecking: Boolean;
+    v: PIXQValue;
+  begin
+    propertyTypeNeedsChecking := length(children) > 0;
+    for v in ta.GetEnumeratorPtrUnsafe do begin
+      if v.kind <> pvkObject then exit(false);
+      if propertyTypeNeedsChecking then begin
+        notEmpty := false;
+        for pp in v.getPropertyEnumerator do begin
+          notEmpty := true;
+          if not TXQTermSequenceType(children[1]).instanceOf(pp.Value) then
+            exit(false);
+        end;
+        //todo: check keys
+        //todo: check function calls convertType/checkType ?
+        if notEmpty and not TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY')) then
           exit(false);
       end;
-      //todo: check keys
-      //todo: check function calls convertType/checkType ?
-      if notEmpty then result := TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY'))
-      else result := true;
     end;
+    result := true;
+  end;
 
+  function checkAtomicSequence: boolean;
+  var atomicCount: integer;
+    function checkAtomicRecursion(v: TXQValue): boolean;
+    var
+      w: PIXQValue;
+    begin
+      case v.kind of
+        pvkUndefined: result := allowNone;
+        pvkSequence: begin
+          result := true;
+          for w in v.GetEnumeratorPtrUnsafe do begin
+            result := checkAtomicRecursion(w.toValue);
+            if not result then exit;
+          end;
+        end
+        else begin
+          inc(atomicCount);
+          result := v.typeAnnotation.derivedFrom(atomicTypeInfo);
+        end;
+      end;
+    end;
+  begin
+    atomicCount := 0;
+    result := checkAtomicRecursion(ta.toValue);
+    if result then begin
+      case atomicCount of
+        0: result := allowNone;
+        1: result := true;
+        else result := allowMultiple;
+      end;
+    end;
+  end;
+
+  function checkFunctionTestSequence: boolean;
   var
-    t: TXSType;
+    sub: PIXQValue;
     fun: TXQValueFunction;
     i: Integer;
   begin
-    case kind of
-      //tikAny, tikNone: ; //handled before
-      tikAtomic: begin
-        t := sub.typeAnnotation;;
-        result := t.derivedFrom(atomicTypeInfo);
-        if result and (length(children) > 0) then begin
-          if (atomicTypeInfo = baseJSONiqSchema.array_) then result := checkArrayMembers
-          else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkMap
-          else raiseInternalError(2019010327);
+    result := true;
+    for sub in ta.GetEnumeratorPtrUnsafe do begin
+      case sub.kind of
+        pvkFunction: begin
+          if length(arguments) = 0 then continue;
+          fun := sub^ as TXQValueFunction;
+          if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
+          for i := 0 to high(fun.parameters) do
+            if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
+          if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
+          else result := arguments[high(arguments)].isItemStar();
         end;
-      end;
-      tikFunctionTest: begin
-        result := false; //hide warning
-        case sub.kind of
-          pvkFunction: begin
-            if length(arguments) = 0 then exit(true);
-            fun := sub as TXQValueFunction;
-            if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
-            for i := 0 to high(fun.parameters) do
-              if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
-            if fun.resulttype <> nil then result := fun.resulttype.subtypeOf(arguments[high(arguments)])
-            else result := arguments[high(arguments)].isItemStar();
-          end;
-          pvkArray, pvkObject: begin
-            //map:   function(A) as item()*,  A: any atomic
-            //array: function(xs:integer) as item()*
-            case length(arguments) of
-              0: result := true;
-              2: begin
-                if not (arguments[high(arguments)].isItemStar()) then exit(false);
-                with arguments[0] do begin
-                  if (allowNone) or (allowMultiple) then exit(false);
-                  case kind of
-                    tikNone: exit(false);
-                    tikAtomic:
-                      case sub.kind of
-                        pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
-                        pvkObject: result := true;
-                      end;
-                    tikAny: result := true;
-                  end;
+        pvkArray, pvkObject: begin
+          //map:   function(A) as item()*,  A: any atomic
+          //array: function(xs:integer) as item()*
+          case length(arguments) of
+            0: result := true;
+            2: begin
+              if not (arguments[high(arguments)].isItemStar()) then exit(false);
+              with arguments[0] do begin
+                if (allowNone) or (allowMultiple) then exit(false);
+                case kind of
+                  tikNone: exit(false);
+                  tikAtomic:
+                    case sub.kind of
+                      pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
+                      pvkObject: result := true;
+                    end;
+                  tikAny: result := true;
                 end;
               end;
             end;
-          end
+          end;
         end;
+        else exit(false);
       end;
-      else result := false; //hide warning
     end;
   end;
 
@@ -976,35 +1018,22 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   end;
 
 var
-  count: Integer;
   i: Integer;
-  v: PIXQValue;
 begin
-  //compare count with sequence count
   case kind of
-    tikNone: exit(ta.isUndefined);
+    tikNone: result := ta.isUndefined;
+    tikAny: result := checkSequenceCount;
+    tikAtomic:
+      if (atomicTypeInfo = baseJSONiqSchema.array_) then result := checkSequenceCount and checkArrayMembers
+      else if (atomicTypeInfo = baseJSONiqSchema.object_) then result := checkSequenceCount and checkMap
+      else result := checkAtomicSequence;
+    tikFunctionTest: exit(checkSequenceCount and checkFunctionTestSequence);
+    tikElementTest: exit(checkSequenceCount and elementTest);
     tikUnion: begin
       for i := 0 to high(children) do
         if TXQTermSequenceType(children[i]).instanceOf(ta, context) then exit(true);
       exit(false);
     end;
-    else
-      count := ta.getSequenceCount;
-      if ((count = 0) and not allowNone) or
-         ((count > 1) and not allowMultiple) then
-        exit(false);
-      if (count = 0) then
-        exit(true);
-      //compare item type
-      if kind = tikAny then
-        exit(true);
-      if kind = tikElementTest then
-        exit(elementTest);
-      result := true;
-      for v in ta.GetEnumeratorPtrUnsafe do begin
-        result := result and instanceOfSingleType(v^);
-        if not result then exit;
-      end;
   end
 end;
 
