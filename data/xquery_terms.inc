@@ -969,6 +969,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
           else result := arguments[high(arguments)].isItemStar();
         end;
         pvkArray, pvkObject: begin
+          result := false;
           //map:   function(A) as item()*,  A: any atomic
           //array: function(xs:integer) as item()*
           case length(arguments) of
@@ -976,13 +977,13 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
             2: begin
               if not (arguments[high(arguments)].isItemStar()) then exit(false);
               with arguments[0] do begin
-                if (allowNone) or (allowMultiple) then exit(false);
+                if (allowNone) or (allowMultiple) then exit();
                 case kind of
-                  tikNone: exit(false);
+                  tikNone: exit();
                   tikAtomic:
                     case sub.kind of
                       pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
-                      pvkObject: result := true;
+                      pvkObject: result := true; //todo check actual key kind
                     end;
                   tikAny: result := true;
                 end;
