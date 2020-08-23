@@ -140,7 +140,7 @@ begin
   t('(map {}, array {}) ! (position(), . instance of map(*), . instance of map(string,string), '+
               '. instance of array(*), . instance of array(string), ' +
               '"F", . instance of function(*), . instance of function(integer) as item()*, . instance of function(integer) as item(), . instance of function(string) as item()*, . instance of function(string) as item() )',
-  '1 true true false false F true true false true false 2 false false true true F true true false false false');
+  '1 true true false false F true true false true false 2 false false true true F true true true false false');
 
 
 
@@ -170,7 +170,7 @@ begin
   t('hexBinary("aa") lt hexBinary("ff") ', 'true');
   t('hexBinary("aa") < hexBinary("ff") ', 'true');
 
-
+  t('codepoints-to-string(([65, [[[[66]]]], [], [], [], [67,68,69], [[[[65, 66], 67], 68], 69], 70], [], [], [[]]))', 'ABCDEABCDEF');
 
 
   t('serialize([1,2,3e0], map {"method": "json" })', '[1,2,3]');

@@ -127,6 +127,19 @@ type
     function GetEnumerator: TXQValueEnumerator;
   end;
 
+  //** @abstract(Iterator over an IXQValue.) Usually not used directly, but in a @code(for var in value) construction
+  TXQValueEnumeratorArrayTransparentUnsafe = record
+  private
+    ptrs: array of TXQValueEnumeratorPtrUnsafe;
+    currentEnumerator: integer;
+    fcurrent: TXQValue;
+    //class procedure clear(out enum: TXQValueEnumerator); static;
+  public
+    function MoveNext: Boolean;
+    property Current: TXQValue read FCurrent;
+    function GetEnumerator: TXQValueEnumeratorArrayTransparentUnsafe;
+  end;
+
   //**Type of xqvalue (see TXQValue)
   TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
 
@@ -509,6 +522,7 @@ type
     function GetEnumerator: TXQValueEnumerator; //**< Implements the enumerator for for..in.@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
+    function GetEnumeratorArrayTransparentUnsafe: TXQValueEnumeratorArrayTransparentUnsafe;
 
     function query(const q: string): IXQValue; //**< Evaluates another XQuery expression on this value using the defaultQueryEngine. The return value is @code(query) whereby self is stored in $_. Use this to do an operation on all values of a sequence, e.g. @code(sum($_))
     function query(const q: string; const vs: array of ixqvalue): IXQValue; //**< Like query, sets the additional arguments as variables $_1, $_2, ...
@@ -614,6 +628,7 @@ type
     function GetEnumerator: TXQValueEnumerator;virtual; //**< Implements the enumerator for for..in. (Only use with IXQValue references, not TXQValue)@br Because it returns an IXQValue, it modifies the reference count of all objects in the sequence. For large sequences this is rather slow (e.g. it wastes 1 second to iterate over 10 million values in a simple benchmark.) and it is recommended to use GetEnumeratorPtrUnsafe. (it took 35ms for those 10 million values, comparable to the 30ms of a native loop not involving any enumerators)
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;virtual; //**< Implements a faster version of GetEnumerator. It does not change any reference counts, not even of self, so it must not be used with values returned by functions!
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; virtual;
+    function GetEnumeratorArrayTransparentUnsafe: TXQValueEnumeratorArrayTransparentUnsafe; virtual;
   //for internal use:
   public
     class function classKind: TXQValueKind; virtual; //**< Primary type of a value
@@ -947,6 +962,7 @@ type
 
     //for internal use
     class function nodeTypeAnnotation(tn: TTreeNode): TXSType; static;
+    class function nodeTypeAnnotationForAtomic(tn: TTreeNode): TXSType; static;
   end;
                                                                {
   TXQPropertyEnumeratorInternal = class
@@ -3719,6 +3735,35 @@ begin
   result := self;
 end;
 
+function TXQValueEnumeratorArrayTransparentUnsafe.MoveNext: Boolean;
+label enterArray, leaveArray, currentEnumeratorMoveNext;
+begin
+  currentEnumeratorMoveNext:
+    result := ptrs[currentEnumerator].MoveNext;
+    if result then begin
+      fcurrent := Ptrs[currentEnumerator].Current^.toValue;
+      if fcurrent.kind <> pvkArray then exit
+      else goto enterArray;
+    end else goto leaveArray;
+
+  enterArray: //fcurrent = ptrs[currentEnumerator].current^ is an array
+    if currentEnumerator = high(ptrs) then
+      SetLength(ptrs, length(ptrs) * 2);
+    inc(currentEnumerator);
+    ptrs[currentEnumerator] := fcurrent.GetEnumeratorMembersPtrUnsafe;
+    goto currentEnumeratorMoveNext;
+
+  leaveArray: //ptrs[currentEnumerator].current^ is nil
+    dec(currentEnumerator);
+    if currentEnumerator < 0 then exit(false);
+    goto currentEnumeratorMoveNext;
+end;
+
+
+function TXQValueEnumeratorArrayTransparentUnsafe.GetEnumerator: TXQValueEnumeratorArrayTransparentUnsafe;
+begin
+  result := self
+end;
 
 
 
@@ -4909,8 +4954,7 @@ begin
       exit
     end;
     pvkNode: begin
-      t := TXQValueNode.nodeTypeAnnotation(v.toNode);
-      if t = baseSchema.untyped then t := baseSchema.untypedAtomic; //????
+      t := TXQValueNode.nodeTypeAnnotationForAtomic(v.toNode);
       result := t.createValue(v.toString);
     end;
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
@@ -7405,18 +7449,15 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
     xqvalueSeqSqueeze(result);
   end;
 
-  function conversionSingle(const w: IXQValue): IXQValue;
+  function atomizeAndCastSingle(const w: IXQValue): IXQValue;
   var
     t: TXSType;
     errCode: String;
   begin
+    //assert: w is not a sequence, node, function or array
     result := w;
-    t := result.typeAnnotation;
-    if t.derivedFrom(baseSchema.node) then begin
-      result := xqvalueAtomize(result);
-      t := result.typeAnnotation;
-    end;
     if typ.instanceOf(result, context) then exit;
+    t := w.typeAnnotation;
     if t.derivedFrom(baseSchema.UntypedAtomic) then begin
       if (typ.atomicTypeInfo.storage <> TXQValueQName) then exit(typ.castAs(result, context))
       else if context.staticContext.model in PARSING_MODEL3 then errCode := 'XPTY0117'
@@ -7433,23 +7474,21 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
 
   procedure convert;
   var
-    seq: TXQVList;
-    temp: IXQValue;
     p: PIXQValue;
+    seqResult: TXQValueSequence;
   begin
     case typ.kind of
       tikAtomic: begin
-        case result.kind of
-          pvkSequence: begin
-            temp := result;
-            seq := TXQVList.create(temp.getSequenceCount);
-            result := TXQValueSequence.create(seq);
-            for p in temp.GetEnumeratorPtrUnsafe do
-              seq.add(conversionSingle(p^));
-          end;
-          else result := conversionSingle(result);
-        end;
+        result := xqvalueAtomize(result);
         checkSequenceCount;
+        if typ.instanceOf(result, context) then exit;
+        if result.kind <> pvkSequence then result := atomizeAndCastSingle(result)
+        else begin
+          seqResult := TXQValueSequence.create(result.getSequenceCount);
+          for p in result.GetEnumeratorPtrUnsafe do
+            seqResult.seq.add(atomizeAndCastSingle(p^));
+          result := seqResult;
+        end;
       end;
       else begin
         checkSequenceCount;
@@ -7468,39 +7507,62 @@ begin
 end;
 
 class function TXQAbstractFunctionInfo.checkType(const v: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext): boolean;
-  function checkSingle(const wpre: IXQValue): boolean;
-  var w: IXQValue;
+var atomicCount: integer;
+  function checkAtomicRecursion(const w: IXQValue): boolean;
+    function fullAtomization: boolean;
+    begin
+      result := checkAtomicRecursion(xqvalueAtomize(w));
+    end;
+
+  var
+    px: PIXQValue;
     st: TXSType;
   begin
-    if wpre.typeAnnotation.derivedFrom(baseSchema.node) then w := xqvalueAtomize(wpre)
-    else w := wpre;
-    if typ.instanceOf(w, context) then exit(true);
-    if (w.kind = pvkNull) and (typ.allowNone) then exit(true);
-    st := w.typeAnnotation;
-    if st.derivedFrom(baseSchema.UntypedAtomic) then begin
-      if typ.atomicTypeInfo.storage = TXQValueQName then exit(false); //XPTY0117
-      exit(typ.castableAs(w, context.staticContext))
+    case w.kind of
+      pvkSequence: begin
+        result := true;
+        for px in w.GetEnumeratorPtrUnsafe do
+          if not checkAtomicRecursion(px^) then
+            exit(false);
+      end;
+      pvkArray: begin
+        result := true;
+        for px in w.GetEnumeratorMembersPtrUnsafe do
+          if not checkAtomicRecursion(px^) then
+            exit(false);
+      end;
+      pvkNode: begin
+        //st := TXQValueNode.nodeTypeAnnotationForAtomic(w.toNode);
+        result := fullAtomization;
+        //checkNode(xqvalueAtomize(w));
+      end;
+      else
+        inc(atomicCount);
+        if typ.instanceOf(w, context) then exit(true);
+        if (w.kind = pvkNull) and (typ.allowNone) then exit(true); //???
+        st := w.typeAnnotation;
+        if st.derivedFrom(baseSchema.UntypedAtomic) then begin
+          if typ.atomicTypeInfo.storage = TXQValueQName then exit(false); //XPTY0117
+          exit(typ.castableAs(w, context.staticContext))
+        end;
+        if    (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
+          or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
+          or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
+            exit(typ.castableAs(w, context.staticContext));
+        result := false;
     end;
-    if    (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st.derivedFrom(baseSchema.Float) or st.derivedFrom(baseSchema.Double)))
-       or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
-       or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
-         exit(typ.castableAs(w, context.staticContext));
-    result := false;
   end;
 
-var
-  w: PIXQValue;
 begin
   if typ = nil then exit(true);
   if typ.instanceOf(v, context) then exit(true);
   result := false;
   if typ.kind = tikAtomic then begin
-    if v.kind <> pvkSequence then
-      exit(checkSingle(v));
-    if ((not typ.allowMultiple) and (v.getSequenceCount > 1)) then exit(false);
-    if ((not typ.allowNone) and (v.getSequenceCount = 0)) then exit(false);
-    for w in v.GetEnumeratorPtrUnsafe do
-      if not checkSingle(w^) then exit(false);
+    atomicCount := 0;
+    result := checkAtomicRecursion(v);
+    if not result then exit;
+    if ((not typ.allowMultiple) and (atomicCount > 1)) then exit(false);
+    if ((not typ.allowNone) and (atomicCount = 0)) then exit(false);
     result := true;
   end;
 end;

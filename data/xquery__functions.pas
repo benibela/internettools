@@ -1580,13 +1580,13 @@ end;
 function getMultipartHeader(const v: IXQValue): string;
 var
   headers: IXQValue;
-  h: PIXQValue;
+  h: TXQValue;
   tempstr: String;
 begin
   result := '';
   headers := v.getProperty('headers');
-  for h in headers.GetEnumeratorPtrUnsafe do begin
-    tempstr := h^.toString;
+  for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+    tempstr := h.toString;
     if striBeginsWith(tempstr, 'Content-Type') and striContains(tempstr, ContentTypeMultipart) then begin
       result := tempstr;
       result := trim(strCopyFrom(result, pos('=', result) + 1));
@@ -1642,7 +1642,7 @@ function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeI
 
 var
   headers: IXQValue;
-  h: PIXQValue;
+  h: TXQValue;
   multipart, tempstr: String;
   mime: TMIMEMultipartData;
   obj: TXQValueMapLike;
@@ -1701,10 +1701,10 @@ begin
       headers := obj.getProperty('headers');
       tempSeq := TXQValueSequence.create(headers.getSequenceCount);
       tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
-      for h in headers.GetEnumeratorPtrUnsafe do begin
-        tempstr := h^.toString;
+      for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+        tempstr := h.toString;
         if not striBeginsWith(tempstr, 'Content-Type') then
-          tempSeq.add(h^);
+          tempSeq.add(h);
       end;
       result := result.setImmutable('headers', tempSeq);
     end;
@@ -1906,7 +1906,7 @@ begin
 end;
 
 {$ImplicitExceptions off}
-function tryValueToInteger(const v: IXQValue; out outv: integer): boolean;
+function tryValueToInteger(const v: TXQValue; out outv: integer): boolean;
 var
   i64: Int64;
   f: xqfloat;
@@ -1979,15 +1979,15 @@ end;
 function xqFunctionCodepoints_to_string({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: TStrBuilder;
   res: string;
- v: PIXQValue;
+ v: TXQValue;
  codepoint: integer;
  ok: Boolean;
 begin
   temp.init(@res);
-  for v in args[0].GetEnumeratorPtrUnsafe do begin
-    ok := tryValueToInteger(v^, codepoint);
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
+    ok := tryValueToInteger(v, codepoint);
     if ok then ok := isValidXMLCharacter(codepoint);
-    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v^.toXQuery());
+    if not ok then raise EXQEvaluationException.create('FOCH0001', 'Invalid character: '+v.toXQuery());
     temp.appendCodePoint(codepoint);
   end;
   temp.final;
@@ -3072,21 +3072,21 @@ var
   end;
 
 var  i: Integer;
-     v: PIXQValue;
+     v: TXQValue;
      resseq: TXQValueSequence;
 begin
   if argc = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collationOverride := nil;
-  if args[0].kind <> pvkSequence then begin
+  if not (args[0].kind in [pvkSequence, pvkArray]) then begin
     if {%H-}equal(args[0], args[1]) then result := xqvalue(1)
     else result := xqvalue();
   end else begin
     i := 0;
     result := nil;
     resseq := nil;
-    for v in args[0].GetEnumeratorPtrUnsafe do begin
+    for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
       i += 1;
-      if equal(v^, args[1]) then
+      if equal(v, args[1]) then
         xqvalueSeqConstruct(result, resseq, xqvalue(i));
     end;
     if result = nil then result := xqvalue();
@@ -3107,7 +3107,7 @@ end;
 function xqFunctionDistinct_values(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
  i: Integer;
- v: PIXQValue;
+ v: TXQValue;
  resseq: TXQValueSequence;
  collation: TXQCollation;
  found: Boolean;
@@ -3119,14 +3119,14 @@ begin
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueSequence.create(atom.getSequenceCount);
-  for v in atom.GetEnumeratorPtrUnsafe do begin
+  for v in atom.GetEnumeratorArrayTransparentUnsafe do begin
     found := false;
     for i:= 0 to resseq.seq.Count - 1 do
-      if context.staticContext.equalDeepAtomic(resseq.seq[i], v^, collation) then begin
+      if context.staticContext.equalDeepAtomic(resseq.seq[i], v, collation) then begin
         found := true;
         break;
       end;
-    if not found then resseq.seq.add(v^);
+    if not found then resseq.seq.add(v);
   end;
   result := resseq;
   xqvalueSeqSqueeze(result);
@@ -3263,10 +3263,11 @@ function castUntypedToDouble(const v: IXQValue): IXQValue; //for sum,min,max
 var x: PIXQValue;
   found: Boolean;
   list: TXQVList;
+  y: TXQValue;
 begin
   found := false;
   for x in v.GetEnumeratorPtrUnsafe do begin
-    if x^.instanceOf(baseSchema.untypedOrNodeUnion) then begin
+    if (x.kind = pvkArray) or x^.instanceOf(baseSchema.untypedOrNodeUnion) then begin
       found := true;
       break;
     end;
@@ -3275,27 +3276,28 @@ begin
 
   list := TXQVList.create(v.getSequenceCount);
   result := TXQValueSequence.create(list); //in case of exceptions
-  for x in v.GetEnumeratorPtrUnsafe do
-    if x^.instanceOf(baseSchema.untypedOrNodeUnion) then
-      list.add(baseSchema.double.createValue(x^))
+  for y in v.GetEnumeratorArrayTransparentUnsafe do
+    if y.instanceOf(baseSchema.untypedOrNodeUnion) then
+      list.add(baseSchema.double.createValue(y))
      else
-      list.add(x^);
+      list.add(y);
   xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionProduct(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  v: PIXQValue;
+  v: TXQValue;
 begin
   if args[0].isUndefined then exit(args[0]);
   result := nil;
-  for v in args[0].GetEnumeratorPtrUnsafe do
-    if result = nil then result := v^
-    else result := xqvalueMultiply(context, result, v^);
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do
+    if result = nil then result := v
+    else result := xqvalueMultiply(context, result, v);
 end;
 
 
 //**< Returns the lowest type that all items in the list can be converted to
+//**assumes v contains no array
 function getPromotedType(const v: IXQValue): TXQValueKind;
   function commonTyp(const a, b: TXQValueKind): TXQValueKind;
   begin
@@ -3347,6 +3349,7 @@ begin
 end;                     }
 
 //** Returns the lowest type derived by decimal that all items in the list can be converted to
+//assumes v contains no array
 function getPromotedDecimalType(const v: ixqvalue): TXSType;
 var
   iterator: TXQValueEnumeratorPtrUnsafe;
@@ -3363,6 +3366,7 @@ begin
 end;
 
 //** Returns the lowest type with datetime storage that all items in the list can be converted to
+//** assumes v contains no array
 function getPromotedDateTimeType(const v: ixqvalue; needDuration: boolean): TXSType;
 var
   pv: PIXQValue;
@@ -3410,7 +3414,7 @@ begin
        and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
       raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
     if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result.toDecimal);
-    exit();
+    if ak <> pvkArray then exit();
   end;
 
   seq := castUntypedToDouble(args[0]);
@@ -3469,6 +3473,10 @@ begin
 end;
 
 function xqFunctionavg({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+procedure raiseError;
+begin
+  raise EXQEvaluationException.Create('FORG0006', 'Invalid types for avg', nil, args[0]);
+end;
 var tempf: xqfloat;
     tempf2: xqfloat;
     tempd: BigDecimal;
@@ -3483,14 +3491,15 @@ begin
   if i = 1 then begin
     result := args[0];
     xqvalueSeqSqueeze(result);
-    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result)
-    else begin
-      kind := result.kind;
-      if not (kind in [pvkInt64, pvkBigDecimal, pvkFloat])
-         or ((kind = pvkDateTime) and not (result.instanceOf(baseSchema.yearMonthDuration)) and not (result.instanceOf(baseSchema.dayTimeDuration))) then
-         raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:avg');
+    if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result))
+    else case result.kind of
+      pvkInt64, pvkBigDecimal, pvkFloat: exit;
+      pvkDateTime: if (result.instanceOf(baseSchema.yearMonthDuration)) or (result.instanceOf(baseSchema.dayTimeDuration)) then
+        exit
+        else raiseError;
+      pvkArray: ; //later
+      else raiseError;
     end;
-    exit;
   end;
 
   seq := castUntypedToDouble(args[0]);
@@ -3523,7 +3532,7 @@ end;
 function xqFunctionminmax(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; const asmin: boolean): IXQValue;
 procedure raiseError;
 begin
-  raise EXQEvaluationException.Create('FORG0006', 'Incompatible types for fn:min/max');
+  raise EXQEvaluationException.Create('FORG0006', 'Invalid types for fn:min/max', nil, args[0]);
 end;
 
 var tempf: xqfloat;
@@ -3534,7 +3543,6 @@ var tempf: xqfloat;
  collation: TXQCollation;
  tempf2: xqfloat;
  tempd: BigDecimal;
- kind: TXQValueKind;
  baseType: TXSType;
  seq: IXQValue;
  enumerable: TXQValueEnumeratorPtrUnsafe;
@@ -3547,14 +3555,18 @@ begin
     Result := args[0];
     if result.kind = pvkSequence then result := args[0].get(1);
     if result.getSequenceCount > 0 then begin
-      if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result);
-      kind := result.kind;
-      if (not (kind in [pvkUndefined, pvkDateTime, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString]))
-         or ((kind = pvkDateTime) and (result.typeAnnotation as TXSDateTimeType).isDuration and ( not result.instanceOf(baseSchema.yearMonthDuration)) and (not result.instanceOf(baseSchema.dayTimeDuration)))
-         then
-        raise EXQEvaluationException.Create('FORG0006', 'Invalid type for fn:min/max');
-    end;
-    exit();
+      if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result));
+      case result.kind of
+        pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString: exit; //ok
+        pvkDateTime:
+          if (result.typeAnnotation as TXSDateTimeType).isDuration and not (result.instanceOf(baseSchema.yearMonthDuration) or result.instanceOf(baseSchema.dayTimeDuration)) then
+            raiseError
+          else
+            exit;
+        pvkArray: ; //below
+        else raiseError;
+      end;
+    end else exit;
   end;
 
   seq := castUntypedToDouble(args[0]);
@@ -5743,7 +5755,7 @@ var
   collation: TXQCollation;
   input, token: string;
   splitted: TStringArray;
-  v: PIXQValue;
+  v: TXQValue;
   i: Integer;
 begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
@@ -5753,8 +5765,8 @@ begin
   token := trim(args[1].toString);
   if (token = '') then exit(xqvalue(false));
 
-  for v in args[0].GetEnumeratorPtrUnsafe do begin
-    input := strTrimAndNormalize(v^.toString, WHITE_SPACE);
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
+    input := strTrimAndNormalize(v.toString, WHITE_SPACE);
 
     splitted := strSplit(input, ' ');
     for i := 0 to high(splitted) do
@@ -6592,7 +6604,7 @@ var
 begin
   for pv in iter do begin
     case pv^.kind of
-      pvkArray: flatten( (pv^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, outlist);
+      pvkArray: flatten( pv^.GetEnumeratorMembersPtrUnsafe, outlist);
       pvkSequence: flatten( pv^.GetEnumeratorPtrUnsafe, outlist);
       else outlist.add(pv^);
     end;

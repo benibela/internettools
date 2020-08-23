@@ -425,6 +425,13 @@ begin
   result := default(TXQValueEnumeratorPtrUnsafe);
 end;
 
+function TXQValue.GetEnumeratorArrayTransparentUnsafe: TXQValueEnumeratorArrayTransparentUnsafe;
+begin
+  result.currentEnumerator := 0;
+  setlength(result.ptrs, 1);
+  result.ptrs[0] := GetEnumeratorPtrUnsafe;
+end;
+
 function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking then raiseXPTY0004TypeError(self, 'float/double');
@@ -2190,6 +2197,17 @@ class function TXQValueNode.nodeTypeAnnotation(tn: TTreeNode): TXSType;
 begin
   case tn.typ of
     tetOpen, tetDocument: result := baseSchema.untyped; //todo: handle i:type="xs:integer" attribute
+    tetText: result := baseSchema.untypedAtomic;
+    tetAttribute: if (tn as TTreeAttribute).isNamespaceNode then result := baseSchema.anyURI else result := baseSchema.untypedAtomic;
+    tetComment, tetProcessingInstruction: result := baseSchema.string_;
+    else raise EXQEvaluationException.Create('pxp:INTERNAL', 'Impossible node type');
+  end;
+end;
+
+class function TXQValueNode.nodeTypeAnnotationForAtomic(tn: TTreeNode): TXSType;
+begin
+  case tn.typ of
+    tetOpen, tetDocument: result := baseSchema.untypedAtomic; //todo: handle i:type="xs:integer" attribute
     tetText: result := baseSchema.untypedAtomic;
     tetAttribute: if (tn as TTreeAttribute).isNamespaceNode then result := baseSchema.anyURI else result := baseSchema.untypedAtomic;
     tetComment, tetProcessingInstruction: result := baseSchema.string_;
