@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 {$I ../internettoolsconfig.inc}
+{$undef HASHMAP_SUPPORTS_MARKING_DELETIONS}
 
 interface
 
@@ -329,7 +330,8 @@ const
 implementation
 uses math;
 
-{var globalStringDeletionKey: string = #0'DELETED';
+{$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
+var globalStringDeletionKey: string = #0'DELETED';
     globalStringDeletionKeyP: pointer;
 
 class procedure TXQBaseTypeInfo.markKeyAsDeleted(var key: string);
@@ -341,7 +343,8 @@ class function TXQBaseTypeInfo.isKeyDeleted(const p: ppointer): boolean;
 begin
 //  result := pointer(key) = pointer(globalStringDeletionKey)
    result := p^ = globalStringDeletionKeyP
-end;}
+end;
+{$endif}
 
 
 
@@ -355,8 +358,10 @@ end;
 function TXQBaseHashmap.TEntityEnumerator.moveNext: boolean;
 begin
  inc(entityId);
-// while (entityId < map^.Size) and tinfo.isKeyDeleted(@map^.Entities[entityId].Key) do
-//   inc(entityId);
+ {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
+ while (entityId < map^.Size) and tinfo.isKeyDeleted(@map^.Entities[entityId].Key) do
+   inc(entityId);
+ {$endif}
  result := entityId < map^.Size;
 end;
 
@@ -496,25 +501,29 @@ begin
  Entity := 0;
  for Counter:=0 to OldSize-1 do
   with Entities[counter] do begin
-   //if not tinfo.isKeyDeleted(@Key) then begin
+   {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}if not tinfo.isKeyDeleted(@Key) then begin{$endif}
      Cell := FindCell(Key);
      CellToEntityIndex[Cell]:=Entity;
+     {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
      if Entity <> Counter then begin
        tempPtrSized := pointer(key);
        pointer(key) := pointer(Entities[Entity].Key);
        pointer(Entities[Entity].Key) := tempPtrSized;
        Entities[Entity].Value := Value;
      end;
+     {$endif}
      inc(Entity);
-   //end;
+   {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}end;{$endif}
   end;
  Size := Entity;
  SetLength(Entities,2 shl LogSize);
+ {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
  //remove old data (not really needed)
  for Counter:=Size to min(OldSize - 1, high(Entities)) do begin
    Entities[Counter].Key:=default(TKey);
    Entities[Counter].Value:=default(TBaseValue);
  end;
+ {$endif}
 end;
 
 function TXQBaseHashmap.include(const Key: TKey; const Value: TBaseValue; allowOverride: boolean): PHashMapEntity;
@@ -595,7 +604,7 @@ begin
  if CellToEntityIndex = nil then exit;
  Entity:=CellToEntityIndex[Cell];
  if Entity>=0 then begin
-  //tinfo.markKeyAsDeleted(Entities[Entity].Key);
+  {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}tinfo.markKeyAsDeleted(Entities[Entity].Key);{$endif}
   Entities[Entity]:=default(THashMapEntity);
   dec(Size);
   if entity < size then begin
@@ -899,7 +908,7 @@ var
   i: SizeInt;
 begin
  for i := 0 to size - 1 do
-   if {not TXQDefaultTypeInfo.isKeyDeleted(@Entities[i].Key) and }( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
+   if {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}not TXQDefaultTypeInfo.isKeyDeleted(@Entities[i].Key) and {$endif}( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
      TOwnershipTracker.Release(TValue(Entities[i].Value));
   inherited;
 end;
