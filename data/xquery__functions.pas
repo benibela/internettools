@@ -4360,6 +4360,7 @@ end;
 
 function xqFunctionUnparsed_Text_Available(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  if args[0].isUndefined then exit(xqvalueFalse);
   result := xqvalueTrue;
   try
     xqFunctionUnparsed_Text(context, argc, args);
