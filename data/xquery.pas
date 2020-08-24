@@ -4210,7 +4210,9 @@ begin
     if not (types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
      errCode := 'FOTY0013'; //wtf?
      break;
-    end else if (context.staticContext.model in PARSING_MODEL3) and (types[i].kind = tikAtomic) and (types[i].atomicTypeInfo.storage = TXQValueQName) and (values[i].instanceOf(baseSchema.untypedAtomic)) then begin
+    end else if (context.staticContext.model in PARSING_MODEL3)
+              and (types[i].kind = tikAtomic) and (types[i].atomicTypeInfo.storage = TXQValueQName)
+              and ((values[i].kind = pvkNode) or values[i].instanceOf(baseSchema.untypedAtomic)) then begin
      errCode := 'XPTY0117'; //wtf?
      break;
     end;
