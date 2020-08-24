@@ -524,7 +524,7 @@ begin
  result:=nil;
  if Size+1>=(1 shl LogSize) then begin
    grow;
-   assert(size < 1 shl LogSize);
+   assert(size + 1 < 1 shl LogSize);
  end;
  Cell:=FindCell(Key);
  Entity:=CellToEntityIndex[Cell];;
