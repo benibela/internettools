@@ -551,7 +551,7 @@ type
     function setImmutable(const name, value: IXQValue): TXQValueMapLike;  //**< Creates a new object with the same values as the current one and changes a property of it
     function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;  //**< Creates a new object with the same values as the current one and changes a property of it
     function setImmutable(const name: string; const s: string): TXQValueMapLike;    //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
-
+    function hashCode: uint32;
   end;
 
 
@@ -643,6 +643,7 @@ type
     function setImmutable(const {%H-}name: string; const {%H-}v: IXQValue): TXQValueMapLike; virtual;
     function setImmutable(const name: string; const s: string): TXQValueMapLike;   virtual;
     function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): TXQValue; virtual;
+    function hashCode: uint32; virtual;
   end;
 
   TXQValueOwnershipTracker = record
@@ -693,6 +694,7 @@ type
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to int64
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
+    function hashCode: uint32; override;
 
     function clone: IXQValue; override;
 
@@ -721,6 +723,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
@@ -750,6 +753,7 @@ type
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
@@ -777,6 +781,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
@@ -805,6 +810,7 @@ type
     function toString: string; override;
     function toDateTime: TDateTime; override;
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function hashCode: uint32; override;
 
 
     function toRawBinary: string;
@@ -830,6 +836,7 @@ type
 
     function toString: string; override; //**< Converts the TXQValue dynamically to string (excludes namespace url)
     function toBooleanEffective: boolean; override;
+    function hashCode: uint32; override;
 
     procedure adaptiveSerialize(var serializer: TXQSerializer); override;
 
@@ -859,6 +866,7 @@ type
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function getInternalDateTimeData: PXQValueDateTimeData; override;
+    function hashCode: uint32; override;
 
     procedure setDateTime(const dateTime: TDateTime);
     class procedure setDateTime(const dateTime: TDateTime; out v: TXQValueDateTimeData); static;
@@ -906,6 +914,7 @@ type
     function toJoinedString(const sep: string=' '): string; override;
     function toDateTime: TDateTime; override; //**< Converts the first element to TDateTime
     function toNode: TTreeNode; override; //**< Converts the first element to a node
+    function hashCode: uint32; override;
 
     function toArray: TXQVArray; override; //**< Returns all elements as array
     function toXQVList: TXQVList; override; //**< Returns all elements as list (which must be freed by the caller)
@@ -950,6 +959,7 @@ type
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function toNode: TTreeNode; override; //**< Returns the node
+    function hashCode: uint32; override;
 
     function clone: IXQValue; override;
 
@@ -1095,6 +1105,7 @@ type
     function clone: IXQValue; override;
 
     function toString: string; override;
+    function hashCode: uint32; override;
 
     procedure jsonSerialize(var serializer: TXQSerializer); override; overload;
     procedure xmlSerialize(var serializer: TXQSerializer); override; overload;
@@ -4799,7 +4810,14 @@ function isSignedXQFloat(const v: xqfloat): boolean;
 begin
   result := PQWord(@v)^ shr 63 = 1;
 end;
-
+type TBBDoubleHelper = type helper (TDoubleHelper) for double
+  function isFinite(): boolean;
+end;
+//IsNan or IsInfinite from math
+function TBBDoubleHelper.isFinite(): boolean;
+begin
+  result := Exp <> 2047;
+end;
 
 
 {function xqtruncdecimal(const f: Decimal): Decimal;

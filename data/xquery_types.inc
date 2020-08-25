@@ -1,3 +1,17 @@
+type THashInfo = record
+  //same hash as python, see:
+  //https://stackoverflow.com/questions/56227419/why-does-pythons-hash-of-infinity-have-the-digits-of-π
+  //https://docs.python.org/3/library/stdtypes.html#hashing-of-numeric-types
+  //https://github.com/python/cpython/blob/master/Python/pyhash.c
+  const hash_pos_inf = 314159;
+  const hash_neg_inf = cardinal.MaxValue - hash_pos_inf;
+  const hash_nan = high(integer);
+  const modulus_bits = {$ifdef xxxCPU64xxxxx}61 no, only use 32 bit version{$else}31{$endif};
+  const modulus = (1 shl modulus_bits) - 1;
+  const bigdecimalInverse = 968029830;
+end;
+
+
 class function TXQValueUndefined.classKind: TXQValueKind;
 begin
   result := pvkUndefined;
@@ -286,6 +300,11 @@ function TXQValue.setImmutable(const props: PString; len: SizeInt; const v: IXQV
 begin
   raiseInternalErrorObjectExpected('setImmutable (or array)');
   result := nil;
+end;
+
+function TXQValue.hashCode: uint32;
+begin
+  result := 0
 end;
 
 function TXQValue.toDecimal: BigDecimal;
@@ -874,6 +893,11 @@ begin
   if bool then result:='true' else result:='false';
 end;
 
+function TXQValueBoolean.hashCode: uint32;
+begin
+  Result:=ord(bool);
+end;
+
 function TXQValueBoolean.clone: IXQValue;
 begin
   result:=xqvalue(bool);
@@ -957,6 +981,13 @@ function TXQValueInt64.toDateTime: TDateTime;
 begin
   result:=extended(value);
 end;
+
+{$push}{$RangeChecks off}{$OverflowChecks off}
+function TXQValueInt64.hashCode: uint32;
+begin
+  result := value mod THashInfo.modulus;
+end;
+{$pop}
 
 procedure TXQValueInt64.jsonSerialize(var serializer: TXQSerializer);
 begin
@@ -1091,6 +1122,30 @@ begin
   Result:=nan;
 end;
 
+function TXQValueFloat.hashCode: uint32;
+var
+  m: QWord;
+  e: Integer;
+begin
+  if not value.isFinite() then
+    case value.SpecialType of
+      fsInf: exit(THashInfo.hash_pos_inf);
+      fsNInf: exit(THashInfo.hash_neg_inf);
+      else exit(THashInfo.hash_nan);
+    end;
+  result := 0;
+  m := value.Mantissa;
+  e := value.Exponent - 21; //it only works with -21 ??
+  result := m mod THashInfo.modulus;
+
+  //see pyhash
+  if e >= 0 then e := e mod THashInfo.modulus_bits
+  else e := THashInfo.modulus_bits - 1 - ( (-1 - e) mod THashInfo.modulus_bits );
+  result := ( (result shl e) and THashInfo.modulus) or (result shr ( THashInfo.modulus_bits - e ));
+
+  if value.Sign then result := cardinal.MaxValue - result + 1;
+end;
+
 procedure TXQValueFloat.jsonSerialize(var serializer: TXQSerializer);
 begin
   if IsNan(value) or IsInfinite(value) then begin
@@ -1218,6 +1273,27 @@ begin
  Result:= getNaN;
 end;
 
+function TXQValueDecimal.hashCode: uint32;
+var r, digit: BigDecimalBinSquared;
+  i: sizeint;
+begin
+  r := 0;
+  digit := 1;
+  for i := 0 to high(value.digits) do begin
+    r := r + digit * value.digits[i] ;
+    if r >= THashInfo.modulus then r := r mod thashinfo.modulus;
+    digit := (digit * ELEMENT_OVERFLOW) mod THashInfo.modulus;
+  end;
+  if value.exponent > 0 then r := r * modPow(ELEMENT_OVERFLOW, value.exponent, thashinfo.modulus)
+  else if value.exponent < 0 then begin
+    assert((ELEMENT_OVERFLOW = 1000000000) and (thashinfo.bigdecimalInverse = 968029830));
+    r := r * modPow(THashInfo.bigdecimalInverse, -value.exponent, thashinfo.modulus);
+  end;
+  if r >= THashInfo.modulus then r := r mod thashinfo.modulus;
+  result := r;
+  if value.signed then result := uint32.MaxValue - result + 1;
+end;
+
 procedure TXQValueDecimal.jsonSerialize(var serializer: TXQSerializer);
 begin
   serializer.append(toString);
@@ -1312,6 +1388,11 @@ begin
   if IsNan(result) and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
+function TXQValueString.hashCode: uint32;
+begin
+  Result:=TXQDefaultTypeInfo.hash(pchar(str), length(str));
+end;
+
 function TXQValueString.toRawBinary: string;
 begin
   if instanceOf(baseSchema.hexBinary) then result := str.decodeHex
@@ -1395,6 +1476,11 @@ function TXQValueQName.toBooleanEffective: boolean;
 begin
   raise EXQEvaluationException.Create('FORG0006', 'A QName cannot be used a boolean');
   result := false;
+end;
+
+function TXQValueQName.hashCode: uint32;
+begin
+  Result:=TXQDefaultTypeInfo.hash(pchar(url), length(url)) xor TXQDefaultTypeInfo.hash(pchar(local), length(local));
 end;
 
 procedure TXQValueQName.adaptiveSerialize(var serializer: TXQSerializer);
@@ -1516,6 +1602,15 @@ end;
 function TXQValueDateTime.getInternalDateTimeData: PXQValueDateTimeData;
 begin
   result := @value;
+end;
+
+function TXQValueDateTime.hashCode: uint32;
+begin
+ with value do
+ result :=   ((((year shl 4) or month) shl 5) or day)
+         xor ((((hour shl 6) or min) shl 6) or seconds)
+         xor microsecs
+         xor timezone;
 end;
 
 procedure TXQValueDateTime.setDateTime(const dateTime: TDateTime);
@@ -1732,7 +1827,7 @@ begin
   duration.microsecs := dt;
 end;
 
-procedure TXQValueDateTime.truncateRange;
+procedure TXQValueDateTime.truncateRange();
 begin
   case (ftypeAnnotation as TXSDateTimeType).truncation of
     xqdttDate:      begin value.year := 1989; value.month := 12; value.day := 30; end;
@@ -1882,6 +1977,22 @@ function TXQValueSequence.toNode: TTreeNode;
 begin
   if seq.Count >= 1 then result := seq[0].toNode
   else result := nil;
+end;
+
+function TXQValueSequence.hashCode: uint32;
+var
+  pv: PIXQValue;
+begin
+  //it is only supposed to calculate hashs of atomic values
+  case getSequenceCount of
+    0: result := 0;
+    1: result := seq[0].hashCode;
+    else begin
+      result := 0;
+      for pv in GetEnumeratorPtrUnsafe do
+        result := result xor pv^.hashCode;
+    end;
+  end;
 end;
 
 function TXQValueSequence.toArray: TXQVArray;
@@ -2129,6 +2240,14 @@ end;
 function TXQValueNode.toNode: TTreeNode;
 begin
   result := node;
+end;
+
+function TXQValueNode.hashCode: uint32;
+var
+  temp: String;
+begin
+  temp := toString;
+  result := TXQDefaultTypeInfo.hash(pchar(temp), length(temp));
 end;
 
 function TXQValueNode.clone: IXQValue;
@@ -2755,6 +2874,11 @@ end;
 function TXQValueJSONNull.toString: string;
 begin
   result:='null';
+end;
+
+function TXQValueJSONNull.hashCode: uint32;
+begin
+  result := 0;
 end;
 
 procedure TXQValueJSONNull.jsonSerialize(var serializer: TXQSerializer);

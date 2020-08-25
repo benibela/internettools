@@ -9,7 +9,52 @@ procedure unittests();
 
 implementation
 
-uses bbutils, commontestutils, xquery.internals.common, sysutils;
+uses bbutils, commontestutils, xquery.internals.common, sysutils, bigdecimalmath, xquery;
+
+procedure hashcodetests;
+  procedure testnumcode(v: integer);
+  var
+    ihash, fhash, bcdhash: LongWord;
+  begin
+    ihash := xqvalue(v).hashCode;
+    fhash := xqvalue(xqfloat(v)).hashCode;
+    bcdhash := xqvalue(bigdecimal(v)).hashCode;
+    test(ihash = fhash);
+    test(ihash = bcdhash);
+  end;
+  procedure testnumcode(v: xqfloat);
+  var
+    bcdhash, fhash: LongWord;
+  begin
+    fhash := xqvalue(xqfloat(v)).hashCode;
+    bcdhash := xqvalue(FloatToBigDecimal(v, bdffExact)).hashCode;
+    test(fhash = bcdhash);
+  end;
+
+var
+  i: Integer;
+  s, zeros: String;
+  f: Extended;
+begin
+  for i := -10 to 10 do begin
+    testnumcode(i);
+    testnumcode(i shl 20);
+  end;
+
+  for i := -100 to 100 do begin
+    f := strtofloat('1e' + intToStr(i));
+    testnumcode(f);
+    testnumcode(-f);
+  end;
+
+  zeros := '';
+  for i := 1 to 100 do begin
+    s := inttostr(i);
+    testnumcode(StrToFloat('10'+zeros+'E-'+s));
+    testnumcode(StrToFloat('0.'+zeros+'1E'+s));
+    zeros += '0';
+  end;
+end;
 
 function containsAll(const hashset: TXQHashsetStrCaseInsensitiveASCII; list: array of string): boolean;
 var
@@ -37,6 +82,8 @@ var hashset: TXQHashsetStrCaseInsensitiveASCII;
     i: Integer;
     ti: String;
 begin
+  hashcodetests;
+
   hashset.init;
   test(not containsSome(hashset, ['a', 'A', 'b', 'B', 'c', 'C']));
   hashset.include('a');
