@@ -37,14 +37,14 @@ type
   TXQDefaultTypeInfo = object(TXQBaseTypeInfo)
     class function hash(data: pchar; datalen: SizeUInt): TXQHashCode; static;
     class function hash(const data: string): TXQHashCode; static;
-    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
+    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static;// inline;
     class function equalKeys(const key1, key2: string): boolean; static; inline;
   end;
   TXQCaseInsensitiveTypeInfo = object(TXQBaseTypeInfo)
     class function hash(data: pchar; datalen: SizeUInt): TXQHashCode; static;
     class function hash(const data: string): TXQHashCode; static;
-    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
-    class function equalKeys(const key1, key2: string): boolean; static; inline;
+    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static;
+    class function equalKeys(const key1, key2: string): boolean; static;
   end;
   TXQVoid = record end;
   //Hashmap based on Bero's FLRECacheHashMap
@@ -68,7 +68,7 @@ type
   private
     //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
     function findCell(const Key: TKey): UInt32; inline;
-    function findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32; inline;
+    function findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32;
     procedure grow;
   protected
   {$if FPC_FULLVERSION <= 30004} public{$endif}
@@ -309,6 +309,7 @@ function nodeNameHash(const s: RawByteString): cardinal;
 function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
 function nodeNameHash(p: pchar; len: sizeint): cardinal; inline;
 
+function calcCellCandidate(logsize: int32; hashcode: TXQHashCode; out mask, step: uint32): uint32; inline;
 
 
 type  TRaiseXQEvaluationExceptionCallback = procedure (const code, message: string);
@@ -408,14 +409,14 @@ begin
   result := (SizeUInt(length(key))  = datalen) and CompareMem(data, pointer(key), datalen);
 end;
 
+class function TXQDefaultTypeInfo.equalKeys(const key1, key2: string): boolean;
+begin
+ result := key1 = key2;
+end;
+
 class function TXQCaseInsensitiveTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
   result := (SizeUInt(length(key))  = datalen) and strliEqual(data, pointer(key), datalen);
-end;
-
-class function TXQDefaultTypeInfo.equalKeys(const key1, key2: string): boolean;
-begin
- result := equalKeys(key1, pointer(key2), length(key2));
 end;
 
 class function TXQCaseInsensitiveTypeInfo.equalKeys(const key1, key2: string): boolean;
@@ -451,14 +452,19 @@ begin
   result := findCellWithHash(key, TInfo.hash(key));
 end;
 
-function TXQBaseHashmap.findCellWithHash(const Key: TKey; hashcode: uint32): UInt32;
+function calcCellCandidate(logsize: int32; hashcode: TXQHashCode; out mask, step: uint32): uint32; inline;
+begin
+  result:=HashCode shr (32-LogSize);
+  Mask:=(2 shl LogSize)-1;
+  Step:=((HashCode shl 1)+1) and Mask;
+end;
+
+function TXQBaseHashmap.findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32;
 var Mask,Step:uint32;
     Entity:int32;
 begin
  if LogSize<>0 then begin
-  result:=HashCode shr (32-LogSize);
-  Mask:=(2 shl LogSize)-1;
-  Step:=((HashCode shl 1)+1) and Mask;
+   result := calcCellCandidate(LogSize, hashcode, mask, step);
  end else begin
   result:=0;
   exit
@@ -811,9 +817,7 @@ var Mask,Step:uint32;
     Entity:int32;
 begin
  if LogSize<>0 then begin
-  result:=HashCode shr (32-LogSize);
-  Mask:=(2 shl LogSize)-1;
-  Step:=((HashCode shl 1)+1) and Mask;
+   result := calcCellCandidate(LogSize, hashcode, mask, step);
  end else begin
   result:=0;
   exit
