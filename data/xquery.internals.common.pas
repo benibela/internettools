@@ -29,18 +29,22 @@ uses
   classes, SysUtils, bbutils;
 
 type
+  TXQHashCode = uint32;
   TXQBaseTypeInfo = object
-    class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
 //    class procedure markKeyAsDeleted(var key: string); static;
 //    class function isKeyDeleted(const p: ppointer): boolean; static; inline;
   end;
   TXQDefaultTypeInfo = object(TXQBaseTypeInfo)
-    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+    class function hash(data: pchar; datalen: SizeUInt): TXQHashCode; static;
+    class function hash(const data: string): TXQHashCode; static;
     class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
+    class function equalKeys(const key1, key2: string): boolean; static; inline;
   end;
   TXQCaseInsensitiveTypeInfo = object(TXQBaseTypeInfo)
-    class function hash(data: pchar; datalen: SizeUInt): uint32; static;
+    class function hash(data: pchar; datalen: SizeUInt): TXQHashCode; static;
+    class function hash(const data: string): TXQHashCode; static;
     class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static; inline;
+    class function equalKeys(const key1, key2: string): boolean; static; inline;
   end;
   TXQVoid = record end;
   //Hashmap based on Bero's FLRECacheHashMap
@@ -63,29 +67,23 @@ type
 
   private
     //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
-    function findCell(keydata: pchar; keylen: SizeUInt): UInt32; inline;
     function findCell(const Key: TKey): UInt32; inline;
-    function findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: UInt32): UInt32;
+    function findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32; inline;
     procedure grow;
   protected
   {$if FPC_FULLVERSION <= 30004} public{$endif}
-    //RealSize: int32;
     LogSize: int32;
     Size: int32;
-    //FCount: int32;
     Entities:array of THashMapEntity;
     CellToEntityIndex: array of int32;
     function getBaseValueOrDefault(const Key:TKey):TBaseValue;
     procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
-    class function hash(const key: TKey): uint32; static;
     function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
   public
     constructor init;
     destructor done;
     procedure Clear;
     function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
-    function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
-    function findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
     function exclude(const Key:TKey):boolean;
     function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
@@ -108,6 +106,13 @@ type
   PXQHashsetStrCaseInsensitiveASCII = ^TXQHashsetStrCaseInsensitiveASCII;
 
   generic TXQBaseHashmapStrPointer<TInfo> = object(specialize TXQBaseHashmap<string, pointer, TInfo>)
+  private
+    class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
+  public
+    function findCell(keydata: pchar; keylen: SizeUInt): UInt32; inline;
+    function findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: TXQHashCode): UInt32;
+    function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity; overload;
+    function findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: TXQHashCode): PHashMapEntity; overload;
   end;
   generic TXQBaseHashmapStrPointerButNotPointer<TValue, TInfo> = object(specialize TXQBaseHashmapStrPointer<TInfo>)
     type
@@ -330,6 +335,7 @@ const
 implementation
 uses math;
 
+
 {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
 var globalStringDeletionKey: string = #0'DELETED';
     globalStringDeletionKeyP: pointer;
@@ -392,11 +398,6 @@ begin
 end;
 
 
-class procedure TXQBaseTypeInfo.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
-begin
-  data := pointer(key);
-  datalen := length(key);
-end;
 
 
 
@@ -410,6 +411,16 @@ end;
 class function TXQCaseInsensitiveTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
   result := (SizeUInt(length(key))  = datalen) and strliEqual(data, pointer(key), datalen);
+end;
+
+class function TXQDefaultTypeInfo.equalKeys(const key1, key2: string): boolean;
+begin
+ result := equalKeys(key1, pointer(key2), length(key2));
+end;
+
+class function TXQCaseInsensitiveTypeInfo.equalKeys(const key1, key2: string): boolean;
+begin
+ result := equalKeys(key1, pointer(key2), length(key2));
 end;
 
 constructor TXQBaseHashmap.init;
@@ -434,25 +445,13 @@ begin
  SetLength(CellToEntityIndex,0);
 end;
 
-class function TXQBaseHashmap.hash(const key: TKey): uint32;
+
+function TXQBaseHashmap.findCell(const key: TKey): UInt32;
 begin
-  result := TInfo.hash(pointer(key), length(key));
+  result := findCellWithHash(key, TInfo.hash(key));
 end;
 
-function TXQBaseHashmap.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
-begin
- result := findCellWithHash(keydata, keylen, TInfo.hash(keydata, keylen));
-end;
-
-function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
-var data: pchar;
-    datalen: SizeUInt;
-begin
-  TInfo.keyToData(key, data, datalen);
-  result := findCell(data, datalen);
-end;
-
-function TXQBaseHashmap.findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: UInt32): UInt32;
+function TXQBaseHashmap.findCellWithHash(const Key: TKey; hashcode: uint32): UInt32;
 var Mask,Step:uint32;
     Entity:int32;
 begin
@@ -466,7 +465,7 @@ begin
  end;
  repeat
   Entity:=CellToEntityIndex[result];
-  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, key))) then begin
    exit;
   end;
   result:=(result+Step) and Mask;
@@ -476,7 +475,6 @@ end;
 procedure TXQBaseHashmap.grow;
 var NewLogSize,NewSize,OldSize,Counter, Entity:int32;
   Cell: UInt32;
-  tempPtrSized: pointer;
 begin
  OldSize := Size;
  NewSize := Size;
@@ -566,32 +564,6 @@ begin
    result:=include(Key,default(TBaseValue))
   else
    result:=nil;
-end;
-
-function TXQBaseHashmap.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
-var Entity:int32;
-    Cell:uint32;
-begin
- result:=nil;
- Cell:=FindCell(data, keylen);
- if CellToEntityIndex <> nil then begin
-   Entity:=CellToEntityIndex[Cell];
-   if Entity>=0 then
-    result:=@Entities[Entity];
- end;
-end;
-
-function TXQBaseHashmap.findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
-var Entity:int32;
-    Cell:uint32;
-begin
- result:=nil;
- Cell:=findCellWithHash(data, keylen, ahash);
- if CellToEntityIndex <> nil then begin
-   Entity:=CellToEntityIndex[Cell];
-   if Entity>=0 then
-    result:=@Entities[Entity];
- end;
 end;
 
 function TXQBaseHashmap.exclude(const Key:TKey):boolean;
@@ -819,6 +791,58 @@ end;
 function TXQHashset.getEnumerator: TKeyOnlyEnumerator;
 begin
   result.init(@self);
+end;
+
+
+
+class procedure TXQBaseHashmapStrPointer.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
+begin
+  data := pointer(key);
+  datalen := length(key)
+end;
+
+function TXQBaseHashmapStrPointer.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
+begin
+ result := findCellWithHash(keydata, keylen, TInfo.hash(keydata, keylen));
+end;
+
+function TXQBaseHashmapStrPointer.findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: TXQHashCode): UInt32;
+var Mask,Step:uint32;
+    Entity:int32;
+begin
+ if LogSize<>0 then begin
+  result:=HashCode shr (32-LogSize);
+  Mask:=(2 shl LogSize)-1;
+  Step:=((HashCode shl 1)+1) and Mask;
+ end else begin
+  result:=0;
+  exit
+ end;
+ repeat
+  Entity:=CellToEntityIndex[result];
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
+   exit;
+  end;
+  result:=(result+Step) and Mask;
+ until false;
+end;
+
+function TXQBaseHashmapStrPointer.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+begin
+  result := findEntityWithHash(data, keylen, tinfo.hash(data, keylen));
+end;
+
+function TXQBaseHashmapStrPointer.findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
+var Entity:int32;
+    Cell:uint32;
+begin
+ Cell:=findCellWithHash(data, keylen, ahash);
+ if CellToEntityIndex <> nil then begin
+   Entity:=CellToEntityIndex[Cell];
+   if Entity>=0 then
+    exit(@Entities[Entity]);
+ end;
+ result:=nil;
 end;
 
 
@@ -1333,6 +1357,11 @@ begin
   result := result + (result shl 15);
 end;
 
+class function TXQDefaultTypeInfo.hash(const data: string): uint32;
+begin
+  result := hash(pointer(data), length(data));
+end;
+
 
 function nodeNameHash(const s: RawByteString): cardinal;
 begin
@@ -1374,6 +1403,11 @@ begin
   result := result xor (result shr 11);
   result := result + (result shl 15);
   //remember to update HTMLNodeNameHashs when changing anything here;
+end;
+
+class function TXQCaseInsensitiveTypeInfo.hash(const data: string): uint32;
+begin
+    result := hash(pointer(data), length(data));
 end;
 
 {$POP}
