@@ -47,7 +47,10 @@ type
     class function equalKeys(const key1, key2: string): boolean; static;
   end;
   TXQVoid = record end;
-  //Hashmap based on Bero's FLRECacheHashMap
+  {** Hashmap based on Bero's FLRECacheHashMap
+
+      TXQHashmapStrOwning, e.g. TXQHashmapStrStr
+  }
   generic TXQBaseHashmap<TKey, TBaseValue, TInfo> = object
     type THashMapEntity=record
       Key: TKey;
@@ -91,6 +94,8 @@ type
     property Count: int32 read Size;
   end;
 
+
+
   generic TXQHashset<TKey, TInfo> = object(specialize TXQBaseHashmap<TKey,TXQVoid,TInfo>)
     type TKeyOnlyEnumerator = object(TEntityEnumerator)
       function currentKey: TKey;
@@ -105,7 +110,51 @@ type
   TXQHashsetStrCaseInsensitiveASCII = specialize TXQHashset<string,TXQCaseInsensitiveTypeInfo>;
   PXQHashsetStrCaseInsensitiveASCII = ^TXQHashsetStrCaseInsensitiveASCII;
 
-  generic TXQBaseHashmapStrPointer<TInfo> = object(specialize TXQBaseHashmap<string, pointer, TInfo>)
+
+  generic TXQBaseHashmapValuePointerLikeReadOnly<TKey, TValue, TKeyInfo> = object(specialize TXQBaseHashmap<TKey, pointer, TKeyInfo>)
+    type
+      TKeyValuePairOption = record
+        entity: PHashMapEntity;
+        function key: TKey; inline;
+        function value: TValue; inline;
+        function isAssigned: boolean; inline;
+      end;
+      //todo: rename tkeypair -> tkeyvaluepairs
+      //PXQBaseHashmapStrPointerButNotPointer = ^TXQBaseHashmapStrPointerButNotPointer;
+      PKeyPairEnumerator = ^TKeyPairEnumerator;
+      PKeyValuePair = PKeyPairEnumerator;
+      TKeyPairEnumerator = object(TEntityEnumerator)
+        function currentPair: PKeyValuePair; inline; //todo: probably better if this returns a TKeyValuePairOption
+        function key: TKey;
+        function value: TValue;
+        property current: PKeyValuePair read currentPair;
+      end;
+  protected
+    function get(const Key: TKey; const def: TValue): TValue; inline;
+    function getOrDefault(const Key: TKey): TValue; inline;
+    function GetValue(const Key: TKey): TValue; inline;
+    function findKeyValuePair(const Key: TKey): TKeyValuePairOption;
+  public
+    function getEnumerator: TKeyPairEnumerator;
+  end;
+
+  generic TXQBaseHashmapValuePointerLikeOwning<TKey, TValue, TKeyInfo, TValueOwnershipTracker> = object(specialize TXQBaseHashmapValuePointerLikeReadOnly<TKey, TValue, TKeyInfo>)
+  type PXQBaseHashmapValuePointerLikeOwning = ^TXQBaseHashmapValuePointerLikeOwning;
+  protected
+    procedure SetValue(const Key: TKey; const AValue: TValue); inline;
+  public
+    procedure clear;
+    destructor done;
+    class procedure disposeAndNil(var map: PXQBaseHashmapValuePointerLikeOwning);
+    procedure assign(const other: TXQBaseHashmapValuePointerLikeOwning);
+    procedure includeAll(const other: TXQBaseHashmapValuePointerLikeOwning);
+    procedure include(const Key: TKey; const aValue: TValue; allowOverride: boolean=true);
+    //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
+    property Values[const Key:TKey]: TValue read GetValue write SetValue; default;
+  end;
+
+
+  generic TXQBaseHashmapStrOwning<TValue, TKeyInfo, TValueOwnershipTracker> = object(specialize TXQBaseHashmapValuePointerLikeOwning<string, TValue, TKeyInfo, TValueOwnershipTracker>)
   private
     class procedure keyToData(const key: string; out data: pchar; out datalen: SizeUInt); static; inline;
   public
@@ -114,62 +163,27 @@ type
     function findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity; overload;
     function findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: TXQHashCode): PHashMapEntity; overload;
   end;
-  generic TXQBaseHashmapStrPointerButNotPointer<TValue, TInfo> = object(specialize TXQBaseHashmapStrPointer<TInfo>)
-    type
-      TKeyValuePairOption = record
-        entity: PHashMapEntity;
-        function key: string; inline;
-        function value: TValue; inline;
-        function isAssigned: boolean; inline;
-      end;
-      //todo: rename tkeypair -> tkeyvaluepairs
-      PXQBaseHashmapStrPointerButNotPointer = ^TXQBaseHashmapStrPointerButNotPointer;
-      PKeyPairEnumerator = ^TKeyPairEnumerator;
-      PKeyValuePair = PKeyPairEnumerator;
-      TKeyPairEnumerator = object(TEntityEnumerator)
-        function currentPair: PKeyValuePair; inline; //todo: probably better if this returns a TKeyValuePairOption
-        function key: string;
-        function value: TValue;
-        property current: PKeyValuePair read currentPair;
-      end;
-  protected
-    function get(const Key: string; const def: TValue): TValue; inline;
-    function getOrDefault(const Key: string): TValue; inline;
-    function GetValue(const Key: string): TValue; inline;
-    function findKeyValuePair(const Key: string): TKeyValuePairOption;
-  public
-    function getEnumerator: TKeyPairEnumerator;
+
+  generic TXQHashmapStrOwning<TValue, TValueOwnershipTracker> = object(specialize TXQBaseHashmapStrOwning<TValue, TXQDefaultTypeInfo, TValueOwnershipTracker>)
   end;
 
-  generic TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue, TXQDefaultTypeInfo>)
-  end;
-  generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>)
+{  generic TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue, TXQDefaultTypeInfo>)
+  end;}
+{  generic TXQHashmapStr<TValue> = object(specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>)
   protected
     procedure SetValue(const Key: string; const AValue: TValue); inline;
   public
     procedure include(const Key: string; const Value: TValue; allowOverride: boolean=true);
     property Values[const Key:string]: TValue read GetValue write SetValue; default;
-  end;
-  generic TXQHashmapStrOwning<TValue, TOwnershipTracker> = object(specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>)
-  type PXQHashmapStrOwning = ^TXQHashmapStrOwning;
-  protected
-    procedure SetValue(const Key: string; const AValue: TValue); inline;
-  public
-    procedure clear;
-    destructor done;
-    class procedure disposeAndNil(var map: PXQHashmapStrOwning);
-    procedure assign(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
-    procedure includeAll(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
-    procedure include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
-    //procedure Add(const Key:TXQHashKeyString; const Value:TValue); //inline;
-    property Values[const Key:string]: TValue read GetValue write SetValue; default;
-  end;
+  end;        }
   TXQDefaultOwnershipTracker = record
     class procedure addRef(o: TObject); static; inline;
     class procedure release(o: TObject); static; inline;
     class procedure addRef(const str: string); static; inline;
     class procedure release(var str: string); static; inline;
   end;
+
+
   generic TXQHashmapStrOwningGenericObject<TValue> = object(specialize TXQHashmapStrOwning<TValue, TXQDefaultOwnershipTracker>)
   end;
   TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
@@ -383,17 +397,17 @@ begin
   result := map^.Entities[entityId].Key;
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.TKeyPairEnumerator.currentPair: PKeyValuePair;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.currentPair: PKeyValuePair;
 begin
   result := @self;
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.TKeyPairEnumerator.key: string;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.key: string;
 begin
   result := map^.Entities[entityId].Key;
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.TKeyPairEnumerator.value: TValue;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.value: TValue;
 begin
  result := TValue(map^.Entities[entityId].Value);
 end;
@@ -411,7 +425,7 @@ end;
 
 class function TXQDefaultTypeInfo.equalKeys(const key1, key2: string): boolean;
 begin
- result := key1 = key2;
+ result := key1 = key2; //todo: this can performs codepage conversions, while the pchar version of equalKeys does not. should the map support codepages?
 end;
 
 class function TXQCaseInsensitiveTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
@@ -801,18 +815,18 @@ end;
 
 
 
-class procedure TXQBaseHashmapStrPointer.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
+class procedure TXQBaseHashmapStrOwning.keyToData(const key: string; out data: pchar; out datalen: SizeUInt);
 begin
   data := pointer(key);
   datalen := length(key)
 end;
 
-function TXQBaseHashmapStrPointer.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
+function TXQBaseHashmapStrOwning.findCell(keydata: pchar; keylen: SizeUInt): UInt32;
 begin
- result := findCellWithHash(keydata, keylen, TInfo.hash(keydata, keylen));
+ result := findCellWithHash(keydata, keylen, TKeyInfo.hash(keydata, keylen));
 end;
 
-function TXQBaseHashmapStrPointer.findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: TXQHashCode): UInt32;
+function TXQBaseHashmapStrOwning.findCellWithHash(keydata: pchar; keylen: SizeUInt; HashCode: TXQHashCode): UInt32;
 var Mask,Step:uint32;
     Entity:int32;
 begin
@@ -824,19 +838,19 @@ begin
  end;
  repeat
   Entity:=CellToEntityIndex[result];
-  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tkeyinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
    exit;
   end;
   result:=(result+Step) and Mask;
  until false;
 end;
 
-function TXQBaseHashmapStrPointer.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
+function TXQBaseHashmapStrOwning.findEntity(data: pchar; keylen: SizeUInt): PHashMapEntity;
 begin
-  result := findEntityWithHash(data, keylen, tinfo.hash(data, keylen));
+  result := findEntityWithHash(data, keylen, tkeyinfo.hash(data, keylen));
 end;
 
-function TXQBaseHashmapStrPointer.findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
+function TXQBaseHashmapStrOwning.findEntityWithHash(data: pchar; keylen: SizeUInt; ahash: UInt32): PHashMapEntity;
 var Entity:int32;
     Cell:uint32;
 begin
@@ -851,22 +865,22 @@ end;
 
 
 
-function TXQBaseHashmapStrPointerButNotPointer.TKeyValuePairOption.key: string;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyValuePairOption.key: TKey;
 begin
   result := entity^.key
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.TKeyValuePairOption.value: TValue;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyValuePairOption.value: TValue;
 begin
  result := TValue(entity^.value)
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.TKeyValuePairOption.isAssigned: boolean;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyValuePairOption.isAssigned: boolean;
 begin
   result := entity <> nil;
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.get(const Key: string; const def: TValue): TValue;
+function TXQBaseHashmapValuePointerLikeReadOnly.get(const Key: TKey; const def: TValue): TValue;
 var
   entity: PHashMapEntity;
 begin
@@ -875,22 +889,22 @@ begin
   else result := tvalue(entity^.Value);
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.getOrDefault(const Key: string): TValue;
+function TXQBaseHashmapValuePointerLikeReadOnly.getOrDefault(const Key: TKey): TValue;
 begin
   result := get(key, default(tvalue));
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.GetValue(const Key: string): TValue;
+function TXQBaseHashmapValuePointerLikeReadOnly.GetValue(const Key: TKey): TValue;
 begin
   result := TValue(getBaseValueOrDefault(key));
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.findKeyValuePair(const Key: string): TKeyValuePairOption;
+function TXQBaseHashmapValuePointerLikeReadOnly.findKeyValuePair(const Key: TKey): TKeyValuePairOption;
 begin
   result.entity := findEntity(key)
 end;
 
-function TXQBaseHashmapStrPointerButNotPointer.getEnumerator: TKeyPairEnumerator;
+function TXQBaseHashmapValuePointerLikeReadOnly.getEnumerator: TKeyPairEnumerator;
 begin
   result.init(@self);
 end;
@@ -901,7 +915,7 @@ end;
 
 //default maps
 
-procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
+{procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
 begin
   SetBaseValue(key, pointer(avalue));
 end;
@@ -910,9 +924,9 @@ procedure TXQHashmapStr.include(const Key: string; const Value: TValue; allowOve
 begin
   inherited include(key, pointer(value), allowOverride);
 end;
+}
 
-
-procedure TXQHashmapStrOwning.include(const Key: string; const aValue: TValue; allowOverride: boolean=true);
+procedure TXQBaseHashmapValuePointerLikeOwning.include(const Key: TKey; const aValue: TValue; allowOverride: boolean=true);
 var
   ent: PHashMapEntity;
 begin
@@ -920,33 +934,33 @@ begin
   if ent^.Value = pointer(AValue) then exit;
   if ent^.Value <> nil then begin
     if not allowOverride then exit;
-    TOwnershipTracker.release(TValue(ent^.Value));
+    TValueOwnershipTracker.release(TValue(ent^.Value));
   end;
-  TOwnershipTracker.addRef(avalue);
+  TValueOwnershipTracker.addRef(avalue);
   ent^.Value:=pointer(avalue);
 end;
 
-procedure TXQHashmapStrOwning.SetValue(const Key: string; const AValue: TValue);
+procedure TXQBaseHashmapValuePointerLikeOwning.SetValue(const Key: TKey; const AValue: TValue);
 begin
   include(key, avalue, true);
 end;
 
-procedure TXQHashmapStrOwning.clear;
+procedure TXQBaseHashmapValuePointerLikeOwning.clear;
 var
   i: SizeInt;
 begin
- for i := 0 to size - 1 do
-   if {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}not TXQDefaultTypeInfo.isKeyDeleted(@Entities[i].Key) and {$endif}( (Entities[i].Key <> '') or (Entities[i].Value <> nil) ) then
-     TOwnershipTracker.Release(TValue(Entities[i].Value));
+ for i := 0 to size - 1 do //todo: skip this for non-owning map
+   if {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}not TXQDefaultTypeInfo.isKeyDeleted(@Entities[i].Key) and {$endif}((Entities[i].Value <> nil) ) then
+     TValueOwnershipTracker.Release(TValue(Entities[i].Value));
   inherited;
 end;
 
-destructor TXQHashmapStrOwning.done;
+destructor TXQBaseHashmapValuePointerLikeOwning.done;
 begin
   clear;
 end;
 
-class procedure TXQHashmapStrOwning.disposeAndNil(var map: PXQHashmapStrOwning);
+class procedure TXQBaseHashmapValuePointerLikeOwning.disposeAndNil(var map: PXQBaseHashmapValuePointerLikeOwning);
 begin
    if map <> nil then begin
      dispose(map,done);
@@ -954,7 +968,7 @@ begin
    end;
 end;
 
-procedure TXQHashmapStrOwning.assign(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
+procedure TXQBaseHashmapValuePointerLikeOwning.assign(const other: TXQBaseHashmapValuePointerLikeOwning);
 var
   i: int32;
 begin
@@ -965,11 +979,11 @@ begin
   CellToEntityIndex:=other.CellToEntityIndex;
   SetLength(entities, length(Entities));
   SetLength(CellToEntityIndex, length(CellToEntityIndex));
-  for i := 0 to size - 1 do
-    if Entities[i].Value <> nil then TOwnershipTracker.addRef(TValue(Entities[i].Value));
+  for i := 0 to size - 1 do //todo: skip this for non-owning map
+    if Entities[i].Value <> nil then TValueOwnershipTracker.addRef(TValue(Entities[i].Value));
 end;
 
-procedure TXQHashmapStrOwning.includeAll(const other: specialize TXQBaseHashmapStrCaseSensitivePointerButNotPointer<TValue>);
+procedure TXQBaseHashmapValuePointerLikeOwning.includeAll(const other: TXQBaseHashmapValuePointerLikeOwning);
 var p: PKeyPairEnumerator;
 begin
   if size > 0 then begin
