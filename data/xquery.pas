@@ -335,6 +335,7 @@ type
     function toMicroSecondStamp(subtractTimeZone: Boolean = true): int64; //does not include timezone
     function toMonths: integer; inline;
     function toDayTime: int64;
+    function hasTimeZone: boolean; inline;
     case boolean of
       true: (values: array[1..7] of integer; );
       false: (year, month, day, hour, min, seconds, microsecs, timezone: integer;);
@@ -647,11 +648,14 @@ type
   end;
 
   TXQValueOwnershipTracker = record
-    class procedure addRef(v: TXQValue); static; inline;
-    class procedure release(v: TXQValue); static; inline;
+    class procedure addRef(v: TXQValue); static;
+    class procedure release(v: TXQValue); static;
+    class function hash(const v: IXQValue): uint32; static;
+    class function equalKeys(const v, w: IXQValue): boolean; static; inline;
   end;
 
   TXQHashmapStrOwningXQValue = specialize TXQHashmapStrOwning<TXQValue, TXQValueOwnershipTracker>;
+  TXQHashmapXQValue = specialize TXQBaseHashmapValuePointerLikeOwning<IXQValue, TXQValue, TXQValueOwnershipTracker, TXQValueOwnershipTracker>;
 
   { TXQValueUndefined }
   //**undefined/empty sequence
@@ -1015,7 +1019,7 @@ type
     function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload; override;
   end;
 
-  //** Experimental String Hash map
+  //** String Hash map
   TXQValueStringMap = class (TXQValueMapLike)
     mapdata: TXQHashmapStrOwningXQValue;
 
@@ -3392,6 +3396,14 @@ begin
 end;
 
 
+type TBBDoubleHelper = type helper (TDoubleHelper) for double
+  function isFinite(): boolean;
+end;
+//IsNan or IsInfinite from math
+function TBBDoubleHelper.isFinite(): boolean;
+begin
+  result := Exp <> 2047;
+end;
 
 
 
@@ -3403,6 +3415,54 @@ end;
 class procedure TXQValueOwnershipTracker.release(v: TXQValue);
 begin
   v._Release;
+end;
+
+class function TXQValueOwnershipTracker.hash(const v: IXQValue): uint32;
+begin
+  result := v.hashCode;
+end;
+
+function TXQValueDateTimeData.hasTimeZone: boolean;
+begin
+  result := timezone = high(integer);
+end;
+
+class function TXQValueOwnershipTracker.equalKeys(const v, w: IXQValue): boolean;
+begin
+  if v.hashCode <> w.hashCode then exit(false);
+  if v.kind = w.kind then begin
+    case v.kind of
+      pvkString:
+        if v.instanceOf(baseSchema.base64Binary) or v.instanceOf(baseSchema.hexBinary) then begin
+          {fallthrough}
+        end else if w.instanceOf(baseSchema.base64Binary) or w.instanceOf(baseSchema.hexBinary) then
+          exit(false)
+        else
+          exit(v.toString = w.toString);
+      pvkFloat: exit(v.toFloat = w.toFloat);
+      pvkInt64: exit(v.toInt64 = w.toInt64);
+      pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
+      pvkDateTime:
+        if v.instanceOf(baseSchema.duration) <> w.instanceOf(baseSchema.duration) then exit(false)
+        else if not v.instanceOf(baseSchema.duration) and (v.getInternalDateTimeData.hasTimeZone <> w.getInternalDateTimeData.hasTimeZone) then
+          exit(false);
+      pvkBoolean, pvkQName: {fallthrough};
+      else exit(false);
+    end;
+  end else begin
+    case v.kind of
+      pvkFloat: if not (v.toFloat.isFinite) then exit(false);
+      pvkInt64, pvkBigDecimal: {fallthrough};
+      else exit(false)
+    end;
+    case w.kind of
+      pvkFloat: if not (w.toFloat.isFinite) then exit(false);
+      pvkInt64, pvkBigDecimal: {fallthrough};
+      else exit(false)
+    end;
+    exit(v.toDecimal = w.toDecimal);
+  end;
+  result := TXQStaticContext(nil).equalDeepAtomic(v,w,nil);
 end;
 
 
@@ -4584,6 +4644,7 @@ end;
 
 
 
+
 { TXQFunctionParameter }
 
 function TXQFunctionParameter.toString(def: string): string;
@@ -4809,14 +4870,6 @@ end;
 function isSignedXQFloat(const v: xqfloat): boolean;
 begin
   result := PQWord(@v)^ shr 63 = 1;
-end;
-type TBBDoubleHelper = type helper (TDoubleHelper) for double
-  function isFinite(): boolean;
-end;
-//IsNan or IsInfinite from math
-function TBBDoubleHelper.isFinite(): boolean;
-begin
-  result := Exp <> 2047;
 end;
 
 
