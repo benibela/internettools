@@ -258,7 +258,7 @@ procedure TXQHashsetQName.addHTMLLowercaseQNames(html5: boolean);
     end;
   end;
 
-var v: TXQHashsetQName.PKeyValuePair;
+var v: TXQHashsetQName.TKeyValuePairOption;
 begin
   if html5 then begin
     transformFromTo(getOrDefault(''), XMLNamespaceUrl_XHTML);
@@ -461,7 +461,7 @@ end;
 
 procedure TXQSerializationParams.setFromMap(const context: TXQEvaluationContext; const v: IXQValue);
 var
-  pp, characterp: TXQProperty;
+  pp: TXQProperty;
   staticOptions: boolean = false;
   tempDoc: IXQValue;
   procedure raiseInvalidParameter(typeError: boolean = true);
@@ -509,18 +509,18 @@ var
     begin
       raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
     end;
-
+  var characterp: TXQProperty;
   begin
     if characterMaps = nil then new(characterMaps,init);
     if pp.value.kind <> pvkObject then error;
-    for characterp in pp.value.getPropertyEnumerator do begin
+    for characterp in pp.value.getEnumeratorStringPropertiesUnsafe do begin
       if characterp.Value.kind <> pvkString then error;
       characterMaps.include(characterp.key, characterp.Value.toString);
     end;
   end;
 
 begin
-  for pp in v.getPropertyEnumerator do begin
+  for pp in v.getEnumeratorStringPropertiesUnsafe do begin
     case pp.Value.getSequenceCount of
       0: continue;
       1: ; //fine

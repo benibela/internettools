@@ -1330,7 +1330,7 @@ procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlE
   var
     p: TXQProperty;
   begin
-    for p in v.getPropertyEnumerator do begin
+    for p in v.getEnumeratorStringPropertiesUnsafe do begin
       if p.Value.kind <> pvkObject then
         addPair(p.key, p.Value.toString)
        else begin
@@ -5750,7 +5750,7 @@ begin
     end;
     pvkObject: begin
       if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
-      result := args[0].getProperty(args[1].toString);
+      result := args[0].getProperty(args[1]);
     end;
     pvkArray: begin
       if 1 <> args[1].Size then raise EXQEvaluationException.create('FOAP0001', 'Invalid size');
@@ -6633,36 +6633,85 @@ end;
 
 function xqFunctionMapMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
 var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
+  function mergeStringMaps: IXQValue;
+  var
+    pv: PIXQValue;
+    value: TXQValue;
+    resobj: TXQValueStringMap;
+    pprop: TXQProperty;
+    tempseq: TXQValueSequence;
+  begin
+    resobj := TXQValueStringMap.create();
+    result := resobj;
+    for pv in argv[0].GetEnumeratorPtrUnsafe do begin
+      for pprop in pv^.getEnumeratorStringPropertiesUnsafe do begin
+        if resobj.hasProperty(pprop.key, @value) then begin
+          case duplicates of
+            xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+            xqmdrUseFirst: ;
+            xqmdrUseLast: resobj.setMutable(pprop.key, pprop.Value);
+            xqmdrCombine: begin
+              tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq.add(value);
+              tempseq.add(pprop.Value);
+              resobj.setMutable(pprop.key, tempseq);
+            end;
+          end;
+        end else resobj.setMutable(pprop.key, pprop.Value);
+      end;
+    end;
+  end;
+  function mergeStandardMaps: IXQValue;
+  var
+    pv: PIXQValue;
+    value: TXQValue;
+    resmap: TXQValueStandardMap;
+    tempseq: TXQValueSequence;
+    pprop: TXQStandardProperty;
+  begin
+    resmap := TXQValueStandardMap.create();
+    result := resmap;
+    for pv in argv[0].GetEnumeratorPtrUnsafe do begin
+      for pprop in pv^.getEnumeratorPropertiesUnsafe do begin
+        if resmap.hasProperty(pprop.key, @value) then begin
+          case duplicates of
+            xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
+            xqmdrUseFirst: ;
+            xqmdrUseLast: resmap.setMutable(pprop.key, pprop.Value);
+            xqmdrCombine: begin
+              tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq.add(value);
+              tempseq.add(pprop.Value);
+              resmap.setMutable(pprop.key, tempseq);
+            end;
+          end;
+        end else resmap.setMutable(pprop.key, pprop.Value);
+      end;
+    end;
+  end;
+
+var
   value: TXQValue;
+  stringOnly: Boolean;
   pv: PIXQValue;
-  resobj: TXQValueStringMap;
-  pprop: TXQProperty;
-  tempseq: TXQValueSequence;
 begin
   if argc >= 2 then begin
     if argv[1].hasProperty('duplicates', @value) then
       duplicates.setFromString(value.toString);
   end;
   if argv[0].getSequenceCount = 1 then exit(argv[0]);
-  resobj := TXQValueStringMap.create();
-  result := resobj;
-  for pv in argv[0].GetEnumeratorPtrUnsafe do begin
-    for pprop in pv^.getPropertyEnumerator do begin
-      if resobj.hasProperty(pprop.key, @value) then begin
-        case duplicates of
-          xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
-          xqmdrUseFirst: ;
-          xqmdrUseLast: resobj.setMutable(pprop.key, pprop.Value);
-          xqmdrCombine: begin
-            tempseq := TXQValueSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
-            tempseq.add(value);
-            tempseq.add(pprop.Value);
-            resobj.setMutable(pprop.key, tempseq);
-          end;
-        end;
-      end else resobj.setMutable(pprop.key, pprop.Value);
+
+  stringOnly := true;
+  for pv in argv[0].GetEnumeratorPtrUnsafe do
+    if pv.getPropertyKeyKind <> xqmpkkStringKeys then begin
+      stringOnly := false;
+      break;
     end;
-  end;
+
+  if stringOnly then
+    result := mergeStringMaps
+   else
+    result := mergeStandardMaps;
 end;
 
 
@@ -6678,18 +6727,21 @@ end;
 
 function xqFunctionMapContains({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue(argv[0].hasProperty(argv[1].toString, nil));
+  result := xqvalue(argv[0].hasProperty(argv[1], nil));
 end;
 
 function xqFunctionMapGet({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 begin
-  result := xqvalue(argv[0].getProperty(argv[1].toString));
+  result := xqvalue(argv[0].getProperty(argv[1]));
 end;
 
-procedure mapFind(outseq: TXQVList; const key: string; const v: IXQValue);
+procedure mapFind(outseq: TXQVList; const key: IXQValue; const v: IXQValue);
 var
   pv, pw: PIXQValue;
-  pp: TXQProperty;
+  mp: TXQStandardProperty;
+  smp: TXQProperty;
+  skey: String;
+  isStringKey: Boolean;
 begin
   for pv in v.GetEnumeratorPtrUnsafe do begin
     case pv^.kind of
@@ -6697,9 +6749,22 @@ begin
         for pw in (pv^ as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe do
           mapFind(outseq, key, pw^);
       pvkObject:
-        for pp in pv^.getPropertyEnumerator do begin
-          if pp.key = key then outseq.addInArray(pp.Value)
-          else mapFind(outseq, key, pp.Value);
+        case pv^.getPropertyKeyKind of
+          xqmpkkStandardKeys: begin
+            for mp in pv^.getEnumeratorPropertiesUnsafe do begin
+              if TXQValueOwnershipTracker.equalKeys(mp.key, key) then outseq.addInArray(mp.Value)
+              else mapFind(outseq, key, mp.Value);
+            end;
+          end;
+          xqmpkkStringKeys: begin
+            isStringKey := TXQValueOwnershipTracker.isStringKeyLike(key.toValue);
+            if isStringKey then
+              skey := key.toString;
+            for smp in pv^.getEnumeratorStringPropertiesUnsafe do begin
+              if isStringKey and ( smp.key = skey) then outseq.addInArray(smp.Value)
+              else mapFind(outseq, key, smp.Value);
+            end;
+          end;
         end;
     end;
   end;
@@ -6711,7 +6776,7 @@ var
 begin
   l := TXQVList.create();
   result := TXQValueJSONArray.create(l);
-  mapFind(l, argv[1].toString, argv[0]);
+  mapFind(l, argv[1], argv[0]);
 end;
 
 function xqFunctionMapPut({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
@@ -6722,49 +6787,95 @@ end;
 function xqFunctionMapEntry({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   obj: TXQValueStringMap;
+  map: TXQValueStandardMap;
 begin
-  obj := TXQValueStringMap.create();
-  obj.setMutable(argv[0].toString, argv[1]);
-  result := obj;
+  if argv[0].typeAnnotation = baseSchema.string_ then begin
+    obj := TXQValueStringMap.create();
+    obj.setMutable(argv[0].toString, argv[1]);
+    result := obj;
+  end else begin
+    map := TXQValueStandardMap.create();
+    map.setMutable(argv[0], argv[1]);
+    result := map;
+  end;
 end;
 
 function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
-var
-  obj: TXQValueStringMap;
-  pp: TXQProperty;
-  keys: array of String = nil;
-  i: Integer;
-  pv: PIXQValue;
-  keep: Boolean;
+  function removeFromStringMap: IXQValue;
+  var
+    stringkeys: array of string = nil;
+    obj: TXQValueStringMap;
+    pp: TXQProperty;
+    i: Integer;
+    v: TXQValue;
+    keep: Boolean;
+  begin
+    SetLength(stringkeys, argv[1].getSequenceCount);
+    i := 0;
+    for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
+      if TXQValueOwnershipTracker.isStringKeyLike(v) then
+        stringkeys[i] := v.toString;
+      inc(i);
+    end;
+    if i = 0 then
+      exit(argv[0]);
+    if i < length(stringkeys) then
+      SetLength(stringkeys, i);
+    obj := TXQValueStringMap.create();
+    for pp in argv[0].getEnumeratorStringPropertiesUnsafe do begin
+      keep := true;
+      for i := 0 to high(stringkeys) do
+        if stringkeys[i] = pp.key then keep := false;
+      if keep then
+        obj.setMutable(pp.key, pp.Value);
+    end;
+    result := obj;
+  end;
+  function removeFromStandardMap: IXQValue;
+  var
+    map: TXQValueStandardMap;
+    keys: array of TXQValue = nil;
+    mp: TXQStandardProperty;
+    i: Integer;
+    v: TXQValue;
+    keep: Boolean;
+  begin
+    SetLength(keys, argv[1].getSequenceCount);
+    if length(keys) = 0 then
+      exit(argv[0]);
+    i := 0;
+    for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
+      keys[i] := v;
+      inc(i);
+    end;
+    map := TXQValueStandardMap.create();
+    for mp in argv[0].getEnumeratorPropertiesUnsafe do begin
+      keep := true;
+      for i := 0 to high(keys) do
+        if TXQValueOwnershipTracker.equalKeys(keys[i], mp.key) then keep := false;
+      if keep then
+        map.setMutable(mp.key, mp.Value);
+    end;
+    result := map;
+  end;
 begin
-  obj := TXQValueStringMap.create();
-  SetLength(keys, argv[1].getSequenceCount);
-  i := 0;
-  for pv in argv[1].GetEnumeratorPtrUnsafe do begin
-    keys[i] := pv^.toString;
-    inc(i);
+  case argv[0].getPropertyKeyKind of
+    xqmpkkStringKeys: result := removeFromStringMap;
+    xqmpkkStandardKeys: result := removeFromStandardMap;
   end;
-  for pp in argv[0].getPropertyEnumerator do begin
-    keep := true;
-    for i := 0 to high(keys) do
-      if keys[i] = pp.key then keep := false;
-    if keep then
-      obj.setMutable(pp.key, pp.Value);
-  end;
-  result := obj;
 end;
 
 function xqFunctionMapFor_Each(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var f: TXQBatchFunctionCall;
     l: TXQVList;
-    pp: TXQProperty;
+    pp: TXQStandardProperty;
 begin
   l := TXQVList.create(argv[0].Size);
   result := TXQValueSequence.create(l);
   with f do begin
     init(context, argv[1]);
-    for pp in argv[0].getPropertyEnumerator do begin
-      l.add(call2(xqvalue(pp.key), pp.Value));
+    for pp in argv[0].getEnumeratorPropertiesUnsafe do begin
+      l.add(call2(pp.key, pp.Value));
     end;
     done;
   end;

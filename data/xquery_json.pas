@@ -71,9 +71,9 @@ var resobj: TXQValueStringMap;
     var
       p: TXQProperty;
     begin
-      for p in another.getPropertyEnumerator do begin
-        if resobj.hasProperty(p^.key,nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
-        resobj.setMutable(p^.key, p^.Value);
+      for p in another.getEnumeratorStringPropertiesUnsafe do begin
+        if resobj.hasProperty(p.key,nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
+        resobj.setMutable(p.key, p.Value);
       end;
     end;
 

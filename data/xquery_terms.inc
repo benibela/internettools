@@ -323,8 +323,8 @@ var
   ar: TXQValueJSONArray;
   seq: TXQValueSequence;
   i: Int64;
-  pp: TXQProperty;
   pk: PIXQValue;
+  w: TXQValue;
 begin
   if unary then begin
     source := context.SeqValue;
@@ -356,15 +356,15 @@ begin
       end;
       pvkObject: begin
         case mode of
-          xqtjlmInteger: xqvalueSeqConstruct(result, seq, pv^.getProperty(IntToStr(integerKey)));
+          xqtjlmInteger: xqvalueSeqConstruct(result, seq, pv^.getProperty(xqvalue(integerKey)));
           xqtjlmName: xqvalueSeqConstruct(result, seq, pv^.getProperty(propname));
           xqtjlmParenthesized:
             for pk in keys.GetEnumeratorPtrUnsafe do begin
-              xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^.toString));
+              xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^));
             end;
           xqtjlmWild:
-            for pp in pv^.getPropertyEnumerator do
-              xqvalueSeqConstruct(result, seq, pp.Value);
+            for w in pv^.getEnumeratorPropertyValuesUnsafe do
+              xqvalueSeqConstruct(result, seq, w);
         end;
       end
     else raiseTypeError0004('Need array/map', pv^);
@@ -897,18 +897,18 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   end;
   function checkMap: boolean;
   var
-    pp: TXQProperty;
     notEmpty, propertyTypeNeedsChecking: Boolean;
     v: PIXQValue;
-  begin
+    w: TXQValue;
+begin
     propertyTypeNeedsChecking := length(children) > 0;
     for v in ta.GetEnumeratorPtrUnsafe do begin
       if v.kind <> pvkObject then exit(false);
       if propertyTypeNeedsChecking then begin
         notEmpty := false;
-        for pp in v.getPropertyEnumerator do begin
+        for w in v.getEnumeratorPropertyValuesUnsafe do begin
           notEmpty := true;
-          if not TXQTermSequenceType(children[1]).instanceOf(pp.Value) then
+          if not TXQTermSequenceType(children[1]).instanceOf(w) then
             exit(false);
         end;
         //todo: check keys
@@ -967,8 +967,8 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     sub, pw: PIXQValue;
     fun: TXQValueFunction;
     i: Integer;
-    pp: TXQProperty;
     returnType: TXQTermSequenceType;
+    w: TXQValue;
   begin
     if length(arguments) > 0 then returnType := arguments[high(arguments)];
     result := true;
@@ -994,8 +994,8 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
                 case sub.kind of
                   pvkObject: begin
                     if not returnType.allowNone then exit();
-                    for pp in sub.getPropertyEnumerator do
-                      if not returnType.instanceOf(pp.value) then
+                    for w in sub.getEnumeratorPropertyValuesUnsafe do
+                      if not returnType.instanceOf(w) then
                         exit();
                   end;
                   pvkArray:
@@ -3034,7 +3034,7 @@ begin
         resultSeq.add((v^ as TXQValueJSONArray).seq[index.toInt64-1]);
       end;
       pvkObject: begin
-        resultSeq.add(v^.getProperty(index.ToString));
+        resultSeq.add(v^.getProperty(index));
       end;
       else if not AllowJSONDefaultInternal then //not an error since JSONiq 1.0.1
         raiseEvaluationError('XPTY0004', 'Invalid call, expected function, object or array, got: '+func.toXQuery());

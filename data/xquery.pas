@@ -90,7 +90,9 @@ type
   TXQuery = class;
   IXQuery = interface;
   TXQNativeModule = class;
-  TXQValuePropertyEnumerator = class;
+  TXQValueStandardPropertyEnumerator = class;
+  TXQValueStringPropertyEnumerator = class;
+  TXQValuePropertyValueEnumerator = class;
   TXQTermDefineVariable = class;
   TXQMapStringObject = class;
 
@@ -142,6 +144,7 @@ type
 
   //**Type of xqvalue (see TXQValue)
   TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  TXQMapPropertyKeyKind = (xqmpkkStringKeys, xqmpkkStandardKeys );
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
   TXQDefaultNamespaceKind = (xqdnkUnknown, xqdnkAny, xqdnkElementType,  xqdnkType, xqdnkFunction);
@@ -504,8 +507,13 @@ type
     function getSequenceCount: integer;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function hasProperty(const name: string; value: PXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function hasProperty(const name: IXQValue; value: PXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getProperty(const name: IXQValue): IXQValue; //**< Returns an object property. Returns empty sequence for non objects.
+    function getPropertyKeyKind: TXQMapPropertyKeyKind;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; //**< Returns an iterator over all object property values. Raises an exception for non-objects
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; //**< Returns an iterator over all object properties. Raises an exception for non-objects
     function getInternalDateTimeData: PXQValueDateTimeData;
     function Size: SizeInt;
 
@@ -597,8 +605,13 @@ type
     function getSequenceCount: integer; virtual; //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: integer): IXQValue; virtual; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1)
     function hasProperty(const {%H-}name: string; {%H-}value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function hasProperty(const {%H-}name: ixqvalue; {%H-}value: PXQValue): boolean; virtual; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: IXQValue): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
     function getProperty(const name: string): IXQValue; virtual; //**< Returns an object property. Returns empty sequence for non objects.
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; virtual; //**< Returns an iterator over all object properties. Raises an exception for non-objects
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; virtual;
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; virtual;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; virtual;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; virtual;
     function getInternalDateTimeData: PXQValueDateTimeData; virtual;
     function Size: SizeInt; virtual;
 
@@ -640,7 +653,7 @@ type
     function enumeratePropertyKeys: IXQValue; virtual;
     function enumeratePropertyValues: IXQValue;       virtual;
     procedure prepareInternetRequest(out method, url, post: string; internet: TInternetAccess);
-    function setImmutable(const name, value: IXQValue): TXQValueMapLike; overload;
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike; virtual; overload;
     function setImmutable(const {%H-}name: string; const {%H-}v: IXQValue): TXQValueMapLike; virtual;
     function setImmutable(const name: string; const s: string): TXQValueMapLike;   virtual;
     function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): TXQValue; virtual;
@@ -652,6 +665,7 @@ type
     class procedure release(v: TXQValue); static;
     class function hash(const v: IXQValue): uint32; static;
     class function equalKeys(const v, w: IXQValue): boolean; static; inline;
+    class function isStringKeyLike(const v: TXQValue): boolean; static;
   end;
 
   TXQHashmapStrOwningXQValue = specialize TXQHashmapStrOwning<TXQValue, TXQValueOwnershipTracker>;
@@ -987,53 +1001,68 @@ type
 
   { TXQProperty }
 
-  TXQProperty = TXQHashmapStrOwningXQValue.PKeyValuePair;{
+  TXQProperty = TXQHashmapStrOwningXQValue.TKeyValuePairOption;
+  TXQStandardProperty = TXQHashmapXQValue.TKeyValuePairOption;
+  generic TXQValueGenericPropertyEnumerator<TProp> = class
   private
-    enum: TXQPropertyEnumeratorInternal;
-    function GetName: string;
-    function GetValue: TXQValue;
+    fcurrent: TProp;
   public
-    property Name: string read GetName;
-    property Value: TXQValue read GetValue;
-  end;}
+    function MoveNext: Boolean; virtual; abstract;
+    property Current: TProp read FCurrent;
 
-
-  TXQValuePropertyEnumerator = class//(TXQPropertyEnumeratorInternal)
-  private
-    hashmapEnumerators: array[0..1] of TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
-    function GetCurrent: TXQProperty;
-  public
-    function MoveNext: Boolean;
-    property Current: TXQProperty read GetCurrent;
-
-    function GetEnumerator: TXQValuePropertyEnumerator;
-
-    constructor create(obj: TXQValueMapLike);
-    destructor destroy; override;
+    function GetEnumerator: TXQValueGenericPropertyEnumerator;
   end;
+
+  TXQValueStringPropertyEnumerator = class(specialize TXQValueGenericPropertyEnumerator<TXQProperty>) end;
+  TXQValueStandardPropertyEnumerator = class(specialize TXQValueGenericPropertyEnumerator<TXQStandardProperty>) end;
+  TXQValuePropertyValueEnumerator = class(specialize TXQValueGenericPropertyEnumerator<TXQValue>) end;
 
   TXQValueMapLike = class (TXQValue)
     class function classKind: TXQValueKind; override;
     function toBooleanEffective: boolean; override;
     //function cloneLinked: TXQValueObject; //**< Creates a weak clone (linked to the current object)
     function setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValueMapLike; overload; override;
+
+    class function newinstance : tobject;override;
+    procedure FreeInstance; override;
   end;
 
   //** String Hash map
   TXQValueStringMap = class (TXQValueMapLike)
     mapdata: TXQHashmapStrOwningXQValue;
 
+    type
+      TXQValueStringPropertyEnumeratorForStringMap = class(TXQValueStringPropertyEnumerator)
+        enumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStringMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStringMap = class(TXQValueStandardPropertyEnumerator)
+        enumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+        tempEntity: TXQHashmapXQValue.THashMapEntity;
+        constructor create(map: TXQValueStringMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStringMap = class(TXQValuePropertyValueEnumerator)
+        enumerator: TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStringMap);
+        function MoveNext: Boolean; override;
+      end;
+
+
     constructor create(); reintroduce; virtual;
     destructor Destroy; override;
 
-    class function newinstance : tobject;override;
-    procedure FreeInstance; override;
-
     function Size: SizeInt; override;
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; override;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function hasProperty(const {%H-}name: ixqvalue; {%H-}value: PXQValue): boolean; override; //**< Checks if an object has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br The value is returned as TXQValue not IXQValue. (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: IXQValue): IXQValue; override; //**< Returns an object property. Returns empty sequence for non objects.
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
-    function getPropertyEnumerator: TXQValuePropertyEnumerator; override;
 
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
 
     procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
     procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
@@ -1048,6 +1077,26 @@ type
 
   TXQValueStringMapPendingUpdate = class(TXQValueStringMap)
     prototype: IXQValue; //txqvaluestringmap
+
+    type
+      TXQHashmapRawEnumerators = array[0..1] of TXQHashmapStrOwningXQValue.TKeyPairEnumerator;
+      TXQValueStringPropertyEnumeratorForStringMapPendingUpdate = class(TXQValueStringPropertyEnumerator)
+        enumerators: TXQHashmapRawEnumerators;
+        constructor create(map: TXQValueStringMapPendingUpdate);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStringMapPendingUpdate = class(TXQValueStandardPropertyEnumerator)
+        enumerators: TXQHashmapRawEnumerators;
+        tempEntity: TXQHashmapXQValue.THashMapEntity;
+        constructor create(map: TXQValueStringMapPendingUpdate);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStringMapPendingUpdate = class(TXQValuePropertyValueEnumerator)
+        enumerators: TXQHashmapRawEnumerators;
+        constructor create(map: TXQValueStringMapPendingUpdate);
+        function MoveNext: Boolean; override;
+      end;
+
     constructor create(); reintroduce; virtual;
     constructor create(p: TXQValueStringMap); reintroduce; virtual;
     destructor Destroy; override;
@@ -1055,6 +1104,13 @@ type
     function Size: SizeInt; override;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+  private
+    function getEnumerators: TXQHashmapRawEnumerators; inline;
+    class function moveNextEnumerators(var enums: TXQHashmapRawEnumerators): boolean; inline; static;
+  public
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
 
     procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
     procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
@@ -1066,6 +1122,57 @@ type
 
     function clone: IXQValue; override;
   end;
+
+  TXQValueStandardMap = class (TXQValueMapLike)
+    mapdata: TXQHashmapXQValue;
+
+    type
+      TXQValueStringPropertyEnumeratorForStandardMap = class(TXQValueStringPropertyEnumerator)
+        enumerator: TXQHashmapXQValue.TKeyPairEnumerator;
+        tempEntity: TXQHashmapStrOwningXQValue.THashMapEntity;
+        constructor create(map: TXQValueStandardMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStandardMap = class(TXQValueStandardPropertyEnumerator)
+        enumerator: TXQHashmapXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStandardMap);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStandardMap = class(TXQValuePropertyValueEnumerator)
+        enumerator: TXQHashmapXQValue.TKeyPairEnumerator;
+        constructor create(map: TXQValueStandardMap);
+        function MoveNext: Boolean; override;
+      end;
+
+    constructor create(); reintroduce; virtual;
+    constructor create(const othermapdata: TXQHashmapXQValue); reintroduce; virtual;
+    destructor Destroy; override;
+
+    function Size: SizeInt; override;
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; override;
+    function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function hasProperty(const key: IXQValue; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
+    function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
+    function getProperty(const key: IXQValue): IXQValue; override; //**< Returns the value of a property
+
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
+
+    procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
+    procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
+    procedure setMutable(const key: IXQValue; const v: IXQValue); reintroduce; //**< Changes a property
+
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike; overload; override;
+    function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
+
+    function enumeratePropertyKeys: IXQValue; override;
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+
+    function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
+  end;
+
 
   //** JSON array of other IXQValue
   TXQValueJSONArray = class (TXQValue)
@@ -3399,6 +3506,11 @@ end;
 type TBBDoubleHelper = type helper (TDoubleHelper) for double
   function isFinite(): boolean;
 end;
+
+
+
+
+
 //IsNan or IsInfinite from math
 function TBBDoubleHelper.isFinite(): boolean;
 begin
@@ -3463,6 +3575,11 @@ begin
     exit(v.toDecimal = w.toDecimal);
   end;
   result := TXQStaticContext(nil).equalDeepAtomic(v,w,nil);
+end;
+
+class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): boolean;
+begin
+  result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
 end;
 
 
@@ -5061,11 +5178,27 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
     raise EXQEvaluationException.create('FOTY0015', 'Function item ' + v.toXQuery() + ' passed to deep-equal')
   end;
 
+  function compareStandardMapToStringMap(standardMap: PIXQValue; stringMap: PIXQValue): boolean;
+  var
+    pp2: TXQStandardProperty;
+    k, tempv: TXQValue;
+  begin
+    result := true;
+    for pp2 in standardMap.getEnumeratorPropertiesUnsafe do begin
+      k := pp2.key.toValue;
+      if not TXQValueOwnershipTracker.isStringKeyLike(k) then
+        exit(false);
+      if not stringMap.hasProperty(k.toString, @tempv) then exit(false)
+      else if not xqvalueDeep_equal(context, pp2.Value, tempv, collation) then exit(false);
+    end;
+  end;
+
 var i, j:integer;
     enum1, enum2, enum1array, enum2array: TXQValueEnumeratorPtrUnsafe;
     pa, pb: PIXQValue;
     tempv: TXQValue;
     pp: TXQProperty;
+    pp2: TXQStandardProperty;
 begin
   if a.getSequenceCount <> b.getSequenceCount then
     exit(false);
@@ -5094,9 +5227,26 @@ begin
       pvkObject: begin
         if pa.kind <> pvkObject then exit(false);
         if pa.Size <> pb.Size then exit(false);
-        for pp in pa.getPropertyEnumerator do
-          if not pb.hasProperty(pp.key, @tempv) then exit(false)
-          else if not xqvalueDeep_equal(context, pp.Value, tempv, collation) then exit(false);
+        case pa.getPropertyKeyKind of
+          xqmpkkStringKeys:
+            case pb.getPropertyKeyKind of
+              xqmpkkStringKeys:
+                for pp in pa.getEnumeratorStringPropertiesUnsafe do
+                  if not pb.hasProperty(pp.key, @tempv) then exit(false)
+                  else if not xqvalueDeep_equal(context, pp.Value, tempv, collation) then exit(false);
+              xqmpkkStandardKeys:
+                result := compareStandardMapToStringMap(pb, pa);
+            end;
+          xqmpkkStandardKeys:
+            case pb.getPropertyKeyKind of
+              xqmpkkStringKeys:
+                result := compareStandardMapToStringMap(pa, pb);
+              xqmpkkStandardKeys:
+                for pp2 in pa.getEnumeratorPropertiesUnsafe do
+                  if not pb.hasProperty(pp2.key, @tempv) then exit(false)
+                  else if not xqvalueDeep_equal(context, pp2.Value, tempv, collation) then exit(false);
+            end;
+        end;
       end
       else begin
         if pa.instanceOf(baseSchema.AnyAtomicType) then begin
@@ -8881,7 +9031,6 @@ var
   seq: TXQVList;
   obj: TXQValue;
   temp: TXQValue;
-  tempprop: TXQProperty;
   tempvi: PIXQValue;
   i: Integer;
 begin
@@ -8897,8 +9046,8 @@ begin
         if obj.hasProperty(searchedProperty, @temp) then newList.add(temp);
       end else newList.add(obj.enumeratePropertyValues);
 
-      for tempprop in obj.getPropertyEnumerator do
-        jsoniqDescendants(tempprop.Value, searchedProperty);
+      for temp in obj.getEnumeratorPropertyValuesUnsafe do
+        jsoniqDescendants(temp, searchedProperty);
     end;
     pvkSequence:
       for tempvi in node.GetEnumeratorPtrUnsafe do
