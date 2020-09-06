@@ -2409,12 +2409,16 @@ type
 
   { TXQTermJSONObjectConstructor }
 
-  TXQTermJSONObjectConstructor = class(TXQTermWithChildren)
-    optionals: array of boolean;
-    objectsRestrictedToJSONTypes: boolean;
-    duplicateCheck: (xqjodAllowDuplicates, xqjodStandard, xqjodJSONiq);
+  TXQTermMapConstructor = class(TXQTermWithChildren)
+    procedure duplicateError(const map: IXQValue; errStandardCode: boolean = true);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
+  end;
+  TXQTermJSONiqObjectConstructor = class(TXQTermMapConstructor)
+    optionals: array of boolean;
+    objectsRestrictedToJSONTypes: boolean;
+    allowDuplicates: boolean;
+    function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function clone: TXQTerm; override;
   end;
 
@@ -3506,8 +3510,6 @@ end;
 type TBBDoubleHelper = type helper (TDoubleHelper) for double
   function isFinite(): boolean;
 end;
-
-
 
 
 
@@ -4893,7 +4895,7 @@ var collations: TStringList;
 
 
 class function EXQException.searchClosestFunction(const addr: pointer): string;
-const terms: array[1..39] of TXQTermClass = (TXQTermWithChildren, TXQTermVariable, TXQTermSequenceType, TXQTermDefineFunction, TXQTerm, TXQTermWithChildren, TXQTermConstant, TXQTermSequence, TXQTermJSONArray, TXQTermSequenceType, TXQTermVariable, TXQTermDefineVariable, TXQTermDefineFunction, TXQTermNodeMatcher, TXQTermFilterSequence, TXQTermPatternMatcher, TXQTermNamedFunction, TXQTermDynamicFunctionCall, TXQTermBinaryOp  , TXQTermFlowerSubClause, TXQTermFlowerLet, TXQTermFlowerFor, TXQTermFlowerWindow, TXQTermFlowerLetPattern, TXQTermFlowerForPattern, TXQTermFlowerWhere, TXQTermFlowerOrder, TXQTermFlowerCount, TXQTermFlowerGroup, TXQTermFlower, TXQTermSomeEvery, TXQTermIf, TXQTermTypeSwitch, TXQTermSwitch, TXQTermReadObjectProperty, TXQTermConstructor, TXQTermJSONObjectConstructor, TXQTermTryCatch, TXQTermModule);
+const terms: array[1..40] of TXQTermClass = (TXQTermWithChildren, TXQTermVariable, TXQTermSequenceType, TXQTermDefineFunction, TXQTerm, TXQTermWithChildren, TXQTermConstant, TXQTermSequence, TXQTermJSONArray, TXQTermSequenceType, TXQTermVariable, TXQTermDefineVariable, TXQTermDefineFunction, TXQTermNodeMatcher, TXQTermFilterSequence, TXQTermPatternMatcher, TXQTermNamedFunction, TXQTermDynamicFunctionCall, TXQTermBinaryOp  , TXQTermFlowerSubClause, TXQTermFlowerLet, TXQTermFlowerFor, TXQTermFlowerWindow, TXQTermFlowerLetPattern, TXQTermFlowerForPattern, TXQTermFlowerWhere, TXQTermFlowerOrder, TXQTermFlowerCount, TXQTermFlowerGroup, TXQTermFlower, TXQTermSomeEvery, TXQTermIf, TXQTermTypeSwitch, TXQTermSwitch, TXQTermReadObjectProperty, TXQTermConstructor, TXQTermMapConstructor, TXQTermJSONiqObjectConstructor, TXQTermTryCatch, TXQTermModule);
 var
   i, j: Integer;
   module: TXQNativeModule;

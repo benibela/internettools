@@ -2536,7 +2536,8 @@ var
   token: String;
   jn: TXQNativeModule;
   optional: Boolean;
-  resobj: TXQTermJSONObjectConstructor;
+  resobj: TXQTermMapConstructor;
+  resjsoniqobj: TXQTermJSONiqObjectConstructor;
   resultfunc: TXQTermNamedFunction;
 begin
   //expect('{'); parsed by caller
@@ -2551,11 +2552,13 @@ begin
     expect('}');
     exit;
   end;
-  resobj := TXQTermJSONObjectConstructor.create();
-  resobj.objectsRestrictedToJSONTypes := not standard and (options.JSONObjectMode = xqjomJSONiq);
-  if standard then resobj.duplicateCheck := xqjodStandard
-  else if options.JSONObjectMode = xqjomJSONiq then resobj.duplicateCheck := xqjodJSONiq
-  else resobj.duplicateCheck := xqjodAllowDuplicates;
+  if standard then resobj := TXQTermMapConstructor.create
+  else begin
+    resjsoniqobj := TXQTermJSONiqObjectConstructor.Create;
+    resjsoniqobj.objectsRestrictedToJSONTypes := (options.JSONObjectMode = xqjomJSONiq);
+    resjsoniqobj.allowDuplicates := not resjsoniqobj.objectsRestrictedToJSONTypes;
+    resobj := resjsoniqobj;
+  end;
   result := resobj;
   try
     skipWhitespaceAndComment();
@@ -2570,8 +2573,8 @@ begin
       skipWhitespaceAndComment();
       resobj.push(parse);
       if optional then begin
-        SetLength(resobj.optionals, length(resobj.children) div 2);
-        resobj.optionals[high(resobj.optionals)] := true;
+        SetLength(resjsoniqobj.optionals, length(resjsoniqobj.children) div 2);
+        resjsoniqobj.optionals[high(resjsoniqobj.optionals)] := true;
       end;
       token := nextToken();
     until (token <> ',');
@@ -3094,7 +3097,7 @@ var astroot: TXQTerm;
     if Assigned(replace^) and (
          replace^.InheritsFrom(TXQTermFilterSequence) or replace^.InheritsFrom(TXQTermSequence) or replace^.InheritsFrom(TXQTermVariable)
          or (replace^.InheritsFrom(TXQTermPendingEQNameToken) and (TXQTermPendingEQNameToken(replace^).pending = xqptVariable))
-         or replace^.InheritsFrom(TXQTermNamedFunction) or replace^.InheritsFrom(TXQTermJSONObjectConstructor) or replace^.InheritsFrom(TXQTermDynamicFunctionCall)
+         or replace^.InheritsFrom(TXQTermNamedFunction) or replace^.InheritsFrom(TXQTermMapConstructor) or replace^.InheritsFrom(TXQTermJSONiqObjectConstructor) or replace^.InheritsFrom(TXQTermDynamicFunctionCall)
        ) then begin
          if pos^ in SYMBOLS + WHITE_SPACE then needDynamicCall:=true
          else begin

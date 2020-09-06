@@ -202,6 +202,8 @@ begin
 
   t('let $map := map:merge((1 to 30)!map{string():.}) return ($map2 := $map, $map2("x") := 123, $map2?foo)!count(.)', '1 1');
 
+  t('let $map := map {1: 234, "1": "foo"} return ($map ? 1, ":", $map ? ("1"), ":", $map ? (1.0))', '234 : foo : 234' );
+
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
   xml.Free;

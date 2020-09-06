@@ -4419,27 +4419,51 @@ begin
   result := inherited visitchildren(visitor);
 end;
 
-{ TXQTermJSONObjectConstructor }
 
-function TXQTermJSONObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
-  function transformValue(v: IXQValue): IXQValue;
-  begin
-    if v.getSequenceCount = 0 then
-      exit(TXQValueJSONNull.create());
-    if v.kind = pvkSequence then
-      if v.getSequenceCount > 1 then begin
-        result := TXQValueJSONArray.create(v.getSequenceCount);
-        (result as TXQValueJSONArray).seq.add(v);
-        exit;
-      end else v := v.get(1);
-    if v is TXQValueNode then
-      exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
-    result := v;
+
+
+procedure TXQTermMapConstructor.duplicateError(const map: IXQValue; errStandardCode: boolean);
+begin
+  raise EXQEvaluationException.create(IfThen(not errStandardCode, 'jerr:JNDY0003', 'XQDY0137'), 'Encountered duplicate keys when constructing map object', nil, map, self);
+end;
+
+function TXQTermMapConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
+var
+  obj: TXQValueStandardMap;
+  i: integer;
+  v: IXQValue;
+begin
+  obj := TXQValueStandardMap.create();
+  if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
+  for i := 0 to length(children) div 2 - 1 do begin
+    v := children[i*2+1].evaluate(context);
+    obj.setMutable(children[i*2].evaluate(context), v);
   end;
-  procedure duplicateError;
-  begin
-    raise EXQEvaluationException.create(IfThen(duplicateCheck = xqjodJSONiq, 'jerr:JNDY0003', 'XQDY0137'), 'Encountered duplicate keys when constructing map object', nil, result, self);
-  end;
+  if obj.Size <> length(children) div 2 then
+    duplicateError(result);
+  result := obj;
+end;
+
+function TXQTermMapConstructor.getContextDependencies: TXQContextDependencies;
+begin
+  result := getChildrenContextDependencies;
+end;
+
+function TXQTermJSONiqObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
+function transformValue(v: IXQValue): IXQValue;
+begin
+  if v.getSequenceCount = 0 then
+    exit(TXQValueJSONNull.create());
+  if v.kind = pvkSequence then
+    if v.getSequenceCount > 1 then begin
+      result := TXQValueJSONArray.create(v.getSequenceCount);
+      (result as TXQValueJSONArray).seq.add(v);
+      exit;
+    end else v := v.get(1);
+  if v is TXQValueNode then
+    exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
+  result := v;
+end;
 
 var
   obj: TXQValueStringMap;
@@ -4458,21 +4482,22 @@ begin
     if objectsRestrictedToJSONTypes then v := transformValue(v);
     obj.setMutable(children[i*2].evaluate(context).toString, v);
   end;
-  if (duplicateCheck <> xqjodAllowDuplicates) and (obj.Size + skippedOptionals <> length(children) div 2) then
-    duplicateError();
+  if not (allowDuplicates) and (obj.Size + skippedOptionals <> length(children) div 2) then
+    duplicateError(result, false);
   result := obj;
 end;
 
-function TXQTermJSONObjectConstructor.getContextDependencies: TXQContextDependencies;
-begin
-  result := getChildrenContextDependencies;
-end;
-
-function TXQTermJSONObjectConstructor.clone: TXQTerm;
+function TXQTermJSONiqObjectConstructor.clone: TXQTerm;
 begin
   Result:=inherited clone;
-  TXQTermJSONObjectConstructor(result).objectsRestrictedToJSONTypes := objectsRestrictedToJSONTypes;
+  TXQTermJSONiqObjectConstructor(result).objectsRestrictedToJSONTypes := objectsRestrictedToJSONTypes;
+  TXQTermJSONiqObjectConstructor(result).optionals := optionals;
+  TXQTermJSONiqObjectConstructor(result).allowDuplicates := allowDuplicates;
 end;
+
+
+
+
 
 
 type
