@@ -664,7 +664,7 @@ type
     class procedure addRef(v: TXQValue); static;
     class procedure release(v: TXQValue); static;
     class function hash(const v: IXQValue): uint32; static;
-    class function equalKeys(const v, w: IXQValue): boolean; static; inline;
+    class function equalKeys(const v, w: IXQValue): boolean; static;
     class function isStringKeyLike(const v: TXQValue): boolean; static;
   end;
 
@@ -3521,68 +3521,13 @@ end;
 
 
 
-class procedure TXQValueOwnershipTracker.addRef(v: TXQValue);
-begin
-  v._AddRef;
-end;
-
-class procedure TXQValueOwnershipTracker.release(v: TXQValue);
-begin
-  v._Release;
-end;
-
-class function TXQValueOwnershipTracker.hash(const v: IXQValue): uint32;
-begin
-  result := v.hashCode;
-end;
-
 function TXQValueDateTimeData.hasTimeZone: boolean;
 begin
   result := timezone = high(integer);
 end;
 
-class function TXQValueOwnershipTracker.equalKeys(const v, w: IXQValue): boolean;
-begin
-  if v.hashCode <> w.hashCode then exit(false);
-  if v.kind = w.kind then begin
-    case v.kind of
-      pvkString:
-        if v.instanceOf(baseSchema.base64Binary) or v.instanceOf(baseSchema.hexBinary) then begin
-          {fallthrough}
-        end else if w.instanceOf(baseSchema.base64Binary) or w.instanceOf(baseSchema.hexBinary) then
-          exit(false)
-        else
-          exit(v.toString = w.toString);
-      pvkFloat: exit(v.toFloat = w.toFloat);
-      pvkInt64: exit(v.toInt64 = w.toInt64);
-      pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
-      pvkDateTime:
-        if v.instanceOf(baseSchema.duration) <> w.instanceOf(baseSchema.duration) then exit(false)
-        else if not v.instanceOf(baseSchema.duration) and (v.getInternalDateTimeData.hasTimeZone <> w.getInternalDateTimeData.hasTimeZone) then
-          exit(false);
-      pvkBoolean, pvkQName: {fallthrough};
-      else exit(false);
-    end;
-  end else begin
-    case v.kind of
-      pvkFloat: if not (v.toFloat.isFinite) then exit(false);
-      pvkInt64, pvkBigDecimal: {fallthrough};
-      else exit(false)
-    end;
-    case w.kind of
-      pvkFloat: if not (w.toFloat.isFinite) then exit(false);
-      pvkInt64, pvkBigDecimal: {fallthrough};
-      else exit(false)
-    end;
-    exit(v.toDecimal = w.toDecimal);
-  end;
-  result := TXQStaticContext(nil).equalDeepAtomic(v,w,nil);
-end;
 
-class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): boolean;
-begin
-  result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
-end;
+
 
 
 procedure TXQParsingOptions.SetAllowJSON(AValue: boolean);
@@ -5172,6 +5117,67 @@ function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollatio
 begin
   result := equalDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
+
+
+
+class procedure TXQValueOwnershipTracker.addRef(v: TXQValue);
+begin
+  v._AddRef;
+end;
+
+class procedure TXQValueOwnershipTracker.release(v: TXQValue);
+begin
+  v._Release;
+end;
+
+class function TXQValueOwnershipTracker.hash(const v: IXQValue): uint32;
+begin
+  result := v.hashCode;
+end;
+
+class function TXQValueOwnershipTracker.equalKeys(const v, w: IXQValue): boolean;
+begin
+  if v.hashCode <> w.hashCode then exit(false);
+  if v.kind = w.kind then begin
+    case v.kind of
+      pvkString:
+        if v.instanceOf(baseSchema.base64Binary) or v.instanceOf(baseSchema.hexBinary) then begin
+          {fallthrough}
+        end else if w.instanceOf(baseSchema.base64Binary) or w.instanceOf(baseSchema.hexBinary) then
+          exit(false)
+        else
+          exit(v.toString = w.toString);
+      pvkFloat: exit(v.toFloat = w.toFloat);
+      pvkInt64: exit(v.toInt64 = w.toInt64);
+      pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
+      pvkDateTime:
+        if v.instanceOf(baseSchema.duration) <> w.instanceOf(baseSchema.duration) then exit(false)
+        else if not v.instanceOf(baseSchema.duration) and (v.getInternalDateTimeData.hasTimeZone <> w.getInternalDateTimeData.hasTimeZone) then
+          exit(false);
+      pvkBoolean, pvkQName: {fallthrough};
+      else exit(false);
+    end;
+  end else begin
+    case v.kind of
+      pvkFloat: if not (v.toFloat.isFinite) then exit(false);
+      pvkInt64, pvkBigDecimal: {fallthrough};
+      else exit(false)
+    end;
+    case w.kind of
+      pvkFloat: if not (w.toFloat.isFinite) then exit(false);
+      pvkInt64, pvkBigDecimal: {fallthrough};
+      else exit(false)
+    end;
+    exit(v.toDecimal = w.toDecimal);
+  end;
+  result := GlobalInterpretedNativeFunctionStaticContext.equalDeepAtomic(v,w,nil);
+end;
+
+class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): boolean;
+begin
+  result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
+end;
+
 
 
 function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQValue; collation: TXQCollation): boolean;
