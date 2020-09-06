@@ -122,12 +122,11 @@ type
       //todo: rename tkeypair -> tkeyvaluepairs
       //PXQBaseHashmapStrPointerButNotPointer = ^TXQBaseHashmapStrPointerButNotPointer;
       PKeyPairEnumerator = ^TKeyPairEnumerator;
-      PKeyValuePair = PKeyPairEnumerator;
       TKeyPairEnumerator = object(TEntityEnumerator)
-        function currentPair: PKeyValuePair; inline; //todo: probably better if this returns a TKeyValuePairOption
+        function currentPair: TKeyValuePairOption; inline;
         function key: TKey;
         function value: TValue;
-        property current: PKeyValuePair read currentPair;
+        property current: TKeyValuePairOption read currentPair;
       end;
   protected
     function get(const Key: TKey; const def: TValue): TValue; inline;
@@ -397,9 +396,9 @@ begin
   result := map^.Entities[entityId].Key;
 end;
 
-function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.currentPair: PKeyValuePair;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.currentPair: TKeyValuePairOption;
 begin
-  result := @self;
+  result.entity := @map^.Entities[entityId];
 end;
 
 function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.key: string;
@@ -984,11 +983,11 @@ begin
 end;
 
 procedure TXQBaseHashmapValuePointerLikeOwning.includeAll(const other: TXQBaseHashmapValuePointerLikeOwning);
-var p: PKeyPairEnumerator;
+var p: TKeyValuePairOption;
 begin
   if size > 0 then begin
     for p in other do
-      include(p^.key, p^.value);
+      include(p.key, p.value);
   end else assign(other);
 end;
 
