@@ -635,7 +635,7 @@ end;
 procedure TXQValue.adaptiveSerialize(var serializer: TXQSerializer);
   procedure objectAdaptiveSerialize(var serializer: TXQSerializer);
   var
-    prop: TXQProperty;
+    prop: TXQStandardProperty;
     first: Boolean;
   begin
     first := true;
@@ -647,7 +647,7 @@ procedure TXQValue.adaptiveSerialize(var serializer: TXQSerializer);
           first := false;
           appendJSONObjectStart;
         end;
-        appendXQueryString(prop.key);
+        prop.key.adaptiveSerialize(serializer);
         append(':');
         prop.Value.adaptiveSerialize(serializer);
       end;
@@ -2813,11 +2813,13 @@ end;
 
 constructor TXQValueStandardMap.create();
 begin
+  inherited create(baseJSONiqSchema.object_);
   mapdata.init();
 end;
 
 constructor TXQValueStandardMap.create(const othermapdata: TXQHashmapXQValue);
 begin
+  inherited create(baseJSONiqSchema.object_);
   mapdata.init;
   mapdata.assign(othermapdata);
 end;
