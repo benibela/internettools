@@ -6905,7 +6905,10 @@ begin
   result := parser.parse(data);
 end;
 
-
+function xqFunctionJSONXMLPlaceholder(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  result := xqvalue();
+end;
 
 
 var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
@@ -7242,6 +7245,10 @@ transform
 
   fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
   fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
+
+  fn3_1.registerFunction('json-to-xml', @xqFunctionJSONXMLPlaceholder, [xqcdContextOther]).setVersionsShared([stringOrEmpty, nodeOrEmpty],  [stringOrEmpty, map, nodeOrEmpty]);
+  fn3_1.registerFunction('xml-to-json', @xqFunctionJSONXMLPlaceholder, [xqcdContextOther]).setVersionsShared([nodeOrEmpty, stringOrEmpty],  [nodeOrEmpty, map, stringOrEmpty]);
+
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   TXQueryEngine.registerNativeModule(fnarray);
