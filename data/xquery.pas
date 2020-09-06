@@ -5147,7 +5147,10 @@ begin
           exit(false)
         else
           exit(v.toString = w.toString);
-      pvkFloat: exit(v.toFloat = w.toFloat);
+      pvkFloat:
+        exit(   (v.toFloat = w.toFloat)
+            or  (IsNan(v.toFloat) and isnan(w.toFloat))
+        );
       pvkInt64: exit(v.toInt64 = w.toInt64);
       pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
       pvkDateTime:
