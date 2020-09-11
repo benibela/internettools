@@ -39,7 +39,7 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.namespaces, bigdecimalmath, math,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.namespaces, bigdecimalmath, math,
   simplehtmltreeparser, simplehtmlparser,
   bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng, xquery__serialization,
 
@@ -437,11 +437,11 @@ begin
   if isnan(f) or (f = 0) then begin
     if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
       raiseDivisionBy0NotAllowed;
-    if IsNan(f) then exit(xqvalueF(getNaN, a, b));
+    if IsNan(f) then exit(xqvalueF(xqfloat.NaN, a, b));
     e := a.toFloat;
-    if isnan(e) or (e=0) then result := xqvalueF(getNaN, a, b)
-    else if isSignedXQFloat(e) = isSignedXQFloat(f) then result := xqvalueF(getPosInf, a, b)
-    else result := xqvalueF(getNegInf, a, b);
+    if isnan(e) or (e=0) then result := xqvalueF(xqfloat.NaN, a, b)
+    else if e.Sign = f.sign then result := xqvalueF(xqfloat.PositiveInfinity, a, b)
+    else result := xqvalueF(xqfloat.NegativeInfinity, a, b);
     exit();
   end;
   e := a.toFloat;
@@ -527,7 +527,7 @@ begin
   else begin
     tempf := a.toFloat;
     if isNan(tempf) then exit(a);
-    if IsInfinite(tempf) then exit(XQValueF(getNaN, a, b));
+    if IsInfinite(tempf) then exit(XQValueF(xqfloat.NaN, a, b));
     ad := a.toDecimal;
   end;
 
@@ -541,13 +541,13 @@ begin
   end;
 
 
-  if isZero(bd) then  exit(XQValueF(getNaN, a, b));
+  if isZero(bd) then  exit(XQValueF(xqfloat.NaN, a, b));
   if isZero(ad) then exit(a);
 
   t := TXSType.commonDecimalType(a, b);
   rd := ad mod bd;
   if (ak = pvkFloat) and isZero(rd) and ((t = baseSchema.double) or (t = baseSchema.float)) then
-    if isSignedXQFloat(a.toFloat) then exit(t.createValue(-0.0));
+    if a.toFloat.sign then exit(t.createValue(-0.0));
   result := t.createValue(rd);
 end;
 
@@ -834,7 +834,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; argc: SizeInt; ar
   begin
     if v.instanceOf(baseSchema.Double) then exit(v);
     if baseSchema.double.tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
-    else exit(baseSchema.double.createValue(getNaN));
+    else exit(baseSchema.double.createValue(xqfloat.NaN));
   end;
 begin
   if argc = 0 then begin
@@ -881,7 +881,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
     else begin
       v := args[0].toFloat;
-      if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
+      if not v.isFinite(v) then exit(baseType.createValue(v));
       if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
       else result := baseType.createValue(v - frac(v));
     end
@@ -901,7 +901,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmFloor));
     else begin
       v := args[0].toFloat;
-      if IsNan(v) or IsInfinite(v) then exit(baseType.createValue(v));
+      if not v.isFinite() then exit(baseType.createValue(v));
       if frac(v) < 0 then result := baseType.createValue(v - frac(v) - 1)
       else result := baseType.createValue(v - frac(v));
     end
@@ -997,7 +997,7 @@ begin
       f := args[0].toFloat;
       if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
       else if prec > 4933 then result := baseType.createValue(0)
-      else result := baseType.createValue(xqfloatRounded(f, prec));
+      else result := baseType.createValue(f.round(prec));
     end;
     else begin raiseXPTY0004TypeError(args[0], 'numeric?'); result := nil; end;
   end;
@@ -1064,7 +1064,7 @@ begin
      end;
     else begin
       f := args[0].toFloat;
-      if IsNan(f) or IsInfinite(f) then exit(baseType.createValue(f));
+      if not f.isFinite then exit(baseType.createValue(f));
 
       if argc = 1 then exit(baseType.createValue(floatRoundHalfToEven(f)));
 
@@ -3528,8 +3528,8 @@ begin
       tempf:=0;
       for pv in enumerable do begin
         tempf2 := pv^.toFloat;;
-        if (isnan(tempf2)) or (isPosInf(tempf2) and isNegInf(tempf)) or (isNegInf(tempf2) and isPosInf(tempf))  then
-          exit(getPromotedDecimalType(seq).createValue(getNaN));
+        if (tempf2.IsNan()) or (tempf2.IsPositiveInfinity and tempf.IsNegativeInfinity()) or (tempf2.IsNegativeInfinity() and tempf.IsPositiveInfinity)  then
+          exit(getPromotedDecimalType(seq).createValue(xqfloat.NaN));
         tempf += tempf2;
       end;
       result := getPromotedDecimalType(seq).createValue(tempf / seq.getSequenceCount);
@@ -5638,7 +5638,7 @@ begin
     pvkFloat: begin
       numberf := args[0].toFloat;
       if IsNan(numberf) then exit(xqvalue(data^.nan));
-      if not isSignedXQFloat(numberf) then currentPictureParser := 0
+      if not numberf.sign then currentPictureParser := 0
       else if currentPictureParser = 0 then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
       with pictureParser[currentPictureParser] do
         if foundChar[xqdfpPercent] then begin

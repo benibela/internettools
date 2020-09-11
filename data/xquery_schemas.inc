@@ -467,9 +467,9 @@ var
       if pure then exit();
       if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
       case v of
-        'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNaN);
-        'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getPosInf);
-        '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, getNegInf);
+        'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.NaN);
+        'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.PositiveInfinity);
+        '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.NegativeInfinity);
         else exit();
       end;
       result := xsceNoError;
@@ -497,8 +497,8 @@ var
             {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
             outv^ := TXQValueFloat.create(self, tempd);
           except
-            on EOverflow do outv^ := TXQValueFloat.create(self, getPosInf);
-            on EUnderflow do outv^ := TXQValueFloat.create(self, getNegInf);
+            on EOverflow do outv^ := TXQValueFloat.create(self, xqfloat.PositiveInfinity);
+            on EUnderflow do outv^ := TXQValueFloat.create(self, xqfloat.NegativeInfinity);
           end;
         end;
       end
@@ -635,7 +635,7 @@ var
   sispure: Boolean;
 begin
   result := xsceNoError;
-  sispure := not IsNan(v) and not IsInfinite(v);
+  sispure := v.isFinite();
   case subType of
     xsstInteger, xsstDecimal: begin
       if not sispure then exit(xsceFOCA0002);

@@ -129,7 +129,7 @@ end;
 
 function TXQValue.toFloat: xqfloat;
 begin
-  result:=myStrToFloat(toString);
+  result:= xqfloat.parse(toString);
 end;
 
 function TXQValue.toString: string;
@@ -1141,12 +1141,15 @@ function TXQValueFloat.toString: string;
       result := BigDecimalToStr(FloatToBigDecimal(v, bdffShortest), bdfExponent);
   end;
 begin
-  if IsNan(value) then exit('NaN');
-  if IsInfinite(value) then
-    if isPosInf(value) then exit('INF')
-    else exit('-INF');
+  if not value.isFinite() then begin
+    case value.SpecialType of
+      fsInf: exit('INF');
+      fsNInf: exit('-INF');
+      else exit('NaN');
+    end;
+  end;
   if value = 0 then
-    if isSignedXQFloat(value) then exit('-0')
+    if value.Sign then exit('-0')
     else exit('0');
   try
     case (typeAnnotation as TXSNumericType).subType of
@@ -1191,18 +1194,22 @@ end;
 
 procedure TXQValueFloat.jsonSerialize(var serializer: TXQSerializer);
 begin
-  if IsNan(value) or IsInfinite(value) then begin
+  if value.isFinite() then begin
+    if value = 0 then begin
+      if value.Sign then serializer.append('-0')
+      else serializer.append('0');
+    end else if frac(value) = 0 then begin
+      serializer.append(IntToStr(trunc(value)));
+    end else
+      serializer.append(toString);
+  end else begin
     if serializer.standard then serializer.error('SERE0020', self);
-    if IsNan(value) then serializer.append('NaN')
-    else if isPosInf(value) then serializer.appendJSONString('INF')
-    else serializer.appendJSONString('-INF');
-  end else if value = 0 then begin
-    if isSignedXQFloat(value) then serializer.append('-0')
-    else serializer.append('0');
-  end else if frac(value) = 0 then begin
-    serializer.append(IntToStr(trunc(value)));
-  end else
-    serializer.append(toString);
+    case value.SpecialType of
+      fsInf: serializer.appendJSONString('INF');
+      fsNInf: serializer.appendJSONString('-INF');
+      else serializer.append('NaN');
+    end;
+  end;
 end;
 
 procedure TXQValueFloat.adaptiveSerialize(var serializer: TXQSerializer);
@@ -1212,13 +1219,7 @@ var s: shortstring;
 begin
   withType := typeAnnotation <> baseSchema.double;
   if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
-  if IsNan(value) or IsInfinite(value) then begin
-    if withType then serializer.append('"');
-    if IsNan(value) then serializer.append('NaN')
-    else if isPosInf(value) then serializer.append('INF')
-    else serializer.append('-INF');
-    if withType then serializer.append('"');
-  end else begin
+  if value.isFinite() then begin
     system.str(value, s);
     //trim
     cutoff := 0;
@@ -1242,6 +1243,14 @@ begin
     if dot > 0 then while (e - cutoff - 1 > dot + 1) and (s[e - cutoff - 1] = '0') do inc(cutoff);
     if cutoff > 0 then delete(s, e - cutoff, cutoff);
     serializer.append(s);
+  end else begin
+    if withType then serializer.append('"');
+    case value.SpecialType of
+      fsInf: serializer.append('INF');
+      fsNInf: serializer.append('-INF');
+      else serializer.append('NaN');
+    end;
+    if withType then serializer.append('"');
   end;
   if withType then serializer.append(')');
 end;
@@ -1313,7 +1322,7 @@ end;
 
 function TXQValueDecimal.toDateTime: TDateTime;
 begin
- Result:= getNaN;
+ Result:= double.NaN;
 end;
 
 function TXQValueDecimal.hashCode: uint32;
@@ -1427,8 +1436,8 @@ end;
 function TXQValueString.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
-  result := myStrToFloat(str);
-  if IsNan(result) and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
+  result := xqfloat.parse(str);
+  if result.IsNan() and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
 function TXQValueString.hashCode: uint32;
@@ -2276,7 +2285,7 @@ begin
   ignore(scontext);
   if scontext.strictTypeChecking and (nodeTypeAnnotation(node) = baseSchema.string_) then raiseXPTY0004TypeError(self, 'float/double');
   str := toString;
-  result := myStrToFloat(str);
+  result := xqfloat.parse(str);
   if IsNan(result) and (str <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 

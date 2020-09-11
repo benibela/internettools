@@ -3224,7 +3224,7 @@ end;
 //**Checks the length of the args array (internally used)
 procedure requiredArgCount(argc: sizeint; minc: sizeint; maxc: sizeint = -2);
 procedure requiredArgType(const v: IXQValue; typ: TXSType);
-function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
+
 //**Calculates starting position / length from a range definition (checks for things like NaN, INF, ...) (internally used)
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 function xqvalueAtomize(const v: IXQValue): IXQValue;
@@ -3340,12 +3340,6 @@ procedure ignore(const intentionallyUnusedParameter: TXQEvaluationContext); over
 procedure ignore(const intentionallyUnusedParameter: IXQValue); overload;inline;
 procedure ignore(const intentionallyUnusedParameter: TXQVArray); overload;inline;
 const MicroSecsPerSec = int64(1000000);
-function getNaN: xqfloat;
-function getPosInf: xqfloat;
-function getNegInf: xqfloat;
-function isPosInf(const f: xqfloat): boolean;
-function isNegInf(const f: xqfloat): boolean;
-function isSignedXQFloat(const v: xqfloat): boolean;
 function isValidXMLCharacter(const codepoint: integer): boolean; inline;
 procedure raiseFORG0001InvalidConversion(const v: IXQValue; const convTo: string);
 procedure raiseXPTY0004TypeError(const v: IXQValue; const convTo: string);
@@ -3437,33 +3431,9 @@ type TXQGlobalSerializationCallback = function (const context: TXQEvaluationCont
 var globalSerializationCallback: TXQGlobalSerializationCallback;
 
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta;
+uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta, xquery.internals.floathelpers;
 
 var
-  XQFormats : TFormatSettings = (
-    CurrencyFormat: 1;
-    NegCurrFormat: 5;
-    ThousandSeparator: #0;
-    DecimalSeparator: '.';
-    CurrencyDecimals: 2;
-    DateSeparator: '-';
-    TimeSeparator: ':';
-    ListSeparator: ',';
-    CurrencyString: '$';
-    ShortDateFormat: 'y-m-d';
-    LongDateFormat: 'yyyy-mm-dd';
-    TimeAMString: 'AM';
-    TimePMString: 'PM';
-    ShortTimeFormat: 'hh:nn';
-    LongTimeFormat: 'hh:nn:ss';
-    ShortMonthNames: ('Jan','Feb','Mar','Apr','May','Jun',
-                      'Jul','Aug','Sep','Oct','Nov','Dec');
-    LongMonthNames: ('January','February','March','April','May','June',
-                     'July','August','September','October','November','December');
-    ShortDayNames: ('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
-    LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
-    TwoDigitYearCenturyWindow: 50;
-  );
   interpretedFunctionSynchronization: TRTLCriticalSection;
 
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
@@ -3506,26 +3476,6 @@ begin
   PPointer(@b)^ := t;
 end;
 
-
-type TBBDoubleHelper = type helper (TDoubleHelper) for double
-  function isFinite(): boolean;
-  Function Mantissa: QWord;
-end;
-//IsNan or IsInfinite from math
-function TBBDoubleHelper.isFinite(): boolean;
-begin
-  result := Exp <> 2047;
-end;
-
-//return mantissa including hidden bit
-//based on fpc 3.3.1 (it is broken in 3.0.4 and does not include the hidden bit)
-function TBBDoubleHelper.Mantissa: QWord;
-var data: qword absolute self;
-begin
-  Result:=(Data and $fffffffffffff);
-  if (Result=0) and (Exp=0) then Exit;
-  Result := Result or $10000000000000;
-end;
 
 
 
@@ -4919,36 +4869,6 @@ end;
 {$I disableRangeOverflowChecks.inc}
 
 
-function getNaN: xqfloat;
-begin
-  result := NaN;
-end;
-function getPosInf: xqfloat;
-begin
-  result := Infinity;
-end;
-function getNegInf: xqfloat;
-begin
-  result := -Infinity;
-end;
-function isPosInf(const f: xqfloat): boolean;
-begin
-  result := f = Infinity;
-end;
-function isNegInf(const f: xqfloat): boolean;
-begin
-  result := f = -Infinity;
-end;
-function isSignedXQFloat(const v: xqfloat): boolean;
-begin
-  result := PQWord(@v)^ shr 63 = 1;
-end;
-
-
-{function xqtruncdecimal(const f: Decimal): Decimal;
-begin
-  result := f - frac(f);
-end;}
 
 
 
@@ -4976,32 +4896,9 @@ begin
   if XQGlobalTrimNodes then result := strTrim(Result);
 end;
 
-function compareValue(a, b: xqfloat): integer;
-begin
-  if IsNan(a) or IsNan(b) then exit(-2);
-  if isPosInf(a) or isPosInf(b) then
-    if isPosInf(a) and isPosInf(b) then exit(0)
-    else if isPosInf(b) then exit(-1)
-    else exit(1);
-  if isNegInf(a) or isNegInf(b) then
-    if isNegInf(a) and isNegInf(b) then exit(0)
-    else if isNegInf(b) then exit(1)
-    else exit(-1);
-  if a < b then exit(-1);
-  if a > b then exit(1);
-  exit(0);
-end;
 
 
 
-function myStrToFloat(s:string): xqfloat;
-begin
-  s := trim(s);
-  if not TryStrToFloat(s, result, XQFormats) then
-    if striEqual(s, 'INF') or striEqual(s, '+INF') then result:=getPosInf
-    else if striEqual(s, '-INF') then result:=getNegInf
-    else {if strliEqual(string(v.varstr), 'NaN') then }result:=getNaN;
-end;
 
 
 
@@ -5157,7 +5054,7 @@ begin
           exit(v.toString = w.toString);
       pvkFloat:
         exit(   (v.toFloat = w.toFloat)
-            or  (IsNan(v.toFloat) and isnan(w.toFloat))
+            or  (v.toFloat.IsNan() and w.toFloat.IsNan()))
         );
       pvkInt64: exit(v.toInt64 = w.toInt64);
       pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
@@ -5291,44 +5188,28 @@ begin
   result := true;
 end;
 
-function xqfloatRounded(f: xqfloat; prec: integer = 0): xqfloat;
-var
-  ff: xqfloat;
-  p: math.float;
-begin
-  if IsNan(f) or IsInfinite(f) then exit((f));
-  if prec = 0 then begin
-    ff := frac(f);
-    if ff = 0 then exit((f));
-    f := f + 0.5;
-    ff := frac(f);
-    if ff >= 0 then result := (f - ff)
-    else result := (f - ff - 1);
-  end else begin
-    p := power(10, prec);
-    result := xqfloatRounded(f / p) * p;
-  end;
-
-end;
 
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: longint; out from, len: integer);
 var unti: integer;  //excluding last
   temp: BigDecimal;
   temp64: SizeInt64;
+  f: xqfloat;
 begin
   case args[1].kind of
     pvkInt64: from := args[1].toInt64;
     pvkFloat: begin
-      if IsNan(args[1].toFloat) or isPosInf(args[1].toFloat) then begin
-        len := 0;
-        exit;
-      end else if isNegInf(args[1].toFloat) then begin
-        from := 1;
-        if argc <= 2 then len := maxLen
-        else len := 0;
-        exit;
-      end;
-      from := round(xqfloatRounded(args[1].toFloat));
+      f := args[1].toFloat;
+      if f.isFinite() then
+        from := round(f.round())
+       else if f.IsNegativeInfinity() then begin
+         from := 1;
+         if argc <= 2 then len := maxLen
+         else len := 0;
+         exit;
+       end else begin //+inf, nan
+         len := 0;
+         exit;
+       end;
     end;
     {pvkBigDecimal:}else begin
       temp := round(args[1].toDecimal);
@@ -5352,11 +5233,14 @@ begin
         else unti := from + temp64;
       end;
       pvkFloat: begin
-        if IsNan(args[2].toFloat) or isNegInf(args[2].toFloat) then begin //Since -INF + INF returns NaN, no characters are selected.
-           len := 0;
-           exit();
-        end else if isPosInf(args[2].toFloat) then unti := maxLen+1
-        else unti := from + round(xqfloatRounded(args[2].toFloat));
+        f := args[2].toFloat;
+        if f.isFinite() then
+          unti := from + round(f.round)
+        else if f.IsPositiveInfinity then unti := maxLen+1
+        else begin //nan, -inf
+          len := 0;
+          exit;
+        end;
       end;
       else begin
         temp := round(args[2].toDecimal);
@@ -6108,8 +5992,8 @@ var
         case scanner.CurTokenString of
           'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity':
             case tempchar of
-              '+': exit(xqvalue(getPosInf)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
-              '-': exit(xqvalue(getNegInf));
+              '+': exit(xqvalue(xqfloat.PositiveInfinity)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
+              '-': exit(xqvalue(xqfloat.NegativeInfinity));
             end;
         end;
     end;
@@ -6342,8 +6226,8 @@ begin
           if jpoLiberal in options then begin
             if parsingPhase = jppObjectExpectKey then readObjectKey
             else case scanner.CurTokenString of
-              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(getPosInf));
-              'NAN', 'NaN', 'nan': pushValue(xqvalue(getNaN));
+              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(xqfloat.PositiveInfinity));
+              'NAN', 'NaN', 'nan': pushValue(xqvalue(xqfloat.NaN));
               else raiseError();
             end;
           end else raiseError();
@@ -6804,15 +6688,15 @@ var ak, bk: TXQValueKind;
     cmpClass: TXSType;
     ad, bd: xqfloat;
   begin
-    if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
+    if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan())) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan())) then
       exit(-2);
     cmpClass := TXSType.commonDecimalType(a, b);
     ad := a.toFloatChecked(Self);
     bd := b.toFloatChecked(self);
     if cmpClass.derivedFrom(baseSchema.Double) then begin
-      result := compareValue(double(ad), double(bd));
+      result := xqfloat(ad).compare((bd));
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
-      result := compareValue(Single(ad), Single(bd));
+      result := xqfloat(single(ad)).compare(Single(bd));
     end else
       result := -2; //should not happen, but hides warning
   end;

@@ -248,8 +248,8 @@ var
   begin
     {$if defined(cpui386) or defined(CPUX86_64)}ClearExceptions(false);{$endif}
     if ((b > 0) = (IsInfinite(a) or (abs(a) > 1)))  then begin
-      if isSignedXQFloat(a) and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then result := xqv(getNegInf)
-      else result := xqv(getPosInf);
+      if a.sign and (frac(b) = 0) and  (abs(b) < high(int64)) and (odd(trunc(b))) then result := xqv(xqfloat.NegativeInfinity)
+      else result := xqv(xqfloat.PositiveInfinity);
     end else result := xqv(0);
   end;
 
