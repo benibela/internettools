@@ -5024,7 +5024,7 @@ begin
 end;
 
 
-
+{$ImplicitExceptions off}
 class procedure TXQValueOwnershipTracker.addRef(v: TXQValue);
 begin
   v._AddRef;
@@ -5041,10 +5041,26 @@ begin
 end;
 
 class function TXQValueOwnershipTracker.equal(const v, w: IXQValue): boolean;
+  function compareIntToFloat(i: int64; f: xqfloat): boolean;
+  begin
+    result := i = f;
+  end;
+  function compareIntToBCD(i: int64; const bcd: BigDecimal): boolean;
+  begin
+    result := i = bcd;
+  end;
+  function compareFloatToBCD(f: xqfloat; const bcd: BigDecimal): boolean;
+  begin
+    result := FloatToBigDecimal(f, bdffExact) = bcd;
+  end;
+
+var
+  vk, wk: TXQValueKind;
 begin
-  if v.hashCode <> w.hashCode then exit(false);
-  if v.kind = w.kind then begin
-    case v.kind of
+  vk := v.kind;
+  wk := w.kind;
+  if vk = wk then begin
+    case vk of
       pvkString:
         if v.instanceOf(baseSchema.base64Binary) or v.instanceOf(baseSchema.hexBinary) then begin
           {fallthrough}
@@ -5066,17 +5082,36 @@ begin
       else exit(false);
     end;
   end else begin
-    case v.kind of
+    if v.hashCode <> w.hashCode then exit(false);
+    case vk of
       pvkFloat: if not (v.toFloat.isFinite) then exit(false);
       pvkInt64, pvkBigDecimal: {fallthrough};
       else exit(false)
     end;
-    case w.kind of
+    case wk of
       pvkFloat: if not (w.toFloat.isFinite) then exit(false);
       pvkInt64, pvkBigDecimal: {fallthrough};
       else exit(false)
     end;
-    exit(v.toDecimal = w.toDecimal);
+    case vk of
+      pvkInt64: case wk of
+        pvkFloat: exit(compareIntToFloat(v.toInt64, w.toFloat));
+        pvkBigDecimal: exit(compareIntToBCD(v.toInt64, w.toDecimal));
+        else ;
+      end;
+      pvkBigDecimal: case wk of
+        pvkFloat: exit(compareFloatToBCD(w.toFloat, v.toDecimal));
+        pvkInt64: exit(compareIntToBCD(w.toInt64, v.toDecimal));
+        else ;
+      end;
+      pvkFloat: case wk of
+        pvkInt64: exit(compareIntToFloat(w.toInt64, v.toFloat));
+        pvkBigDecimal: exit(compareFloatToBCD(v.toFloat, w.toDecimal));
+        else ;
+      end;
+      else ;
+    end;
+    exit(false);
   end;
   result := GlobalInterpretedNativeFunctionStaticContext.equalDeepAtomic(v,w,nil);
 end;
@@ -5085,6 +5120,7 @@ class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): bool
 begin
   result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
 end;
+{$ImplicitExceptions on}
 
 
 
