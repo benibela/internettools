@@ -664,7 +664,7 @@ type
     class procedure addRef(v: TXQValue); static;
     class procedure release(v: TXQValue); static;
     class function hash(const v: IXQValue): uint32; static;
-    class function equalKeys(const v, w: IXQValue): boolean; static;
+    class function equal(const v, w: IXQValue): boolean; static;
     class function isStringKeyLike(const v: TXQValue): boolean; static;
   end;
 
@@ -5040,7 +5040,7 @@ begin
   result := v.hashCode;
 end;
 
-class function TXQValueOwnershipTracker.equalKeys(const v, w: IXQValue): boolean;
+class function TXQValueOwnershipTracker.equal(const v, w: IXQValue): boolean;
 begin
   if v.hashCode <> w.hashCode then exit(false);
   if v.kind = w.kind then begin

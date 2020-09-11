@@ -37,14 +37,14 @@ type
   TXQDefaultTypeInfo = object(TXQBaseTypeInfo)
     class function hash(data: pchar; datalen: SizeUInt): TXQHashCode; static;
     class function hash(const data: string): TXQHashCode; static;
-    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static;// inline;
-    class function equalKeys(const key1, key2: string): boolean; static; inline;
+    class function equal(const key: string; data: pchar; datalen: SizeUInt): boolean; static;// inline;
+    class function equal(const key1, key2: string): boolean; static; inline;
   end;
   TXQCaseInsensitiveTypeInfo = object(TXQBaseTypeInfo)
     class function hash(data: pchar; datalen: SizeUInt): TXQHashCode; static;
     class function hash(const data: string): TXQHashCode; static;
-    class function equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean; static;
-    class function equalKeys(const key1, key2: string): boolean; static;
+    class function equal(const key: string; data: pchar; datalen: SizeUInt): boolean; static;
+    class function equal(const key1, key2: string): boolean; static;
   end;
   TXQVoid = record end;
   {** Hashmap based on Bero's FLRECacheHashMap
@@ -417,24 +417,24 @@ end;
 
 
 
-class function TXQDefaultTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
+class function TXQDefaultTypeInfo.equal(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
   result := (SizeUInt(length(key))  = datalen) and CompareMem(data, pointer(key), datalen);
 end;
 
-class function TXQDefaultTypeInfo.equalKeys(const key1, key2: string): boolean;
+class function TXQDefaultTypeInfo.equal(const key1, key2: string): boolean;
 begin
- result := key1 = key2; //todo: this can performs codepage conversions, while the pchar version of equalKeys does not. should the map support codepages?
+ result := key1 = key2; //todo: this can performs codepage conversions, while the pchar version of equal does not. should the map support codepages?
 end;
 
-class function TXQCaseInsensitiveTypeInfo.equalKeys(const key: string; data: pchar; datalen: SizeUInt): boolean;
+class function TXQCaseInsensitiveTypeInfo.equal(const key: string; data: pchar; datalen: SizeUInt): boolean;
 begin
   result := (SizeUInt(length(key))  = datalen) and strliEqual(data, pointer(key), datalen);
 end;
 
-class function TXQCaseInsensitiveTypeInfo.equalKeys(const key1, key2: string): boolean;
+class function TXQCaseInsensitiveTypeInfo.equal(const key1, key2: string): boolean;
 begin
- result := equalKeys(key1, pointer(key2), length(key2));
+ result := equal(key1, pointer(key2), length(key2));
 end;
 
 constructor TXQBaseHashmap.init;
@@ -484,7 +484,7 @@ begin
  end;
  repeat
   Entity:=CellToEntityIndex[result];
-  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equalKeys(Entities[Entity].Key, key))) then begin
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tinfo.equal(Entities[Entity].Key, key))) then begin
    exit;
   end;
   result:=(result+Step) and Mask;
@@ -837,7 +837,7 @@ begin
  end;
  repeat
   Entity:=CellToEntityIndex[result];
-  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tkeyinfo.equalKeys(Entities[Entity].Key, keydata, keylen))) then begin
+  if (Entity=ENT_EMPTY) or ((Entity<>ENT_DELETED) and (tkeyinfo.equal(Entities[Entity].Key, keydata, keylen))) then begin
    exit;
   end;
   result:=(result+Step) and Mask;
@@ -930,9 +930,13 @@ var
   ent: PHashMapEntity;
 begin
   ent := findEntity(key, true);
-  if ent^.Value = pointer(AValue) then exit;
+  if ent^.Value = pointer(AValue) then begin
+    if allowOverride then ent^.Key := key;
+    exit;
+  end;
   if ent^.Value <> nil then begin
     if not allowOverride then exit;
+    ent^.Key := key;
     TValueOwnershipTracker.release(TValue(ent^.Value));
   end;
   TValueOwnershipTracker.addRef(avalue);

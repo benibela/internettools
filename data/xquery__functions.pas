@@ -6752,7 +6752,7 @@ begin
         case pv^.getPropertyKeyKind of
           xqmpkkStandardKeys: begin
             for mp in pv^.getEnumeratorPropertiesUnsafe do begin
-              if TXQValueOwnershipTracker.equalKeys(mp.key, key) then outseq.addInArray(mp.Value)
+              if TXQValueOwnershipTracker.equal(mp.key, key) then outseq.addInArray(mp.Value)
               else mapFind(outseq, key, mp.Value);
             end;
           end;
@@ -6852,7 +6852,7 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
     for mp in argv[0].getEnumeratorPropertiesUnsafe do begin
       keep := true;
       for i := 0 to high(keys) do
-        if TXQValueOwnershipTracker.equalKeys(keys[i], mp.key) then keep := false;
+        if TXQValueOwnershipTracker.equal(keys[i], mp.key) then keep := false;
       if keep then
         map.setMutable(mp.key, mp.Value);
     end;
