@@ -3509,14 +3509,22 @@ end;
 
 type TBBDoubleHelper = type helper (TDoubleHelper) for double
   function isFinite(): boolean;
+  Function Mantissa: QWord;
 end;
-
-
-
 //IsNan or IsInfinite from math
 function TBBDoubleHelper.isFinite(): boolean;
 begin
   result := Exp <> 2047;
+end;
+
+//return mantissa including hidden bit
+//based on fpc 3.3.1 (it is broken in 3.0.4 and does not include the hidden bit)
+function TBBDoubleHelper.Mantissa: QWord;
+var data: qword absolute self;
+begin
+  Result:=(Data and $fffffffffffff);
+  if (Result=0) and (Exp=0) then Exit;
+  Result := Result or $10000000000000;
 end;
 
 
