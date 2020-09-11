@@ -881,7 +881,7 @@ begin
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
     else begin
       v := args[0].toFloat;
-      if not v.isFinite(v) then exit(baseType.createValue(v));
+      if not v.isFinite() then exit(baseType.createValue(v));
       if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
       else result := baseType.createValue(v - frac(v));
     end

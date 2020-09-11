@@ -5054,7 +5054,7 @@ begin
           exit(v.toString = w.toString);
       pvkFloat:
         exit(   (v.toFloat = w.toFloat)
-            or  (v.toFloat.IsNan() and w.toFloat.IsNan()))
+            or  (v.toFloat.IsNan() and w.toFloat.IsNan())
         );
       pvkInt64: exit(v.toInt64 = w.toInt64);
       pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
@@ -6688,7 +6688,7 @@ var ak, bk: TXQValueKind;
     cmpClass: TXSType;
     ad, bd: xqfloat;
   begin
-    if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan())) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan())) then
+    if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan()) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan()) then
       exit(-2);
     cmpClass := TXSType.commonDecimalType(a, b);
     ad := a.toFloatChecked(Self);
