@@ -1656,14 +1656,15 @@ begin
   result := @value;
 end;
 
+{$push}{$RangeChecks off}{$OverflowChecks off}
 function TXQValueDateTime.hashCode: uint32;
 begin
  with value do
  result :=   ((((year shl 4) or month) shl 5) or day)
-         xor ((((hour shl 6) or min) shl 6) or seconds)
-         xor microsecs
+         xor ((((hour shl 6) or (min + timezone) ) shl 6) or seconds)
          xor timezone;
 end;
+{$pop}
 
 procedure TXQValueDateTime.setDateTime(const dateTime: TDateTime);
 var
