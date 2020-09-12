@@ -900,21 +900,30 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     notEmpty, propertyTypeNeedsChecking: Boolean;
     v: PIXQValue;
     w: TXQValue;
-begin
+    p: TXQStandardProperty;
+  begin
     propertyTypeNeedsChecking := length(children) > 0;
     for v in ta.GetEnumeratorPtrUnsafe do begin
       if v.kind <> pvkObject then exit(false);
       if propertyTypeNeedsChecking then begin
-        notEmpty := false;
-        for w in v.getEnumeratorPropertyValuesUnsafe do begin
-          notEmpty := true;
-          if not TXQTermSequenceType(children[1]).instanceOf(w) then
-            exit(false);
+        case v.getPropertyKeyKind of
+          xqmpkkStringKeys: begin
+            notEmpty := false;
+            for w in v.getEnumeratorPropertyValuesUnsafe do begin
+              notEmpty := true;
+              if not TXQTermSequenceType(children[1]).instanceOf(w) then
+                exit(false);
+            end;
+            if notEmpty and not TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY')) then
+              exit(false);
+          end;
+          xqmpkkStandardKeys: begin
+            for p in v.getEnumeratorPropertiesUnsafe do
+              if not TXQTermSequenceType(children[0]).instanceOf(p.key) or not TXQTermSequenceType(children[1]).instanceOf(p.value) then
+                exit(false);
+            result := true;
+          end;
         end;
-        //todo: check keys
-        //todo: check function calls convertType/checkType ?
-        if notEmpty and not TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY')) then
-          exit(false);
       end;
     end;
     result := true;
