@@ -9,8 +9,11 @@ uses
   Classes, SysUtils;
 
 type TBBDoubleHelper = type helper (TDoubleHelper) for double
-  function Frac: QWord;
-  function IsNan(): Boolean;
+  function Data: QWord; inline;
+  function Frac: QWord; inline;
+  function IsNan(): Boolean; inline;
+  function IsPositiveInfinity: Boolean; inline;
+  function IsNegativeInfinity: Boolean; inline;
   function isFinite(): boolean;
   Function Mantissa: QWord;
   function compare(other: double): integer;
@@ -48,9 +51,13 @@ implementation
 
 uses math;
 
+function TBBDoubleHelper.Data: QWord;
+begin
+  result := TDoubleRec(self).Data;
+end;
+
 //replace Frac because the fpc 3.0.4 version is broken (appears to include hidden bit)
 function TBBDoubleHelper.Frac: QWord;
-var data: qword absolute self;
 begin
   result := data and $fffffffffffff;
 end;
@@ -59,6 +66,17 @@ end;
 function TBBDoubleHelper.IsNan(): Boolean;
 begin
   result := (Exp = 2047) and (Frac <> 0);
+end;
+
+//replace Is*Infinity because the fpc 3.0.4 version raises sigfpe on nan
+function TBBDoubleHelper.IsPositiveInfinity: Boolean;
+begin                 //   SeeexxxxxpppMMMMMMMMMAAAAAAAANNNNNNNNTTTTTTTTTIIIIIIISSSSSSSSAAA
+  result := data = QWord( %0111111111110000000000000000000000000000000000000000000000000000 );
+end;
+
+function TBBDoubleHelper.IsNegativeInfinity: Boolean;
+begin                 //   SeeexxxxxpppMMMMMMMMMAAAAAAAANNNNNNNNTTTTTTTTTIIIIIIISSSSSSSSAAA
+  result := data = QWord( %1111111111110000000000000000000000000000000000000000000000000000 );
 end;
 
 //return mantissa including hidden bit
