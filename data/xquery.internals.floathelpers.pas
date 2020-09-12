@@ -9,6 +9,8 @@ uses
   Classes, SysUtils;
 
 type TBBDoubleHelper = type helper (TDoubleHelper) for double
+  function Frac: QWord;
+  function IsNan(): Boolean;
   function isFinite(): boolean;
   Function Mantissa: QWord;
   function compare(other: double): integer;
@@ -46,21 +48,34 @@ implementation
 
 uses math;
 
-//IsNan or IsInfinite from math
-function TBBDoubleHelper.isFinite(): boolean;
+//replace Frac because the fpc 3.0.4 version is broken (appears to include hidden bit)
+function TBBDoubleHelper.Frac: QWord;
+var data: qword absolute self;
 begin
-  result := Exp <> 2047;
+  result := data and $fffffffffffff;
+end;
+
+//replace IsNan because the fpc 3.0.4 version is broken (raises sigfpe on comisd xmm0,QWORD PTR ds:0x668b90 <NaN> )
+function TBBDoubleHelper.IsNan(): Boolean;
+begin
+  result := (Exp = 2047) and (Frac <> 0);
 end;
 
 //return mantissa including hidden bit
 //based on fpc 3.3.1 (it is broken in 3.0.4 and does not include the hidden bit)
 function TBBDoubleHelper.Mantissa: QWord;
-var data: qword absolute self;
 begin
-  Result:=(Data and $fffffffffffff);
+  Result:=Frac;
   if (Result=0) and (Exp=0) then Exit;
   Result := Result or $10000000000000;
 end;
+
+//not (IsNan or IsInfinite)
+function TBBDoubleHelper.isFinite(): boolean;
+begin
+  result := Exp <> 2047;
+end;
+
 
 {function getNaN: xqfloat;
 begin
