@@ -3491,7 +3491,6 @@ var tempf: xqfloat;
     tempd: BigDecimal;
  i: Integer;
  seq: IXQValue;
- kind: TXQValueKind;
  enumerable: TXQValueEnumeratorPtrUnsafe;
  pv: PIXQValue;
 begin

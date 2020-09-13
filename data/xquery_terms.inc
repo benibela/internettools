@@ -4443,6 +4443,7 @@ var
   v: IXQValue;
 begin
   obj := TXQValueStandardMap.create();
+  result := obj;
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
@@ -4450,7 +4451,6 @@ begin
   end;
   if obj.Size <> length(children) div 2 then
     duplicateError(result);
-  result := obj;
 end;
 
 function TXQTermMapConstructor.getContextDependencies: TXQContextDependencies;
@@ -4481,6 +4481,7 @@ var
   v: IXQValue;
 begin
   obj := TXQValueStringMap.create();
+  result := obj;
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
@@ -4493,7 +4494,6 @@ begin
   end;
   if not (allowDuplicates) and (obj.Size + skippedOptionals <> length(children) div 2) then
     duplicateError(result, false);
-  result := obj;
 end;
 
 function TXQTermJSONiqObjectConstructor.clone: TXQTerm;
