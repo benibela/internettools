@@ -129,11 +129,11 @@ type
         property current: TKeyValuePairOption read currentPair;
       end;
   protected
-    function get(const Key: TKey; const def: TValue): TValue; inline;
-    function getOrDefault(const Key: TKey): TValue; inline;
     function GetValue(const Key: TKey): TValue; inline;
     function findKeyValuePair(const Key: TKey): TKeyValuePairOption;
   public
+    function get(const Key: TKey; const def: TValue): TValue; inline;
+    function getOrDefault(const Key: TKey): TValue; inline;
     function getEnumerator: TKeyPairEnumerator;
   end;
 
@@ -180,6 +180,8 @@ type
     class procedure release(o: TObject); static; inline;
     class procedure addRef(const str: string); static; inline;
     class procedure release(var str: string); static; inline;
+    class procedure addRef(const i: SizeInt); static; inline;
+    class procedure release(var i: SizeInt); static; inline;
   end;
 
 
@@ -188,7 +190,8 @@ type
   TXQHashmapStrOwningObject = specialize TXQHashmapStrOwningGenericObject<TObject>;
   TXQHashmapStrStr = object(specialize TXQHashmapStrOwning<string, TXQDefaultOwnershipTracker>)
   end;
-
+  TXQhashmapStrSizeInt = object(specialize TXQHashmapStrOwning<SizeInt, TXQDefaultOwnershipTracker>)
+  end;
 
   {$if false}
   generic TXQBaseHashmapStrCaseInsensitivePointerButNotPointer<TValue> = object(specialize TXQBaseHashmapStrPointerButNotPointer<TValue, TXQDefaultTypeInfo>)
@@ -763,6 +766,16 @@ end;
 class procedure TXQDefaultOwnershipTracker.release(var str: string);
 begin
  fpc_ansistr_decr_ref(pointer(str));
+end;
+
+class procedure TXQDefaultOwnershipTracker.addRef(const i: SizeInt);
+begin
+  ignore(i);
+end;
+
+class procedure TXQDefaultOwnershipTracker.release(var i: SizeInt);
+begin
+  ignore(i);
 end;
 
 
