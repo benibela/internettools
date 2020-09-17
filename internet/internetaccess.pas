@@ -101,12 +101,18 @@ type
     function getFormDataIndex(const name: string): integer;
     procedure add(const sdata: string; const headers: string = '');
     procedure addFormData(const name, sdata: string; headers: string = '');
+    //procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: TStringArray);
     procedure addFormDataFile(const name, filename: string; headers: string = '');
     procedure addFormData(const name, sdata, filename, contenttype, headers: string);
     function compose(out boundary: string; boundaryHint: string = '---------------------------1212jhjg2ypsdofx0235p2z5as09'): string;
     procedure parse(sdata, boundary: string);
     procedure clear;
 
+    const HeaderSeparator = #13#10;
+    class function buildHeaders(const name, filename, contenttype, headers: string): TStringArray; static;
+    class function insertMissingNameToHeaders(const name: string; headers: TStringArray): TStringArray; static;
+    class function nameFromHeader(const header: string): string; static;
+    class function indexOfHeader(const sl: TStringArray; name: string): sizeint; static;
     class function HeaderForBoundary(const boundary: string): string; static;
     class function randomLetter: Char; static;
   end;
@@ -523,22 +529,17 @@ begin
   add(sdata, headers);
 end;
 
+{procedure TMIMEMultipartData.addFormData(const name, sdata: string; headers: TStringArray);
+begin
+  add(sdata, strJoin(insertMissingNameToHeaders(name, headers), HeaderSeparator));
+end;}
+
 procedure TMIMEMultipartData.addFormDataFile(const name, filename: string; headers: string);
 begin
   headers := 'Content-Disposition: form-data; name="'+name+'"; filename="'+filename+'"' + #13#10 + headers; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
   add(strLoadFromFileUTF8(filename), headers);
 end;
 
-function indexOfHeader(const sl: TStringArray; name: string): integer;
-var
-  i: Integer;
-begin
-  name := trim(name) + ':';
-  for i:=0 to high(sl) do
-    if striBeginsWith(sl[i], name) then
-      exit(i);
-  exit(-1);
-end;
 
 procedure TMIMEMultipartData.addFormData(const name, sdata, filename, contenttype, headers: string);
 var
@@ -653,6 +654,47 @@ end;
 procedure TMIMEMultipartData.clear;
 begin
   setlength(data, 0);
+end;
+
+class function TMIMEMultipartData.buildHeaders(const name, filename, contenttype, headers: string): TStringArray;
+var
+  splittedHeaders: TStringArray;
+  disposition: String;
+begin
+  splittedHeaders := strSplit(headers, HeaderSeparator, false);
+
+  if (contenttype <> '') and (indexOfHeader(splittedHeaders, 'Content-Type') < 0) then
+    arrayInsert(splittedHeaders, 0, 'Content-Type: ' + contenttype);
+  if indexOfHeader(splittedHeaders, 'Content-Disposition') < 0 then begin
+    disposition := 'Content-Disposition: form-data; name="'+name+'"';
+    if filename <> '' then disposition += '; filename="'+filename+'"'; //todo: name may encoded with [RFC2045]/rfc2047; filename may be approximated or encoded with 2045
+    arrayInsert(splittedHeaders, 0, disposition);
+  end;
+
+  result := splittedHeaders;
+end;
+
+class function TMIMEMultipartData.insertMissingNameToHeaders(const name: string; headers: TStringArray): TStringArray;
+begin
+  result := headers;
+  if indexOfHeader(result, 'Content-Disposition') < 0 then
+    arrayInsert(result, 0, 'Content-Disposition: form-data; name="'+name+'"');
+end;
+
+class function TMIMEMultipartData.nameFromHeader(const header: string): string;
+begin
+  result := strBefore(header, ':');
+end;
+
+class function TMIMEMultipartData.indexOfHeader(const sl: TStringArray; name: string): sizeint;
+var
+  i: sizeint;
+begin
+  name := trim(name) + ':';
+  for i:=0 to high(sl) do
+    if striBeginsWith(sl[i], name) then
+      exit(i);
+  exit(-1);
 end;
 
 class function TMIMEMultipartData.HeaderForBoundary(const boundary: string): string;

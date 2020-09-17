@@ -1291,53 +1291,200 @@ begin
 end;
 
 
-procedure urlEncodingFromValue(value: IXQValue; cmp: TStringComparisonFunc; urlEncoded: boolean; charset: TSystemCodePage;
-                               out names, values: TStringArray;
-                               out specialNames: TStringArray; out specialValues: TXQVArray); //-> special objects
-  procedure addSingleValue(temp: string);
+type
+THttpRequestParam = record
+  key, value: string;
+  hasValue: boolean;
+  mimeHeaders: TStringArray;
+end;
+PHttpRequestParam = ^THttpRequestParam;
+EHttpRequestParamsException = Exception;
+THttpRequestParams = object //This could completely replace TMIMEMultipartData
+  urlencoded: boolean;
+  charset: TSystemCodePage;
+
+  size: sizeint;
+  data: array of THttpRequestParam;
+  firstKeyIndex: TXQHashmapStrSizeInt;
+  keysToRemove: TXQHashsetStr;
+  function addRawKey(const k: string): PHttpRequestParam;
+  function addRawParam(const p: THttpRequestParam): PHttpRequestParam;
+  function addRawKeyValue(const k, v: string): PHttpRequestParam;
+
+  function  addKeyValue(const n, v: string): PHttpRequestParam; //not encoded
+  procedure addUrlEncodedList(s: string); //encoded
+  procedure addXQValue(const value: IXQValue; const staticContext: TXQStaticContext);
+  procedure addMime(const mime: TMIMEMultipartData);
+
+  procedure mergeOverride(const requestOverride: THttpRequestParams);
+  procedure addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams);
+
+  function toUrlEncodedRequest: string;
+  function toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
+  function toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
+
+  procedure compress;
+  procedure clear;
+  constructor init;
+  destructor done;
+end;
+
+function THttpRequestParams.addRawKey(const k: string): PHttpRequestParam;
+begin
+  if size = length(data) then
+    if length(data) > 0 then SetLength(data, 2*length(data))
+    else SetLength(data, 16);
+  result := @data[size];
+  result.key := k;
+  result.hasValue := true;
+  keysToRemove.exclude(k);
+  firstKeyIndex.include(k, size, false);
+  inc(size);
+end;
+
+function THttpRequestParams.addRawParam(const p: THttpRequestParam): PHttpRequestParam;
+begin
+  result := addRawKey(p.key);
+  result.value := p.value;
+  result.mimeHeaders := p.mimeHeaders;
+end;
+
+function THttpRequestParams.addRawKeyValue(const k, v: string): PHttpRequestParam;
+begin
+  result := addRawKey(k);
+  result.value := v;
+end;
+
+procedure THttpRequestParams.compress;
+begin
+  if length(data) <> size then
+    SetLength(data, size);
+end;
+
+procedure THttpRequestParams.clear;
+begin
+  size := 0;
+  data := nil;
+  firstKeyIndex.clear;
+  keysToRemove.Clear;
+end;
+
+constructor THttpRequestParams.init;
+begin
+  keysToRemove.init;
+  firstKeyIndex.init;
+  charset := CP_UTF8;
+  urlencoded := false;
+  size := 0;
+  data := nil;
+end;
+
+destructor THttpRequestParams.done;
+begin
+  keysToRemove.done;
+  firstKeyIndex.done;
+end;
+
+function THttpRequestParams.addKeyValue(const n, v: string): PHttpRequestParam; //not encoded
+begin
+  if urlEncoded then result := addRawKeyValue(formEncode(n, charset), formEncode(v, charset))
+  else result := addRawKeyValue(n, v);
+end;
+
+procedure THttpRequestParams.addUrlEncodedList(s: string);
+  procedure addUrlEncodedPair(temp: string);
+  var
+    key: String;
   begin
-    if urlEncoded then begin
-      arrayAdd(names, strSplitGet('=', temp));
-      arrayAdd(values, temp);
-    end else begin
-      arrayAdd(names,  urlHexDecode(strSplitGet('=', temp)));
-      arrayAdd(values, urlHexDecode(temp));
-    end;
+    key := strSplitGet('=', temp);
+    if urlEncoded then addRawKeyValue(key, temp)
+    else addRawKeyValue(urlHexDecode(key), urlHexDecode(temp));
   end;
 
-  procedure add(s: string);
+var
+  split: TStringArray;
+  i: Integer;
+begin
+  if s = '' then exit;
+  split := strSplit(s, '&');
+  for i:=0 to high(split) do addUrlEncodedPair(split[i]);
+end;
+
+
+procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticContext: TXQStaticContext);
+  procedure addSpecialPair(n: string; v: TXQValueMapLike);
   var
-    split: TStringArray;
+    param: PHttpRequestParam;
+    value, filename, contenttype, headers, h: String;
+    temp: TXQValue;
     i: Integer;
   begin
-    if s = '' then exit;
-    split := strSplit(s, '&');
-    for i:=0 to high(split) do addSingleValue(split[i]);
+    if urlEncoded then n := formEncode(n, charset);
+    param := addRawKey(n);
+
+    headers := '';
+    value := '';
+    param.hasValue := false;
+    filename := '';
+    contenttype := '';
+    if v.hasProperty('file', @temp) then begin
+      filename := temp.toString;
+      value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
+      param.hasValue := true;
+    end;
+    if v.hasProperty('filename', @temp) then filename := temp.toString;
+    if v.hasProperty('type', @temp) then contenttype := temp.toString;
+    if v.hasProperty('value', @temp) then begin
+      value := temp.toString;
+      param.hasValue := true;
+    end;
+
+    if v.hasProperty('headers', @temp) then begin
+      for i := 1 to temp.getSequenceCount do begin
+        h := temp.get(i).toString;
+        if i > 1 then h := TMIMEMultipartData.HeaderSeparator + h;
+        headers += h;
+      end;
+    end;
+
+    if urlEncoded then value := formEncode(value, charset);
+
+    param.value := value;
+    param.mimeHeaders := TMIMEMultipartData.buildHeaders(n, filename, contenttype, headers);
   end;
 
-  procedure addPair(const n, v: string);
+  procedure addSingletonXQValue(name: string; v: TXQValue);
   begin
-    if urlEncoded then begin
-      arrayAdd(names, formEncode(n, charset));
-      arrayAdd(values, formEncode(v, charset));
-    end else begin
-      arrayAdd(names, n);
-      arrayAdd(values, v);
-    end;
+    if v.kind <> pvkObject then
+      addKeyValue(name, v.toString)
+    else
+      addSpecialPair(name, v as TXQValueMapLike);
+  end;
+
+  procedure markUnusedKeyForDeletion(name: string);
+  begin
+    if urlEncoded then name := formEncode(name, charset);
+    if firstKeyIndex.contains(name) then
+      exit; //not unused
+    keysToRemove.include(name);
   end;
 
   procedure addObject(const v: IXQValue);
   var
     p: TXQProperty;
+    w: PIXQValue;
   begin
     for p in v.getEnumeratorStringPropertiesUnsafe do begin
-      if p.Value.kind <> pvkObject then
-        addPair(p.key, p.Value.toString)
-       else begin
-         arrayAdd(specialNames, p.key);
-         setlength(specialValues, length(specialValues) + 1);
-         specialValues[high(specialValues)] := p.Value;
-       end;
+      case p.value.kind of
+        pvkUndefined: markUnusedKeyForDeletion(p.key);
+        pvkSequence: case p.value.getSequenceCount of
+          0: markUnusedKeyForDeletion(p.key);
+          1: addSingletonXQValue(p.key, p.value);
+          else for w in p.value.GetEnumeratorPtrUnsafe do
+            addSingletonXQValue(p.key, w.toValue);
+        end;
+        else addSingletonXQValue(p.key, p.value);
+      end;
     end;
   end;
 
@@ -1345,54 +1492,176 @@ var
   v: PIXQValue;
   sname: string;
   svalue: string;
+  nodeCompare: TStringComparisonFunc;
 begin
-  names := nil;
-  values := nil;
-  specialNames := nil;
-  specialValues := nil;
+  nodeCompare := @staticContext.NodeCollation.equal;
   for v in value.GetEnumeratorPtrUnsafe do
     case v^.kind of
       pvkObject: addObject(v^);
       pvkNode:
-        if nodeToFormData(v^.toNode, cmp, true, sname, svalue) then
-          addPair(sname, svalue)
-       else add(v^.toString);
-     else add(v^.toString)
+        if nodeToFormData(v^.toNode, nodeCompare, true, sname, svalue) then
+          addKeyValue(sname, svalue)
+       else addUrlEncodedList(v^.toString);
+     else addUrlEncodedList(v^.toString)
    end;
 end;
 
-procedure addSpecialValue(const staticContext: TXQStaticContext; var mime: TMIMEMultipartData; n: string; v: TXQValue; defaultValue: string = '');
+procedure THttpRequestParams.addMime(const mime: TMIMEMultipartData);
 var
-  temp: TXQValue;
-  value, filename, contenttype, headers: String;
-  h: String;
-  i: integer;
+  i: SizeInt;
+  param: PHttpRequestParam;
 begin
-  headers := '';
-  value := defaultValue;
-  filename := '';
-  contenttype := '';
-  if v.hasProperty('file', @temp) then begin
-    filename := temp.toString;
-    value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
+  //if urlencoded then raise EHttpRequestParamsException.Create('Cannot add mime data to urlencoded request');
+  for i := 0 to high(mime.data) do begin
+    param := addKeyValue(mime.data[i].getFormDataName, mime.data[i].data);
+    param.mimeHeaders := mime.data[i].headers;
   end;
-  if v.hasProperty('filename', @temp) then filename := temp.toString;
-  if v.hasProperty('type', @temp) then contenttype := temp.toString;
-  if v.hasProperty('value', @temp) then value := temp.toString;
+end;
 
-  if v.hasProperty('headers', @temp) then begin
-    for i := 1 to temp.getSequenceCount do begin
-      h := temp.get(i).toString;
-      if i > 1 then h := #13#10 + h;
-      headers += h;
+procedure THttpRequestParams.mergeOverride(const requestOverride: THttpRequestParams);
+var
+  requestOverrideUsed: array of boolean;
+  requestOverrideNextKeyOccurrence: array of SizeInt; //this is used to build a multimap
+  requestOverrideKeyIndex: TXQhashmapStrSizeInt;
+
+  procedure initRequestOverrideInfo;
+  var lastKeyIndex: TXQhashmapStrSizeInt;
+    i, last: SizeInt;
+    k: string;
+  begin
+    SetLength(requestOverrideUsed, requestOverride.size);
+    SetLength(requestOverrideNextKeyOccurrence, requestOverride.size);
+    requestOverrideKeyIndex.init;
+    lastKeyIndex.init;
+    for i := 0 to requestOverride.size - 1 do begin
+      requestOverrideNextKeyOccurrence[i] := -1;
+      last := lastKeyIndex.get(requestOverride.data[i].key, -1);
+      if last >= 0 then requestOverrideNextKeyOccurrence[last] := i;
+      lastKeyIndex[requestOverride.data[i].key] := i;
+    end;
+    lastKeyIndex.done;
+
+    requestOverrideKeyIndex.init;
+    requestOverrideKeyIndex.assign(requestOverride.firstKeyIndex);
+    for k in requestOverride.keysToRemove do
+      requestOverrideKeyIndex.include(k, -1, false);
+  end;
+
+  procedure mergeHeaders(var p: THttpRequestParam; const over: THttpRequestParam);
+  var
+    i, j: sizeint;
+    name: String;
+  begin
+    if p.mimeHeaders = nil then begin
+      p.mimeHeaders := over.mimeHeaders;
+      exit;
+    end;
+    for i := 0 to high(p.mimeHeaders) do begin
+      name := TMIMEMultipartData.nameFromHeader(p.mimeHeaders[i]);
+      j := TMIMEMultipartData.indexOfHeader(over.mimeHeaders, name);
+      if j >= 0 then p.mimeHeaders[i] := over.mimeHeaders[j];
+    end;
+    for j := 0 to high(over.mimeHeaders) do begin
+      name := TMIMEMultipartData.nameFromHeader(over.mimeHeaders[j]);
+      i := TMIMEMultipartData.indexOfHeader(p.mimeHeaders, name);
+      if i < 0 then begin
+        SetLength(p.mimeHeaders, length(p.mimeHeaders) + 1);
+        p.mimeHeaders[high(p.mimeHeaders)] := over.mimeHeaders[j];
+      end;
     end;
   end;
 
-  if (value <> '') or (headers <> '') then
-    mime.addFormData(n, value, filename, contenttype, headers);
+var oldData: array of THttpRequestParam;
+  oldSize, i, replaced: SizeInt;
+begin
+  if (requestOverride.urlencoded <> urlencoded) or
+     (urlencoded and (requestOverride.charset <> charset)) then
+    raise EHttpRequestParamsException.Create('Incompatible http params');
+  initRequestOverrideInfo;
 
+  oldData := data;
+  oldSize := size;
+  clear;
+  SetLength(data, oldSize + requestOverride.size);
+  for i := 0 to oldSize - 1 do begin
+    replaced := requestOverrideKeyIndex.get(oldData[i].key, -2);
+    //replaced = -2: not overriden; replaced = -1: to remove; >= 0: override
+    if replaced <> -1 then begin
+      addRawParam(oldData[i]);
+      if replaced > -1 then begin
+        requestOverrideKeyIndex.include(oldData[i].key, requestOverrideNextKeyOccurrence[replaced]);
+        requestOverrideUsed[replaced] := true;
+        if requestOverride.data[replaced].hasValue then data[size-1].value := requestOverride.data[replaced].value;
+        if requestOverride.data[replaced].mimeHeaders <> nil then mergeHeaders(data[size-1], requestOverride.data[replaced]);
+      end;
+    end;
+  end;
+  for i := 0 to high(requestOverrideUsed) do
+    if not requestOverrideUsed[i] then
+      addRawParam(requestOverride.data[i]);
+  requestOverrideKeyIndex.done;
+  compress;
 end;
 
+procedure THttpRequestParams.addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams);
+var temp: TTreeNode;
+  name, value: string;
+begin
+  for temp in form.getEnumeratorDescendants do begin
+    if nodeToFormData(temp, cmp, false, name, value) then begin
+      addKeyValue(name, value);
+    end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
+      name := temp.getAttribute('name');
+      if (name <> '') and requestOverride.firstKeyIndex.contains(name) then
+        addKeyValue(name, temp.getAttribute('value'));
+    end;
+  end;
+
+  mergeOverride(requestOverride);
+end;
+
+function THttpRequestParams.toUrlEncodedRequest: string;
+var sb: TStrBuilder;
+  i: sizeint;
+begin
+  sb.init(@result);
+  for i := 0 to size - 1 do begin
+    if i <> 0 then sb.append('&');
+    if urlencoded then begin
+      sb.append(data[i].key);
+      sb.append('=');
+      sb.append(data[i].value);
+    end else begin
+      sb.append(formEncode(data[i].key,  charset));
+      sb.append('=');
+      sb.append(formEncode(data[i].value, charset));
+    end;
+  end;
+  sb.final;
+end;
+
+
+
+
+function THttpRequestParams.toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
+var mime: TMIMEMultipartData;
+begin
+  if urlencoded then raise EHttpRequestParamsException.Create('MIME Request needs unencoded params');
+  mime := toMimeRequest(staticContext);
+  result := mime.compose(header);
+end;
+
+function THttpRequestParams.toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
+var
+  i: SizeInt;
+begin
+  result := default(TMIMEMultipartData);
+  SetLength(result.data, size);
+  for i := 0 to size - 1 do begin
+    result.data[i].data := data[i].value;
+    result.data[i].headers := TMIMEMultipartData.insertMissingNameToHeaders(data[i].key, data[i].mimeHeaders);
+  end;
+end;
 
 //see https://html.spec.whatwg.org/multipage/forms.html and https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-2
 {todo:
@@ -1402,113 +1671,60 @@ check for <form method=dialog>
 enctype=text/plain
 }
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var replaceNames, replaceValues: TStringArray;
-    specialReplaceValues: TXQVArray;
-    specialReplaceNames: TStringArray;
+var requestOverride: THttpRequestParams;
     cmp: TStringComparisonFunc;
+
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
-      temp: TTreeNode;
-      method: string;
-      name, value: String;
-      request: string;
-      used: TStringList;
-      i: Integer;
-      mime: TMIMEMultipartData;
       multipart: boolean;
+    var
       header: string;
       post: Boolean;
-      encoding: TSystemCodePage;
+      method: string;
+      actionURI: String;
       resultobj: TXQValueStringMap;
-
-      procedure addPair(n: string; v: string);
-      begin
-        if not multipart then begin
-          if request <> '' then request += '&';
-          request += formEncode(n,encoding) + '=' + formEncode(v, encoding);
-        end else begin
-          mime.addFormData(n, v);
-        end;
-      end;
-
-
-      procedure addToRequest(n: string; v: string; addToUsed: boolean = true);
-      var
-        replaced: Integer;
-      begin
-        if addToUsed then begin
-          replaced := arrayIndexOf(replaceNames, n);
-          if replaced >= 0 then v := replaceValues[replaced]
-          else if multipart then begin
-            replaced := arrayIndexOf(specialReplaceNames, n);
-            if replaced >= 0 then begin
-              addSpecialValue(context.staticContext, mime, n, specialReplaceValues[replaced].toValue, v);
-              used.Add(n);
-              exit;
-            end;
-          end;
-          used.Add(n);
-        end;
-        addPair(n, v);
-      end;
-
+      request: THttpRequestParams;
+      encodedRequest: string;
     begin
       if form = nil then exit(xqvalue());
+      request.init;
+
       method := UpperCase(form.getAttribute('method', 'GET', cmp));
       post := striEqual(method, 'POST');
-      request := '';
-      mime.data := nil;
       multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
-      encoding := getFormEncoding(form);
+      request.charset := getFormEncoding(form);
 
-      used := TStringList.Create;
-      used.CaseSensitive:=true;
-      for temp in form.getEnumeratorDescendants do begin
-        if nodeToFormData(temp, cmp, false, name, value) then begin
-          addToRequest(name, value);
-        end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
-          name := temp.getAttribute('name');
-          if (name <> '') then begin
-            i := arrayIndexOf(replaceNames, name);
-            if (i >= 0) and (replaceValues[i] = temp.getAttribute('value')) and (used.IndexOf(name) < 0) then
-              addToRequest(name, '');
-          end;
-        end;
-      end;
+      request.addFormAndMerge(form, cmp, requestOverride);
+      request.done;
 
-      for i:=0 to high(replaceNames) do
-        if used.IndexOf(replaceNames[i]) < 0 then
-          addToRequest(replaceNames[i], replaceValues[i], false);
-      for i:=0 to high(specialReplaceNames) do
-        if used.IndexOf(specialReplaceNames[i]) < 0 then
-          addSpecialValue(context.staticContext, mime, specialReplaceNames[i], specialReplaceValues[i].toValue, '');
-      used.free;
-
-      value := form.getAttribute('action', cmp);
+      actionURI := form.getAttribute('action', cmp);
 
       resultobj := TXQValueStringMap.create();
       result := resultobj;
 
       resultobj.setMutable('method', method);
 
+      if not multipart then encodedRequest := request.toUrlEncodedRequest
+      else begin
+        encodedRequest := request.toMimeRequest(context.staticContext, header);
+        resultobj.setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
+      end;
+
       if post then begin
-        if multipart then begin
-          request := mime.compose(header);
-          resultobj.setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
-        end;
-        resultobj.setMutable('post', request)
-      end else if request <> '' then
-        if strContains(value, '?') then value += '&' + request
-        else value += '?' + request;
+        resultobj.setMutable('post', encodedRequest)
+      end else if encodedRequest <> '' then
+        if strContains(actionURI, '?') then actionURI += '&' + encodedRequest
+        else actionURI += '?' + encodedRequest;
 
 
       {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      if (form.getDocument() <> nil) then value := strResolveURI(value, form.getDocument().baseURI);
-      value := strResolveURI(value, context.staticContext.baseURI);
+      if (form.getDocument() <> nil) then actionURI := strResolveURI(actionURI, form.getDocument().baseURI);
+      actionURI := strResolveURI(actionURI, context.staticContext.baseURI);
       {$ENDIF}
-      resultobj.setMutable('url', value);
-      if encoding <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(encoding));
+      resultobj.setMutable('url', actionURI);
+      if request.charset <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(request.charset));
+
     end;
 
 var v: PIXQValue;
@@ -1520,61 +1736,44 @@ begin
     exit(xqvalue);
 
   cmp := @context.staticContext.nodeCollation.equal;
+  requestOverride.init;
 
   if argc = 2 then
-    urlEncodingFromValue(args[1], cmp, false,{<-false=>no encoding} CP_NONE, replaceNames, replaceValues, specialReplaceNames, specialReplaceValues);
-
+    requestOverride.addXQValue(args[1], context.staticContext);
 
   resseq := TXQValueSequence.create();
   result := resseq;
   for v in args[0].GetEnumeratorPtrUnsafe do
     resseq.add(encodeForm(v^.toNode));
   xqvalueSeqSqueeze(result);
+  requestOverride.done;
 end;
 
 function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var names, values: array of TStringArray;
-    used: array of array of boolean = nil;
-    rep: Integer;
-    res: String;
-    cmp: TStringComparisonFunc;
-    i: Integer;
-    specialNames: TStringArray;
-    specialValues: TXQVArray;
+var i: Integer;
     encoding: TSystemCodePage;
+    requests: array[0..1] of THttpRequestParams;
 begin
-  names := nil; values := nil;
-  setlength(names, 2); setlength(values, 2);
-  cmp := @context.staticContext.nodeCollation.equal; ignore(context);
   encoding := CP_UTF8;
   if argc = 3 then begin
     encoding := strEncodingFromName(args[2].toString);
     if encoding = CP_NONE then encoding := CP_UTF8;
   end;
-  urlEncodingFromValue(args[0], cmp, true, encoding, names[0], values[0], specialNames, specialValues); //todo: handle specials
-  urlEncodingFromValue(args[1], cmp, true, encoding, names[1], values[1], specialNames, specialValues);
-  setlength(used, 2);
 
-  setlength(used[1], length(values[1]));
-  for i := 0 to high(used[1]) do used[1][i] := false;
-
-
-  res := '';
-  for i := 0 to high(names[0]) do begin
-    rep := arrayIndexOf(names[1], names[0][i]);
-    if rep < 0 then res += IfThen(res = '', '', '&') + names[0][i] + '=' + values[0][i]
-    else begin
-      res += IfThen(res = '', '', '&') + names[1][rep] + '=' + values[1][rep];
-      used[1][rep] := true;
-    end;
+  for i := 0 to 1 do begin
+    requests[i] := default(THttpRequestParams);
+    requests[i].init;
+    requests[i].urlencoded := true;
+    requests[i].charset:=encoding;
+    requests[i].addXQValue(args[i], context.staticContext);
   end;
 
-  for i := 0 to high(names[1]) do begin
-    if used[1][i] then continue;
-    res += IfThen(res = '', '', '&') + names[1][i] + '=' + values[1][i];
-  end;
+  requests[0].mergeOverride(requests[1]);
 
-  result := xqvalue(res);
+  result := xqvalue(requests[0].toUrlEncodedRequest);
+
+  requests[0].done;
+  requests[1].done;
 end;
 
 function getMultipartHeader(const v: IXQValue): string;
@@ -1649,31 +1848,20 @@ var
   tempSeq: TXQValueSequence;
   procedure mimeCombine;
   var
-    cmp: TStringComparisonFunc;
-    names: TStringArray;
-    values: TStringArray;
-    specialNames: TStringArray;
-    specialValues: TXQVArray;
-    i, j: Integer;
-    temps: String;
+    baseRequest, requestOverride: THttpRequestParams;
   begin
-    cmp := @context.staticContext.nodeCollation.equal;
-    urlEncodingFromValue(args[1], cmp, false, CP_NONE, names, values, specialNames, specialValues);
-    for i := 0 to high(names) do begin
-      j := mime.getFormDataIndex(names[i]);
-      if j < 0 then mime.addFormData(names[i], values[i])
-      else mime.data[j].data := values[i];
-    end;
-    for i := 0 to high(specialNames) do begin
-      j := mime.getFormDataIndex(specialNames[i]);
-      temps := '';
-      if j >= 0 then temps := mime.data[j].data;
-      addSpecialValue(context.staticContext, mime, specialNames[i], specialValues[i].toValue, temps);
-      if j >= 0 then begin
-        mime.data[j] := mime.data[high(mime.data)];
-        SetLength(mime.data, length(mime.data) - 1);
-      end
-    end;
+    baseRequest.init;
+    baseRequest.addMime(mime);
+
+    requestOverride.init;
+    requestOverride.addXQValue(args[1], context.staticContext);
+
+    baseRequest.mergeOverride(requestOverride);
+
+    mime := baseRequest.toMimeRequest(context.staticContext);
+
+    baseRequest.done;
+    requestOverride.done;
   end;
 
 begin
@@ -1727,14 +1915,15 @@ var paramobj: TXQValueStringMap;
 
   procedure parseParamsUriEncoded(const q: ixqvalue);
   var
-    names, values, specialNames: TStringArray;
-    specialValues: TXQVArray;
+    request: THttpRequestParams;
     i: Integer;
   begin
     if paramobj = nil then paramobj := TXQValueStringMap.create();
-    urlEncodingFromValue(q, @context.staticContext.nodeCollation.equal, false, CP_NONE, names, values, specialNames, specialValues);
-    for i := 0 to high(names) do
-      addParam(names[i], values[i]);
+    request.init;
+    request.addXQValue(q, context.staticContext);
+    for i := 0 to request.size - 1 do
+      addParam(request.data[i].key, request.data[i].value);
+    request.done;
   end;
   procedure parseParamsMime(const data, boundary: string);
   var mime: TMIMEMultipartData;

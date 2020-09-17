@@ -817,8 +817,8 @@ begin
 
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
-  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "XYZ"}).url', 'pseudo://test?xxx=yyy&a=XYZ');
-  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "BV"}).url', 'pseudo://test?xxx=yyy&a=BV');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "XYZ"}).url', 'pseudo://test?a=XYZ&xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "BV"}).url', 'pseudo://test?a=BV&xxx=yyy');
   t('form(<form><input name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
 
   t('uri-combine(<input name="c" value="foo"/>, <input name="d" value="bar"/>)', 'c=foo&d=bar');

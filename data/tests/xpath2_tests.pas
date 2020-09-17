@@ -2143,6 +2143,13 @@ begin
   t('uri-combine({"x": "++", "y&": 123}, {"x": 0, "y": 456})', 'x=0&y%26=123&y=456');
   t('uri-combine({"x": "++", "y&": 123}, {"y": "456", "x": 0})', 'x=0&y%26=123&y=456');
 
+  t('uri-combine("a=u&b=v&a=w&b=x&a=y&b=z", "a=1")', 'a=1&b=v&b=x&b=z');
+  t('uri-combine("a=u&b=v&a=w&b=x&a=y&b=z", "a=1&a=2")', 'a=1&b=v&a=2&b=x&b=z');
+  t('uri-combine("a=u&b=v&a=w&b=x&a=y&b=z", "a=1&a=2&a=3")', 'a=1&b=v&a=2&b=x&a=3&b=z');
+  t('uri-combine("a=u&b=v&a=w&b=x&a=y&b=z", "a=1&a=2&a=3&a=4")', 'a=1&b=v&a=2&b=x&a=3&b=z&a=4');
+  t('join(for $i in 0 to 5 return uri-combine("a=u&b=v&a=w&b=x&a=y&b=z", {"a": 1 to $i}))', 'b=v&b=x&b=z a=1&b=v&b=x&b=z a=1&b=v&a=2&b=x&b=z a=1&b=v&a=2&b=x&a=3&b=z a=1&b=v&a=2&b=x&a=3&b=z&a=4 a=1&b=v&a=2&b=x&a=3&b=z&a=4&a=5');
+  t('join(for $i in 0 to 5 return uri-combine("a=u&b=v&a=w&b=x&a=y&b=z", {"a": 1 to 2, "b": 1 to $i}))', 'a=1&a=2 a=1&b=1&a=2 a=1&b=1&a=2&b=2 a=1&b=1&a=2&b=2&b=3 a=1&b=1&a=2&b=2&b=3&b=4 a=1&b=1&a=2&b=2&b=3&b=4&b=5');
+
   t('binary-to-string(xs:hexBinary("1234567890ABCDEF"))',#$12#$34#$56#$78#$90#$AB#$CD#$EF);
   t('binary-to-string(xs:hexBinary("C3A4"))','ä');
   t('binary-to-string(xs:hexBinary("C3A4"), "latin1")','Ã¤');
@@ -3283,11 +3290,18 @@ begin
   t('form-combine($f, "foo=cat").post', 'foo=cat&X=123&Y=456', '');
   t('form(//form[1], "Y=override2&Z=override3&Z=override4").post', 'foo=bar&X=123&Y=override2&Z=override3&Z=override4', '');
   t('form(//form[1], "foo=override&Y=override2&Z=override3&Z=override4").post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
-//todo: fix this
-//  t('form(//form[1], {"foo": "override", "Y": "override2", "Z": "override3", "Z": "override4"}).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
-//  t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&X=123&Y=override2&ride=&Z=override3&Z=override4', '');
-//  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": "override3", "Z": "override4"}).post', 'foo=over%25%26ride&X=123&Y=override+2&Z=override3&Z=override4', '');
+
+  t('form(//form[1], {"foo": "override", "Y": "override2", "Z": ("override3", "override4")}).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], ({"foo": "override", "Y": "override2", "Z": "override3"}, "Z=override4")).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], ({"Z": ()}, {"foo": "override", "Y": "override2", "Z": "override3"}, "Z=override4", {"Z": ("override5", "override6")})).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4&Z=override5&Z=override6', '');
+  t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&X=123&Y=override2&ride=&Z=override3&Z=override4', '');
+  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": ("override3", "override4")}).post', 'foo=over%25%26ride&X=123&Y=override+2&Z=override3&Z=override4', '');
   t('form(//form[1], //form[1]//button).post', 'foo=bar&X=123&Y=456&btn=fu', '');
+  t('form(//form[1], {"foo": (), "X": (), "Y": ()}).post', '');
+  t('form(//form[1], ({"foo": (), "X": (), "Y": ()}, "Y=1b&X=1a&Y=2b&X=2a")).post', 'X=1a&Y=1b&Y=2b&X=2a');
+  t('form(//form[1], ({"foo": (), "X": (7,8), "Y": (9,10,11)}, "Y=1b&X=1a&Y=2b&X=2a")).post', 'X=7&Y=9&X=8&Y=10&Y=11&Y=1b&X=1a&Y=2b&X=2a');
+  t('form(//form[1], ({"foo": {}, "X": (7,8), "Y": (9,10,11)})).post', 'foo=bar&X=7&Y=9&X=8&Y=10&Y=11');
+  t('form(//form[1], ({"foo": {"value": "def"}, "X": (7,8), "Y": (9,10,11)})).post', 'foo=def&X=7&Y=9&X=8&Y=10&Y=11');
 
   t('form(//form[2]).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('form(//form[2]).method', 'GET', '');
