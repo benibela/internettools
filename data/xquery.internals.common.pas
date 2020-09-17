@@ -942,16 +942,17 @@ procedure TXQBaseHashmapValuePointerLikeOwning.include(const Key: TKey; const aV
 var
   ent: PHashMapEntity;
 begin
-  ent := findEntity(key, true);
-  if ent^.Value = pointer(AValue) then begin
-    if allowOverride then ent^.Key := key;
+  ent := findEntity(key);
+  if ent = nil then begin
+    TValueOwnershipTracker.addRef(avalue);
+    inherited include(key, pointer(avalue));
     exit;
   end;
-  if ent^.Value <> nil then begin
-    if not allowOverride then exit;
-    ent^.Key := key;
-    TValueOwnershipTracker.release(TValue(ent^.Value));
-  end;
+  if not allowOverride then exit;
+  ent^.Key := key;
+  if ent^.Value = pointer(AValue) then
+    exit;
+  TValueOwnershipTracker.release(TValue(ent^.Value));
   TValueOwnershipTracker.addRef(avalue);
   ent^.Value:=pointer(avalue);
 end;
