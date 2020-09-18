@@ -915,7 +915,12 @@ begin
         else raise;
     end;
     aakCount: result := OK[res.getSequenceCount = StrToInt(value)];
-    aakDeepEq: result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
+    aakDeepEq: begin
+      xq.ParsingOptions.LineEndingNormalization:=xqlenNone;
+      result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
+      if not (config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1]) then
+        xq.ParsingOptions.LineEndingNormalization := xqlenXML11;
+    end;
     aakXml: result := OK[xmlEqual(res, value, ignorePrefixes)];
     //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
     aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
