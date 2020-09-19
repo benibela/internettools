@@ -15,6 +15,9 @@ uses
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
   bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common;
   { you can add units after this }
+
+const QT3BASEURI = 'http://QT3.W3.ORG/';
+
 type
 
  TSource = class
@@ -1461,7 +1464,7 @@ begin
   e := definition;
   definition := nil;
   staticBaseUri := xq.parseQuery('*:static-base-uri/@*:uri', xqpmXPath2).evaluate(e).toString;
-  if staticBaseUri = '' then staticBaseUri := e.getDocument().baseURI;
+  if staticBaseUri = '' then staticBaseUri := QT3BASEURI;//e.getDocument().baseURI;
 
   collations := TStringList.Create;
   for v in xq.parseQuery('*:collation', xqpmXPath2).evaluate(e) do begin
@@ -1726,10 +1729,19 @@ TQT3FakeInternetAccess = class(TMockInternetAccess)
   procedure doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock); override;
 end;
 
-var i: integer;
+var testSetIndex: integer;
   clr: TCommandLineReader;
 
 procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
+  procedure loadFile(const fn: string);
+  var
+    temp: String;
+  begin
+    lastHTTPHeaders.Clear;
+    temp := strLoadFromFile(fn);
+    writeBlock(pchar(temp)^, length(temp));
+    lastHTTPResultCode := 200;
+  end;
 var ur: string;
   procedure searchURL(e: TEnvironment);
   var
@@ -1737,7 +1749,9 @@ var ur: string;
     temp: String;
     i: integer;
     s: TSource;
+
   begin
+    if strBeginsWith(ur, QT3BASEURI) then delete(ur, 1, length(QT3BASEURI));
     if TEnvironment(e).resources <> nil then
       for r in TEnvironment(e).resources do
         if TResource(r).uri = ur then begin
@@ -1774,6 +1788,7 @@ var
   temp: String;
 begin
   ur := url.combined();
+  if strBeginsWith(ur, QT3BASEURI) then delete(ur, 1, length(QT3BASEURI));
   lastHTTPResultCode := 400;
 
   for e in currentTest.environments do begin
@@ -1786,7 +1801,16 @@ begin
       lastHTTPResultCode := 200;
       temp := strLoadFromFile(ur);
       writeBlock(pchar(temp)^, length(temp));
+      exit;
     end;
+  end;
+  if FileExists(strResolveURI(ur, TTestSet(testsets[testSetIndex]).fileName)) then begin
+    loadFile(strResolveURI(ur, TTestSet(testsets[testSetIndex]).fileName));
+    exit
+  end;
+  if FileExists(ur) then begin
+    loadFile(ur);
+    exit
   end;
 end;
 
@@ -1938,8 +1962,8 @@ begin
 
 
   logger.beginXQTS(testsets);
-  for i := 0 to testsets.Count-1 do
-    TTestSet(testsets[i]).run;
+  for testSetIndex := 0 to testsets.Count-1 do
+    TTestSet(testsets[testSetIndex]).run;
 
 
   {cmd := TCommandLineReader.create;
