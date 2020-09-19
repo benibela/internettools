@@ -5651,7 +5651,7 @@ begin
   result := xqFunctionFormat_DateTimeC(context, argc, args, false, true);
 end;
 
-type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentItself, spInExponent, spInSuffix);
+type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentSeparator, spInExponent, spInSuffix);
 
 function xqFunctionFormat_Number(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -5659,7 +5659,8 @@ var
   picture: String;
   c: integer;
   numberf: xqfloat;
-  number: BigDecimal;
+  number: BigDecimal; //mantissa
+  exponent: integer;
   currentPictureParser: integer;
   pictureParser: array[0..1] of record
     foundChar: array[TXQDecimalFormatProperty] of boolean;
@@ -5674,6 +5675,7 @@ var
     exponentOptional: Integer;
     activeChar: Boolean;
     prefix, suffix: string;
+    scalingFactor: integer;// = integerMandatory
   end;
   arabic: String;
   dot: LongInt;
@@ -5697,10 +5699,21 @@ var
   procedure checkPictureFinal;
   begin
     with pictureParser[currentPictureParser] do begin
+      scalingFactor := integerMandatory;
       if (not  foundChar[xqdfpDigit]) and (not foundChar[xqdfpZeroDigit]) then raiseInvalidPicture;
       if (foundChar[xqdfpExponentSeparator] and (exponentMandatory + exponentOptional > 0))
          and (foundChar[xqdfpPercent] or foundChar[xqdfpPerMille]) then raiseInvalidPicture;
       if (arrayLast(integerGroups, -1) = integerMandatory + integerOptional) then raiseInvalidPicture; //no grouping symbol next to decimal or at string end
+
+      if (integerMandatory = 0) and (fractionMandatory + fractionOptional = 0) then begin
+        if foundChar[xqdfpExponentSeparator] then begin
+          fractionMandatory := 1;
+        end;// else integerMandatory := 1;
+      end;
+      if foundChar[xqdfpExponentSeparator] and (integerMandatory = 0) and (integerOptional > 0) then begin
+        integerMandatory := 1;
+        dec(integerOptional);
+      end;
     end;
   end;
 
@@ -5740,11 +5753,10 @@ begin
     if c = data^.chars[xqdfpDecimalSeparator] then begin
       checkDuplicate(xqdfpDecimalSeparator);
       case subPosition of
-        spExponentItself: raiseInvalidPicture;
         spInPrefix, spInInteger: subPosition := spInFraction;
+        spInExponent, spExponentSeparator: raiseInvalidPicture;
       end;
     end else if c = data^.chars[xqdfpGroupingSeparator] then begin
-      if subPosition = spExponentItself then raiseInvalidPicture;
       case subPosition of
         spInPrefix, spInInteger: begin
           subPosition := spInInteger;
@@ -5757,7 +5769,7 @@ begin
           if (i = 0) {<- adjacent to decimal sep} or (arrayLast(fractionGroups, -1) = i) then raiseInvalidPicture;
           arrayAdd(fractionGroups, i);
         end;
-        //exponent?
+        spInExponent, spExponentSeparator: raiseInvalidPicture;
       end;
     end {else if c = data^.chars[xqdfpMinusSign] then begin it is just a passive character
     end }else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
@@ -5772,7 +5784,7 @@ begin
           if fractionOptional > 0 then raiseInvalidPicture;
           inc(fractionMandatory);
         end;
-        spInExponent,spExponentItself: begin
+        spInExponent,spExponentSeparator: begin
           inc(exponentMandatory);
           subPosition := spInExponent
         end;
@@ -5785,22 +5797,28 @@ begin
           inc(integerOptional);
         end;
         spInFraction: inc(fractionOptional);
-        spInExponent,spExponentItself: begin
+        spInExponent,spExponentSeparator: begin
           inc(exponentOptional);
           subPosition := spInExponent
         end;
       end;
     end else if c = data^.chars[xqdfpPatternSeparator] then begin
       checkPictureFinal;
-      if (currentPictureParser = 1) or (subPosition = spExponentItself) then raiseInvalidPicture;
+      if (currentPictureParser = 1) or (subPosition = spExponentSeparator) then raiseInvalidPicture;
       currentPictureParser := 1;
       continue;
-    end else if (c = data^.chars[xqdfpExponentSeparator]) and false {this is 3.1 syntax} then begin
+    end else if activeChar and (c = data^.chars[xqdfpExponentSeparator]) and (context.staticContext.model in PARSING_MODEL3_1) then begin
       case subPosition of
         spInPrefix: activeChar := false;
-        spInInteger, spInFraction, spInExponent, spExponentItself: begin
-          subPosition := spInFraction;
+        spInInteger, spInFraction: begin
+          if (not  foundChar[xqdfpDigit]) and (not foundChar[xqdfpZeroDigit]) then raiseInvalidPicture;
+          subPosition := spExponentSeparator;
           checkDuplicate(xqdfpExponentSeparator);
+        end;
+        spExponentSeparator: raiseInvalidPicture;
+        spInExponent: begin
+          activeChar := false;
+          subPosition := spInSuffix;
         end;
         spInSuffix: activeChar := false;
       end;
@@ -5808,14 +5826,17 @@ begin
     if not activeChar then begin
       if subPosition = spInPrefix then prefix += strGetUnicodeCharacter(c)
       else begin
-        if subPosition = spExponentItself then suffix += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+        if subPosition = spExponentSeparator then begin //exponent not followed by active char becomes part of suffix
+          foundChar[xqdfpExponentSeparator] := false;
+          suffix += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+        end;
         suffix += strGetUnicodeCharacter(c);
         subPosition := spInSuffix;
       end;
     end;
     case subPosition of
       spInPrefix: if activeChar then subPosition := spInInteger;
-      spInInteger, spInFraction, spInExponent, spExponentItself: if not activeChar then subPosition := spInSuffix;
+      spInInteger, spInFraction, spInExponent, spExponentSeparator: if not activeChar then subPosition := spInSuffix;
       spInSuffix: if activeChar then raiseInvalidPicture;
     end;
   end;
@@ -5853,8 +5874,13 @@ begin
   with pictureParser[currentPictureParser] do begin
     number.signed := false;
 
-    //todo: exponent (5,6)
+    if foundChar[xqdfpExponentSeparator] then begin
+      exponent := mostSignificantExponent(number) - scalingFactor + 1;
+      shift10(number, -exponent);
+    end;
+
     number := round(number, -(fractionMandatory + fractionOptional) );
+
 
     arabic := BigDecimalToStr(number);
     if (integerMandatory = 0) and (fractionOptional + fractionMandatory > 0) and strBeginsWith(arabic, '0') then begin
@@ -5911,6 +5937,19 @@ begin
         else c := 0;
         resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + c );
       end;
+    end;
+
+    if foundChar[xqdfpExponentSeparator] then begin
+      resstr += strGetUnicodeCharacter(data^.chars[xqdfpExponentSeparator]);
+      if exponent < 0 then begin
+        resstr += strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]);
+        exponent := -exponent;
+      end;
+      arabic := inttostr(exponent);
+      if length(arabic) < exponentMandatory then
+        resstr += strDup( strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit]), exponentMandatory - length(arabic) );
+      for i := 1 to length(arabic) do
+        resstr += strGetUnicodeCharacter(data^.chars[xqdfpZeroDigit] + ord(arabic[i]) - ord('0') );
     end;
 
     result := xqvalue(prefix + resstr + suffix);

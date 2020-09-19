@@ -3848,7 +3848,7 @@ var declarationDuplicateChecker: TStringList;
       if p <= length(value) then raiseParsingError('XQST0097', 'Need character');
     end;
 
-    var uniqueSigns: array[1..6] of TXQDecimalFormatProperty = (xqdfpDecimalSeparator, xqdfpGroupingSeparator, xqdfpPercent, xqdfpPerMille, xqdfpDigit, xqdfpPatternSeparator);
+    var uniqueSigns: array[1..7] of TXQDecimalFormatProperty = (xqdfpDecimalSeparator, xqdfpGroupingSeparator, xqdfpPercent, xqdfpPerMille, xqdfpDigit, xqdfpPatternSeparator, xqdfpExponentSeparator);
       i: Integer;
       j: Integer;
   begin
@@ -3895,6 +3895,10 @@ var declarationDuplicateChecker: TStringList;
               setChar(xqdfpZeroDigit);
               if decimalFormat.formats.chars[xqdfpZeroDigit] <> charUnicodeZero(decimalFormat.formats.chars[xqdfpZeroDigit]) then
                 raiseParsingError('XQST0097', 'Need zero digit');
+            end;
+            'exponent-separator': begin
+              require3_1();
+              setChar(xqdfpExponentSeparator);
             end
             else raiseSyntaxError('Unknown property');
           end;
