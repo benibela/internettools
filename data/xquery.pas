@@ -3829,21 +3829,26 @@ begin
 end;
 
 function TXQValueEnumeratorArrayTransparentUnsafe.MoveNext: Boolean;
-label enterArray, leaveArray, currentEnumeratorMoveNext;
+label enter, leaveArray, currentEnumeratorMoveNext;
 begin
   currentEnumeratorMoveNext:
     result := ptrs[currentEnumerator].MoveNext;
     if result then begin
       fcurrent := Ptrs[currentEnumerator].Current^.toValue;
-      if fcurrent.kind <> pvkArray then exit
-      else goto enterArray;
+      case fcurrent.kind of
+        pvkArray, pvkSequence, pvkUndefined: goto enter;
+        else exit;
+      end;
     end else goto leaveArray;
 
-  enterArray: //fcurrent = ptrs[currentEnumerator].current^ is an array
+  enter: //fcurrent = ptrs[currentEnumerator].current^ is an array or sequence
     if currentEnumerator = high(ptrs) then
       SetLength(ptrs, length(ptrs) * 2);
     inc(currentEnumerator);
-    ptrs[currentEnumerator] := fcurrent.GetEnumeratorMembersPtrUnsafe;
+    if fcurrent.kind = pvkArray then
+      ptrs[currentEnumerator] := fcurrent.GetEnumeratorMembersPtrUnsafe
+     else
+      ptrs[currentEnumerator] := fcurrent.GetEnumeratorPtrUnsafe;
     goto currentEnumeratorMoveNext;
 
   leaveArray: //ptrs[currentEnumerator].current^ is nil
