@@ -5705,14 +5705,16 @@ var
          and (foundChar[xqdfpPercent] or foundChar[xqdfpPerMille]) then raiseInvalidPicture;
       if (arrayLast(integerGroups, -1) = integerMandatory + integerOptional) then raiseInvalidPicture; //no grouping symbol next to decimal or at string end
 
-      if (integerMandatory = 0) and (fractionMandatory + fractionOptional = 0) then begin
-        if foundChar[xqdfpExponentSeparator] then begin
+      if foundChar[xqdfpExponentSeparator] then begin
+        if (integerMandatory = 0) and (fractionMandatory + fractionOptional = 0) then
           fractionMandatory := 1;
-        end;// else integerMandatory := 1;
-      end;
-      if foundChar[xqdfpExponentSeparator] and (integerMandatory = 0) and (integerOptional > 0) then begin
-        integerMandatory := 1;
-        dec(integerOptional);
+        if (integerMandatory = 0) and (integerOptional > 0) then begin
+          integerMandatory := 1;
+          dec(integerOptional);
+        end else if (integerMandatory = 0) and (fractionMandatory = 0) and (fractionOptional > 0) then begin
+          fractionMandatory := 1;
+          dec(fractionOptional);
+        end;
       end;
     end;
   end;
