@@ -506,6 +506,24 @@ begin
   test(precision(StrToBigDecimal('0.00101')), 3);
   test(precision(StrToBigDecimal('0.000101')), 3);
 
+  test(mostSignificantExponent(StrToBigDecimal('1E1000')),1000);
+  test(mostSignificantExponent(StrToBigDecimal('1230000000000')), 12);
+  test(mostSignificantExponent(123), 2);
+  test(mostSignificantExponent(12), 1);
+  test(mostSignificantExponent(10), 1);
+  test(mostSignificantExponent(9), 0);
+  test(mostSignificantExponent(8), 0);
+  test(mostSignificantExponent(1), 0);
+  test(mostSignificantExponent(StrToBigDecimal('0.9')),-1);
+  test(mostSignificantExponent(StrToBigDecimal('0.1')),-1);
+  test(mostSignificantExponent(StrToBigDecimal('0.09')),-2);
+  test(mostSignificantExponent(StrToBigDecimal('0.001')),-3);
+  test(mostSignificantExponent(StrToBigDecimal('0.0001')),-4);
+  test(mostSignificantExponent(StrToBigDecimal('0.00000000000001')),-14);
+  test(mostSignificantExponent(StrToBigDecimal('1E-1000')),-1000);
+  test(mostSignificantExponent(0), 0);
+
+
   bd := StrToBigDecimal('123') div StrToBigDecimal('1');
   test(BigDecimalToStr(bd),  '123');
   test(BigDecimalToStr(bd, bdfExponent),  '1.23E2');

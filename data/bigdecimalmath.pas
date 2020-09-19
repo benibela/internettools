@@ -216,6 +216,10 @@ operator >(const a: BigDecimal; const b: BigDecimal): boolean;
 procedure normalize(var x: BigDecimal);
 //** How many non-zero digits the number contains
 function precision(const v: BigDecimal): integer;
+//** The index of the leading, most significant digit @br
+//** That is, the exponent of number when it is written in scientific notation @br
+//** That is, 10^result <= v < 10^(result+1)
+function mostSignificantExponent(const v: BigDecimal): integer;
 
 type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmRoundHalfUp, bfrmRoundHalfToEven);
 //** Universal rounding function @br
@@ -1622,6 +1626,17 @@ begin
   if realhigh = reallow then exit(digitsInBin(v.digits[realhigh]) - trailingZeros(v.digits[reallow]));
 
   result := digitsInBin(v.digits[realhigh]) + (realhigh - reallow) * DIGITS_PER_ELEMENT - trailingZeros(v.digits[reallow])
+end;
+
+function mostSignificantExponent(const v: BigDecimal): integer;
+var
+  realhigh: Integer;
+begin
+  realhigh := high(v.digits);
+  while (realhigh >= 0) and (v.digits[realhigh] = 0) do dec(realhigh);
+  if realhigh < 0 then exit(0);
+
+  result := digitsInBin(v.digits[realhigh]) + (realhigh  + v.exponent) * DIGITS_PER_ELEMENT - 1;
 end;
 
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
