@@ -461,12 +461,12 @@ end;
 
 procedure TXQSerializationParams.setFromMap(const context: TXQEvaluationContext; const v: IXQValue);
 var
-  pp: TXQProperty;
+  pp: TXQStandardProperty;
   staticOptions: boolean = false;
   tempDoc: IXQValue;
   procedure raiseInvalidParameter(typeError: boolean = true);
   begin
-    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.key, pp.Value);
+    raiseXQEvaluationError(ifthen(typeError, 'XPTY0004', 'SEPM0016'), 'Invalid parameter for '+ pp.key.toXQuery, pp.Value);
   end;
 
   function toSerializationBool(const s:string): boolean; overload;
@@ -509,27 +509,28 @@ var
     begin
       raiseXPTY0004TypeError(pp.value, 'Map for serialization param use-character-maps.');
     end;
-  var characterp: TXQProperty;
+  var characterp: TXQStandardProperty;
   begin
     if characterMaps = nil then new(characterMaps,init);
     if pp.value.kind <> pvkObject then error;
-    for characterp in pp.value.getEnumeratorStringPropertiesUnsafe do begin
-      if characterp.Value.kind <> pvkString then error;
-      characterMaps.include(characterp.key, characterp.Value.toString);
+    for characterp in pp.value.getEnumeratorPropertiesUnsafe do begin
+      if (not  TXQValueOwnershipTracker.isStringKeyLike(characterp.key.toValue)) or (characterp.Value.kind <> pvkString) then error;
+      characterMaps.include(characterp.key.toString, characterp.Value.toString);
     end;
   end;
 
 begin
-  for pp in v.getEnumeratorStringPropertiesUnsafe do begin
+  for pp in v.getEnumeratorPropertiesUnsafe do begin
+    if not TXQValueOwnershipTracker.isStringKeyLike(pp.key.toValue) then continue;
     case pp.Value.getSequenceCount of
       0: continue;
       1: ; //fine
-      else case pp.key of
+      else case pp.key.toString of
         'cdata-section-elements', 'suppress-indentation': ; //fine
         else raiseXPTY0004TypeError(v, 'Invalid parameter');
       end;
     end;
-    case pp.key of
+    case pp.key.toString of
       'allow-duplicate-names': allowDuplicateNames := valueBool();
       'byte-order-mark': byteOrderMark := valueBool();
       'cdata-section-elements': setQNameList(cdataSectionElements);
