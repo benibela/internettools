@@ -5878,6 +5878,7 @@ begin
 
     if foundChar[xqdfpExponentSeparator] then begin
       exponent := mostSignificantExponent(number) - scalingFactor + 1;
+      if (exponent <> 0) and (isZero(number)) then exponent := 0;
       shift10(number, -exponent);
     end;
 
