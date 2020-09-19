@@ -5004,13 +5004,13 @@ begin
       t := TXQValueNode.nodeTypeAnnotationForAtomic(v.toNode);
       result := t.createValue(v.toString);
     end;
-    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Function values cannot be atomized.');
     pvkArray: begin
       seqResult := TXQValueSequence.create(v.getSequenceCount);
       for x in v.GetEnumeratorMembersPtrUnsafe do seqResult.seq.add(xqvalueAtomize(x^));
       result := seqResult;
       exit;
     end;
+    pvkFunction, pvkObject: raise EXQEvaluationException.create('FOTY0013', 'Maps and function values cannot be atomized.' + v.toXQuery);
     else if v.instanceOf(baseSchema.AnyAtomicType) then exit(v)
     else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.toXQuery());
   end;
