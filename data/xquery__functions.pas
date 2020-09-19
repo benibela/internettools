@@ -6213,23 +6213,66 @@ end;
    PXPair = ^TXPair;
 
 function compareDirect(self: TObject; p1,p2: pointer): integer;
-var v1: PIXQValue absolute p1;
-    v2: PIXQValue absolute p2;
-    sortingContext: PSortingContext absolute self;
-    i, c1, c2: Integer;
-begin
-  c1 := v1^.getSequenceCount;
-  c2 := v2^.getSequenceCount;
-  if (c1 = 1 ) and (c2 = 1) then exit( sortingContext^.staticContext.compareDeepAtomic(v1^, v2^, sortingContext^.collation) );
-
-  for i := 1 to min(c1, c2) do begin
-    result := sortingContext^.staticContext.compareDeepAtomic(v1^.get(i), v2^.get(i), sortingContext^.collation);
-    if result <> 0 then begin
-      if (result > 0) and (v1^.get(i).kind = pvkFloat) and (sortingContext^.staticContext.compareAtomic(v1^.get(i), v1^.get(i)) <> 0) then result := -1; //nan check
-      exit;
-    end;
+  procedure error(v1, v2: TXQValue);
+  begin
+    raise EXQEvaluationException.Create('XPTY0004', 'Sorting failed, cannot compare ' + v1.toXQuery + ' with ' +v2.toXQuery, nil, nil, nil);
   end;
-  result := sign(c1 - c2);
+var sortingContext: PSortingContext absolute self;
+  function compare(v1, v2: TXQValue): integer;
+    procedure error; overload;
+    begin
+      error(v1,v2);
+    end;
+    function compareStrings: integer;
+    begin
+      result := sortingContext.collation.compare(v1.toString, v2.toString)
+    end;
+
+  begin
+    if v1.kind = pvkNode then begin
+      if (v2.kind = pvkNode) or (TXQValueOwnershipTracker.isStringKeyLike(v2)) then
+        exit(compareStrings)
+       else
+        error;
+    end;
+    if v2.kind = pvkNode then begin
+      if TXQValueOwnershipTracker.isStringKeyLike(v1) then
+        exit(compareStrings)
+       else
+        error;
+    end;
+    result := sortingContext^.staticContext.compareDeepAtomic(v1, v2, sortingContext^.collation);
+    if result = -2 then error;
+  end;
+
+var pv1: PIXQValue absolute p1;
+    pv2: PIXQValue absolute p2;
+    c1, c2: Integer;
+    v1, v2: TXQValue;
+    k1, k2: TXQValueKind;
+    e1, e2: TXQValueEnumeratorArrayTransparentUnsafe;
+
+begin
+  v1 := pv1^.toValue;
+  v2 := pv2^.toValue;
+  k1 := v1.kind;
+  k2 := v2.kind;
+  c1 := v1.getSequenceCount;
+  c2 := v2.getSequenceCount;
+  if (k1 <> pvkArray) and (k2 <> pvkArray) and (c1 = 1 ) and (c2 = 1) then begin
+    result := compare(v1, v2);
+    exit;
+  end;
+
+  e1 := v1.GetEnumeratorArrayTransparentUnsafe;
+  e2 := v2.GetEnumeratorArrayTransparentUnsafe;
+  while e1.MoveNext do begin
+    if not e2.MoveNext then exit(1);
+    result := compare(e1.current, e2.current);
+    if result <> 0 then exit;
+  end;
+  if e2.MoveNext then result := -1
+  else result := 0
 end;
 function compareWithKey(self: TObject; p1,p2: pointer): integer;
 begin
@@ -6238,17 +6281,30 @@ end;
 
 
 procedure sortXQList(list: TXQVList; const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue);
+
+  procedure errorFOTY0013(v: TXQValue);
+  begin
+    raise EXQEvaluationException.create('FOTY0013', 'Cannot sort list containing non-comparable value: '+v.toXQuery);
+  end;
+
 var
   sortContext: TSortingContext;
   keyfunc: TXQValueFunction;
   tempArray: array of TXPair = nil;
   count, i, stacksize: Integer;
   stack: TXQEvaluationStack;
+  w: TXQValue;
 begin
   if (argc >= 2) and not (args[1].isUndefined) then sortContext.collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else sortContext.collation := context.staticContext.collation;
   sortContext.staticContext := context.staticContext;
   if argc < 3 then begin
+    for i := 0 to list.Count - 1 do
+      case list[i].kind of
+        pvkObject, pvkFunction: errorFOTY0013(list[i].toValue);
+        pvkArray: for w in list[i].GetEnumeratorArrayTransparentUnsafe do
+          if w.kind in [pvkObject, pvkFunction] then errorFOTY0013(w);
+      end;
     list.sort(@compareDirect, TObject(@sortContext));
   end else begin
     count := list.count;

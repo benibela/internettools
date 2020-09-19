@@ -7122,7 +7122,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) then begin
     if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(0)
-    else exit(-1); //randomly choosen
+    else exit(-1); //move NaNs first for fn:sort
   end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(1);
   result := compareAtomic(a,b,overrideCollation);
 end;
