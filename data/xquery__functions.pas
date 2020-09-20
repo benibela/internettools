@@ -5284,29 +5284,25 @@ var
     format: string;
     minwidth, maxwidth: integer;
   end = nil;
-  picturedlength: Integer;
+  picturedlength: Integer = 0;
   commapos: SizeInt;
   tempstrmin, tempstrmax: string;
-  last: Integer;
+  last: Integer = 1;
   i, j: SizeInt;
-  calendarNamespace: string;
+  calendarNamespace: string = '';
   dateTime: PXQValueDateTimeData;
   number: Integer;
   component, format: String;
   sublang: String;
   formatted: String;
   missingCharacterCount: Integer;
-  zerocp: Integer;
+  zerocp: Integer = ord('0');
   allDigits: Boolean;
   tz, tempcount: Integer;
-  fallbackOccured: String;
+  fallbackOccured: String = '';
   tempcountopt: LongInt;
   tempxqv: array of IXQValue;
-
-
 begin
-  calendarNamespace := '';
-  fallbackOccured := '';
   if argc = 5 then begin
     lang := args[2].toString;
     calendar := args[3].toString;
@@ -5345,8 +5341,6 @@ begin
   picture := args[1].toString;
   //writeln('>>',picture);
   SetLength(pictured, 32);
-  picturedlength := 0;
-  last := 1;
   i := 1;
   while i <= length(picture) do begin
     case picture[i] of

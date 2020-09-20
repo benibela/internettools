@@ -5248,6 +5248,7 @@ begin
          else len := 0;
          exit;
        end else begin //+inf, nan
+         from := 1;
          len := 0;
          exit;
        end;

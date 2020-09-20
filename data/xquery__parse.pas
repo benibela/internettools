@@ -711,6 +711,11 @@ begin
   if (pos <= lastErrorPos) and assigned(errorTracking.pendingException) then raise errorTracking.pendingException;
   errorTracking.raiseParsingError(lastTokenStart, pos, errcode, s);
   lastErrorPos := pos;
+  if pos + 1 >= (pchar(str) + length(str)) then begin
+    //raise error directly on last or penultimate character in the query
+    //because no further syntax error can occur, and more importantly, if the parsing is not aborted, it might read invalid bytes
+    raise errorTracking.pendingException;
+  end;
 end;
 
 procedure TXQParsingContext.raiseSyntaxError(s: string);
