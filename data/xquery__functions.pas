@@ -7185,8 +7185,9 @@ begin
   result := parser.parse(data);
 end;
 
-function xqFunctionJSONXMLPlaceholder(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTransformPlaceholder(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
+  raise EXQEvaluationException.create('FOXT0004', 'XSLT is not supported');
   result := xqvalue();
 end;
 
@@ -7526,6 +7527,8 @@ transform
   fn3_1.registerFunction('json-doc', @xqFunctionJSON_doc, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
   fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
 
+  fn3_1.registerFunction('transform', @xqFunctionTransformPlaceholder, [xqcdContextOther]).setVersionsShared([map, map]);
+
   //from https://gist.github.com/joewiz/d986da715facaad633db
   fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?) as document-node()?', 'json-to-xml($json-text, map {})');
   fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?, $options as map(*)) as document-node()?', '$json-text ! document { x:joewiz-json-to-xml-recurse(parse-json(., if ($options?duplicates = "retain") then map:put($options, "duplicates", "use-first") else $options )) }');
@@ -7534,6 +7537,7 @@ transform
   x.registerInterpretedFunction('joewiz-json-to-xml-recurse', '($json as item()*) as item()+', ' let $data-type := x:joewiz-json-data-type($json) return element { QName("http://www.w3.org/2005/xpath-functions", $data-type) } { if ($data-type eq "array") then for $array-member in $json?* let $array-member-data-type := x:joewiz-json-data-type($array-member) return element {$array-member-data-type} { if ($array-member-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($array-member)/node() else $array-member } else if ($data-type eq "map") then map:for-each( $json, function($object-name, $object-value) { let $object-value-data-type := x:joewiz-json-data-type($object-value) return element { QName("http://www.w3.org/2005/xpath-functions", $object-value-data-type) } { attribute key {$object-name}, if ($object-value-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($object-value)/node() else $object-value } } ) else $json }');
   x.registerInterpretedFunction('joewiz-json-data-type', '($json as item()?) as xs:string', ' if ($json instance of array(*)) then "array" else if ($json instance of map(*)) then "map" else if ($json instance of xs:string) then "string" else if ($json instance of xs:double) then "number" else if ($json instance of xs:boolean) then "boolean" else if (empty($json)) then "null" else error(xs:QName("ERR"), "Not a known data type for json data")');
   x.registerInterpretedFunction('joewiz-xml-to-json-recurse', '($input as node()*) as item()*', ' for $node in $input return typeswitch ($node) case element(fn:map) return if ($node/@key) then map { $node/@key: map:merge( x:joewiz-xml-to-json-recurse($node/node()) ) } else map:merge( x:joewiz-xml-to-json-recurse($node/node()) ) case element(fn:array) return if ($node/@key) then map { $node/@key: array { x:joewiz-xml-to-json-recurse($node/node()) } } else array { x:joewiz-xml-to-json-recurse($node/node()) } case element(fn:string) return if ($node/@key) then map { $node/@key: $node/string() } else $node/string() case element(fn:number) return if ($node/@key) then map { $node/@key: $node cast as xs:double } else $node cast as xs:double case element(fn:boolean) return if ($node/@key) then map { $node/@key: $node cast as xs:boolean } else $node cast as xs:boolean case element(fn:null) return if ($node/@key) then map { $node/@key: () } else () case document-node() return x:joewiz-xml-to-json-recurse($node/node()) (: Comments, processing instructions, and whitespace text node children of map and array are ignored :) case text() return if (normalize-space($node) eq "") then () else $node case comment() | processing-instruction() return () case element() return error(fn:QName("http://www.w3.org/2005/xqt-errors", "FOJS0006"), "Invalid XML representation of JSON") default return error(xs:QName("ERR"), "Does not match known node types for xml-to-json data")');
+
 
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
