@@ -275,10 +275,10 @@ begin
     HTMLNodeNameHashs.basefont: result := striequal(n.value,'basefont') and not isHTML5;
     HTMLNodeNameHashs.frame: result := striequal(n.value,'frame') and not isHTML5;
 
-    HTMLNodeNameHashs.keygen: result := striequal(n.value,'keygen') and isHTML5;
-    HTMLNodeNameHashs.source: result := striequal(n.value,'source') and isHTML5;
-    HTMLNodeNameHashs.track: result := striequal(n.value,'track') and isHTML5;
-    HTMLNodeNameHashs.wbr: result := striequal(n.value,'wbr') and isHTML5;
+    HTMLNodeNameHashs.keygen: result := isHTML5 and striequal(n.value,'keygen');
+    HTMLNodeNameHashs.source: result := isHTML5 and striequal(n.value,'source');
+    HTMLNodeNameHashs.track: result := isHTML5 and striequal(n.value,'track');
+    HTMLNodeNameHashs.wbr: result := isHTML5 and striequal(n.value,'wbr') ;
   end;
 end;
 
