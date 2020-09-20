@@ -39,7 +39,7 @@ procedure finalizeFunctions;
 
 implementation
 
-uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.namespaces, bigdecimalmath, math,
+uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
   simplehtmltreeparser, simplehtmlparser,
   bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng, xquery__serialization,
 

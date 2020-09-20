@@ -13,7 +13,7 @@ uses
   {$endif}
   Classes, sysutils, strutils, xquery, xquery_module_math,
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
-  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common;
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common, xquery.internals.collations;
   { you can add units after this }
 
 const QT3BASEURI = 'http://QT3.W3.ORG/';
@@ -869,7 +869,7 @@ function TAssertionAssert.check(const testResult: TTestCaseResultValue; errorCod
   var context: TXQEvaluationContext;
   begin
     context.staticContext := xq.StaticContext;
-    result := xqvalueDeep_equal(context, a, b, TXQCollation(TXQueryEngine.collationsInternal.Objects[0]));
+    result := xqvalueDeep_equal(context, a, b, internalDefaultCollation);
   end;
 
   function normalize(const v: IXQValue): IXQValue;
@@ -1617,6 +1617,7 @@ var
   sc: TXQStaticContext;
   collationsSame: Boolean;
   i: Integer;
+  collationsInternal: TStringList;
 begin
   SetExceptionMask([exInvalidOp, exDenormalized, {exZeroDivide,}
                    exOverflow, exUnderflow, exPrecision]);
@@ -1634,22 +1635,23 @@ begin
     if env.staticBaseUri = '#UNDEFINED' then sc.baseURI:=''
    // else if env.staticBaseUri = '' then sc.baseURI := currentfile
     else sc.baseURI := env.staticBaseUri;
-    collationsSame := ( (env.collations.Count = 0) or (TXQueryEngine.collationsInternal.Count = env.collations.Count) );
+    collationsInternal := internalGetCollations;
+    collationsSame := ( (env.collations.Count = 0) or (collationsInternal.Count = env.collations.Count) );
     for i := 0 to env.collations.Count-1 do begin
-      if TXQueryEngine.collationsInternal.IndexOf(env.collations[i]) < 0 then collationsSame:=false;
+      if collationsInternal.IndexOf(env.collations[i]) < 0 then collationsSame:=false;
       if not collationsSame then break;
     end;
     if not collationsSame then begin
-      TXQueryEngine.collationsInternal.Clear;
-      TXQueryEngine.collationsInternal.Assign(env.collations);
+      collationsInternal.Clear;
+      collationsInternal.Assign(env.collations);
     end;
-    if (env.defaultCollation <> '') and (TXQueryEngine.collationsInternal[0] <> env.defaultCollation) then
-      TXQueryEngine.collationsInternal.Exchange(0, TXQueryEngine.collationsInternal.IndexOf(env.defaultCollation));
-  end else if (TXQueryEngine.collationsInternal.Count = 0)
-              or (TXQueryEngine.collationsInternal.Count > 1)
-              or ((TXQueryEngine.collationsInternal.Count = 1) and (TXQueryEngine.collationsInternal.Objects[0] <> xqtsCollations.Objects[0])) then begin
-    TXQueryEngine.collationsInternal.Clear;
-    TXQueryEngine.collationsInternal.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
+    if (env.defaultCollation <> '') and (collationsInternal[0] <> env.defaultCollation) then
+      collationsInternal.Exchange(0, collationsInternal.IndexOf(env.defaultCollation));
+  end else if (collationsInternal.Count = 0)
+              or (collationsInternal.Count > 1)
+              or ((collationsInternal.Count = 1) and (collationsInternal.Objects[0] <> xqtsCollations.Objects[0])) then begin
+    collationsInternal.Clear;
+    collationsInternal.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
   end;
 
 
@@ -1903,8 +1905,8 @@ begin
   //TDependency.putMany(parseForced(clr.readString('dependencies-false'), [#13,#10,';']), false);
 
 
-  TXQueryEngine.collationsInternal.Clear;
-  TXQueryEngine.collationsInternal.OwnsObjects:=false;
+  internalGetCollations.Clear;
+  internalGetCollations.OwnsObjects:=false;
   xqtsCollations := TStringList.Create;
   xqtsCollations.OwnsObjects:=true;
   xqtsCollations.AddObject('http://www.w3.org/2005/xpath-functions/collation/codepoint', TXQCollationCodepoint.Create('http://www.w3.org/2005/xpath-functions/collation/codepoint'));
