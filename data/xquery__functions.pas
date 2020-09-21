@@ -5654,7 +5654,7 @@ var
   c: integer;
   numberf: xqfloat;
   number: BigDecimal; //mantissa
-  exponent: integer;
+  exponent: integer = 0;
   currentPictureParser: integer;
   pictureParser: array[0..1] of record
     foundChar: array[TXQDecimalFormatProperty] of boolean;
