@@ -13,7 +13,7 @@ uses
   {$endif}
   Classes, sysutils, strutils, xquery, xquery_module_math,
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
-  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common, xquery.internals.collations;
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common, xquery.internals.collations, xquery_module_uca;
   { you can add units after this }
 
 const QT3BASEURI = 'http://QT3.W3.ORG/';
@@ -1631,11 +1631,11 @@ begin
     exit;
   end;
   sc := xq.StaticContext;
+  collationsInternal := internalGetCollations;
   if env <> nil then begin
     if env.staticBaseUri = '#UNDEFINED' then sc.baseURI:=''
    // else if env.staticBaseUri = '' then sc.baseURI := currentfile
     else sc.baseURI := env.staticBaseUri;
-    collationsInternal := internalGetCollations;
     collationsSame := ( (env.collations.Count = 0) or (collationsInternal.Count = env.collations.Count) );
     for i := 0 to env.collations.Count-1 do begin
       if collationsInternal.IndexOf(env.collations[i]) < 0 then collationsSame:=false;
