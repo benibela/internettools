@@ -1171,8 +1171,10 @@ begin
 end;
 
 function TJavaEnv.ExceptionCheck: boolean;
+var temp: jboolean;
 begin
-  result := env^^.ExceptionCheck(env) <> JNI_FALSE
+  temp := env^^.ExceptionCheck(env);
+  result := temp <> JNI_FALSE
 end;
 
 procedure TJavaEnv.Throw(e: jobject);
