@@ -13,7 +13,8 @@ uses
   {$endif}
   Classes, sysutils, strutils, xquery, xquery_module_math,
   simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
-  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common, xquery.internals.collations, xquery_module_uca;
+  bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common, xquery.internals.collations,
+  dynlibs, xquery_module_uca_icu;
   { you can add units after this }
 
 const QT3BASEURI = 'http://QT3.W3.ORG/';
@@ -1447,7 +1448,14 @@ begin
   end;
 end;
 
-{ TEnvironment }
+procedure addDefaultCollations(collations: TStringList);
+begin
+  if (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
+        collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
+  if config.version in PARSING_MODEL3_1 then
+    if (collations.IndexOf(TXQCollation(xqtsCollations.Objects[1]).id) < 0) then
+      collations.AddObject(TXQCollation(xqtsCollations.Objects[1]).id, xqtsCollations.Objects[1]);
+end;
 
 procedure TEnvironment.init;
 var
@@ -1459,7 +1467,8 @@ var
   decimalformat: TXQDecimalFormat;
   temp: SizeInt;
   att: TTreeAttribute;
-  temps: String;
+  temps, collationuri: String;
+  collation: TXQCollation;
 begin
   e := definition;
   definition := nil;
@@ -1468,17 +1477,21 @@ begin
 
   collations := TStringList.Create;
   for v in xq.parseQuery('*:collation', xqpmXPath2).evaluate(e) do begin
-    i := xqtsCollations.IndexOf(v.toNode['uri']);
-    if (i < 0) and strBeginsWith(v.toNode['uri'], 'http://www.w3.org/2013/collation/UCA') then begin//todo: use a real collation
-      xqtsCollations.AddObject(v.toNode['uri'], TXQCollationCodepoint.Create(v.toNode['uri']));
+    collationuri := v.toNode['uri'];
+
+    i := xqtsCollations.IndexOf(collationuri);
+    if i >= 0 then collation := TXQCollation(xqtsCollations.Objects[i])
+    else begin
+      collation := internalGetCollation(collationuri);
+      if collation = nil then raise Exception.Create('Failed to find collation: ' + collationuri);
+      xqtsCollations.AddObject(collationuri, collation);
     end;
-    i := xqtsCollations.IndexOf(v.toNode['uri']);
-    if i < 0 then raise Exception.Create('Failed to find collation: ' + v.toNode['uri']);
-    collations.AddObject(v.toNode['uri'], xqtsCollations.Objects[i]);
-    if v.toNode['default'] = 'true' then defaultCollation:=v.toNode['uri'];
+    collations.AddObject(collationuri, collation);
+    if v.toNode['default'] = 'true' then defaultCollation:=collationuri;
   end;
-  if (collations.Count > 0) and (collations.IndexOf(TXQCollation(xqtsCollations.Objects[0]).id) < 0) then
-    collations.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
+  if collations.Count > 0 then
+    addDefaultCollations(collations);
+
 
   u := xq.parseQuery('*:param', xqpmXPath2).evaluate(e);
   SetLength(params, u.getSequenceCount);
@@ -1651,7 +1664,7 @@ begin
               or (collationsInternal.Count > 1)
               or ((collationsInternal.Count = 1) and (collationsInternal.Objects[0] <> xqtsCollations.Objects[0])) then begin
     collationsInternal.Clear;
-    collationsInternal.AddObject(TXQCollation(xqtsCollations.Objects[0]).id, xqtsCollations.Objects[0]);
+    addDefaultCollations(collationsInternal);
   end;
 
 
@@ -1910,11 +1923,14 @@ begin
   xqtsCollations := TStringList.Create;
   xqtsCollations.OwnsObjects:=true;
   xqtsCollations.AddObject('http://www.w3.org/2005/xpath-functions/collation/codepoint', TXQCollationCodepoint.Create('http://www.w3.org/2005/xpath-functions/collation/codepoint'));
-  xqtsCollations.AddObject('http://www.w3.org/2010/09/qt-fots-catalog/collation/caseblind', TXQCollationCodepointLocalizedInsensitive.Create('http://www.w3.org/2010/09/qt-fots-catalog/collation/caseblind'));
   xqtsCollations.AddObject('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive', TXQCollationCodepointInsensitive.Create('http://www.w3.org/2005/xpath-functions/collation/html-ascii-case-insensitive'));
+  xqtsCollations.AddObject('http://www.w3.org/2010/09/qt-fots-catalog/collation/caseblind', TXQCollationCodepointLocalizedInsensitive.Create('http://www.w3.org/2010/09/qt-fots-catalog/collation/caseblind'));
 
   TXQueryEngine.registerCollation(TXQCollation(xqtsCollations.Objects[0]));
-
+  if config.version in PARSING_MODEL3_1 then begin
+    registerFallbackUnicodeConversion;
+    registerModuleUCAICU;
+  end;
   case clr.readString('parser') of
     'simple': tree := TTreeParser.Create;
     'fcl-xml': begin

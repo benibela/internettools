@@ -13,6 +13,7 @@ TXQCollation = class
   constructor Create(const aid: string);
   function compare(const a, b: string): integer;
   function equal(const a, b: string): boolean; virtual;
+  function find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean; virtual;
   function indexOf(const strToBeExaminated, searched: string): SizeInt; virtual;
   function contains(const strToBeExaminated, searched: string): boolean; virtual;
   function startsWith(const strToBeExaminated, expectedStart: string): boolean; virtual;
@@ -26,7 +27,7 @@ end;
 TXQCollationCodepoint = class(TXQCollation)
  function doCompare(const a, b: string): integer; override;
  function equal(const a, b: string): boolean; override;
- function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+ function find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean; override;
  function contains(const strToBeExaminated, searched: string): boolean; override;
  function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
@@ -39,7 +40,7 @@ end;
 TXQCollationCodepointInsensitive = class(TXQCollation)
  function doCompare(const a, b: string): integer; override;
  function equal(const a, b: string): boolean; override;
- function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+ function find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean; override;
  function contains(const strToBeExaminated, searched: string): boolean; override;
  function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
@@ -58,6 +59,10 @@ TXQCollationCodepointLocalizedInsensitive = class(TXQCollation)
  function doCompare(a, b: pansichar; len: SizeInt): integer; override;
 end;
 
+
+type TOnCreateCollation = function (id: string): TXQCollation;
+
+var onCreateCollation: TOnCreateCollation;
 
 //class function collationsInternal: TStringList;
 function internalDefaultCollation: TXQCollation;
@@ -93,10 +98,17 @@ var
   i: Integer;
 begin
   collationLock.enter;
-  i := collations.IndexOf(id);
-  if i < 0 then result := nil
-  else result:=TXQCollation(collations.Objects[i]);
-  collationLock.leave;
+  try
+    i := collations.IndexOf(id);
+    if i < 0 then begin
+      if onCreateCollation <> nil then begin
+        result := onCreateCollation(id);
+        if result <> nil then collations.AddObject(id, result);
+      end else result := nil;
+    end else result:=TXQCollation(collations.Objects[i]);
+  finally
+    collationLock.leave;
+  end;
 end;
 
 function internalGetCollations: TStringList;
@@ -154,18 +166,33 @@ begin
   result := compare(a,b) = 0;
 end;
 
-function TXQCollation.indexOf(const strToBeExaminated, searched: string): SizeInt;
+function TXQCollation.find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean;
 var
-  i: Integer;
+  i: sizeint;
 begin
   for i:=1 to length(strToBeExaminated) - length(searched) + 1 do
-    if compare(@strToBeExaminated[i], @searched[1], length(searched)) = 0 then exit(i);
-  exit(0);
+    if compare(@strToBeExaminated[i], @searched[1], length(searched)) = 0 then begin
+      matchStart := i;
+      matchLength := length(searched);
+      result := true;
+      exit();
+    end;
+  matchStart := -1;
+  matchLength := 0;
+  result := false;
+end;
+
+function TXQCollation.indexOf(const strToBeExaminated, searched: string): SizeInt;
+var
+  temp: sizeint;
+begin
+  if not find(strToBeExaminated, searched, result, temp) then
+    result := 0;
 end;
 
 function TXQCollation.contains(const strToBeExaminated, searched: string): boolean;
 begin
-  result := indexOf(strToBeExaminated, searched) >= 0
+  result := indexOf(strToBeExaminated, searched) > 0
 end;
 
 function TXQCollation.startsWith(const strToBeExaminated, expectedStart: string): boolean;
@@ -200,9 +227,12 @@ begin
   result := strEqual(a,b);
 end;
 
-function TXQCollationCodepoint.indexOf(const strToBeExaminated, searched: string): SizeInt;
+function TXQCollationCodepoint.find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean;
 begin
-  result := strIndexOf(strToBeExaminated, searched);
+  matchStart := strIndexOf(strToBeExaminated, searched);
+  result := matchStart > 0;
+  if result then matchLength:=length(searched)
+  else matchLength := 0;
 end;
 
 function TXQCollationCodepoint.contains(const strToBeExaminated, searched: string): boolean;
@@ -299,9 +329,12 @@ begin
   result := striEqual(a,b);
 end;
 
-function TXQCollationCodepointInsensitive.indexOf(const strToBeExaminated, searched: string): SizeInt;
+function TXQCollationCodepointInsensitive.find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean;
 begin
-  result := striIndexOf(strToBeExaminated, searched);
+  matchStart := striIndexOf(strToBeExaminated, searched);
+  result := matchStart > 0;
+  if result then matchLength:=length(searched)
+  else matchLength := 0;
 end;
 
 function TXQCollationCodepointInsensitive.contains(const strToBeExaminated, searched: string): boolean;
