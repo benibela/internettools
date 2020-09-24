@@ -4413,8 +4413,8 @@ end;
 
 
 function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
-
-  procedure visitAnnotations(var ans: TXQAnnotations; isFunction: boolean; isAnonymousFunction: boolean = false);
+  type TAnnotationParent = (anFunction, anVariable, anInstanceOf);
+  procedure visitAnnotations(var ans: TXQAnnotations; parent: TAnnotationParent; isAnonymousFunction: boolean = false);
     var
       i: Integer;
       hasPrivatePublic: Boolean;
@@ -4431,8 +4431,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
               'private', 'public': ; //ok
               else raiseParsingError('XQST0045', 'Only private/public annotations are allowed in namespace '+XMLNamespaceUrl_XQuery, oldname);
             end;
-            if hasPrivatePublic then
-              raiseParsingError(ifthen(isFunction, 'XQST0106', 'XQST0116'), '%private/%public has to be unique', oldname);
+            if hasPrivatePublic and (parent <> anInstanceOf) then
+              raiseParsingError(ifthen(parent = anFunction, 'XQST0106', 'XQST0116'), '%private/%public has to be unique', oldname);
             hasPrivatePublic := true;
             if isAnonymousFunction then raiseParsingError('XQST0125', 'anonymous functions cannot be public or private', oldname);
           end;
@@ -4474,7 +4474,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       tikFunctionTest:
         if st.atomicTypeInfo <> nil then begin
           with TObject(st.atomicTypeInfo) as TXQAnnotationsInClass do begin
-            visitAnnotations(annotations, false);
+            visitAnnotations(annotations, anInstanceOf);
             freeAnnotations(annotations);
             free;
             st.atomicTypeInfo := nil;
@@ -4616,7 +4616,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   begin
     oldfname := f.name;
     if objInheritsFrom(f.name, TXQEQNameUnresolved) then f.name := TXQEQNameUnresolved(f.name).resolveAndFreeToEQNameWithPrefix(staticContext,errorTracking, xqdnkFunction);
-    visitAnnotations(f.annotations, true, f.name = nil);
+    visitAnnotations(f.annotations, anFunction, f.name = nil);
     if f.kind = xqtdfUserDefined then begin
       resolveFunctionParams(f,staticContext);
       for i := 0 to f.parameterCount - 1 do begin
@@ -4635,7 +4635,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   procedure visitDefineVariable(f: TXQTermDefineVariable);
   begin
-    visitAnnotations(f.annotations, false);
+    visitAnnotations(f.annotations, anVariable);
   end;
 
   procedure visitNodeMatcher(n: TXQTermNodeMatcher);
