@@ -1785,13 +1785,12 @@ var ur: string;
       if (e.sources <> nil) then begin
         for i := 0 to e.sources.Count - 1 do begin
           s := TSource(e.sources[i]);
-          if (s.role = '.') and (
+          if //(s.role = '.') and
+            (
               (ur = s.url) or
               (ur = s.tree.getDocument().documentURI)
               ) then begin
-            lastHTTPResultCode := 200;
-            temp := strLoadFromFile(TSource(e.sources[i]).filename);
-            writeBlock(pchar(temp)^, length(temp));
+            loadFile(TSource(e.sources[i]).filename);
           end;
         end;
       end;

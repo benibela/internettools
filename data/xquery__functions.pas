@@ -7178,7 +7178,7 @@ var
   parser: TXQJsonParser;
 begin
   if args[0].isUndefined then exit(args[0]);
-  data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FODC0002');
+  data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FOUT1170');
 
   parser.init;
   parser.context := @context;
