@@ -2072,7 +2072,7 @@ begin
     'comment': result := TXQTermConstructorComputed.create(tetComment);
     'namespace': if isModel3 then result := TXQTermConstructorComputed.create(tetNamespace);
   end;
-  if result = nil then raiseSyntaxError('Unknown constructor name');
+  if result = nil then raiseSyntaxErrorFatal('Unknown constructor name');
   try
     expectName := (result.typ in [tetOpen, tetProcessingInstruction, tetAttribute, tetNamespace]) ;
     if expectName then begin
