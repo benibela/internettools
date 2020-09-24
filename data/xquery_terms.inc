@@ -4212,6 +4212,11 @@ var
     end;
 
     procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
+      procedure invalidNameXQDY0074(const reason: string);
+      begin
+         raiseEvaluationError('XQDY0074', reason+v.toString);
+      end;
+
     var
       vname: TXQValueQName;
       namespaceUrlPrefix: String;
@@ -4230,12 +4235,13 @@ var
             else tree.namespace := nil;
           xqeqnPrefix: begin
             setNamespaceFromPrefix(namespaceUrlPrefix);
-            if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
+            if tree.namespace = nil then invalidNameXQDY0074('Failed to find namespace for ');
           end;
           xqeqnNamespaceUrl: begin
             setTreeNamespaceFromQName(namespaceUrlPrefix, 'Q', defkind);
+            if context.staticContext.model = xqpmXQuery1 then invalidNameXQDY0074('Q{} notation requires 3.0+: ');
           end;
-          xqeqnInvalid: raiseEvaluationError('XQDY0074', 'Invalid EQName '+v.toString);
+          xqeqnInvalid: invalidNameXQDY0074('Invalid EQName: ');
         end;
       end else raiseEvaluationError('XPTY0004', 'Expected string value');
       if tree.namespace <> nil then

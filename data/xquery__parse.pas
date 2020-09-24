@@ -2113,7 +2113,7 @@ begin
           end else result.push(tempSeq); //that's really slow for nodes because it makes a deep copy of them if they are taken from a subsequence. But if it's mixing atomic/nodes flattening the sequences makes the separator spaces wrong
         end else result.push(tempSeq);
       end else result.nameValue := parsePrimaryLevel;
-    end else if not (parsingModel in PARSING_MODEL3_1) and (result.typ = tetNamespace) then
+    end else if not (parsingModel in PARSING_MODEL3_1) and (result.typ in [tetComment, tetText, tetNamespace]) then
       raiseSyntaxError('This type of node must not be empty ');
     expect('}');
   except
