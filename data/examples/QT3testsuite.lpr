@@ -96,6 +96,7 @@ TTestCaseResultValue = record
   error: string;
   result: TTestCaseResult;
   serialization: string;
+  allOfInfo: string;
 end;
 
 TTestCase = class
@@ -128,14 +129,14 @@ TResult = class
   assertions: TList;
   constructor create(e: TTreeNode);
   function hasSerializationAssertion: boolean;
-  function check(const testResult: TTestCaseResultValue; errorCode: string=''): TTestCaseResult;
+  function check(var testResult: TTestCaseResultValue; errorCode: string=''): TTestCaseResult;
   function expectError: boolean;
 end;
 
 { TAssertion }
 
 TAssertion = class
-  function check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; virtual; abstract;
+  function check(var testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; virtual; abstract;
   function expectError: boolean; virtual; abstract;
   function isSerializationAssertion: boolean; virtual; abstract;
 end;
@@ -146,7 +147,7 @@ TAssertionList = class(TAssertion)
   kind: (alkAnyOf, alkAllOf, alkNeither);
   list: TList;
   constructor create();
-  function check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; override;
+  function check(var testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; override;
   function expectError: boolean; override;
   function isSerializationAssertion: boolean; override;
 end;
@@ -160,7 +161,7 @@ TAssertionAssert = class(TAssertion)
   normalizeSpace, ignorePrefixes: boolean;
   flags: string;
   constructor create(akind: TAssertionAssertKind; avalue: string);
-  function check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; override;
+  function check(var testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult; override;
   function expectError: boolean; override;
   function regexFlags: TWrappedRegExprFlags;
   function isSerializationAssertion: boolean; override;
@@ -425,11 +426,11 @@ begin
   case resultValue.result of
     tcrPass: bufferTestSet.add('<tr class="passed" >'+n+'<td colspan="4">passed</td>');
     tcrFail: begin
-      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED</td><td>'+trimLines(htmlStrEscape(tc.resultToString(resultValue)))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      bufferTestSet.add('<tr class="failed">'+n+'<td>FAILED'+resultvalue.allOfInfo+'</td><td>'+trimLines(htmlStrEscape(tc.resultToString(resultValue)))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
       if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrWrongError: begin
-      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error</td><td>'+trimLines(htmlStrEscape(tc.resultToString(resultValue)))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
+      bufferTestSet.add('<tr class="wrongError">'+n+'<td>wrong error'+resultvalue.allOfInfo+'</td><td>'+trimLines(htmlStrEscape(tc.resultToString(resultValue)))+'</td><td>'+htmlStrEscape(tc.expectedPrettier)+'</td>');
       if printInputs then bufferTestSet.add('<td>'+trimLines(htmlStrEscape(TTest(tc.tests[0]).test))+'</td>');
     end;
     tcrNA: bufferTestSet.add('<tr class="correctNA" >'+n+'<td colspan="4">n/a</td>');
@@ -619,12 +620,12 @@ begin
   case resultValue.result of
     tcrPass: writeln('passed'); //todo
     tcrFail: begin
-      writeln('FAILED');
+      writeln('FAILED', resultValue.allOfInfo);
       writeln(' got: '+tc.resultToString(resultValue)+ LineEnding+' expected: '+tc.expectedPrettier);
       if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
     tcrWrongError: begin
-      writeln('wrong error');
+      writeln('wrong error', resultValue.allOfInfo);
       writeln(' got: '+tc.resultToString(resultValue)+ LineEnding+' expected: '+tc.expectedPrettier);
       if printInputs then writeln(' Input: ', TTest(tc.tests[0]).test);
     end;
@@ -660,24 +661,32 @@ begin
   list := tlist.Create;
 end;
 
-function TAssertionList.check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult;
+function TAssertionList.check(var testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult;
 var
   i: Integer;
+  tempResult: TTestCaseResult;
 begin
-  result := tcrFail;
+  case kind of
+      alkAnyOf: result := tcrFail;
+      alkAllOf, alkNeither: result := tcrPass;
+  end;
+
   for i := 0 to list.Count - 1 do begin
-    result := TAssertion(list[i]).check(testResult, errorCode);
+    tempResult := TAssertion(list[i]).check(testResult, errorCode);
     if kind = alkNeither then begin
-      case result of
-        tcrPass: result := tcrFail;
-        tcrFail, tcrWrongError: result := tcrPass;
-        else raise Exception.Create('invalid error code for <not>: '+inttostr(ord(result)) );
+      case tempResult of
+        tcrPass: tempResult := tcrFail;
+        tcrFail, tcrWrongError: tempResult := tcrPass;
+        else raise Exception.Create('invalid error code for <not>: '+inttostr(ord(tempResult)) );
       end;
     end;
 
     case kind of
-      alkAnyOf: if result in [tcrPass] then exit;
-      alkAllOf, alkNeither: if result in [tcrFail, tcrWrongError] then exit;
+      alkAnyOf: if tempResult in [tcrPass] then exit(tempResult);
+      alkAllOf, alkNeither: if tempResult in [tcrFail, tcrWrongError] then begin
+        result := tempResult;
+        testResult.allOfInfo += ' '+inttostr(i+1);
+      end;
     end;
   end;
 end;
@@ -861,7 +870,7 @@ begin
   compareTree.free;
 end;
 
-function TAssertionAssert.check(const testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult;
+function TAssertionAssert.check(var testResult: TTestCaseResultValue; errorCode: string): TTestCaseResult;
   function res: IXQValue;
   begin
     result := testResult.value; // xq.VariableChangelog.get('result');
@@ -1004,7 +1013,7 @@ begin
   exit(false);
 end;
 
-function TResult.check(const testResult: TTestCaseResultValue; errorCode: string=''): TTestCaseResult;
+function TResult.check(var testResult: TTestCaseResultValue; errorCode: string=''): TTestCaseResult;
 begin
   if assertions.Count <> 1 then
     raise Exception.Create('Invalid assertion count in result');
@@ -1090,6 +1099,7 @@ var
   query: ixquery;
 begin
   result.error := '';
+  result.allOfInfo := '';
   result.value := nil;
   if not arrayStrContains(config.forceTestCase, name) then begin
     result.result:= tcrNA;
