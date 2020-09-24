@@ -510,7 +510,7 @@ begin
   end else begin
     colon := pos(':', localpart);
     if colon = 0 then begin
-      namespacePrefix := '';
+      namespaceUrlPrefix := '';
       result := xqeqnPrefixAbsent;
     end else begin
       namespaceUrlPrefix := copy(localpart, 1, colon - 1);
