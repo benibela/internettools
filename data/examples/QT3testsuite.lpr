@@ -472,7 +472,7 @@ begin
   end;
   bufferOverview.add(formatResultHTML('<a href="#'+ts.name+'">'+ts.name+'</a>', r, true));
   bufferBody.add('<h3><a name="'+ts.name+'">'+ts.name+'</a></h3>');
-  bufferBody.add('<a href="http://dev.w3.org/cvsweb/~checkout~/2011/QT3-test-suite/'+ts.fileName+'?content-type=application%2Fxml" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
+  bufferBody.add('<a href="https://github.com/w3c/qt3tests/blob/master/'+ts.fileName+'" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
   bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failed: '+ inttostr(r[tcrFail])+ '  Wrong error: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Skipped: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
   for i := 0 to bufferTestSet.Count - 1 do
     bufferBody.add(bufferTestSet[i]);
@@ -1886,11 +1886,15 @@ begin
 
   case clr.readString('mode') of
     'xquery1': config.version := xqpmXQuery1;
-    'xquery3': config.version := xqpmXQuery3_0;
+    'xquery3', 'xquery3.0': config.version := xqpmXQuery3_0;
     'xquery3.1': config.version := xqpmXQuery3_1;
     'xpath2': config.version := xqpmXPath2;
-    'xpath3': config.version := xqpmXPath3_0;
+    'xpath3', 'xpath3.0': config.version := xqpmXPath3_0;
     'xpath3.1': config.version := xqpmXPath3_1;
+    else begin
+      writeln(stderr, 'unknown mode');
+      exit;
+    end;
   end;
   if config.version in [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1] then begin
     if GetEnvironmentVariable('QTTEST') <> '42' then begin
