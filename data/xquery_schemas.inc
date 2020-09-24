@@ -512,6 +512,20 @@ var
       else tempe := getPosInf;}
   end;
 
+  procedure specialCaseDecimalTenth(tenth: integer);
+  var d: BigDecimal;
+  begin
+    d := Default(BigDecimal);
+    d.exponent := -1;
+    setlength(d.digits, 1);
+    d.digits[0] := (ELEMENT_OVERFLOW div 10) * tenth;
+    if not constraintsSatisfied(d) then begin
+      result := xsceFORG0001;
+      exit;
+    end else result := xsceNoError;
+    if assigned(outv) then outv^ := TXQValueDecimal.create(d);
+  end;
+
 var
 {  tempintstart, tempintend, tempdot, tempexp: integer;
   tempe: Extended;}
@@ -539,8 +553,11 @@ begin
                //'e', 'E': ;
              end;
              '.': if secondDigit in [0..9] then
-                    if subType <> xsstInteger then
-                      result := tryCreateValue( secondDigit / 10, outv);
+                    case subType of
+                      xsstInteger: {fail};
+                      xsstDecimal: specialCaseDecimalTenth(secondDigit);
+                      else result := tryCreateValue( secondDigit / 10, outv);
+                    end;
              '+': if secondDigit in [0..9] then
                     result := tryCreateValue( secondDigit , outv);
              '-': case secondDigit of
