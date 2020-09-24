@@ -118,6 +118,9 @@ function equalNamespaces(const ans, bns: TNamespace): boolean; inline;
 function equalNamespaces(const ans, bns: string): boolean; inline;
 function namespaceGetURL(const n: INamespace): string; inline;
 
+function isValidNCName(const s: string): boolean;
+type TXQEQNameParseResult = (xqeqnPrefixAbsent, xqeqnPrefix, xqeqnNamespaceUrl, xqeqnInvalid);
+function parseEQName(const eqname: string; out namespaceUrlPrefix, localpart: string): TXQEQNameParseResult;
 
 implementation
 
@@ -140,6 +143,7 @@ begin
   if n = nil then result := ''
   else result := n.getURL;
 end;
+
 
 
 
@@ -455,6 +459,70 @@ begin
   //writeln(stderr, 'destroy: ', url);
   inherited Destroy;
 end;
+
+function isValidNCName(const s: string): boolean;
+const AsciiNameStartChar = ['A'..'Z', '_', 'a'..'z'];
+      AsciiNameChar = AsciiNameStartChar + ['-', '.', '0'..'9'];
+var
+  curpos: SizeInt;
+  cp: Integer;
+begin
+  result := false;
+  if s = '' then exit();
+  curpos := 1;
+  if s[1] in AsciiNameStartChar then inc(curpos)
+  else begin
+    cp := strDecodeUTF8Character(s, curpos);
+    if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
+       or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
+       or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
+       or ((cp >= $2070) and (cp <= $218F)) or((cp >= $2C00) and (cp <= $2FEF))
+       or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
+       or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then exit();
+  end;
+  while curpos <= length(s) do begin
+    if s[curpos] in AsciiNameChar then inc(curpos)
+    else begin
+      cp := strDecodeUTF8Character(s, curpos);
+      if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
+         or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
+         or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
+         or ((cp >= $2070) and (cp <= $218F)) or((cp >= $2C00) and (cp <= $2FEF))
+         or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
+         or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then //like above
+         if not ((cp = $B7) or ((cp >= $0300) and (cp <= $036F)) or ((cp >= $203F) and (cp <= $2040))) then
+           exit();
+    end;
+  end;
+  result := true;
+end;
+
+function parseEQName(const eqname: string; out namespaceUrlPrefix, localpart: string): TXQEQNameParseResult;
+var
+  colon: SizeInt;
+begin
+  localpart := xmlStrWhitespaceCollapse(eqname);
+  if strBeginsWith(localpart, 'Q{') then begin //EQName!
+    namespaceUrlPrefix := strSplitGet('}', localpart);
+    delete(namespaceUrlPrefix, 1, 2); //Q{ no more
+    if namespaceUrlPrefix.contains('{') then exit(xqeqnInvalid);
+    result := xqeqnNamespaceUrl;
+  end else begin
+    colon := pos(':', localpart);
+    if colon = 0 then begin
+      namespacePrefix := '';
+      result := xqeqnPrefixAbsent;
+    end else begin
+      namespaceUrlPrefix := copy(localpart, 1, colon - 1);
+      delete(localpart, 1, colon);
+      result := xqeqnPrefix;
+    end;
+  end;
+  if not isValidNCName(localpart) then
+    result := xqeqnInvalid;
+end;
+
+
 
 initialization
   XMLNamespace_XML := TNamespace.makeWithRC1(XMLNamespaceUrl_XML, 'xml');

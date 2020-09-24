@@ -151,25 +151,18 @@ end;
 
 procedure splitEQName(context: TXQEvaluationContext; node: TTreeNode; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown);
 var
-  colon: SizeInt;
   namespacePrefix: String;
 begin
-  localpart := xmlStrWhitespaceCollapse(eqname);
-  if strBeginsWith(localpart, 'Q{') then begin //EQName!
-    namespaceURL := strSplitGet('}', localpart);
-    delete(namespaceURL, 1, 2); //Q{ no more
-  end else begin
-    colon := pos(':', localpart);
-    if colon = 0 then namespacePrefix := ''
-    else begin
-      namespacePrefix := copy(localpart, 1, colon - 1);
-      delete(localpart, 1, colon);
+  case parseEQName(eqname, namespacePrefix, localpart) of
+    xqeqnPrefix, xqeqnPrefixAbsent: begin
+      if node <> nil then begin
+        namespaceURL := node.getNamespaceURL(namespacePrefix);
+        if namespaceURL <> '' then exit;
+      end;
+      namespaceURL := namespaceGetURL(context.findNamespace(namespacePrefix, kind));
     end;
-    if node <> nil then begin
-      namespaceURL := node.getNamespaceURL(namespacePrefix);
-      if namespaceURL <> '' then exit;
-    end;
-    namespaceURL := namespaceGetURL(context.findNamespace(namespacePrefix, kind));
+    xqeqnNamespaceUrl: namespaceURL := namespacePrefix;
+    xqeqnInvalid: namespaceURL:='<invalid>';
   end;
 end;
 

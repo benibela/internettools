@@ -4179,12 +4179,11 @@ var
       // tree.namespace := context.findNamespace('', defkind)
     end;
 
-    procedure setTreeNodeNameFromQName(const url, aprefix, local: string; defkind: TXQDefaultNamespaceKind);
+    procedure setTreeNamespaceFromQName(const url, aprefix: string; defkind: TXQDefaultNamespaceKind);
 
     var
       prefix: String;
     begin
-      tree.value := local;
       prefix := aprefix;
       if (prefix = '') and (url = '') then
         tree.namespace := nil //something weird happens, if there is a non-nil Q{} Qname. Children of this node that have an empty-prefix namespace inherit this non-nil non existing namespace, so copying and serializing them, duplicates there namespace declaration attribute
@@ -4215,39 +4214,42 @@ var
     procedure setTreeNodeNameFromValue(v: IXQValue; defkind: TXQDefaultNamespaceKind);
     var
       vname: TXQValueQName;
-      sep: SizeInt;
-      temp: String;
+      namespaceUrlPrefix: String;
+      eqnameKind: TXQEQNameParseResult;
     begin
       if (v.kind = pvkSequence) and (v.getSequenceCount = 1) then v := v.get(1);
       if (v.instanceOf(baseSchema.QName))  then begin
         vname := (v as TXQValueQName);
-        setTreeNodeNameFromQName(vname.url, vname.prefix, vname.local, defkind);
+        setTreeNamespaceFromQName(vname.url, vname.prefix, defkind);
+        tree.value := vname.local;
       end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
-        tree.value := v.toString;
-        sep := pos(':', tree.value);
-        if sep = 0 then begin
-          if defkind = xqdnkElementType then setNamespaceFromPrefix('')
-          else tree.namespace := nil;
-        end else begin
-          temp := copy(tree.value, 1, sep - 1);
-          tree.value := copy(tree.value, sep + 1);
-          setNamespaceFromPrefix(temp);
-          if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
+        eqnameKind := parseEQName(v.toString, namespaceUrlPrefix, tree.value);
+        case eqnameKind of
+          xqeqnPrefixAbsent:
+            if defkind = xqdnkElementType then setNamespaceFromPrefix('')
+            else tree.namespace := nil;
+          xqeqnPrefix: begin
+            setNamespaceFromPrefix(namespaceUrlPrefix);
+            if tree.namespace = nil then raiseEvaluationError('XQDY0074', 'Failed to find namespace for '+v.toString);
+          end;
+          xqeqnNamespaceUrl: begin
+            setTreeNamespaceFromQName(namespaceUrlPrefix, 'Q', defkind);
+          end;
+          xqeqnInvalid: raiseEvaluationError('XQDY0074', 'Invalid EQName '+v.toString);
         end;
       end else raiseEvaluationError('XPTY0004', 'Expected string value');
       if tree.namespace <> nil then
         with tree.namespace.getSelf do
           if ((prefix = 'xml') <> (url = XMLNamespaceUrl_XML)) or (prefix = 'xmlns') or (url = XMLNamespaceUrl_XMLNS) then
             raiseEvaluationError(IfThen(tree.typ <> tetAttribute, 'XQDY0096', 'XQDY0044'), 'Invalid namespace: '+tree.namespace.serialize);
-      if not baseSchema.isValidNCName(tree.value) then
-        raiseEvaluationError('XQDY0074', 'Invalid name: '+tree.value);
     end;
   var
     tqname: TXQTermEQNameToken;
   begin
     if t.ClassType = TXQTermEQNameToken then begin
       tqname := TXQTermEQNameToken(t);
-      setTreeNodeNameFromQName(tqname.namespaceurl, tqname.namespaceprefix, tqname.localpart, defkind);
+      setTreeNamespaceFromQName(tqname.namespaceurl, tqname.namespaceprefix, defkind);
+      tree.value := tqname.localpart;
     end else setTreeNodeNameFromValue(t.evaluate(context), defkind);
     setTreeHash;
     if (tree.typ = tetAttribute) and (tree.value = 'xmlns') and (tree.namespace = nil) then
@@ -4297,7 +4299,7 @@ begin
           if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node)
                 or nameValueEvaluated.isUndefined then begin
              tree.value := nameValueEvaluated.toString;
-             if (tree.value <> '') and not baseSchema.isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
+             if (tree.value <> '') and not isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
              setTreeHash;
              tree.namespace := XMLNamespace_XMLNS;
           end else raiseTypeError0004('Invalid namespace prefix', nameValueEvaluated);
@@ -4362,7 +4364,7 @@ begin
         if nameValueEvaluated.instanceOf(baseSchema.NCName) then tree.value := nameValueEvaluated.toString
         else if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node) then begin
           tree.value := strTrim(nameValueEvaluated.toString, WHITE_SPACE);
-          if not baseSchema.isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
+          if not isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
         end else raiseTypeError0004('Need NCName', nameValueEvaluated);
         if striEqual(tree.value, 'XML') then raiseEvaluationError('XQDY0064', '"XML" cannot be used as PI name');
         setTreeHash;

@@ -1001,42 +1001,8 @@ begin
 end;
 
 class function TXSSchema.isValidNCName(const s: string): boolean;
-//this should do the same as RegExpr_XMLNCName
-//except being faster (and working)
-const AsciiNameStartChar = ['A'..'Z', '_', 'a'..'z'];
-      AsciiNameChar = AsciiNameStartChar + ['-', '.', '0'..'9'];
-var
-  curpos: SizeInt;
-  cp: Integer;
 begin
-  result := false;
-  if s = '' then exit();
-  curpos := 1;
-  if s[1] in AsciiNameStartChar then inc(curpos)
-  else begin
-    cp := strDecodeUTF8Character(s, curpos);
-    if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
-       or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
-       or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
-       or ((cp >= $2070) and (cp <= $218F)) or((cp >= $2C00) and (cp <= $2FEF))
-       or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
-       or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then exit();
-  end;
-  while curpos <= length(s) do begin
-    if s[curpos] in AsciiNameChar then inc(curpos)
-    else begin
-      cp := strDecodeUTF8Character(s, curpos);
-      if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
-         or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
-         or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
-         or ((cp >= $2070) and (cp <= $218F)) or((cp >= $2C00) and (cp <= $2FEF))
-         or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
-         or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then //like above
-         if not ((cp = $B7) or ((cp >= $0300) and (cp <= $036F)) or ((cp >= $203F) and (cp <= $2040))) then
-           exit();
-    end;
-  end;
-  result := true;
+  result := xquery.namespaces.isValidNCName(s);
 end;
 
 class function TXSSchema.isValidQName(s: string): boolean;
