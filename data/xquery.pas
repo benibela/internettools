@@ -6739,7 +6739,7 @@ var ak, bk: TXQValueKind;
       end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
        //okay
       end else begin
-        if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
+        //if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
         exit(-2);
       end;
     end;
