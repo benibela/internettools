@@ -355,7 +355,7 @@ begin
     pvkInt64:      result := qualifiedTypeName(toString, 'integer');
     pvkFloat:      result := qualifiedTypeName(toString, '');
     pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(IsIntegral(toDecimal), 'integer', 'decimal') );
-    pvkString:     result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
+    pvkString, pvkBinary: result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
     pvkQName, pvkDateTime:
       result := qualifiedTypeName(escapeToXQueryString(toString), '' );
 
@@ -1394,12 +1394,6 @@ end;
 
 {$ImplicitExceptions on}
 
-class function TXQValueString.canCreateFromString(const v: string): boolean;
-begin
-  ignore(v);
-  result := true;
-end;
-
 class function TXQValueString.classKind: TXQValueKind;
 begin
   Result:=pvkString;
@@ -1418,15 +1412,10 @@ begin
     raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
 end;
 
-{$ImplicitExceptions off}
 function TXQValueString.toString: string;
 begin
   result := str;
-  //if ((typeAnnotation as TXSSimpleType).primitive as TXSStringType).subType in [xsstBase64Binary, xsstHexBinary] then
-  if instanceOf(baseSchema.base64Binary) then
-    result := StringReplace(result, ' ', '', [rfReplaceAll]);
 end;
-{$ImplicitExceptions on}
 
 function TXQValueString.toDateTime: TDateTime;
 begin
@@ -1445,19 +1434,84 @@ begin
   Result:=TXQDefaultTypeInfo.hash(pchar(str), length(str));
 end;
 
-function TXQValueString.toRawBinary: string;
-begin
-  if instanceOf(baseSchema.hexBinary) then result := str.decodeHex
-  else if instanceOf(baseSchema.base64Binary) then begin
-    if str = '' then exit('');
-    result := base64.DecodeStringBase64(str)
-  end else begin assert(false); result := ''; end;
-end;
 
 function TXQValueString.clone: IXQValue;
 begin
   result := TXQValueString.create(ftypeAnnotation, str);
 end;
+
+
+
+
+
+constructor TXQValueBinary.create(atypeAnnotation: TXSType; const astr: string);
+begin
+  inherited create(atypeAnnotation);
+  encoded := astr;
+end;
+
+destructor TXQValueBinary.Destroy;
+begin
+  encoded := '';
+  inherited Destroy;
+end;
+
+class function TXQValueBinary.classKind: TXQValueKind;
+begin
+  Result:=pvkBinary;
+end;
+
+function TXQValueBinary.toBoolean: boolean;
+begin
+  Result:= (encoded <> '');
+end;
+
+function TXQValueBinary.toBooleanEffective: boolean;
+begin
+  raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
+  result := false;
+end;
+
+function TXQValueBinary.toString: string;
+begin
+  Result:=encoded;
+end;
+
+function TXQValueBinary.toDateTime: TDateTime;
+begin
+  raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to datetime.');
+  result := 0;
+end;
+
+function TXQValueBinary.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+begin
+  raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to float.');
+  result := 0;
+end;
+
+function TXQValueBinary.hashCode: uint32;
+begin
+  Result:=TXQDefaultTypeInfo.hash(pchar(encoded), length(encoded));
+end;
+
+function TXQValueBinary.toRawBinary: string;
+begin
+  if instanceOf(baseSchema.hexBinary) then result := encoded.decodeHex
+  else if instanceOf(baseSchema.base64Binary) then begin
+    if encoded = '' then exit('');
+    result := base64.DecodeStringBase64(encoded)
+  end else begin assert(false); result := ''; end;
+end;
+
+function TXQValueBinary.clone: IXQValue;
+begin
+  Result:=TXQValueBinary.create(typeAnnotation, encoded);
+end;
+
+
+
+
+
 
 
 constructor TXQValueQName.create(atypeAnnotation: TXSType; const aurl, aprefix, alocal: string);

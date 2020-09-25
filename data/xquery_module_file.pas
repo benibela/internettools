@@ -329,7 +329,7 @@ end;
 function append_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
-  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueString).toRawBinary);
+  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueBinary).toRawBinary);
 end;
 function append_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -353,7 +353,7 @@ begin
   ignore(context);
   offset := -1;
   if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueString).toRawBinary, offset);
+  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueBinary).toRawBinary, offset);
 end;
 function write_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -629,7 +629,7 @@ begin
   if argc >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
   if argc >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
   if rangeErr then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
+  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
 end;
 
 function read_text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;

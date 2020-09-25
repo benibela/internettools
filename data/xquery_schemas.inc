@@ -757,11 +757,11 @@ begin
       result := xsceNoError;
       if outv <> nil then
         if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then
-          outv^ := TXQValueString.create(self, v.toString)
+          outv^ := TXQValueBinary.create(self, v.toString)
         else if subType = xsstHexBinary then
-          outv^ := TXQValueString.create(self, base64.DecodeStringBase64(v.toString).encodeHex)
+          outv^ := TXQValueBinary.create(self, base64.DecodeStringBase64(v.toString).encodeHex)
         else
-          outv^ := TXQValueString.create(self, base64.EncodeStringBase64(v.toString.decodeHex))
+          outv^ := TXQValueBinary.create(self, base64.EncodeStringBase64(v.toString.decodeHex))
     end;
     xsstUrl: begin
       if not st.derivedFrom(schema.anyURI) then
@@ -788,7 +788,8 @@ begin
   result := xsceNoError;
   if (outv <> nil) then
     case subType of
-      xsstHexBinary: outv^ := TXQValueString.create(self, UpperCase(v));
+      xsstHexBinary: outv^ := TXQValueBinary.create(self, UpperCase(v));
+      xsstBase64Binary: outv^ := TXQValueBinary.create(self, StringReplace(v, ' ', '', [rfReplaceAll]));
       else outv^ := TXQValueString.create(self, v);
     end;
 end;
@@ -1253,8 +1254,10 @@ begin
   AnyURI := primitiveBaseType(TXSStringType.create('anyURI', AnyAtomicType, xsstUrl));
   anyURI.whiteSpaceFacet:=xsfwCollapse; anyURI.whiteSpaceFixed := true;
   Base64Binary := primitiveBaseType(TXSStringType.create('base64Binary', AnyAtomicType, xsstBase64Binary, '^(([A-Za-z0-9+/] *){4})*(([A-Za-z0-9+/] *){2}[AEIMQUYcgkosw048] *=|[A-Za-z0-9+/] *[AQgw] *= *=)?$'));
+  Base64Binary.storage := TXQValueBinary;
   base64Binary.whiteSpaceFacet:=xsfwCollapse; base64Binary.whiteSpaceFixed := true;
   hexBinary := primitiveBaseType(TXSStringType.create('hexBinary', AnyAtomicType, xsstHexBinary, '^([0-9A-Fa-f][0-9A-Fa-f])*$'));
+  Base64Binary.storage := TXQValueBinary;
   hexBinary.whiteSpaceFacet:=xsfwCollapse; hexBinary.whiteSpaceFixed := true;
   String_ := primitiveBaseType(TXSStringType.create('string', AnyAtomicType, xsstString));
 

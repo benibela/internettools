@@ -2222,7 +2222,7 @@ begin
   //(string, encoding?) => binary
   data := args[0].toString;
   if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
-  result := TXQValueString.create(baseSchema.hexBinary, data.encodeHex);
+  result := TXQValueBinary.create(baseSchema.hexBinary, data.encodeHex);
 end;
 function xqFunctionString_To_base64Binary(argc: SizeInt; args: PIXQValue): IXQValue;
 var
@@ -2231,7 +2231,7 @@ begin
   //(string, encoding?) => binary
   data := args[0].toString;
   if argc > 1 then data := strConvert(data, CP_UTF8, strEncodingFromName(args[1].toString));
-  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
+  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(data));
 end;
 
 
@@ -3494,7 +3494,7 @@ begin
 end;
 
 
-//**< Returns the lowest type that all items in the list can be converted to
+//**< Returns the lowest type that all items in the list can be converted to, for sum/min/max/avg
 //**assumes v contains no array
 function getPromotedType(const v: IXQValue): TXQValueKind;
   function commonTyp(const a, b: TXQValueKind): TXQValueKind;
@@ -3510,6 +3510,7 @@ function getPromotedType(const v: IXQValue): TXQValueKind;
     //leafes
     if (a = pvkDateTime) or (b = pvkDateTime) then if a = b then exit(pvkDateTime) else exit(pvkUndefined);
     if (a = pvkBoolean) or (b = pvkBoolean) then if a = b then exit(pvkBoolean) else exit(pvkUndefined);
+    if (a = pvkBinary) or (b = pvkBinary) then if a = b then exit(pvkBinary) else exit(pvkUndefined);
     if (a in [pvkString,pvkNode]) or (b in [pvkString,pvkNode]) then
       if (a in [pvkString,pvkNode]) = (b in [pvkString,pvkNode]) then exit(pvkString) else exit(pvkUndefined);
 
@@ -3521,6 +3522,7 @@ function getPromotedType(const v: IXQValue): TXQValueKind;
     if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
     if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
     if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);
+
 
     result := pvkUndefined;
   end;
@@ -3754,7 +3756,7 @@ begin
     if result.getSequenceCount > 0 then begin
       if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result));
       case result.kind of
-        pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString: exit; //ok
+        pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString, pvkBinary: exit; //ok
         pvkDateTime:
           if (result.typeAnnotation as TXSDateTimeType).isDuration and not (result.instanceOf(baseSchema.yearMonthDuration) or result.instanceOf(baseSchema.dayTimeDuration)) then
             raiseError
@@ -3862,6 +3864,18 @@ begin
             result := xqvalue(temps);
             exit;
           end;
+    end;
+    pvkBinary: begin
+      result := nil;
+      temps := (seq.get(1).toValue as TXQValueBinary).toRawBinary;
+      for pv in enumerable do begin
+        temps2 := (pv^.toValue as TXQValueBinary).toRawBinary;
+        if (CompareStr(temps2, temps) < 0) = asmin then begin
+          temps := temps2;
+          xqvalueMoveNoRefCount(pv^, result);
+        end;
+      end;
+      if result = nil then result := seq.get(1) else result._AddRef;
     end;
     else begin raiseError; result := nil; end;
   end;
@@ -6385,7 +6399,7 @@ var
 begin
   if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
-  result := TXQValueString.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString)))
+  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(collation.key(args[0].toString)))
 end;
 
 function wregexprParse(argc: SizeInt; argv: PIXQValue; flagsPos: integer; allowEmptyMatch: boolean;  toescape: PBoolean = nil;  all: PBoolean = nil): TWrappedRegExpr; overload;

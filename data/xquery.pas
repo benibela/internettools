@@ -142,7 +142,7 @@ type
   end;
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
   TXQMapPropertyKeyKind = (xqmpkkStringKeys, xqmpkkStandardKeys );
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
@@ -818,7 +818,25 @@ type
     constructor create(atypeAnnotation: TXSType; const value: IXQValue); override;
     destructor Destroy; override;
 
-    class function canCreateFromString(const v: string): boolean; virtual;
+    class function classKind: TXQValueKind; override;
+
+    function toBoolean: boolean; override;
+    function toBooleanEffective: boolean; override;
+    function toString: string; override;
+    function toDateTime: TDateTime; override;
+    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function hashCode: uint32; override;
+
+    function clone: IXQValue; override;
+  end;
+
+
+  //** string value
+  TXQValueBinary = class (TXQValue)
+    encoded:  string;
+
+    constructor create(atypeAnnotation: TXSType; const astr: string);
+    destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
 
@@ -829,14 +847,12 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function hashCode: uint32; override;
 
-
     function toRawBinary: string;
 
     function clone: IXQValue; override;
   end;
 
 
-  { TXQValueQName }
   //** QName value (namespace + local part)
   TXQValueQName = class (TXQValue)
     prefix, url, local: string;
@@ -3423,7 +3439,6 @@ end;
 
 
 
-
 function TXQValueDateTimeData.hasTimeZone: boolean;
 begin
   result := timezone = high(integer);
@@ -5010,13 +5025,8 @@ begin
   wk := w.kind;
   if vk = wk then begin
     case vk of
-      pvkString:
-        if v.instanceOf(baseSchema.base64Binary) or v.instanceOf(baseSchema.hexBinary) then begin
-          {fallthrough}
-        end else if w.instanceOf(baseSchema.base64Binary) or w.instanceOf(baseSchema.hexBinary) then
-          exit(false)
-        else
-          exit(v.toString = w.toString);
+      pvkString: exit(v.toString = w.toString);
+      pvkBinary: exit( (v.typeAnnotation.base = w.typeAnnotation.base) and (v.toString = w.toString)) ;
       pvkFloat:
         exit(   (v.toFloat = w.toFloat)
             or  (v.toFloat.IsNan() and w.toFloat.IsNan())
@@ -6687,64 +6697,62 @@ var ak, bk: TXQValueKind;
       result := -2; //should not happen, but hides warning
   end;
 
-  function compareCommonAsStrings(): integer;
-    function compareStrSignCapped(const sa, sb: string): integer;
-    begin
-      result := CompareStr(sa, sb);
-      if result <> 0 then
-        if result < 0 then result := -1
-        else result := 1
-    end;
+  function compareStrSignCapped(const sa, sb: string): integer;
+  begin
+    result := CompareStr(sa, sb);
+    if result <> 0 then
+      if result < 0 then result := -1
+      else result := 1
+  end;
 
-    function compareCommonAsBinary(): integer;
-    var sa, sb, temp: string;
-        at, bt: (tBase64, tHex, tUntyped, tOther);
-    begin
-      sa := '';
-      sb := '';
-      if a.typeAnnotation <> b.typeAnnotation then begin
-        if a.instanceOf(baseSchema.base64Binary) then at := tBase64
-        else if a.instanceOf(baseSchema.hexBinary) then at := tHex
-        else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
-        else at := tOther;
-        if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
-        else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
-        else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
-        else bt := tOther;
+  function compareCommonAsBinary(): integer;
+  var sa, sb, temp: string;
+      at, bt: (tBase64, tHex, tUntyped, tOther);
+  begin
+    sa := '';
+    sb := '';
+    if a.typeAnnotation <> b.typeAnnotation then begin
+      if a.instanceOf(baseSchema.base64Binary) then at := tBase64
+      else if a.instanceOf(baseSchema.hexBinary) then at := tHex
+      else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
+      else at := tOther;
+      if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
+      else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
+      else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
+      else bt := tOther;
 
-        result := 0;
-        if (at = tUntyped) or (bt = tUntyped) then begin
-          try
-            if at = tUntyped then temp := a.toString
-            else temp := b.toString;
-            if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
-            else begin
-              if length(temp) and 1 = 1 then exit(-2);
-              temp := temp.DecodeHex;
-            end;
-            if at = tUntyped then sa := temp
-            else sb := temp;
-          except
-            on e: Exception do exit(-2); {StreamError for base64, exception for hex}
+      result := 0;
+      if (at = tUntyped) or (bt = tUntyped) then begin
+        try
+          if at = tUntyped then temp := a.toString
+          else temp := b.toString;
+          if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
+          else begin
+            if length(temp) and 1 = 1 then exit(-2);
+            temp := temp.DecodeHex;
           end;
-        end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
-         //okay
-        end else begin
-          if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
-          exit(-2);
+          if at = tUntyped then sa := temp
+          else sb := temp;
+        except
+          on e: Exception do exit(-2); {StreamError for base64, exception for hex}
         end;
+      end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
+       //okay
+      end else begin
+        if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
+        exit(-2);
       end;
-      if sa = '' then sa := (a as TXQValueString).toRawBinary;
-      if sb = '' then sb := (b as TXQValueString).toRawBinary;
-      result := compareStrSignCapped(sa, sb);
-      //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
     end;
+    if sa = '' then sa := (a as TXQValueBinary).toRawBinary;
+    if sb = '' then sb := (b as TXQValueBinary).toRawBinary;
+    result := compareStrSignCapped(sa, sb);
+    //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
+  end;
+
+  function compareCommonAsStrings(): integer;
+
 
   begin
-    if    a.instanceOf(baseSchema.base64Binary) or a.instanceOf(baseSchema.hexBinary)
-       or b.instanceOf(baseSchema.base64Binary) or b.instanceOf(baseSchema.hexBinary)
-    then exit(compareCommonAsBinary());
-
     if overrideCollation = nil then begin
       overrideCollation := collation;
       if overrideCollation = nil then exit(compareStrSignCapped(a.toString, b.toString));
@@ -6877,6 +6885,7 @@ var ak, bk: TXQValueKind;
       pvkNull: result := 0;
       pvkUndefined: result := -2;
       pvkNode, pvkString: result := compareCommonAsStrings;
+      pvkBinary: result := compareCommonAsBinary;
       pvkSequence: begin
         if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
         if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
@@ -7102,7 +7111,7 @@ begin
   ak := a.kind;
   bk := b.kind;
   if ((ak in [pvkInt64, pvkFloat, pvkBigDecimal]) and (bk in [pvkInt64, pvkFloat, pvkBigDecimal]))
-     or ((ak = bk) and (ak in [pvkBoolean, pvkString])) then
+     or ((ak = bk) and (ak in [pvkBoolean, pvkString, pvkBinary])) then
     exit(true);
 
   ac := a.typeAnnotation;
