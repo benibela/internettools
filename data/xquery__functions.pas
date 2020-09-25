@@ -3746,6 +3746,7 @@ var tempf: xqfloat;
  seq: IXQValue;
  enumerable: TXQValueEnumeratorPtrUnsafe;
  pv: PIXQValue;
+ tempv: TXQValue;
 begin
   if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
@@ -3866,16 +3867,11 @@ begin
           end;
     end;
     pvkBinary: begin
-      result := nil;
-      temps := (seq.get(1).toValue as TXQValueBinary).toRawBinary;
-      for pv in enumerable do begin
-        temps2 := (pv^.toValue as TXQValueBinary).toRawBinary;
-        if (CompareStr(temps2, temps) < 0) = asmin then begin
-          temps := temps2;
-          xqvalueMoveNoRefCount(pv^, result);
-        end;
-      end;
-      if result = nil then result := seq.get(1) else result._AddRef;
+      tempv := seq.get(1).toValue;
+      for pv in enumerable do
+        if (TXQValueBinary.compare(pv^.toValue, tempv) < 0) = asmin then
+          tempv := pv^.toValue;
+      result := tempv;
     end;
     else begin raiseError; result := nil; end;
   end;

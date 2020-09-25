@@ -835,7 +835,7 @@ type
   TXQValueBinary = class (TXQValue)
     encoded:  string;
 
-    constructor create(atypeAnnotation: TXSType; const astr: string);
+    constructor create(atypeAnnotation: TXSType; const astr: string); reintroduce;
     destructor Destroy; override;
 
     class function classKind: TXQValueKind; override;
@@ -848,6 +848,8 @@ type
     function hashCode: uint32; override;
 
     function toRawBinary: string;
+
+    class function compare(a, b: TXQValue): integer; static;
 
     function clone: IXQValue; override;
   end;
@@ -6697,61 +6699,7 @@ var ak, bk: TXQValueKind;
       result := -2; //should not happen, but hides warning
   end;
 
-  function compareStrSignCapped(const sa, sb: string): integer;
-  begin
-    result := CompareStr(sa, sb);
-    if result <> 0 then
-      if result < 0 then result := -1
-      else result := 1
-  end;
-
-  function compareCommonAsBinary(): integer;
-  var sa, sb, temp: string;
-      at, bt: (tBase64, tHex, tUntyped, tOther);
-  begin
-    sa := '';
-    sb := '';
-    if a.typeAnnotation <> b.typeAnnotation then begin
-      if a.instanceOf(baseSchema.base64Binary) then at := tBase64
-      else if a.instanceOf(baseSchema.hexBinary) then at := tHex
-      else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
-      else at := tOther;
-      if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
-      else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
-      else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
-      else bt := tOther;
-
-      result := 0;
-      if (at = tUntyped) or (bt = tUntyped) then begin
-        try
-          if at = tUntyped then temp := a.toString
-          else temp := b.toString;
-          if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
-          else begin
-            if length(temp) and 1 = 1 then exit(-2);
-            temp := temp.DecodeHex;
-          end;
-          if at = tUntyped then sa := temp
-          else sb := temp;
-        except
-          on e: Exception do exit(-2); {StreamError for base64, exception for hex}
-        end;
-      end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
-       //okay
-      end else begin
-        //if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
-        exit(-2);
-      end;
-    end;
-    if sa = '' then sa := (a as TXQValueBinary).toRawBinary;
-    if sb = '' then sb := (b as TXQValueBinary).toRawBinary;
-    result := compareStrSignCapped(sa, sb);
-    //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
-  end;
-
   function compareCommonAsStrings(): integer;
-
-
   begin
     if overrideCollation = nil then begin
       overrideCollation := collation;
@@ -6885,7 +6833,7 @@ var ak, bk: TXQValueKind;
       pvkNull: result := 0;
       pvkUndefined: result := -2;
       pvkNode, pvkString: result := compareCommonAsStrings;
-      pvkBinary: result := compareCommonAsBinary;
+      pvkBinary: result := TXQValueBinary.compare(a, b);
       pvkSequence: begin
         if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
         if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');

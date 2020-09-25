@@ -320,6 +320,8 @@ function jsonStrEscape(s: string):string;
 function strSplitOnAsciiWS(s: string): TStringArray;
 function urlHexDecode(s: string): string;
 
+function compareStrSignCapped(const sa, sb: string): integer;
+
 
 function nodeNameHash(const s: RawByteString): cardinal;
 function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
@@ -1364,6 +1366,13 @@ begin
   setlength(result, p-1);
 end;
 
+function compareStrSignCapped(const sa, sb: string): integer;
+ begin
+   result := CompareStr(sa, sb);
+   if result <> 0 then
+     if result < 0 then result := -1
+     else result := 1
+ end;
 
 
 
