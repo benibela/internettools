@@ -336,7 +336,7 @@ end;
 
 function trimLines(const s: string): string;
 var
-  leadingSpace, i: Integer;
+  leadingSpace, i, inLineLeadingSpace: Integer;
   lines: bbutils.TStringArray;
 begin
   result := s;
@@ -345,7 +345,12 @@ begin
     lines := strSplit(result, #10);
     leadingSpace := 0;
     while (leadingSpace < length(lines[0])) and (lines[0][leadingSpace + 1] in [#9, ' ']) do inc(leadingSpace);
-    for i := 0 to high(lines) do Delete(lines[i], 1, leadingSpace);
+    for i := 0 to high(lines) do begin
+      inLineLeadingSpace := 0;
+      while (inLineLeadingSpace <= leadingSpace) and (inLineLeadingSpace + 1 <= length(lines[i])) and (lines[i][inLineLeadingSpace+1] in [#0..' ']) do
+        inc(inLineLeadingSpace);
+      Delete(lines[i], 1, inLineLeadingSpace);
+    end;
     result := strJoin(lines, #10);
   end;
 end;
@@ -1042,8 +1047,8 @@ end;
 function TTestCase.expectedPrettier: string;
 begin
   result := expected;
-  if strContains(result, '&lt;') then result := strDecodeHTMLEntities(result,CP_UTF8) + ' <!--unescaped--> ';
-  result := trimLines(result);
+  if strContains(result, '&') then result := strDecodeHTMLEntities(result,CP_UTF8) + ' (unescaped) ';
+  result := StringReplace(trimLines(result), ' xmlns="http://www.w3.org/2010/09/qt-fots-catalog"', '', []);
 end;
 
 constructor TTestCase.create(e: TTreeNode);
