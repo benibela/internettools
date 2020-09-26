@@ -4268,7 +4268,7 @@ var
 begin
   errCode := 'XPTY0004';
   for i := 0 to high(types) do
-    if not (types[i].kind in [tikFunctionTest, tikElementTest, tikAny]) and (values[i].kind = pvkFunction) then begin
+    if not (types[i].kind in [tikFunctionTest, tikElementTest, tikAny, tikArrayTest, tikMapTest, tikJSONiqTest]) and (values[i].kind in [pvkFunction, pvkObject]) then begin
      errCode := 'FOTY0013'; //wtf?
      break;
     end else if (context.staticContext.model in PARSING_MODEL3)

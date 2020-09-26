@@ -1428,7 +1428,7 @@ begin
 
 
 
-  map := TXQTermSequenceType.create(baseJSONiqSchema.object_); mapStar := star(map);
+  map := TXQTermSequenceType.create(tikMapTest); mapStar := star(map);
   arrayt := TXQTermSequenceType.create(baseJSONiqSchema.array_); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
   null := TXQTermSequenceType.create(baseJSONiqSchema.jsNull);
   jsonItemOrEmpty := TXQTermSequenceType.create(baseJSONiqSchema.jsonItem, true);  jsonItemStar := star(jsonItemOrEmpty);
