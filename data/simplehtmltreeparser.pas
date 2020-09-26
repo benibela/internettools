@@ -1649,7 +1649,8 @@ begin
       exit;
     end;
   if prefix = '' then begin
-    if (namespace <> nil) and (namespace.getPrefix = '') then begin
+    if ( (namespace = nil) and (url <> '') ) //it is not an override if xmlns="" is set on an element in no namespace: it is the removal of a namespace of an ancestor node
+       or ( (namespace <> nil) and (namespace.getPrefix = '') and (url = '') ) then begin
       if not overrides then exit;
       //todo?: if document <> inl then document.add(n)
       //namespace := n;

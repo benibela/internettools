@@ -4062,7 +4062,7 @@ var
     end;
   end;
 
-  var oldDeclaredNodeNamespaceCount: integer;
+  var oldDeclaredNodeNamespaceCount, oldstatenamespacecount: integer;
   procedure addDirectlyConstructedNodeAsKid;
   var
     i: Integer;
@@ -4136,7 +4136,7 @@ var
           if (context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
             //copied nodes inherit all namespaces even those created implicitly by prefixes used in names of their ancestors.
             //writeln(context.namespaces.Count);
-            for i := 0 to state.namespaceOverrides.Count - 1 do
+            for i := oldstatenamespacecount to state.namespaceOverrides.Count - 1 do
               //if not kid.isNamespaceUsed(context.namespaces.items[i]) then
                 kid.addNamespaceDeclaration(state.namespaceOverrides.items[i], false);
           end;
@@ -4325,7 +4325,7 @@ var
   end;
 
 
-var i, oldNodeNameSpaceCount, oldstatenamespacecount: integer;
+var i, oldNodeNameSpaceCount: integer;
   nameValueEvaluated: IXQValue;
 begin
   with state do begin
