@@ -4074,13 +4074,23 @@ var
             tempNamespaces.free;
           end;
           if (not context.staticContext.copyNamespaceInherit) and (context.namespaces <> nil) then begin
+            //writeln(context.namespaces.Count);
             //remove namespaces of new parent
             for i := 0 to context.namespaces.Count - 1 do
-              if not kid.isNamespaceUsed(context.namespaces.items[i]) then begin
-                if context.namespaces.items[i].getPrefix = '' then kid.addAttribute('xmlns', '')
-                else kid.addAttribute(context.namespaces.items[i].getPrefix, '').namespace := XMLNamespace_XMLNS;
-              end;
+              if not kid.isNamespaceUsed(context.namespaces.items[i]) then
+                kid.addNamespaceDeclaration(context.namespaces.items[i].getPrefix, '', false);
           end;
+          if (context.staticContext.copyNamespaceInherit) and (context.namespaces <> nil) then begin
+            //copied nodes inherit all namespaces even those created implicitily by prefixes used in names of their ancestors.
+            //writeln(context.namespaces.Count);
+            //remove namespaces of new parent
+            for i := 0 to context.namespaces.Count - 1 do
+              //if not kid.isNamespaceUsed(context.namespaces.items[i]) then
+                kid.addNamespaceDeclaration(context.namespaces.items[i], false);
+          end;
+          //for attrib in kid.getEnumeratorAttributes do
+          //  writeln(attrib.value,'=',attrib.realvalue);
+          //writeln;
         end;
         else;
       end;

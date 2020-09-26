@@ -205,6 +205,7 @@ TTreeNode = class
   function addAttribute(const aname, avalue: string): TTreeAttribute;
   procedure addAttributes(const props: array of THTMLProperty);
   procedure addNamespaceDeclaration(n: TNamespace; overrides: boolean );
+  procedure addNamespaceDeclaration(const prefix, url: string; overrides: boolean );
   procedure addChild(child: TTreeNode);
   procedure removeAttribute(a: TTreeAttribute);
 
@@ -1632,29 +1633,34 @@ begin
 end;
 
 procedure TTreeNode.addNamespaceDeclaration(n: TNamespace; overrides: boolean );
+begin
+  addNamespaceDeclaration(n.getPrefix, n.getURL, overrides);
+end;
+
+procedure TTreeNode.addNamespaceDeclaration(const prefix, url: string; overrides: boolean);
 var a : TTreeAttribute;
 begin
   for a in getEnumeratorAttributes do
     if (a.isNamespaceNode) and (
-         ((a.namespace = nil) and (n.getPrefix = ''))
-         or ((a.namespace <> nil) and (n.getPrefix = a.value))
+         ((a.namespace = nil) and (prefix = ''))
+         or ((a.namespace <> nil) and (prefix = a.value))
       ) then begin
-      if overrides then a.realvalue:=n.getURL;
+      if overrides then a.realvalue:=URL;
       exit;
     end;
-  if n.getPrefix = '' then begin
-    if (namespace = nil) or (namespace.getPrefix = '') then begin
+  if prefix = '' then begin
+    if (namespace <> nil) and (namespace.getPrefix = '') then begin
       if not overrides then exit;
       //todo?: if document <> inl then document.add(n)
       //namespace := n;
     end;
-    addAttribute('xmlns', n.getURL)
+    addAttribute('xmlns', URL)
   end else begin
-    if (namespace <> nil) and (namespace.getPrefix = n.getPrefix) then begin
+    if (namespace <> nil) and (namespace.getPrefix = prefix) then begin
       if not overrides then exit;
       //namespace := n;
     end;
-    addAttribute(n.getPrefix, n.getURL).namespace := XMLNamespace_XMLNS;
+    addAttribute(prefix, URL).namespace := XMLNamespace_XMLNS;
   end;
 end;
 
