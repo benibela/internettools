@@ -3079,7 +3079,7 @@ var
   prefix: String;
 begin
   prefix := args[0].toString;
-  if prefix = 'xml' then exit(xqvalue(XMLNamespaceUrl_XML));
+  if prefix = 'xml' then exit(baseSchema.anyURI.createValue(XMLNamespaceUrl_XML));
   if args[1].toNode = nil then exit(xqvalue);
   temp := TNamespaceList.Create;
   args[1].toNode.getAllNamespaces(temp);
