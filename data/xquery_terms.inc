@@ -3885,6 +3885,7 @@ begin
   with state do begin
     baseOffset := 0;
     olddocumentnamespacecount:= -1;
+    namespaceOverrides := nil;
     if context.namespaces <> nil then olddocumentnamespacecount := context.namespaces.Count;
     if (typ = tetDocument) then begin
       document := TTreeDocument.create(nil);
@@ -3904,6 +3905,8 @@ begin
       if context.namespaces <> nil then
         if olddocumentnamespacecount = -1 then FreeAndNil(context.namespaces)
         else context.namespaces.deleteFrom(olddocumentnamespacecount);
+      if state.namespaceOverrides <> nil then
+        state.namespaceOverrides.Free;
     end;
   end;
 end;
@@ -3944,6 +3947,24 @@ var
     if (context.namespaces = nil) then context.namespaces := TNamespaceList.Create;
     result := context.namespaces;
   end;
+  //Explicitly declared namespace like xmlns:ns="foo"
+  procedure addExplicitNamespace(n: TNamespace);
+  begin
+    needNamespaceList.addIfNewPrefixUrl(n);
+    if context.staticContext.copyNamespaceInherit then
+      exit; //explicit namespaces are automatically inherited, so they need to be removed if (inherit) is off
+    if state.namespaceOverrides = nil then state.namespaceOverrides := TNamespaceList.Create;
+    state.namespaceOverrides.addIfNewPrefixUrl(n);
+  end;
+  //Implicitly declared namespace like ns in <ns:element/>, not to be confused with the unrelated implicitNamespaces property
+  procedure addImplicitNamespace(n: TNamespace);
+  begin
+    needNamespaceList.addIfNewPrefixUrl(n);
+    if not context.staticContext.copyNamespaceInherit then
+      exit; //implicit namespaces are not automatically inherited, so they need to be added if (inherit) is on
+    if state.namespaceOverrides = nil then state.namespaceOverrides := TNamespaceList.Create;
+    state.namespaceOverrides.addIfNewPrefixUrl(n);
+  end;
 
   function chooseRandomPrefix(): string;
   begin
@@ -3974,13 +3995,13 @@ var
               //if the namespace prefix is not already correctly bound, we need to add it. But if we have already a namespace for that prefix, we need use another prefix
               //Also this does not actually create namespace nodes. Real namespace nodes might be inherited by the children, but these implicit namespaces nodes must not.
               if namespaceIndex >= 0 then kid.namespace := state.document.addNamespace(kid.namespace.getURL, chooseRandomPrefix());
-              context.namespaces.add(kid.namespace)
+              addImplicitNamespace(kid.namespace)
             end;
           end else begin
             if (tree.namespace <> nil) and (tree.namespace.getPrefix = kid.value) and (tree.namespace.getURL <> TTreeAttribute(kid).realvalue) then begin
               tree.namespace := state.document.addNamespace(tree.namespace.getURL, chooseRandomPrefix());
               tree.addAttribute(tree.namespace.getPrefix, tree.namespace.getURL).namespace := XMLNamespace_XMLNS;
-              needNamespaceList.add(tree.namespace);
+              addImplicitNamespace(tree.namespace);
             end;
           end;
         end;
@@ -4005,7 +4026,7 @@ var
         if TTreeAttribute(kid).isNamespaceNode then begin
           if (kid.value = '') and ((tree.namespace = nil) or (tree.namespace.getPrefix = '')) and (TTreeAttribute(kid).realvalue <> namespaceGetURL(tree.namespace)) then
             raiseEvaluationError('XQDY0102', 'Namespace override');
-          needNamespaceList.addIfNewPrefixUrl(TNamespace.make(kid.getStringValue(), kid.value));
+          addExplicitNamespace(TNamespace.make(kid.getStringValue(), kid.value));
         end;
       end;
       tetDocument: begin
@@ -4073,20 +4094,19 @@ var
             end;}
             tempNamespaces.free;
           end;
-          if (not context.staticContext.copyNamespaceInherit) and (context.namespaces <> nil) then begin
+          if (not context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
             //writeln(context.namespaces.Count);
             //remove namespaces of new parent
-            for i := 0 to context.namespaces.Count - 1 do
-              if not kid.isNamespaceUsed(context.namespaces.items[i]) then
-                kid.addNamespaceDeclaration(context.namespaces.items[i].getPrefix, '', false);
+            for i := 0 to state.namespaceOverrides.Count - 1 do
+              if not kid.isNamespaceUsed(state.namespaceOverrides.items[i]) then
+                kid.addNamespaceDeclaration(state.namespaceOverrides.items[i].getPrefix, '', false);
           end;
-          if (context.staticContext.copyNamespaceInherit) and (context.namespaces <> nil) then begin
-            //copied nodes inherit all namespaces even those created implicitily by prefixes used in names of their ancestors.
+          if (context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
+            //copied nodes inherit all namespaces even those created implicitly by prefixes used in names of their ancestors.
             //writeln(context.namespaces.Count);
-            //remove namespaces of new parent
-            for i := 0 to context.namespaces.Count - 1 do
+            for i := 0 to state.namespaceOverrides.Count - 1 do
               //if not kid.isNamespaceUsed(context.namespaces.items[i]) then
-                kid.addNamespaceDeclaration(context.namespaces.items[i], false);
+                kid.addNamespaceDeclaration(state.namespaceOverrides.items[i], false);
           end;
           //for attrib in kid.getEnumeratorAttributes do
           //  writeln(attrib.value,'=',attrib.realvalue);
@@ -4170,8 +4190,7 @@ var
       procedure registerNamespace();
       begin
         state.document.addNamespace(tree.namespace);
-        if context.namespaces = nil then needNamespaceList;
-        context.namespaces.Add(tree.namespace);
+        addImplicitNamespace(tree.namespace);
       end;
     var
       i: Integer;
@@ -4216,7 +4235,7 @@ var
           if (prefix = '') and (url = XMLNamespaceUrl_XML) then prefix := 'xml';
           if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
           tree.namespace := state.document.addNamespace(url, prefix);
-          needNamespaceList.Add(tree.namespace);
+          addImplicitNamespace(tree.namespace);
         end;
       end;
     end;
@@ -4272,7 +4291,7 @@ var
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
   end;
 
-var i, oldnodenamespacecount: integer;
+var i, oldnodenamespacecount, oldstatenamespacecount: integer;
   nameValueEvaluated: IXQValue;
 begin
   with state do begin
@@ -4305,7 +4324,8 @@ begin
 
     oldnodenamespacecount:= 0;
     if context.namespaces <> nil then oldnodenamespacecount := context.namespaces.Count;
-
+    oldstatenamespacecount := 0;
+    if state.namespaceOverrides <> nil then oldstatenamespacecount := state.namespaceOverrides.count;
 
     case typ of
       tetAttribute, tetNamespace: begin
@@ -4337,7 +4357,7 @@ begin
           needNamespaceList;
           for i:= 0 to implicitNamespaces.Count - 1 do begin
             tree.addNamespaceDeclaration(implicitNamespaces.namespaces[i], true);
-            context.namespaces.add(implicitNamespaces.namespaces[i]);
+            addExplicitNamespace(implicitNamespaces.namespaces[i]);
           end;
         end;
 
@@ -4346,7 +4366,7 @@ begin
         if nameValue <> nil then begin
           setTreeNodeNameFromTerm(nameValue, xqdnkElementType);
           if tree.namespace <> nil then
-            needNamespaceList.addIfNewPrefixUrl(tree.namespace);
+            addImplicitNamespace(tree.namespace);
         end;
 
         if (root = tree) and (olddocumentnamespacecount > 0)  then
@@ -4401,6 +4421,8 @@ begin
   end;
   if context.namespaces <> nil then
     context.namespaces.deleteFrom(oldnodenamespacecount);
+  if state.namespaceOverrides <> nil then
+    state.namespaceOverrides.deleteFrom(oldstatenamespacecount);
   result := tree;
 end;
 

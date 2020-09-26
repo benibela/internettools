@@ -2404,6 +2404,7 @@ type
     root: TTreeNode;
     baseOffset: TTreeNodeIntOffset;
     olddocumentnamespacecount: Integer;
+    namespaceOverrides: TNamespaceList;
   end;
 
   TXQTermConstructor = class(TXQTermWithChildren)
