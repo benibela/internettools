@@ -3947,6 +3947,21 @@ var
     if (context.namespaces = nil) then context.namespaces := TNamespaceList.Create;
     result := context.namespaces;
   end;
+  (*
+  Different kinds of namespaces:
+                              Nested, direct constructor              Copied node,inherit=true         Copied node,inherit=false
+  Explicit
+  xmlns:ns="foo"                     inherit                                 inherit                         no inherit
+  inherited                                                                                                  => REMOVE
+
+  Implicit
+  <ns:element/>                     no inherit                               inherit ?                       no inherit
+  not inherited                                                              => ADD
+
+  Computed
+  namespace xy{..}                  no inherit                               inherit ?                       no inherit
+  inherited                          => REMOVE                                                               => REMOVE
+  *)
   //Explicitly declared namespace like xmlns:ns="foo"
   procedure addExplicitNamespace(n: TNamespace);
   begin
@@ -4047,6 +4062,22 @@ var
     end;
   end;
 
+  var oldDeclaredNodeNamespaceCount: integer;
+  procedure addDirectlyConstructedNodeAsKid;
+  var
+    i: Integer;
+  begin
+    if (kid.typ = tetOpen) and assigned(context.namespaces) and not context.staticContext.copyNamespaceInherit  and (context.namespaces.count > oldDeclaredNodeNamespaceCount) then begin
+      //remove namespaces created by namespace constructors in the content sequence
+      for i := oldDeclaredNodeNamespaceCount to context.namespaces.Count - 1 do
+        if not kid.isNamespaceUsed(context.namespaces.items[i]) then
+          kid.addNamespaceDeclaration(context.namespaces.items[i].getPrefix, '', false);
+      //todo: does copy-namespace preserve matter here? nodes constructed in the content sequence are conceptionally "copied", but our parser converts them to non-copied direct constructors
+    end;
+    addNodeAsKid;
+  end;
+
+
   procedure addValue(const v: IXQValue);
     procedure addClonedNodeAsKid(n: TTreeNode);
     var
@@ -4094,6 +4125,7 @@ var
             end;}
             tempNamespaces.free;
           end;
+
           if (not context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
             //writeln(context.namespaces.Count);
             //remove namespaces of new parent
@@ -4108,6 +4140,7 @@ var
               //if not kid.isNamespaceUsed(context.namespaces.items[i]) then
                 kid.addNamespaceDeclaration(state.namespaceOverrides.items[i], false);
           end;
+
           //for attrib in kid.getEnumeratorAttributes do
           //  writeln(attrib.value,'=',attrib.realvalue);
           //writeln;
@@ -4291,7 +4324,8 @@ var
       raiseEvaluationError('XQDY0044', 'Attribute must not be called xmlns');
   end;
 
-var i, oldnodenamespacecount, oldstatenamespacecount: integer;
+
+var i, oldNodeNameSpaceCount, oldstatenamespacecount: integer;
   nameValueEvaluated: IXQValue;
 begin
   with state do begin
@@ -4323,6 +4357,7 @@ begin
     inc(baseOffset);
 
     oldnodenamespacecount:= 0;
+    oldDeclaredNodeNamespaceCount := 0;
     if context.namespaces <> nil then oldnodenamespacecount := context.namespaces.Count;
     oldstatenamespacecount := 0;
     if state.namespaceOverrides <> nil then oldstatenamespacecount := state.namespaceOverrides.count;
@@ -4375,11 +4410,13 @@ begin
           for i := 0 to olddocumentnamespacecount - 1 do
             tree.addNamespaceDeclaration(context.namespaces.items[i], false);
 
+        if context.namespaces <> nil then oldDeclaredNodeNamespaceCount := context.namespaces.Count;
+
         for i:=0 to high(children) do begin
           if objInheritsFrom(children[i], TXQTermConstructor) then begin
             kid := TXQTermConstructor(children[i]).evaluate(context, state);
             if kid = nil then continue;
-            addNodeAsKid;
+            addDirectlyConstructedNodeAsKid;
           end else begin
             previousValueWasAtomic:=false; //because constant text contents is stored as string not as text node
             addValue(children[i].evaluate(context));
