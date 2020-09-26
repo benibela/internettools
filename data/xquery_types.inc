@@ -610,7 +610,7 @@ procedure TXQValue.xmlSerialize(var serializer: TXQSerializer);
           first := false;
         end;
         tempName := prop.key;
-        if TXSSchema.isValidNCName(tempName) then
+        if isValidNCName(tempName) then
           appendXMLElementStartTag(tempName)
         else begin
           appendXMLElementStartOpen('_');

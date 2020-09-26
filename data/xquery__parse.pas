@@ -4680,8 +4680,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           else raiseSyntaxError('=>', b);
         end;
         tcall := tdf.children[0] as TXQTermWithChildren;
-      end else
+      end else begin
         raiseSyntaxError('=>', b);
+        exit
+      end;
       setlength(tcall.children, length(tcall.children) + 1);
       if insertAt <> high(tcall.children) then
         move(tcall.children[insertAt], tcall.children[insertAt + 1], sizeof(tcall.children[0]) * (length(tcall.children) - insertAt - 1));

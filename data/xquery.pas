@@ -1930,7 +1930,7 @@ type
 
   TXQTermSequenceType = class(TXQTermWithChildren)
     name: string;
-    allowNone, allowMultiple: boolean;
+    allowNone, allowMultiple: boolean; //?, *, and + modifiers. (note: tikNone/empty-sequence() does not have allowNone set)
     kind: TXQTypeInformationKind;
     atomicTypeInfo: TXSType; //used for tikAtomic (or tikFunctionTest during parsing) or tikJSONiqTest
     nodeMatching: TXQPathMatchingStep; //only for tikElementTest
@@ -9061,7 +9061,6 @@ end;
 
 class function TXQueryEngine.getCollation(id: string; base: string; errCode: string): TXQCollation;
 var
-  i: Integer;
   oldid: string;
 begin
   if strEndsWith(id, '/') then delete(id, length(id), 1);

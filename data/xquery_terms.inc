@@ -3993,7 +3993,7 @@ var
     doc: TTreeNode;
     n: TTreeNode;
     attrib: TTreeNode;
-    namespaceIndex: Integer;
+    namespaceIndex: SizeInt;
   begin
     kid.parent := tree;
     previousValueWasAtomic := false;
@@ -4062,10 +4062,10 @@ var
     end;
   end;
 
-  var oldDeclaredNodeNamespaceCount, oldstatenamespacecount: integer;
+  var oldDeclaredNodeNamespaceCount, oldstatenamespacecount: SizeInt;
   procedure addDirectlyConstructedNodeAsKid;
   var
-    i: Integer;
+    i: SizeInt;
   begin
     if (kid.typ = tetOpen) and assigned(context.namespaces) and not context.staticContext.copyNamespaceInherit  and (context.namespaces.count > oldDeclaredNodeNamespaceCount) then begin
       //remove namespaces created by namespace constructors in the content sequence
@@ -4083,7 +4083,7 @@ var
     var
       temp: TTreeNode;
       attrib, tempattrib: TTreeAttribute;
-      i: Integer;
+      i: SizeInt;
       tempNamespaces: TNamespaceList;
       tempNamespace: TNamespace;
     begin
@@ -4118,16 +4118,10 @@ var
             for i:=0 to tempNamespaces.Count - 1 do
               if context.staticContext.copyNamespacePreserve or (kid.isNamespaceUsed(tempNamespaces.items[i])) then
                 kid.addNamespaceDeclaration(tempNamespaces.items[i], false);
-            {if not tempNamespaces.hasNamespacePrefix('') then begin
-              v.toNode.getOwnNamespaces(tempNamespaces);
-              if not tempNamespaces.hasNamespacePrefix('') then
-                kid.addNamespaceDeclaration(TNamespace.make('', ''), false);
-            end;}
             tempNamespaces.free;
           end;
 
           if (not context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
-            //writeln(context.namespaces.Count);
             //remove namespaces of new parent
             for i := 0 to state.namespaceOverrides.Count - 1 do
               if not kid.isNamespaceUsed(state.namespaceOverrides.items[i]) then
@@ -4135,15 +4129,9 @@ var
           end;
           if (context.staticContext.copyNamespaceInherit) and (state.namespaceOverrides <> nil) then begin
             //copied nodes inherit all namespaces even those created implicitly by prefixes used in names of their ancestors.
-            //writeln(context.namespaces.Count);
             for i := oldstatenamespacecount to state.namespaceOverrides.Count - 1 do
-              //if not kid.isNamespaceUsed(context.namespaces.items[i]) then
                 kid.addNamespaceDeclaration(state.namespaceOverrides.items[i], false);
           end;
-
-          //for attrib in kid.getEnumeratorAttributes do
-          //  writeln(attrib.value,'=',attrib.realvalue);
-          //writeln;
         end;
         else;
       end;
@@ -4238,7 +4226,6 @@ var
       end;
       tree.namespace := context.staticContext.findNamespace(prefix, defkind);
       if tree.namespace <> nil then registerNamespace();
-      // tree.namespace := context.findNamespace('', defkind)
     end;
 
     procedure setTreeNamespaceFromQName(const url, aprefix: string; defkind: TXQDefaultNamespaceKind);
@@ -4251,19 +4238,7 @@ var
         tree.namespace := nil //something weird happens, if there is a non-nil Q{} Qname. Children of this node that have an empty-prefix namespace inherit this non-nil non existing namespace, so copying and serializing them, duplicates there namespace declaration attribute
       else begin
         setNamespaceFromPrefix(prefix);
-        {//find namespace from earlier tree construction
-        if (context.namespaces <> nil) and ((prefix <> '') or (defkind = xqdnkElementType)) then begin
-          i := context.namespaces.lastIndexOfNamespacePrefix(prefix);
-          if (i >= 0) then begin
-            tree.fnamespace := context.namespaces.items[i];
-            if tree.fnamespace.getURL = url then begin
-              if i < state.olddocumentnamespacecount then registerNamespace(); //duplicate namespace if it is from another document
-              exit;
-            end;
-          end;
-        end;
         //new namespace
-        tree.fnamespace := context.staticContext.findNamespace(prefix, defkind);}
         if (tree.namespace = nil) or (tree.namespace.getURL <> url) then begin//((defkind = xqdnkElementType) or (url <> '')) then begin
           if (prefix = '') and (url = XMLNamespaceUrl_XML) then prefix := 'xml';
           if (prefix = '') and (defkind <> xqdnkElementType) then prefix := chooseRandomPrefix;
@@ -4325,7 +4300,7 @@ var
   end;
 
 
-var i, oldNodeNameSpaceCount: integer;
+var i, oldNodeNameSpaceCount: SizeInt;
   nameValueEvaluated: IXQValue;
 begin
   with state do begin

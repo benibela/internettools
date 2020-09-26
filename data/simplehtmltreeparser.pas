@@ -1205,7 +1205,7 @@ begin
     tetAttribute, tetNamespace: result := TTreeAttribute(self).realvalue;
     tetText, tetComment: result := value;
     tetProcessingInstruction: if attributes = nil then result := '' else result := attributes.getStringValue;
-    else{tetClose, tetInternalDoNotUseCDATAText:} assert(false);
+    else{tetClose, tetInternalDoNotUseCDATAText:} begin assert(false); result := ''; end;
   end;
 end;
 

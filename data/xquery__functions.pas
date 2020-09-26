@@ -1520,8 +1520,8 @@ end;
 
 procedure THttpRequestParams.mergeOverride(const requestOverride: THttpRequestParams);
 var
-  requestOverrideUsed: array of boolean;
-  requestOverrideNextKeyOccurrence: array of SizeInt; //this is used to build a multimap
+  requestOverrideUsed: array of boolean = nil;
+  requestOverrideNextKeyOccurrence: array of SizeInt = nil; //this is used to build a multimap
   requestOverrideKeyIndex: TXQhashmapStrSizeInt;
 
   procedure initRequestOverrideInfo;
@@ -7152,6 +7152,7 @@ begin
   case argv[0].getPropertyKeyKind of
     xqmpkkStringKeys: result := removeFromStringMap;
     xqmpkkStandardKeys: result := removeFromStandardMap;
+    else result := nil;
   end;
 end;
 
