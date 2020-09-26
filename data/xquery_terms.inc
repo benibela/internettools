@@ -1002,7 +1002,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
               if not (returnType.isItemStar()) then begin
                 case sub.kind of
                   pvkObject: begin
-                    if not returnType.allowNone then exit();
+                    if not returnType.allowNone and (returnType.kind <> tikNone) then exit();
                     for w in sub.getEnumeratorPropertyValuesUnsafe do
                       if not returnType.instanceOf(w) then
                         exit();

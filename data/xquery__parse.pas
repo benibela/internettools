@@ -1321,7 +1321,7 @@ begin
          case pos^ of
            '*': inc(pos);
            else begin
-             result.push(parseSequenceType(flags));
+             result.push(parseSequenceType(flags + [xqstNoMultiples]));
              expect(',');
              result.push(parseSequenceType(flags));
            end;
