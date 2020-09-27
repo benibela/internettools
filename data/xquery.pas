@@ -5889,7 +5889,7 @@ procedure TXQJsonParser.setConfigFromMap(const map: IXQValue);
 
   procedure checkType(const v: TXQValue; t: TXSType);
   begin
-    if (v.getSequenceCount <> 1) or not (v.instanceOf(t)) then
+    if (v.getSequenceCount <> 1) or (not v.instanceOf(t) and not (v.instanceOf(baseSchema.untypedAtomic)) and (v.kind <> pvkNode)) then
       raiseInvalidParam;
   end;
 var vo: TXQValue;
