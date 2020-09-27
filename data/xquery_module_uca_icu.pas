@@ -18,7 +18,7 @@ unit xquery_module_uca_icu;
 interface
 
 uses
-    {$if FPC_FULLVERSION < 30200}dynlibs{$endif}, Classes, SysUtils, xquery.internals.collations;
+    {$if FPC_FULLVERSION < 30200}dynlibs,{$endif} Classes, SysUtils, xquery.internals.collations;
 
 //XPath/XQuery UCA
 type TUCAConfiguration = record
