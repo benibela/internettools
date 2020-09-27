@@ -4182,13 +4182,16 @@ var
     var x: PIXQValue;
     begin
       for x in enum do begin
-        if not first then result += ' ';
         case x^.kind of
           pvkFunction, pvkObject: raiseEvaluationError('FOTY0013', 'Cannot serialize function');
           pvkArray: enumToString(x^.GetEnumeratorMembersPtrUnsafe);
-          else result += x^.toString;
+          pvkSequence: enumToString(x^.GetEnumeratorPtrUnsafe);
+          else begin
+            if not first then result += ' ';
+            result += x^.toString;
+            first := false;
+          end;
         end;
-        first := false;
       end;
     end;
 

@@ -6982,20 +6982,29 @@ begin
   enum1 := a;
   while enum1.MoveNext do begin
     va := enum1.Current^.toValue;
-    if va.kind <> pvkArray then begin
-      enum2 := b;
-      while enum2.MoveNext do begin
-        vb := enum2.Current^.toValue;
-        if vb.kind <> pvkArray then begin;
-          compres := compareCommon(va, vb, overrideCollation, false);
-          result := (compres = accept1) or (compres = accept2);
-        end else result := compareGeneral(va.GetEnumeratorPtrUnsafe, (vb as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, overrideCollation, accept1, accept2);;
+    case va.kind of
+      pvkArray: begin
+        result := compareGeneral( va.GetEnumeratorMembersPtrUnsafe, b, overrideCollation, accept1, accept2);
         if result then exit;
       end;
-    end else begin
-      result := compareGeneral( (va as TXQValueJSONArray).GetEnumeratorMembersPtrUnsafe, b, overrideCollation, accept1, accept2);
-      if result then exit;
-    end;
+      pvkSequence: begin
+        result := compareGeneral( va.GetEnumeratorPtrUnsafe, b, overrideCollation, accept1, accept2);
+        if result then exit;
+      end;
+      else
+        enum2 := b;
+        while enum2.MoveNext do begin
+          vb := enum2.Current^.toValue;
+          case vb.kind of
+            pvkArray: result := compareGeneral(va.GetEnumeratorPtrUnsafe, vb.GetEnumeratorMembersPtrUnsafe, overrideCollation, accept1, accept2);
+            pvkSequence: result := compareGeneral(va.GetEnumeratorPtrUnsafe, vb.GetEnumeratorPtrUnsafe, overrideCollation, accept1, accept2);
+            else
+              compres := compareCommon(va, vb, overrideCollation, false);
+              result := (compres = accept1) or (compres = accept2);
+          end;
+          if result then exit;
+        end;
+    end
   end;
   result := false;
 end;
