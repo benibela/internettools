@@ -63,7 +63,7 @@ type
   int32_t = longint;
   PUCollator = pointer;
   PUStringSearch = pointer;
-
+  {$if FPC_FULLVERSION < 30200}TLibHandle = PtrInt;{$endif}
 //Dynamic loading of libicu
 var
   hlibICU: TLibHandle = 0;
