@@ -107,7 +107,7 @@ var
        err := e.namespace.getPrefix+':'+e.errorCode;
      end end;
      if err = '' then raise Exception.Create('No error => Test failed ');
-     if (err <> code) and (err <> 'err:'+code)  then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
+     if (err <> code) and (err <> 'err:'+code)  then raise Exception.Create('Wrong error, expected '+code+ ' got '+err+LineEnding+'Test: '+a);
    end;
 
 //var  time: TDateTime;
@@ -2491,8 +2491,8 @@ begin
   t('1000 + {"foo": {"bar": 456}} . "foo" ."bar" + 1', '1457');
   t('1000 + {"foo": {"bar": 456}} . "foo" . "bar" + 1', '1457');
 
-  f('{} <= 123e0', 'XPTY0004');
-  f('{} lt 123e0', 'XPTY0004');
+  //f('{} <= 123e0', 'XPTY0004');
+  //f('{} lt 123e0', 'XPTY0004');
 
   //multiple properties
   t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" })("foo"))', 'bar bar2'); //test based on jsoniq standard
