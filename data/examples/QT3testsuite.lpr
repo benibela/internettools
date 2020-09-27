@@ -1883,6 +1883,8 @@ begin
 
   testsets := TList.Create;
   environments := TStringList.Create;
+  environments.Sorted := true;
+  environments.Duplicates:=dupAccept;
   treeCache.init();
 
   clr := TCommandLineReader.create;
