@@ -1076,6 +1076,7 @@ var known: TNamespaceList;
       case sub.typ of
         tetText: result := sub.value.IsBlank();
         tetOpen: result := not (insideHTMLElement and elementIsPhrasing(sub));
+        tetProcessingInstruction: result := not insideHTMLElement;
         else;
       end;
       sub := sub.getNextSibling();
