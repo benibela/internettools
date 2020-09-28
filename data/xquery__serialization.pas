@@ -1259,15 +1259,33 @@ var
     end;
   end;
 
+var interceptor: TSpecialStringHandler;
+
+  procedure appendText(const value: string);
+  begin
+    if params.hasNormalizationForm or (params.characterMaps <> nil)  then
+      interceptor.appendXMLHTMLCharacterMappedText(value,false,false)
+     else
+      case params.method of
+        xqsmXML, xqsmXHTML: serializer.appendXMLText(value);
+        xqsmHTML: serializer.appendHTMLText(value);
+        xqsmText: serializer.append(value);
+        else;
+      end;
+  end;
+
   procedure addAtomicString(const s: string);
   begin
     addItemStart;
     if not hasItemSeparator then begin
-      if not wasNodeOrFirst then serializer.append(' ');
+      if not wasNodeOrFirst then appendText(' ');
       wasNodeOrFirst := false;
     end;
-    serializer.append(s);
+    appendText(s);
   end;
+
+
+
 
   procedure add(const v: IXQValue);
   var
@@ -1302,7 +1320,7 @@ var
 
 var
   hasDoctypeSystem: Boolean;
-  interceptor: TSpecialStringHandler;
+
 begin
   with params do
     case method of
