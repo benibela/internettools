@@ -5934,6 +5934,7 @@ function TXQJsonParser.parse(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if (argc = 2) then
     setConfigFromMap(args[1]);
+  if args[0].isUndefined then exit(xqvalue);
   result := parse(args[0].toString);
 end;
 
@@ -6244,7 +6245,10 @@ begin
       raiseError('unclosed');
     end;
 
-    if result = nil then result := xqvalue;
+    if result = nil then begin
+     if not (jpoLiberal in options) then raiseError('No data');
+      result := xqvalue;
+    end;
   finally
     //for i := 0 to containerCount - 1 do containerStack[i]._Release;
     scanner.free;
