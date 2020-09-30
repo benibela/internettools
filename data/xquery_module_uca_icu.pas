@@ -334,7 +334,7 @@ begin
   result := 0;
   if strActualEncoding(CP_ACP) = CP_UTF8 then begin
     pt := PUnicodeChar(textUtf16) + from;
-    pend := pt + endBefore;
+    pend := PUnicodeChar(textUtf16) + endBefore;
     while pt < pend do begin
       //see strGetUnicodeCharacterUTFLength(); and strDecodeUTF16Character();
       if pt^ < #$80 then inc(result)
@@ -478,6 +478,7 @@ begin
     result += '-kb-' + boolCode[backwards];
     result += '-kk-' + boolCode[normalization];
     result += '-kc-' + boolCode[caseLevel];
+    result += '-kn-' + boolCode[numeric];
     result += '-kf-' + caseFirstCode[caseFirst];
     if length(reorder) > 0 then begin
       result += '-kr';

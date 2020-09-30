@@ -2423,19 +2423,18 @@ end;
 
 function xqFunctionSubstring_after(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var a,b: string;
-    i:integer;
     collation: TXQCollation;
+    start, len: SizeInt;
 begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   a := args[0].toString;
   b := args[1].toString;
   if b = '' then result := xqvalue(a)
-  else begin
-    i := collation.indexOf(a,b);
-    if i = 0 then result := xqvalue('')
-    else result := xqvalue(strcopyfrom(a,i+length(b)));
-  end;
+  else if collation.find(a,b,start, len) then
+    result := xqvalue(strcopyfrom(a,start + len))
+   else
+    result := xqvalue('')
 end;
 
 
