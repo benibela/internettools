@@ -147,11 +147,44 @@ end;
 
 procedure TW32InternetAccess.doTransferUnchecked(method: string; const decoded: TDecodedUrl; const data: TInternetAccessDataBlock);
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', ''); //just as default. it will be overriden
+
+    procedure newConnection;
+    var tempPort: integer;
+        service: DWORD;
+    begin
+      if hLastConnection<>nil then
+        InternetCloseHandle(hLastConnection);
+      if striequal(decoded.protocol, 'https') then begin
+        tempPort:=443;
+        service:=INTERNET_SERVICE_HTTP;
+      end else {if striequal(decoded.protocol, 'http') then} begin //if there is no else branch fpc gives pointless warnings
+        tempPort:=80;
+        service :=INTERNET_SERVICE_HTTP;
+      end;
+      if decoded.port <> '' then
+        tempPort := StrToIntDef(decoded.port, 80);
+      //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
+      if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,nil,            nil,service,0,0)
+      else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),nil,service,0,0)
+      else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),pchar(strUnescapeHex(decoded.password, '%')),service,0,0);
+    end;
+
+    function newOpenRequest: HINTERNET;
+    var flags: DWORD;
+    begin
+      flags := INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_CACHE_WRITE or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT;
+      if striequal(decoded.protocol, 'https') then begin
+        flags := flags or INTERNET_FLAG_SECURE;
+        if not internetConfig^.checkSSLCertificates then
+          flags := flags or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID
+      end;
+      result := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), flags, 0);
+    end;
+
 var
   databuffer : array[0..4095] of char;
   hfile: hInternet;
   dwindex,dwcodelen,dwRead,dwNumber,temp: cardinal;
-  tempPort: integer;
   dwcode : array[1..20] of char;
   res    : pchar;
   callResult: boolean;
@@ -163,21 +196,7 @@ begin
 
   if (lastServer.Protocol<>decoded.protocol) or (lastServer.Host<>decoded.host) or (lastServer.Port <> decoded.port)
      or (lastServer.username <> decoded.username) or (lastServer.password <> decoded.password) then begin
-    if hLastConnection<>nil then
-      InternetCloseHandle(hLastConnection);
-    if striequal(decoded.protocol, 'https') then begin
-      tempPort:=443;
-      temp:=INTERNET_SERVICE_HTTP;
-    end else {if striequal(decoded.protocol, 'http') then} begin //if there is no else branch fpc gives pointless warnings
-      tempPort:=80;
-      temp:=INTERNET_SERVICE_HTTP;
-    end;
-    if decoded.port <> '' then
-      tempPort := StrToIntDef(decoded.port, 80);
-    //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
-    if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,nil,            nil,temp,0,0)
-    else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),nil,temp,0,0)
-    else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),pchar(strUnescapeHex(decoded.password, '%')),temp,0,0);
+    newConnection;
     if hLastConnection=nil then begin
       lastHTTPResultCode := -2;
       lastErrorDetails:=rsConnectingTo0SFailed;
@@ -190,14 +209,7 @@ begin
     lastServer := decoded; //remember to which server the connection points. We cannot use lastURLDecoded, since the connection has already changed, but lastURLDecoded is only set after redirects
   end;
 
-  if striequal(decoded.protocol, 'https') then begin
-    if internetConfig^.checkSSLCertificates then
-      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE , 0)
-     else
-      hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, 0)
-  end else
-    hfile := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT, 0);
-
+  hfile := newOpenRequest;
   if not assigned(hfile) then begin
     lastErrorDetails := rsReceivingFrom0SFaile;
     exit;
