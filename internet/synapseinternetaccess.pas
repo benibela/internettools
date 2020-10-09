@@ -86,7 +86,10 @@ implementation
 
 uses synautil,ssl_openssl_lib,bbutils{$ifndef WINDOWS},netdb{$endif};
 
-{ TSynapseInternetAccess }
+resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Failed DNS lookup, failed to load OpenSSL, failed proxy, server does not exists or has no open port.';
+
+
+
 
 {$if defined(WINDOWS) or defined(android)}
 function checkEtcResolv(): boolean;
@@ -218,6 +221,7 @@ begin
     checkHeaders;
   end else begin
     lastHTTPResultCode := -4;
+    lastErrorDetails := rsConnectionFailed;
   end;
 end;
 
