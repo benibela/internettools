@@ -807,7 +807,6 @@ begin
     end;
     tikArrayTest: result := 'array';
     tikMapTest: result := 'map';
-    else result := 'unknown type';
   end;
   if allowNone and allowMultiple then result += '*'
   else if allowMultiple then result += '+'
@@ -1011,6 +1010,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
                     for pw in sub.GetEnumeratorMembersPtrUnsafe do
                       if not returnType.instanceOf(pw^) then
                         exit();
+                  else;
                 end;
               end;
               with arguments[0] do begin
@@ -1021,6 +1021,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
                     case sub.kind of
                       pvkArray: result := subtypeItemTypeAtomic(atomicTypeInfo, baseSchema.integer);
                       pvkObject: result := true; //todo check actual key kind
+                      else;
                     end;
                   tikAny: result := true;
                 end;
@@ -1168,6 +1169,7 @@ begin
           end;
           exit(false);
         end;
+        else;
       end;
     tikArrayTest: begin
       if length(tb.children) = 0 then begin
@@ -1191,8 +1193,10 @@ begin
     tikJSONiqTest: case kind of
       tikArrayTest: exit(tb.atomicTypeInfo = baseJSONiqSchema.array_);
       tikMapTest: exit(tb.atomicTypeInfo = baseJSONiqSchema.object_);
-      tikJSONiqTest: exit(atomicTypeInfo.derivedFrom(tb.atomicTypeInfo))
+      tikJSONiqTest: exit(atomicTypeInfo.derivedFrom(tb.atomicTypeInfo));
+      else;
     end;
+    tikAtomic: ;
   end;
   exit(false);
 end;
@@ -4779,6 +4783,7 @@ begin
   case kind of
     xqtdfStaticPartialApplication: result += children[high(children)].getContextDependencies;
     xqtdfDynamicPartialApplication: result += children[0].getContextDependencies;
+    xqtdfUserDefined, xqtdfNamedReference: ;
   end;
 end;
 

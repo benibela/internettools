@@ -1410,6 +1410,10 @@ type
     class function commonDecimalType(a,b: TXSType; const failureType: TXSType): TXSType; //static;
     class function commonDecimalType(const a,b: IXQValue): TXSType; static;
 
+  private
+    procedure failCreateValue(err: TXSCastingError; v: int64);
+  public
+
     //** Creates a new value from the argument array (directly maps to the xs:something constructors of XPath)
     function createValue(const v: IXQValue): IXQValue; inline;
     function createValue(const v: Int64): IXQValue; inline;
@@ -1659,6 +1663,7 @@ type
   TXQEvaluationStack = class(TXQVCustomList)
   private
     {$ifdef TRACK_STACK_VARIABLE_NAMES}debugNames: array of string;{$endif}
+    procedure failTop(const name: TXQTermVariable; i: integer = 0);
   public
     procedure push(const value: ixqvalue);
     procedure pop();
@@ -4893,17 +4898,16 @@ begin
   result := temp;
 end;
 
+procedure TXSType.failCreateValue(err: TXSCastingError; v: int64);
+begin
+  TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
+end;
 function TXSType.createValue(const v: Int64): IXQValue;
 var err: TXSCastingError;
-  procedure fail;
-  begin
-    TXQueryInternals.raiseXSCEError(err, IntToStr(v), name)
-  end;
-
-var temp: TXQValue;
+    temp: TXQValue;
 begin
   err := tryCreateValue(v, @temp);
-  if err <> xsceNoError then fail;
+  if err <> xsceNoError then failCreateValue(err, v);
   result := temp;
 end;
 
@@ -5754,7 +5758,6 @@ begin
 end;
 
 
-
 procedure TXQEvaluationStack.push(const value: ixqvalue);
 begin
   if fcount >= fcapacity then
@@ -5764,7 +5767,7 @@ begin
   fcount += 1;
 end;
 
-procedure TXQEvaluationStack.pop;
+procedure TXQEvaluationStack.pop();
 begin
   assert(fcount > 0);
   fbuffer[fcount-1] := nil;
@@ -5804,18 +5807,17 @@ begin
   push(v);
 end;
 
+procedure TXQEvaluationStack.failTop(const name: TXQTermVariable; i: integer);
+begin
+  raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
+end;
 function TXQEvaluationStack.top(const name: TXQTermVariable; i: integer): IXQValue;
-  procedure fail;
-  begin
-    raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
-  end;
-
 begin
   result := top(i);
   {$ifdef TRACK_STACK_VARIABLE_NAMES}
   if not strEqual(debugNames[count - i - 1], name.value)
   //   and (debugNames[count - i - 1][1] <> '0') {and (v.namespace = XMLNamespaceURL_MyExtensionOperators}
-     then fail;
+     then failTop(name, i);
 
   {$endif}
 end;

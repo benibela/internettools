@@ -1078,7 +1078,7 @@ begin
     xqlenNone:  result := s;
     xqlenXML1:  result := strNormalizeLineEndings(s);
     xqlenXML11: result := strNormalizeLineEndingsUTF8(s);
-    else result := s;
+    //else result := s;
   end;
 end;
 
@@ -1562,6 +1562,7 @@ var token: String;
           case kind of
             xqtfcLetPattern: expect(':=');
             xqtfcForPattern: expect('in');
+            else;
           end;
           expr := parse();
         end;
@@ -4481,6 +4482,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           end;
         end;
       tikElementTest: if st.nodeMatching.requiredType <> nil then visitSequenceType(st.nodeMatching.requiredType, 'XPST0008');
+      else;
     end;
   end;
 
@@ -4834,6 +4836,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
           if pos(':', temp) > 0 then temp := strAfter(temp, ':');
           c.nameHash := nodeNameHash(temp)
         end;
+        else;
       end;
     end;
     if c.implicitNamespaces <> nil then begin
@@ -4870,6 +4873,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
         end;
         xqtfcWindow: if TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable <> nil then
           raiseParsingError('XQST0103', 'Duplicate variable: '+TXQTermFlowerWindow(f.children[i]).findDuplicatedVariable.ToString, clause);
+        else;
       end;
       TXQTermFlowerSubClause(f.children[i]).visitchildrenToUndeclare(checker);
     end;

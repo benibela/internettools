@@ -392,8 +392,8 @@ begin
     xsvList: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (nested list)');
     xsvUnion: for i := 0 to high((aitemType as TXSUnionType).members) do
       if not objInheritsFrom(TXSUnionType(aitemType).members[i], TXSSimpleType) or (TXSSimpleType(TXSUnionType(aitemType).members[i]).variety <> xsvAtomic) then
-        raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)')
-    else raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
+        raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong union member type for usage in list)');
+    xsvAbsent: raise EXQParsingException.Create('err:XQST0012', 'Invalid schema (wrong list type)')
   end;
 end;
 
