@@ -2268,7 +2268,7 @@ begin
         result.name := TXQEQNameUnresolved(result.name).resolveAndFreeToEQNameWithPrefix(staticContext, errorTracking,xqdnkFunction);
       if result.name.namespaceURL = '' then raiseParsingError('XQST0060', 'No namespace for declared function: '+result.name.ToString);
       if staticContext.isLibraryModule and (result.name.namespaceURL <> namespaceGetURL(staticContext.moduleNamespace)) then
-        raiseParsingError('XQST0048', 'Expected module namespace url');
+        raiseParsingError('XQST0048', 'Namespace of function  ' + result.name.ToString + ' needs to be the module namespace "' + staticContext.moduleNamespace.getURL + '".');
       if (result.name.namespacePrefix = '') and isModel3 then refuseReservedFunctionName(result.name.localname);
       case result.name.namespaceURL of
         XMLNamespaceUrl_XML, XMLNamespaceURL_XMLSchema, XMLNamespaceURL_XMLSchemaInstance, XMLNamespaceURL_XPathFunctions:
