@@ -1452,7 +1452,7 @@ type
       cardinality: (fcFinite, fcCountableInfinite);
       numeric: boolean;
     end;}
-    variety: (xsvAbsent, xsvAtomic, xsvList, xsvUnion);
+    variety: (xsvAtomic, xsvAbsent, xsvList, xsvUnion);
     primitive: TXSType;
     //items
     //members
