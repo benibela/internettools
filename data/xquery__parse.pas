@@ -605,6 +605,30 @@ begin
   end;
 end;
 
+type TLineRange = record
+  startLineIndex, lastLineIndex: SizeInt;
+  lines: TCharArrayView; //all lines between start line and end line inclusively
+  lastLine: TStringView;
+//  startOffset, endOffset: ;
+end;
+
+function strMapPcharRangeToLines(const s: string; startpos, lastpos: pchar): TLineRange;
+var
+  startLineStart, endLineStart: pchar;
+  view: TCharArrayView;
+begin
+  strCountLinesBeforePos(s, lastpos, result.lastLineIndex, endLineStart);
+  if startpos < endLineStart then
+    strCountLinesBeforePos(s, startpos, result.startLineIndex, startLineStart)
+   else begin
+    result.startLineIndex := result.lastLineIndex;
+    startLineStart := endLineStart;
+   end;
+  view := s.unsafeViewFrom(startLineStart);
+  result.lines := view.viewUntil(s.unsafeViewFrom(endLineStart).findLineBreak.nilMeansInfinity);
+  result.lastLine := result.lines.viewFrom(endLineStart);
+end;
+
 constructor TXQParsingErrorTracker.Create(const astr: string);
 begin
   str := astr;
@@ -659,26 +683,26 @@ begin
 end;
 
 function TXQParsingErrorTracker.lineInfoMessage(startAt, endAt: pchar): string;
-var lines, i: SizeInt;
-    lineStart: pchar;
-    view: TCharArrayView;
+var i: SizeInt;
     line: String;
     errorStart: Integer;
-    pos: pchar absolute endAt;
-    lastTokenStart: pchar absolute startAt;
+    lineRange: TLineRange;
 begin
   result := '';
-  if str.unsafeView.isOnBounds(pos) then begin
-    if (lastTokenStart < pchar(str)) or (lastTokenStart > pos) then lastTokenStart := pos - 1;
+  if str.unsafeView.isOnBounds(endAt) then begin
+    if (startAt < pchar(str)) or (startAt > endAt) then begin
+      startAt := endAt - 1;
+      if startAt < pchar(str) then startAt := endAt;
+    end;
 
-    strCountLinesBeforePos(str, pos, lines, lineStart);
-    view := str.unsafeView.viewFrom(lineStart);
-    view := view.viewUntil(view.findLineBreak.nilToLast);
-    line := view.ToString;
-
-    result := 'in line ' + inttostr(lines) + ' column ' + inttostr(lastTokenStart - lineStart + 1) + LineEnding + line + LineEnding;
-    line := copy(line, 1, pos - lineStart + 1);
-    errorStart := lastTokenStart - lineStart + 1;
+    lineRange := strMapPcharRangeToLines(str, startAt, endAt);
+    if lineRange.startLineIndex = lineRange.lastLineIndex then
+      result := 'in line ' + inttostr(linerange.startLineIndex) + ' column ' + inttostr(lineRange.lines.offsetOf(startAt) + 1)
+    else
+      result := 'in lines ' + inttostr(linerange.startLineIndex) + ' to ' + inttostr(linerange.lastLineIndex);
+    result += LineEnding + lineRange.lines.ToString + LineEnding;
+    line := copy(lineRange.lastLine.ToString, 1, lineRange.lastLine.offsetOf(endAt) + 1);
+    errorStart := lineRange.lastLine.offsetOf(startAt) + 1;
     for i := 1 to length(line) do
       if line[i] <> #9 then
         if i >= errorStart then line[i] := '^'
