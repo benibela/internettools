@@ -97,6 +97,7 @@ type
     function isEmpty: boolean; inline;
     function isInBounds(target: PElement): boolean; inline;
     function isOnBounds(target: PElement): boolean; inline;
+    function offsetOf(target: PElement): SizeInt; inline;
 
     function getEnumerator: TArrayViewEnumerator; inline;
 
@@ -146,14 +147,17 @@ type
     function viewBehind(newStartSkip: pchar): TCharArrayView; reintroduce;
   end;
 
-  TStringView = object(TCharArrayView)
-  end;
+  TStringView = TCharArrayView;
 
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
+    function unsafeViewTo(newLast: pchar): TStringView;
+    function unsafeViewUntil(newEnd: pchar): TStringView;
+    function unsafeViewFrom(newStart: pchar): TStringView;
+    function unsafeViewBehind(newStartSkip: pchar): TStringView;
   end;
   TBBPcharHelper = type helper for pchar
-    function nilToLast: pchar;
+    function nilMeansInfinity: pchar;
   end;
 
   TCriticalSectionHelper = {$if FPC_FULLVERSION >= 030200}type{$else}record{$endif} helper for TRTLCriticalSection
@@ -263,6 +267,11 @@ end;
 function TArrayView.isOnBounds(target: PElement): boolean;
 begin
   result := (data <= target) and (target <= dataend);
+end;
+
+function TArrayView.offsetOf(target: PElement): SizeInt;
+begin
+  result := target - data;
 end;
 
 
@@ -472,7 +481,27 @@ begin
   result.init(self);
 end;
 
-function TBBPcharHelper.nilToLast: pchar;
+function TBB2StringHelper.unsafeViewTo(newLast: pchar): TStringView;
+begin
+  result := unsafeView.viewTo(newLast);
+end;
+
+function TBB2StringHelper.unsafeViewUntil(newEnd: pchar): TStringView;
+begin
+  result := unsafeView.viewUntil(newEnd);
+end;
+
+function TBB2StringHelper.unsafeViewFrom(newStart: pchar): TStringView;
+begin
+  result := unsafeView.viewFrom(newStart);
+end;
+
+function TBB2StringHelper.unsafeViewBehind(newStartSkip: pchar): TStringView;
+begin
+  result := unsafeView.viewBehind(newStartSkip);
+end;
+
+function TBBPcharHelper.nilMeansInfinity: pchar;
 begin
   if self = nil then result := pchar(high(PtrUInt))
   else result := self;
