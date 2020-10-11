@@ -3792,19 +3792,15 @@ var declarationDuplicateChecker: TStringList;
       end;
     end;
 
-    module := engine.findModule(moduleURL);
+    module := engine.findModule(staticContext, moduleURL, at);
     if module = nil then begin
-      if assigned(engine.OnImportModule) then engine.onImportModule(engine, staticContext, moduleURL, at);
-      module := engine.findModule(moduleURL);
-      if module = nil then begin
-        nativeModule := engine.findNativeModule(moduleURL);
-        if nativeModule = nil then raiseParsingErrorFatal('XQST0059', 'Unknown module: '+moduleURL);
-        if moduleName <> '' then begin
-          if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
-          staticContext.namespaces.add(TNamespace.make(nativeModule.namespace.getURL, moduleName));
-        end;
-        exit;
+      nativeModule := engine.findNativeModule(moduleURL);
+      if nativeModule = nil then raiseParsingErrorFatal('XQST0059', 'Unknown module: '+moduleURL);
+      if moduleName <> '' then begin
+        if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
+        staticContext.namespaces.add(TNamespace.make(nativeModule.namespace.getURL, moduleName));
       end;
+      exit;
     end;
     if moduleName = '' then moduleName := module.getStaticContext.moduleNamespace.getPrefix;
     staticContext.importedModules.AddObject(moduleName, module);

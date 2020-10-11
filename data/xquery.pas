@@ -2870,6 +2870,7 @@ public
 
     procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. A XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
     function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
+    function findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery; //**< Finds a certain registered XQuery module or tries to load one
     class function findNativeModule(const ns: string): TXQNativeModule; //**< Finds a native module.
 
     //** Registers a collation for custom string comparisons
@@ -8251,6 +8252,14 @@ begin
       exit(tempModule);
   end;
   exit(nil);
+end;
+
+function TXQueryEngine.findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery;
+begin
+  result := findModule(namespace);
+  if result <> nil then exit;
+  if assigned(OnImportModule) then onImportModule(self, staticContext, namespace, at);
+  result := findModule(namespace);
 end;
 
 class procedure TXQueryEngine.registerCollation(const collation: TXQCollation);

@@ -7201,6 +7201,127 @@ begin
   result := xqvalue();
 end;
 
+type TLoadXQueryHelper = object
+  oldDeclareExternalVariable: TXQDeclareExternalVariableEvent;
+  externalVariables: IXQValue;
+  procedure OnDeclareExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+end;
+
+procedure TLoadXQueryHelper.OnDeclareExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+var
+  tempName: IXQValue;
+  tempValue: TXQValue;
+begin
+  ignore(sender); ignore(context);
+  tempName := TXQValueQName.create(namespaceUrl, variable);
+  if externalVariables.hasProperty(tempName, @tempValue) then
+    value := tempValue;
+  //oldDeclareExternalVariable(sender, context, namespaceUrl, variable, value);
+end;
+
+function xqFunctionLoadXQueryModule(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  uri: String;
+  at: TStringArray = nil;
+  ps: TXQProperty;
+  i: Integer;
+  module: TXQuery;
+  moduleContext: TXQEvaluationContext;
+  helper: TLoadXQueryHelper;
+  resMap: TXQValueStringMap;
+  functionsMap, variablesMap, functionMap: TXQValueStandardMap;
+  sc: TXQStaticContext;
+  temp: IXQValue;
+  tempValue: TXQValue;
+  pp: TXQStandardProperty;
+begin
+  uri := args[0].toString;
+  if uri.IsEmpty then raise  EXQEvaluationException.create('FOQM0001', 'Empty module uri');
+
+  if argc >= 2 then begin
+    for ps in args[1].getEnumeratorStringPropertiesUnsafe do begin
+      case ps.key of
+        'location-hints': begin
+          SetLength(at, ps.value.getSequenceCount);
+          for i := 0 to high(at) do at[i]:= ps.value.get(i+1).toString;
+        end;
+        'xquery-version': begin
+          if not (ps.value.kind in [pvkBigDecimal, pvkInt64]) then
+            raiseXPTY0004TypeError(args[1], 'Invalid xquery version ');
+          if ps.value.toFloat > 3.1000000001 {floating point is not exact for 3.1} then
+            raise EXQEvaluationException.create('FOQM0006', 'Invalid xquery version ' + args[1].toXQuery);
+        end;
+        'vendor-options', 'variables': begin
+          if ps.value.kind <> pvkObject then raiseXPTY0004TypeError(args[1], ps.key);
+          for pp in ps.value.getEnumeratorPropertiesUnsafe do
+            if not (pp.key.kind in [pvkQName]) then raiseXPTY0004TypeError(args[1], ps.key);
+        end;
+      end;
+    end;
+  end;
+
+  try
+    module := context.staticContext.sender.findModule(context.staticContext, uri, at);
+  except
+    on e: EXQException do
+      raise EXQEvaluationException.create('FOQM0003', 'Failed to load module: ' + uri + LineEnding + e.Message);
+  end;
+  if module = nil then
+    raise EXQEvaluationException.create('FOQM0002', 'Failed to load module: ' + uri);
+
+  moduleContext := context.staticContext.sender.getEvaluationContext();
+  moduleContext.globallyDeclaredVariables := TXQVariableChangeLog.create();
+  helper.oldDeclareExternalVariable := context.staticContext.sender.OnDeclareExternalVariable;
+  if argc >= 2 then begin
+    temp := args[1].getProperty('context-item');
+    case temp.getSequenceCount of
+      1: begin
+        moduleContext.SeqValue := temp;
+        moduleContext.SeqLength := 1;
+        moduleContext.SeqIndex := 1;
+      end;
+    end;
+    helper.externalVariables := args[1].getProperty('variables');
+    context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
+  end;
+  try
+    moduleContext.staticContext := module.getstaticContext;
+    module.evaluate(moduleContext);
+
+
+    functionsMap := TXQValueStandardMap.create();
+    variablesMap := TXQValueStandardMap.create();
+    resMap := TXQValueStringMap.create();
+    resMap.setMutable('functions', functionsMap);
+    resMap.setMutable('variables', variablesMap);
+    result := resMap;
+
+    with moduleContext do
+      for i := 0 to globallyDeclaredVariables.count - 1 do begin
+        if globallyDeclaredVariables.getNamespace(i) <> uri then continue;
+        variablesMap.setMutable(TXQValueQName.create(globallyDeclaredVariables.getNamespace(i), globallyDeclaredVariables.getName(i)),
+                              globallyDeclaredVariables.get(i)
+                              );
+      end;
+    sc := module.getStaticContext;
+    for i := 0 to high(sc.functions) do begin
+      temp := TXQValueQName.create(sc.functions[i].namespaceURL, sc.functions[i].name);
+      if functionsMap.hasProperty(temp, @tempValue) then begin
+        functionMap := tempValue as TXQValueStandardMap;
+      end else
+        functionMap := TXQValueStandardMap.create();
+
+      functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), sc.functions[i].directClone);
+      functionsMap.setMutable(temp, functionMap);
+    end;
+    //todo: functions need to have their own context with globallyDeclaredVariables
+
+  finally
+    context.staticContext.sender.OnDeclareExternalVariable := helper.oldDeclareExternalVariable;
+    moduleContext.globallyDeclaredVariables.Free;
+  end;
+end;
+
 
 var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
 
@@ -7518,8 +7639,6 @@ transform
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, dependencyAll).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
   fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())'], [xqcdContextOther]);
 
-  //3.1 todo: collation-key, json-to-xml , load-xquery-module random-number-generator transform xml-to-json
-
   fn3_1.registerFunction('apply', @xqFunctionApply, dependencyNone).setVersionsShared([functiont, arrayt, itemStar]);
   fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [xqcdContextCollation]).setVersionsShared([stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]);
   fn3_1.registerFunction('default-language', @xqFunctionDefault_Language, [xqcdContextCollation]).setVersionsShared([language]);
@@ -7538,6 +7657,7 @@ transform
   fn3_1.registerFunction('parse-json', @xqFunctionParseJSON, [xqcdContextOther]).setVersionsShared([stringOrEmpty, itemOrEmpty],  [stringOrEmpty, map, itemOrEmpty]);
 
   fn3_1.registerFunction('transform', @xqFunctionTransformPlaceholder, [xqcdContextOther]).setVersionsShared([map, map]);
+  fn3_1.registerFunction('load-xquery-module', @xqFunctionLoadXQueryModule, [xqcdContextOther]).setVersionsShared([stringt, map], [stringt, map, map]);
 
   //from https://gist.github.com/joewiz/d986da715facaad633db
   fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?) as document-node()?', 'json-to-xml($json-text, map {})');
@@ -7752,6 +7872,7 @@ begin
   fnarray.free;
   fnmap.free;
 end;
+
 
 initialization
   GlobalNodeSerializationCallback := @GlobalNodeSerializationCallbackImpl;
