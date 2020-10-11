@@ -26,6 +26,7 @@ begin
   tquery('inner-text(<a> x<b> y</b> z </a>)', 'x y z');
   tquery('inner-text(<a> x <b>y </b>z </a>)', 'x y z');
   tquery('inner-text(<a> x<b> y </b>z </a>)', 'x y z');
+  tquery('inner-text(<a> <b> foo </b> <br/> <b> </b> c <b>d</b> </a>)', 'foo'#10'c d');
 
 end;
 

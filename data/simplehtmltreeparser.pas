@@ -1138,6 +1138,7 @@ var cur:TTreeNode;
     skipElement: Boolean;
     lastTextHadTrailingSpace: boolean;
     tempBufferLength: SizeInt;
+    newTextToAdd: String;
   function bufferEndsWithWhitespace: boolean; inline;
   begin
     result := (builder.count > 0) and (builder.buffer^[builder.count] <= ' ');
@@ -1150,11 +1151,16 @@ begin
   lastTextHadTrailingSpace := false;
   while (cur<>nil) and (cur <> till_excluding) do begin
     if cur.typ = tetText then begin
-      if ( lastTextHadTrailingSpace or ( (cur.value <> '') and (cur.value[1] <= ' ') ) )
-        and not bufferEndsWithWhitespace then
-        builder.append(' ');
-      builder.append(strTrimAndNormalize(cur.value));
-      lastTextHadTrailingSpace := (cur.value <> '') and (cur.value[length(cur.value)] <= ' ');
+      if cur.value <> '' then begin
+        newTextToAdd := strTrimAndNormalize(cur.value);
+        if newTextToAdd <> '' then begin
+          if ( lastTextHadTrailingSpace or (cur.value[1] <= ' ') )
+            and not bufferEndsWithWhitespace then
+            builder.append(' ');
+          builder.append(newTextToAdd);
+          lastTextHadTrailingSpace := (cur.value[length(cur.value)] <= ' ');
+        end else lastTextHadTrailingSpace := true;
+      end;
     end else if cur.typ = tetOpen then begin
       case cur.hash of
         HTMLNodeNameHashs.area: skipElement := striEqual(cur.value, 'area');
