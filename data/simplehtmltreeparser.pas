@@ -1136,13 +1136,25 @@ class function TTreeNode.innerTextRangeInternal(from, till_excluding: TTreeNode)
 var cur:TTreeNode;
     builder: TStrBuilder;
     skipElement: Boolean;
+    lastTextHadTrailingSpace: boolean;
+    tempBufferLength: SizeInt;
+  function bufferEndsWithWhitespace: boolean; inline;
+  begin
+    result := (builder.count > 0) and (builder.buffer^[builder.count] <= ' ');
+  end;
+
 begin
   //https://www.w3.org/TR/html52/dom.html#dom-htmlelement-innertext
   cur := from;
   builder.init(@result);
+  lastTextHadTrailingSpace := false;
   while (cur<>nil) and (cur <> till_excluding) do begin
     if cur.typ = tetText then begin
+      if ( lastTextHadTrailingSpace or ( (cur.value <> '') and (cur.value[1] <= ' ') ) )
+        and not bufferEndsWithWhitespace then
+        builder.append(' ');
       builder.append(strTrimAndNormalize(cur.value));
+      lastTextHadTrailingSpace := (cur.value <> '') and (cur.value[length(cur.value)] <= ' ');
     end else if cur.typ = tetOpen then begin
       case cur.hash of
         HTMLNodeNameHashs.area: skipElement := striEqual(cur.value, 'area');
@@ -1169,13 +1181,17 @@ begin
         cur := cur.reverse;
         continue;
       end else begin
+        tempBufferLength := builder.count;
         case cur.hash of
           HTMLNodeNameHashs.br: if striEqual(cur.value, 'br') then builder.append(#10);
           HTMLNodeNameHashs.td: if striEqual(cur.value, 'td') then builder.append(#9);
           HTMLNodeNameHashs.th: if striEqual(cur.value, 'th') then builder.append(#9);
           HTMLNodeNameHashs.tr: if striEqual(cur.value, 'tr') then builder.append(#10); //todo: do this on all block elements
           HTMLNodeNameHashs.p: if striEqual(cur.value, 'p') then builder.append(#10#10); //todo: collapse, <p><p/><p> are only 2 as well
+          //todo: line break before headers, after divs?
         end;
+        if tempBufferLength <> builder.count then
+          lastTextHadTrailingSpace := false;
       end;
     end;
 

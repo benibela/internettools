@@ -11,6 +11,24 @@ implementation
 
 uses bbutils, commontestutils, xquery.internals.common, xquery;
 
+procedure tquery(const q, expected: string);
+begin
+  test(query(q).toString, expected);
+end;
+
+procedure testInnerText;
+begin
+  tquery('inner-text(<a>xyz</a>)', 'xyz');
+  tquery('inner-text(<a>xyz</a>/text())', 'xyz');
+  tquery('inner-text(<a> x y z </a>)', 'x y z');
+  tquery('inner-text(<a> x y z </a>/text())', 'x y z');
+  tquery('inner-text(<a> x <b>y</b> z </a>)', 'x y z');
+  tquery('inner-text(<a> x<b> y</b> z </a>)', 'x y z');
+  tquery('inner-text(<a> x <b>y </b>z </a>)', 'x y z');
+  tquery('inner-text(<a> x<b> y </b>z </a>)', 'x y z');
+
+end;
+
 procedure unittests();
 var sb: TXHTMLStrBuilder;
     xqs: TXQSerializer;
@@ -40,6 +58,8 @@ begin
   xqs.final;
   test(buffer, '{"a": "bar"}|{"a": "foo=\"bar\""}');
   xqs.final;
+
+  testInnerText();
 end;
 
 end.
