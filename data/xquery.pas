@@ -1958,7 +1958,7 @@ type
     function castAs(v: IXQValue; const context: TXQEvaluationContext): IXQValue;
     function castableAs(v: IXQValue; staticContext: TXQStaticContext): boolean;
     function instanceOf(const ta: IXQValue; const context: TXQEvaluationContext): boolean;
-    function instanceOf(const ta: IXQValue): boolean;
+    //function instanceOf(const ta: IXQValue): boolean;
     function instanceOf(const node: TTreeNode): boolean;
     function subtypeOf(tb: TXQTermSequenceType): boolean;
   private
@@ -9288,7 +9288,7 @@ begin
     end;
 
     for i := 0 to high(staticContext.moduleContextItemDeclarations) do
-      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue) then
+      if (staticContext.moduleContextItemDeclarations[i].getSequenceType <> nil) and not staticContext.moduleContextItemDeclarations[i].getSequenceType.instanceOf(context.SeqValue, context) then
         raiseXPTY0004TypeError(context.SeqValue, staticContext.moduleContextItemDeclarations[i].getSequenceType.debugTermToString);
   end;
   //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed

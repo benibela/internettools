@@ -889,7 +889,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
       if v.kind <> pvkArray then exit(false);
       if memberTypeNeedsChecking then
         for w in v.GetEnumeratorMembersPtrUnsafe do
-          if not TXQTermSequenceType(children[0]).instanceOf(w^) then
+          if not TXQTermSequenceType(children[0]).instanceOf(w^, context) then
             exit(false);
     end;
     result := true;
@@ -910,15 +910,15 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
             notEmpty := false;
             for w in v.getEnumeratorPropertyValuesUnsafe do begin
               notEmpty := true;
-              if not TXQTermSequenceType(children[1]).instanceOf(w) then
+              if not TXQTermSequenceType(children[1]).instanceOf(w, context) then
                 exit(false);
             end;
-            if notEmpty and not TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY')) then
+            if notEmpty and not TXQTermSequenceType(children[0]).instanceOf(xqvalue('KEY'), context) then
               exit(false);
           end;
           xqmpkkStandardKeys: begin
             for p in v.getEnumeratorPropertiesUnsafe do
-              if not TXQTermSequenceType(children[0]).instanceOf(p.key) or not TXQTermSequenceType(children[1]).instanceOf(p.value) then
+              if not TXQTermSequenceType(children[0]).instanceOf(p.key, context) or not TXQTermSequenceType(children[1]).instanceOf(p.value, context) then
                 exit(false);
             result := true;
           end;
@@ -1003,12 +1003,12 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
                   pvkObject: begin
                     if not returnType.allowNone and (returnType.kind <> tikNone) then exit();
                     for w in sub.getEnumeratorPropertyValuesUnsafe do
-                      if not returnType.instanceOf(w) then
+                      if not returnType.instanceOf(w, context) then
                         exit();
                   end;
                   pvkArray:
                     for pw in sub.GetEnumeratorMembersPtrUnsafe do
-                      if not returnType.instanceOf(pw^) then
+                      if not returnType.instanceOf(pw^, context) then
                         exit();
                   else;
                 end;
@@ -1076,17 +1076,19 @@ begin
   end
 end;
 
-function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
+(*function TXQTermSequenceType.instanceOf(const ta: IXQValue): boolean;
 var temp: TXQEvaluationContext;
 begin
-  temp.staticContext := nil;
+  temp := default(TXQEvaluationContext);
   result := instanceOf(ta, temp);
-end;
+end;*)
 
 {$ImplicitExceptions off}
 function TXQTermSequenceType.instanceOf(const node: TTreeNode): boolean;
+var temp: TXQEvaluationContext;
 begin
-  result := instanceof(xqvalue(node));
+  temp := default(TXQEvaluationContext);
+  result := instanceof(xqvalue(node), temp); //todo: this might crash when this type depends on something in the context (e.g. namespaces)
 end;
 {$ImplicitExceptions on}
 
