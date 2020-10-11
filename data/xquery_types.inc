@@ -3414,7 +3414,8 @@ var
   i: Integer;
 {$endif}
 begin
-  if count <> length(parameters) then raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': '+inttostr(count) + ' <> ' + inttostr(length(parameters)));
+  if count <> length(parameters) then
+    raise EXQEvaluationException.create('err:XPTY0004', 'Mismatched argument count for function '+name+': got '+inttostr(count) + ' <> expected ' + inttostr(length(parameters)));
   {$IFDEF TRACK_STACK_VARIABLE_NAMES}
   if length(parameters) = 0 then exit;
   stack := inContext.temporaryVariables;
