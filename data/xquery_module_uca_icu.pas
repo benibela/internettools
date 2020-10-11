@@ -506,6 +506,13 @@ begin
   //writeln('request: ',url);
   if not config.parseUrlEncoded(url) then exit;
 
+  //some config options do not work with icu. Change them so that the qt3 tests pass
+  if (config.strength > 3) and (config.alternate = ucaaBlanked) then
+     if not config.fallback then exit
+     else if config.strength = 4 then config.strength := 3;
+  if (length(config.reorder) = 1) and (config.fallback) then
+     SetLength(config.reorder, 0);
+
   icuConfig := configToBCP47;
 
   err := 0;
@@ -548,9 +555,10 @@ end;
 
 function TUCAConfiguration.parseUrlEncoded(const id: string): boolean;
 var
-  temp: TStringArray;
+  temp, reorderTemp: TStringArray;
   key, arg: String;
-  i: Integer;
+  i, j, k: Integer;
+  hasInvalidScriptCode: Boolean;
  procedure setBool(var b: boolean);
  begin
    case arg of
@@ -562,6 +570,7 @@ var
 
 begin
   result := true;
+  hasInvalidScriptCode := false;
   temp := strSplit(id, ';', false);
   for i := 0 to high(temp) do begin
     arg := temp[i];
@@ -600,11 +609,35 @@ begin
       else result := false;
     end;
     'numeric'      : setBool(numeric);
-    'reorder': ; //todo
+    'reorder': begin
+      reorderTemp := strSplit(arg, ',');
+      SetLength(reorder, length(reorderTemp));
+      k := 0;
+      for j := 0 to high(reorderTemp) do begin
+        case reorderTemp[j] of
+          'space': reorder[k].code := ucarcSpace;
+          'punct': reorder[k].code := ucarcPunct;
+          'symbol': reorder[k].code := ucarcSymbol;
+          'currency': reorder[k].code := ucarcCurrency;
+          'digit': reorder[k].code := ucarcDigit;
+          else begin
+            reorder[k].code := ucarcScriptCode;;
+            reorder[k].scriptCode := reorderTemp[j];
+            if length(reorderTemp[j]) <> 4 then
+              dec(k);
+          end;
+        end;
+        inc(k);
+      end;
+      if k < length(reorder) then begin
+        hasInvalidScriptCode := true;
+        SetLength(reorder, k);
+      end;
+    end
     else result := false;
   end;
   end;
-  if fallback then result := true;
+  result := fallback or (result and not hasInvalidScriptCode);
 end;
 
 
