@@ -922,56 +922,60 @@ begin
   if errorCode <> '' then
     if not (kind in [aakError, aakSerializationError]) then
       exit(tcrFail);
-
-  case kind of
-    aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
-    aakEq: try
-      result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = 0];
-    except
-      on e: EXQEvaluationException do
-        if e.errorCode = 'XPTY0004' then result := OK[false]
-        else raise;
-    end;
-    aakCount: result := OK[res.getSequenceCount = StrToInt(value)];
-    aakDeepEq: begin
-      xq.ParsingOptions.LineEndingNormalization:=xqlenNone;
-      result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
-      if not (config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1]) then
-        xq.ParsingOptions.LineEndingNormalization := xqlenXML11;
-    end;
-    aakXml: result := OK[xmlEqual(res, value, ignorePrefixes)];
-    //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
-    aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
-    aakSerializationMatches: begin
-      result := tcrFail;
-      regex := wregexprParse(value, regexflags);
-      try
-        result := OK[wregexprMatches(regex, testResult.serialization)]
-      finally
-        wregexprFree(regex);
+  try
+    case kind of
+      aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
+      aakEq: try
+        result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = 0];
+      except
+        on e: EXQEvaluationException do
+          if e.errorCode = 'XPTY0004' then result := OK[false]
+          else raise;
       end;
-    end;
-
-    aakEmpty: result := OK[res.isUndefined];
-    aakType: result := OK[xq.evaluate('$result instance of '+value, ASSERTION_PARSING_MODEL).toBoolean];
-    aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
-    aakFalse: result := OK[(res.kind = pvkBoolean) and not res.toBoolean];
-    aakStringValue: begin
-      if ((value = '-0') or (value = '0')) and (res.getSequenceCount = 1) and (res.get(1).kind = pvkFloat)
-         and (res.toFloat = 0) then exit(tcrPass); //todo: actual handle this
-
-      if res.getSequenceCount <= 1 then str := res.toString
-      else str := xq.evaluateXPath2('pxp:join($result)').toString;
-      if normalizeSpace then begin
-        str := strTrimAndNormalize(str , [' ', #9, #$A, #$D]);
-        value := strTrimAndNormalize(value , [' ', #9, #$A, #$D]);
+      aakCount: result := OK[res.getSequenceCount = StrToInt(value)];
+      aakDeepEq: begin
+        xq.ParsingOptions.LineEndingNormalization:=xqlenNone;
+        result := OK[deepEqual(res, xq.parseQuery(value, config.version).evaluate())];
+        if not (config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1]) then
+          xq.ParsingOptions.LineEndingNormalization := xqlenXML11;
       end;
-      result := OK[str = value];
+      aakXml: result := OK[xmlEqual(res, value, ignorePrefixes)];
+      //aakXml: result := OK[xqfunctionDeep_Equal res.getSequenceCount = StrToInt(value)];
+      aakPermutation: result := OK[deepEqual(normalize(res), normalize(xq.parseQuery(value, config.version).evaluate()))];
+      aakSerializationMatches: begin
+        result := tcrFail;
+        regex := wregexprParse(value, regexflags);
+        try
+          result := OK[wregexprMatches(regex, testResult.serialization)]
+        finally
+          wregexprFree(regex);
+        end;
+      end;
+
+      aakEmpty: result := OK[res.isUndefined];
+      aakType: result := OK[xq.evaluate('$result instance of '+value, ASSERTION_PARSING_MODEL).toBoolean];
+      aakTrue: result := OK[(res.kind = pvkBoolean) and res.toBoolean];
+      aakFalse: result := OK[(res.kind = pvkBoolean) and not res.toBoolean];
+      aakStringValue: begin
+        if ((value = '-0') or (value = '0')) and (res.getSequenceCount = 1) and (res.get(1).kind = pvkFloat)
+           and (res.toFloat = 0) then exit(tcrPass); //todo: actual handle this
+
+        if res.getSequenceCount <= 1 then str := res.toString
+        else str := xq.evaluateXPath2('pxp:join($result)').toString;
+        if normalizeSpace then begin
+          str := strTrimAndNormalize(str , [' ', #9, #$A, #$D]);
+          value := strTrimAndNormalize(value , [' ', #9, #$A, #$D]);
+        end;
+        result := OK[str = value];
+      end;
+      aakError, aakSerializationError:
+        if errorCode = '' then result := tcrFail
+        else if (errorCode = value) or (value = '*') then result := tcrPass
+        else result := tcrWrongError;
     end;
-    aakError, aakSerializationError:
-      if errorCode = '' then result := tcrFail
-      else if (errorCode = value) or (value = '*') then result := tcrPass
-      else result := tcrWrongError;
+  except
+    result := tcrFail;
+    testResult.allOfInfo += ' ASSERT CRASH ';
   end;
 end;
 
