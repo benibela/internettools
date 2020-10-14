@@ -1291,14 +1291,15 @@ begin
   put('feature', 'namespace-axis', false);
   put('feature', 'infoset-dtd', false);
   put('feature', 'xpath-1.0-compatibility', false);
-  put('feature', 'fn-format-integer-CLDR', false);
-  put('feature', 'fn-load-xquery-module', false);
+  put('feature', 'fn-format-integer-CLDR', true);
+  put('feature', 'fn-load-xquery-module', true);
   put('feature', 'fn-transform-XSLT', false);
   put('feature', 'fn-transform-XSLT30', false);
-  put('feature', 'simple-uca-fallback', false);
-  put('feature', 'advanced-uca-fallback', false);
+  put('feature', 'simple-uca-fallback', true);
+  put('feature', 'advanced-uca-fallback', true);
   put('feature', 'olson-timezone', false);
   put('feature', 'arbitraryPrecisionDecimal', true);
+  put('feature', 'remote_http', false);
 
   put('unicode-normalization-form', 'NFD', true);
   put('unicode-normalization-form', 'NFKD', true);
