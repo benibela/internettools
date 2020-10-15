@@ -1252,7 +1252,7 @@ begin
     try
       for  j := 0 to Random(5) do s += Random(2) * power(2, Random(256) - 127);
     except
-      on e: EMathError do continue;
+      on e: Exception do continue;
     end;
     checkSingleRoundTripPM(s);
   end;
@@ -1284,7 +1284,7 @@ begin
     try
       e := 0; for j := 0 to Random(30) do e += Random(10) * power(10, Random(9902) - 4951);
     except
-      on e: EMathError do continue;
+      on e: Exception do continue;
     end;
     checkExtendedRoundTrip(e);
   end;
