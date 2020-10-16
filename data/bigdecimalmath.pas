@@ -34,7 +34,7 @@ unit bigdecimalmath;
 
 
 {$mode objfpc}{$H+}
-
+{$ModeSwitch advancedrecords}
 interface
 
 uses
@@ -82,6 +82,7 @@ type BigDecimalBin = integer; BigDecimalBinSquared = int64; //must be large enou
 Invalid digit count
 {$ENDIF}
 
+type TBigDecimalFormat = (bdfExact, bdfExponent);
 type
   //** @abstract(Big Decimal type). @br
   //** Consisting of an bcd integer times a decimal exponent ([integer digits] * 10 ^ (DIGITS_PER_ELEMENT * exponent)) @br
@@ -98,6 +99,17 @@ type
     digits: array of BigDecimalBin;
     exponent: integer;
     signed, lastDigitHidden: ByteBool;
+
+    function toString(format: TBigDecimalFormat = bdfExact): string;
+    {$ifdef FPC_HAS_TYPE_SINGLE}
+    function toSingle: single;
+    {$endif}
+    {$ifdef FPC_HAS_TYPE_Double}
+    function toDouble: double;
+    {$endif}
+    {$ifdef FPC_HAS_TYPE_EXTENDED}
+    function toExtended: extended;
+    {$endif}
   end;
   PBigDecimal = ^BigDecimal;
 
@@ -111,7 +123,6 @@ function TryStrToBigDecimal(const s: string; res: PBigDecimal; errCode: PBigDeci
 //** Supports standard decimal notation, like -123.456 or 1E-2    (@code(-?[0-9]+(.[0-9]+)?([eE][-+]?[0-9]+)))
 //** Raises an exception on invalid input.
 function StrToBigDecimal(const s: string): BigDecimal; inline;
-type TBigDecimalFormat = (bdfExact, bdfExponent);
 //type TBigDecimalFormat = (bdfExact, bdfExponent); format: TBigDecimalFormat = bdfExact
 //** Converts a bigdecimal to a decimal string @br
 //** The result will be fixed width format [0-9]+(.[0-9]+)?, even if the input had an exponent
@@ -125,7 +136,7 @@ function BigDecimalToLongint(const a: BigDecimal): Longint;
 function BigDecimalToInt64(const a: BigDecimal): Int64;
 
 //**Converts a bigdecimal to an extended (may introduce rounding errors)
-function BigDecimalToExtended(const a: BigDecimal): Extended;
+function BigDecimalToExtended(const a: BigDecimal): Extended; deprecated 'Use .toExtended record method';
 
 
 type TBigDecimalFloatFormat = (bdffExact, bdffShortest);
@@ -272,12 +283,51 @@ function fastpower2to(const exp: Int64): BigDecimal;
 //** Calculates 5 ** exp exactly, with exp being an integer (faster than power for negative exp)
 function fastpower5to(const exp: Int64): BigDecimal;
 
+type TFloatInformation = class
+  type
+    {$ifdef FPC_HAS_TYPE_SINGLE}
+    TSingleInformation = class
+      type float = single;
+      const PowersOf10: array[0..10] of single = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
+                                                        1e10);
+      const MaxExactPowerOf10 = 10; //todo: is this correct? (log to base 5)
+      const MaxExactMantissa = 16777215; //2^24 - 1
+      const MaxExactMantissaDigits = 8;
+    end;
+    {$endif}
+    {$ifdef FPC_HAS_TYPE_EXTENDED}
+    TDoubleInformation = class
+      type float = double;
+
+      //numbers with mantissa <= 2^53 - 1 = 9007199254740991 and -22 <= true exponent <= 22 can be represented exactly as double
+      const PowersOf10: array[0..22] of double = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
+                                                        1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22 );
+      const MaxExactPowerOf10 = 22;
+      const MaxExactMantissa = 9007199254740991; //2^53 - 1
+      const MaxExactMantissaDigits = 16;
+    end;
+    {$endif}
+    {$ifdef FPC_HAS_TYPE_EXTENDED}
+    TExtendedInformation = class
+      type float = extended;
+      const PowersOf10: array[0..27] of extended = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
+                                                        1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+                                                        1e23, 1e24,1e25, 1e26,1e27);
+      const MaxExactPowerOf10 = 27; //todo: is this correct? (log to base 5)
+      const MaxExactMantissa: QWord = QWord($FFFFFFFFFFFFFFFF); //2^64 - 1 = 18446744073709551615
+      const MaxExactMantissaDigits = 20;
+    end;
+    {$endif}
+end;
+
+
 implementation
 
 const divisionDefaultPrecision = 18;
       divisionDefaultFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit, bddfFillIntegerPart];
 
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
+
 
 //returns:
 //@þaram(intstart Position of the first digit in integer part)
@@ -688,16 +738,9 @@ begin
 end;
 
 
-
 function BigDecimalToExtended(const a: BigDecimal): Extended;
-var
-  i: Integer;
 begin
-  result := 0;
-  for i := high(a.digits) downto 0 do
-    result := result * ELEMENT_OVERFLOW + a.digits[i];
-  result *= math.intpower(ELEMENT_OVERFLOW, a.exponent);
-  if a.signed then result := -result;
+  result := a.toExtended;
 end;
 
 function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
@@ -1129,7 +1172,7 @@ begin
   
   if a <> low(Integer) then temp := abs(a)
   else temp := high(Integer);
-  
+
   
   for i := 0 to high(result.digits) do begin
     result.digits[i] := temp mod ELEMENT_OVERFLOW;
@@ -2112,6 +2155,91 @@ operator**(const a: BigDecimal; const b: int64): BigDecimal;
 begin
   result := power(a, b);
 end;
+
+procedure BigDecimalToApproximateShortStr(out s: shortstring; const v: BigDecimal);
+var
+  temp: String;
+begin
+  temp := BigDecimalToStr(v, bdfExponent);
+  if length(temp) > 250 then begin
+    s := copy(temp, 1, 128) + copy(temp, length(temp) - 20, 21);
+  end else s := temp;
+end;
+
+type generic TBigDecimalToFloatConverter<TFloat, TInfo> = class
+  class function convertSlowly(const v: BigDecimal): TFloat;
+  class function convert(const v: BigDecimal): TFloat;
+end;
+
+class function TBigDecimalToFloatConverter.convertSlowly(const v: BigDecimal): TFloat;
+var s: shortstring;
+begin
+  BigDecimalToApproximateShortStr(s, v);
+  val(s, result);
+end;
+
+class function TBigDecimalToFloatConverter.convert(const v: BigDecimal): TFloat;
+var
+  realhigh, firstBinCount, i, digitCount: Integer;
+  mantissa: qword;
+begin
+  with v do begin
+    if (exponent >= -TInfo.MaxExactPowerOf10 div DIGITS_PER_ELEMENT) and (exponent <= TInfo.MaxExactPowerOf10 div DIGITS_PER_ELEMENT) then begin
+      realhigh := high(digits);
+      while (realhigh >= 0) and (digits[realhigh] = 0) do dec(realhigh);
+      case realhigh of
+        -1: if signed then exit(-0) else exit(0);
+        0: result := digits[0];
+        else
+          firstBinCount := digitsInBin(digits[realhigh]);
+          digitCount := firstBinCount + realhigh * DIGITS_PER_ELEMENT;
+          if (digitCount > TInfo.MaxExactMantissaDigits) or (digitCount = 20 {with 20 digits the QWord might overflow}) then exit(convertSlowly(v));
+          mantissa := 0;
+          for i := realhigh downto 0 do
+            mantissa := mantissa * ELEMENT_OVERFLOW + digits[i];
+          if mantissa > TInfo.MaxExactMantissa then exit(convertSlowly(v));
+          result := TFloat(mantissa)
+      end;
+      if exponent >= 0 then result := result * powersOf10[DIGITS_PER_ELEMENT * exponent]
+      else result := result / TInfo.powersOf10[-DIGITS_PER_ELEMENT * exponent];
+      if signed then result := -result;
+    end else
+      result := convertSlowly(v);
+  end;
+end;
+
+{$ifdef FPC_HAS_TYPE_Single}
+type
+  TBigDecimalToSingleConverter = specialize TBigDecimalToFloatConverter<single, TFloatInformation.TSingleInformation>;
+
+function BigDecimal.toString(format: TBigDecimalFormat): string;
+begin
+  result := BigDecimalToStr(self, format);
+end;
+
+function BigDecimal.toSingle: single;
+begin
+  result := TBigDecimalToSingleConverter.convert(self);
+end;
+{$endif}
+
+{$ifdef FPC_HAS_TYPE_Double}
+type
+  TBigDecimalToDoubleConverter = specialize TBigDecimalToFloatConverter<double, TFloatInformation.TDoubleInformation>;
+function BigDecimal.toDouble: double;
+begin
+  result := TBigDecimalToDoubleConverter.convert(self);
+end;
+{$endif}
+
+{$ifdef FPC_HAS_TYPE_EXTENDED}
+type
+  TBigDecimalToExtendedConverter = specialize TBigDecimalToFloatConverter<extended, TFloatInformation.TExtendedInformation>;
+function BigDecimal.toExtended: extended;
+begin
+  result := TBigDecimalToExtendedConverter.convert(self);
+end;
+{$endif}
 
 
 initialization
