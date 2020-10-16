@@ -40,6 +40,22 @@ begin
   if a <> b then raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
 end;
 
+function FloatToStrExact(e: extended): string;
+var
+  dot: SizeInt;
+  cutoff: Integer;
+begin
+  //wikipedia:  if an 80-bit IEEE 754 binary floating-point value is correctly converted and (nearest) rounded to a decimal string with at least 21 significant decimal digits then converted back to binary format it will exactly match the original
+  str(e:22:22, result);
+  dot := pos('.',result);
+  if dot = 0 then exit;
+  cutoff := 0;
+  while (length(result) - cutoff > dot) and (result[length(result) - cutoff] = '0') do inc(cutoff);
+  if length(result) - cutoff = dot then inc(cutoff);
+  if cutoff > 0 then
+    delete(result, length(result) - cutoff + 1, cutoff);
+end;
+
 function equalUpToPrecision(bf, bf2: BigDecimal): boolean;
 var
   i: Integer;
@@ -156,8 +172,10 @@ begin
   blarge := blarge * 1000 - 17;
   test(blarge = 123456789983); test(blarge = 123456789983.0);
 
-  blarge += 0.42;
-  test(blarge = 123456789983.42, 'blarge <> 123456789983.42');
+  blarge += FloatToBigDecimal(0.42);
+  test(BigDecimalToStr(blarge), '123456789983.42');
+  test(blarge = FloatToBigDecimal(123456789983.42, bdffShortest), 'blarge <> 123456789983.42');
+
 
   b1e1000 := StrToBigDecimal('1E1000'); test(BigDecimalToStr(b1e1000, bdfExponent), '1.0E1000');
   bn1e1000 := StrToBigDecimal('-1E1000'); test(BigDecimalToStr(bn1e1000, bdfExponent), '-1.0E1000');
@@ -770,10 +788,11 @@ begin
 
     d := Random(100000000) / powersOf10[random(10)];
     if random(2) = 0 then d := - d;
-    ds := FloatToStr(d);
+    ds := FloatToStrExact(d);
     dbf := StrToBigDecimal(ds);
     test(BigDecimalToStr(dbf), ds);
-    test(SameValue(BigDecimalToExtended(dbf), d, 1e-9),  FloatToStr(BigDecimalToExtended(dbf))+ ' <> ' + ds);
+    if not SameValue(BigDecimalToExtended(dbf), d, 1e-9) then
+      test(false,  FloatToStrExact(BigDecimalToExtended(dbf))+ ' <> ' + ds);
     compareTest(dbf, CompareValue(0, d), CompareValue(1, d));
 
 
@@ -794,7 +813,7 @@ begin
     e := Random(1000000) / powersOf10[random(7)];
     if random(2) = 0 then d := - d;
     if random(2) = 0 then e := - e;
-    test(BigDecimalToStr(StrToBigDecimal(FloatToStr(d)) * StrToBigDecimal(FloatToStr(e)) ), FloatToStr(d*e), FloatToStr(d)+ ' * ' + FloatToStr(e));
+    test(BigDecimalToExtended(StrToBigDecimal(FloatToStrExact(d)) * StrToBigDecimal(FloatToStrExact(e)) ), FloatToStr(d*e), FloatToStrExact(d)+ ' * ' + FloatToStrExact(e));
 
   end;
 
@@ -1096,7 +1115,7 @@ begin
   test(BigDecimalToStr(FloatToBigDecimal(double(144115188075855877))), '144115188075855870');
 
   test(BigDecimalToStr(FloatToBigDecimal(double(1E-20))), '0.00000000000000000001');
-  test(BigDecimalToStr(FloatToBigDecimal(double(1 / 3.0))), '0.3333333333333333');
+  test(BigDecimalToStr(FloatToBigDecimal(double(1 / 3))), '0.3333333333333333');
   test(BigDecimalToStr(FloatToBigDecimal(double(-1.7976931348623158e+30))), '-1797693134862315800000000000000');
   test(BigDecimalToStr(FloatToBigDecimal(double(1.7976931348623158e+30))), '1797693134862315800000000000000');
   test(BigDecimalToStr(FloatToBigDecimal(double(-1.7976931348623158e+305))), '-179769313486231600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000');
