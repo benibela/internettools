@@ -6802,10 +6802,15 @@ var ak, bk: TXQValueKind;
     result := compareInts(temp);
   end;
 
-  function getFirst(const seq: TXQValue): txqvalue;
+  function compareMultiple(enuma, enumb: TXQValueEnumeratorPtrUnsafe): integer;
   begin
-    result := seq.get(1).toValue;
+    if not enuma.MoveNext then exit(-2);
+    if not enumb.MoveNext then exit(-2);
+    result := compareCommon(enuma.Current.toValue, enumb.Current.toValue, overrideCollation, castUnknownToString);
+    if enuma.MoveNext then raiseXPTY0004TypeError(a, 'singleton');
+    if enumb.MoveNext then raiseXPTY0004TypeError(b, 'singleton');
   end;
+
 
   function compareCommonEqualKind(): integer;
   var
@@ -6842,12 +6847,9 @@ var ak, bk: TXQValueKind;
       pvkUndefined: result := -2;
       pvkNode, pvkString: result := compareCommonAsStrings;
       pvkBinary: result := TXQValueBinary.compare(a, b);
-      pvkSequence: begin
-        if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
-        if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
-        result := compareCommon(getFirst(a), getFirst(b), overrideCollation, castUnknownToString);
-      end;
-      pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
+      pvkSequence: result := compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe);
+      pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+      pvkArray: result := compareMultiple(a.GetEnumeratorMembersPtrUnsafe, b.GetEnumeratorMembersPtrUnsafe);
       else begin result := -2; raisePXPInternalError; end;
     end;
   end;
@@ -6881,22 +6883,18 @@ begin
   if ak = bk then exit(compareCommonEqualKind());
   case ak of
     pvkUndefined: exit(-2);
-    pvkSequence: begin
-      if a.getSequenceCount <> 1 then raiseXPTY0004TypeError(a, 'singleton');
-      exit(compareCommon(getFirst(a),b,overrideCollation,castUnknownToString));
-    end;
+    pvkSequence: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe));
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+    pvkArray: exit(compareMultiple(a.GetEnumeratorMembersPtrUnsafe, b.GetEnumeratorPtrUnsafe));
     else;
   end;
   case bk of
     pvkUndefined: exit(-2);
-    pvkSequence: begin
-      if b.getSequenceCount <> 1 then raiseXPTY0004TypeError(b, 'singleton');
-      exit(compareCommon(a,getFirst(b),overrideCollation,castUnknownToString));
-    end;
+    pvkSequence: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe));
     pvkNull: exit(1);
-    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable')
+    pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
+    pvkArray: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorMembersPtrUnsafe));
     else;
   end;
   if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
