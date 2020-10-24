@@ -135,9 +135,10 @@ function BigDecimalToLongint(const a: BigDecimal): Longint;
 //**Converts a bigdecimal to a native int (can overflow)
 function BigDecimalToInt64(const a: BigDecimal): Int64;
 
+{$ifdef FPC_HAS_TYPE_Extended}
 //**Converts a bigdecimal to an extended (may introduce rounding errors)
 function BigDecimalToExtended(const a: BigDecimal): Extended; deprecated 'Use .toExtended record method';
-
+{$endif}
 
 type TBigDecimalFloatFormat = (bdffExact, bdffShortest);
 
@@ -295,7 +296,7 @@ type TFloatInformation = class
       const MaxExactMantissaDigits = 8;
     end;
     {$endif}
-    {$ifdef FPC_HAS_TYPE_EXTENDED}
+    {$ifdef FPC_HAS_TYPE_DOUBLE}
     TDoubleInformation = class
       type float = double;
 
@@ -737,11 +738,12 @@ begin
   if not a.signed then result := -result;
 end;
 
-
+{$ifdef FPC_HAS_TYPE_Extended}
 function BigDecimalToExtended(const a: BigDecimal): Extended;
 begin
   result := a.toExtended;
 end;
+{$endif}
 
 function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
   function safebin(const bd: BigDecimal; bini: Integer): BigDecimalBin; inline;
