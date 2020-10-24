@@ -1215,10 +1215,13 @@ end;
 procedure TXQValueFloat.adaptiveSerialize(var serializer: TXQSerializer);
 var s: shortstring;
   dot, e, i, cutoff: Integer;
-  withType: Boolean;
 begin
-  withType := typeAnnotation <> baseSchema.double;
-  if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
+  if typeAnnotation <> baseSchema.double then begin
+    inherited adaptiveSerialize(serializer);
+    exit
+  end;
+
+  //if withType then serializer.appendTypeNameFunctionStart(typeAnnotation);
   if value.isFinite() then begin
     system.str(value, s);
     //trim
@@ -1244,15 +1247,12 @@ begin
     if cutoff > 0 then delete(s, e - cutoff, cutoff);
     serializer.append(s);
   end else begin
-    if withType then serializer.append('"');
     case value.SpecialType of
       fsInf: serializer.append('INF');
       fsNInf: serializer.append('-INF');
       else serializer.append('NaN');
     end;
-    if withType then serializer.append('"');
   end;
-  if withType then serializer.append(')');
 end;
 
 function TXQValueFloat.clone: IXQValue;
