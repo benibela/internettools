@@ -178,7 +178,7 @@ var
 {$endif}
 begin
   {$ifdef windows}
-  temp := FileGetAttr(Filename);
+  temp := DWORD(FileGetAttr(Filename));
   result := (temp <> $ffffffff) and ((temp and FILE_ATTRIBUTE_DIRECTORY) = 0);
   {$else}
   result := FileExists(Filename) and not DirectoryExists(Filename);
