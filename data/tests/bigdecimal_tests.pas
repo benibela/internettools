@@ -164,7 +164,9 @@ begin
   test(BigDecimalToStr(blarge), '123456789');
   test(BigDecimalToStr(blarge, bdfExponent), '1.23456789E8');
   test(blarge = 123456789); test(blarge = 123456789.0);
-  test(BigDecimalToExtended(blarge) = 123456789.0); test(BigDecimalToInt64(blarge) = 123456789); test(BigDecimalToLongint(blarge) = 123456789);
+  {$ifdef FPC_HAS_TYPE_EXTENDED}test(blarge.toExtended = 123456789.0);{$endif}
+  {$ifdef FPC_HAS_TYPE_DOUBLE}test(blarge.toDouble = 123456789.0);{$endif}
+  test(BigDecimalToInt64(blarge) = 123456789); test(BigDecimalToLongint(blarge) = 123456789);
 
   blarge += 1;
   test(blarge = 123456790); test(blarge = 123456790.0);
@@ -329,9 +331,19 @@ begin
   test(TryStrToBigDecimal('e1', nil) = false);
   test(TryStrToBigDecimal('.e2', nil) = false);
   test(TryStrToBigDecimal('18', nil) = TRUE);
-  test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528'))) = double(StrToFloat('-3.40282346638528')));
-  test(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38'))) = double(StrToFloat('-3.40282346638528E38')));
-  test(single(double(BigDecimalToExtended(StrToBigDecimal('-3.40282346638528E38')))) = single(double(StrToFloat('-3.40282346638528E38'))));
+  {$ifdef FPC_HAS_TYPE_SINGLE}
+  test(StrToBigDecimal('-3.40282346638528E38').toSingle = single(StrToFloat('-3.40282346638528E38')));
+  {$endif}
+  {$ifdef FPC_HAS_TYPE_DOUBLE}
+  test(StrToBigDecimal('-3.40282346638528').toDouble = double(StrToFloat('-3.40282346638528')));
+  test(StrToBigDecimal('-3.40282346638528E38').toDouble = double(StrToFloat('-3.40282346638528E38')));
+  test(single(StrToBigDecimal('-3.40282346638528E38').toDouble) = single(double(StrToFloat('-3.40282346638528E38'))));
+  {$endif}
+  {$ifdef FPC_HAS_TYPE_EXTENDED}
+  test(double(StrToBigDecimal('-3.40282346638528').toExtended) = double(StrToFloat('-3.40282346638528')));
+  test(double(StrToBigDecimal('-3.40282346638528E38').toExtended) = double(StrToFloat('-3.40282346638528E38')));
+  test(single(double(StrToBigDecimal('-3.40282346638528E38').toExtended)) = single(double(StrToFloat('-3.40282346638528E38'))));
+  {$endif}
 
 
    test(BigDecimalToStr(StrToBigDecimal(IntToStr(powersOf10[8] + powersOf10[16]))), IntToStr(powersOf10[8] + powersOf10[16]));
@@ -769,7 +781,9 @@ begin
   SetLength(bf.digits, 3);
   bf.digits[0] := 1;
   test(BigDecimalToStr(bf), '1');
-  test(FloatToStr(BigDecimalToExtended(bf)), '1');
+  {$ifdef FPC_HAS_TYPE_EXTENDED}test(FloatToStr(bf.toExtended), '1');{$endif}
+  {$ifdef FPC_HAS_TYPE_DOUBLE}test(FloatToStr(bf.toDouble), '1');{$endif}
+  {$ifdef FPC_HAS_TYPE_SINGLE}test(FloatToStr(bf.toSingle), '1');{$endif}
   test(BigDecimalToInt64(bf), 1);
   test(BigDecimalToLongint(bf), 1);
 
@@ -791,8 +805,10 @@ begin
     ds := FloatToStrExact(d);
     dbf := StrToBigDecimal(ds);
     test(BigDecimalToStr(dbf), ds);
+    {$ifdef FPC_HAS_TYPE_EXTENDED}
     if not SameValue(BigDecimalToExtended(dbf), d, 1e-9) then
       test(false,  FloatToStrExact(BigDecimalToExtended(dbf))+ ' <> ' + ds);
+    {$endif}
     compareTest(dbf, CompareValue(0, d), CompareValue(1, d));
 
 
@@ -809,12 +825,13 @@ begin
       writeln(FloatToStr(d)+ ' / ' + FloatToStr(e));
     end;
 
+    {$ifdef FPC_HAS_TYPE_EXTENDED}
     d := Random(1000000) / powersOf10[random(7)];
     e := Random(1000000) / powersOf10[random(7)];
     if random(2) = 0 then d := - d;
     if random(2) = 0 then e := - e;
     test(BigDecimalToExtended(StrToBigDecimal(FloatToStrExact(d)) * StrToBigDecimal(FloatToStrExact(e)) ), FloatToStr(d*e), FloatToStrExact(d)+ ' * ' + FloatToStrExact(e));
-
+    {$endif}
   end;
 
   test(BigDecimalToStr(round(StrToBigDecimal('1.1'))), '1');
@@ -1227,6 +1244,7 @@ var d: double;
   u64, u64b, u64c, u64d: qword;
 begin
   //enumerating tests
+  //These tests are probably correct, but they fail because fpc rounds wrongly (see fpc #29531)
   if BCD_SLOW_TESTS then begin
     for i := 0 to 22 do begin
       u32 := (1 shl i);
