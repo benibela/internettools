@@ -492,8 +492,8 @@ var
         xsstFloat, xsstDouble: begin
           try
             if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
-            else if subType = xsstDouble then tempd := double(BigDecimalToExtended(temp))
-            else tempd := single(BigDecimalToExtended(temp));
+            else if subType = xsstDouble then tempd := temp.toDouble
+            else tempd := temp.toSingle;
             {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
             outv^ := TXQValueFloat.create(self, tempd);
           except
@@ -622,8 +622,8 @@ begin
       xsstDecimal:
         if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
         else outv^ := TXQValueDecimal.create(self, i);
-      xsstFloat:   outv^ := TXQValueFloat.create(self, single(BigDecimalToExtended(i)));
-      xsstDouble:  outv^ := TXQValueFloat.create(self, double(BigDecimalToExtended(i)));
+      xsstFloat:   outv^ := TXQValueFloat.create(self, i.toSingle);
+      xsstDouble:  outv^ := TXQValueFloat.create(self, i.toDouble);
     end;
 end;
 
