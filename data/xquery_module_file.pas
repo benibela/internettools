@@ -569,12 +569,9 @@ begin
     if FileExistsAsTrueFile(dest) then raiseFileError(Error_Exists, 'Target cannot be overriden', args[1]);
   end else begin
     if not FileOrDirectoryExists(source) then raiseFileError(Error_Not_Found, 'No source', args[0]);
-    {$ifdef windows}if FileExistsAsTrueFile(dest) then if not sysutils.DeleteFile(dest) then
-      raiseFileError(Error_Io_Error, 'Destination exists', args[1]);
-    {$endif}
   end;
 
-  if not RenameFile(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
+  if not fileMoveReplace(source, dest) then raiseFileError(Error_Io_Error, 'Moving failed', args[0]);
   result := xqvalue();
 end;
 
