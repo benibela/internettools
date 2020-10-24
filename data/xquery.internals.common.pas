@@ -29,7 +29,7 @@ uses
   classes, SysUtils, bbutils;
 
 type
-  TXQCompareResult = (xqcrReservedInvalid = -4, xqcrEmptySequence = -3, xqcrIncomparable = -2, xqcrLessThan = -1, xqcrEqual = 0, xqcrGreaterThan = 1);
+  TXQCompareResult = (xqcrReservedInvalid = -5, xqcrEmptySequence = -4, xqcrNaN = -3, xqcrIncomparable = -2, xqcrLessThan = -1, xqcrEqual = 0, xqcrGreaterThan = 1);
   TXQCompareResultHelper = type helper for TXQCompareResult
     class function fromIntegerResult(i: integer): TXQCompareResult; static;
     class function compare(a, b: int64): TXQCompareResult; static;
@@ -397,7 +397,7 @@ begin
 end;
 
 function TXQCompareResultHelper.inverted(): TXQCompareResult;
-const temp: array[TXQCompareResult] of TXQCompareResult = (xqcrReservedInvalid, xqcrEmptySequence, xqcrIncomparable, xqcrGreaterThan{!}, xqcrEqual, xqcrLessThan{!});
+const temp: array[TXQCompareResult] of TXQCompareResult = (xqcrReservedInvalid, xqcrEmptySequence, xqcrNaN, xqcrIncomparable, xqcrGreaterThan{!}, xqcrEqual, xqcrLessThan{!});
 begin
   result := temp[self];
 end;

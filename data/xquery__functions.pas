@@ -565,18 +565,20 @@ end;
 
 function xqvalueEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(cxt.staticContext.equalAtomic(a,b,nil))
-  else
-    result := xqvalue();
+  cxt.staticContext.compareAtomic(a,b,result,xqcrEqual);
 end;
 
 function xqvalueUnequalAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
+var
+ compres: TXQCompareResult;
 begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then
-    result := xqvalue(not cxt.staticContext.equalAtomic(a,b,nil))
-  else
-    result := xqvalue;
+  compres := cxt.staticContext.compareAtomic(a,b, nil);
+  case compres of
+    //xqcrNaN, xqcrLessThan, xqcrGreaterThan: result := xqvalueTrue;
+    xqcrEqual: result := xqvalueFalse;
+    xqcrEmptySequence: result := xqvalue;
+    else result := xqvalueTrue;
+  end;
 end;
 
 

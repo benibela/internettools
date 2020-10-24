@@ -6695,7 +6695,7 @@ var ak, bk: TXQValueKind;
     ad, bd: xqfloat;
   begin
     if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan()) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan()) then
-      exit(xqcrIncomparable);
+      exit(xqcrNaN);
     cmpClass := TXSType.commonDecimalType(a, b);
     ad := a.toFloatChecked(Self);
     bd := b.toFloatChecked(self);

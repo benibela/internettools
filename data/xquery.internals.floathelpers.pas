@@ -138,7 +138,7 @@ begin
   end;
   ast := SpecialType;
   bst := b.SpecialType;
-  if (ast in [fsNaN, fsInvalidOp]) or (bst in [fsNaN, fsInvalidOp]) then exit(xqcrIncomparable);
+  if (ast in [fsNaN, fsInvalidOp]) or (bst in [fsNaN, fsInvalidOp]) then exit(xqcrNaN);
   if ast = bst then
     exit(xqcrEqual);
   case ast of
