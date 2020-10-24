@@ -226,7 +226,7 @@ begin
   dateTime := FileDateToDateTime(search.Time);
   sysutils.FindClose(search);
   dt := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
-  dt.value.timezone:=GetLocalTimeOffset;;
+  dt.value.timezone:=-GetLocalTimeOffset;;
   result := dt;
 end;
 

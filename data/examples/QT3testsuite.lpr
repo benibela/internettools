@@ -1741,7 +1741,7 @@ begin
   cat.addRef;
   if cat.getFirstChild().getAttribute('test-suite') = 'EXPATH' then begin
     registerModuleFile;
-    xq.ImplicitTimezoneInMinutes := GetLocalTimeOffset;
+    xq.ImplicitTimezoneInMinutes := -GetLocalTimeOffset;
   end;
   basePath := strBeforeLast(cat.documentURI,'/');
   for v in xq.parseQuery('/*:catalog/*:*', xqpmXPath2).evaluate(cat) do begin
