@@ -6,7 +6,8 @@ unit xquery.internals.floathelpers;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, xquery.internals.common;
+
 
 type TBBDoubleHelper = type helper (TDoubleHelper) for double
   function Data: QWord; inline;
@@ -16,7 +17,7 @@ type TBBDoubleHelper = type helper (TDoubleHelper) for double
   function IsNegativeInfinity: Boolean; inline;
   function isFinite(): boolean;
   Function Mantissa: QWord;
-  function compare(other: double): integer;
+  function compare(other: double): TXQCompareResult;
   function round(prec: integer = 0): double;
   function parse(const str: string): double;
 end;
@@ -125,28 +126,28 @@ end;}
 begin
   result := f - frac(f);
 end;}
-function TBBDoubleHelper.compare(other: double): integer;
+function TBBDoubleHelper.compare(other: double): TXQCompareResult;
 var
   b: double absolute other;
   ast, bst: TFloatSpecial;
 begin
   if isFinite() and b.isFinite() then begin
-    if self < b then exit(-1);
-    if self > b then exit(1);
-    exit(0);
+    if self < b then exit(xqcrLessThan);
+    if self > b then exit(xqcrGreaterThan);
+    exit(xqcrEqual);
   end;
   ast := SpecialType;
   bst := b.SpecialType;
-  if (ast in [fsNaN, fsInvalidOp]) or (bst in [fsNaN, fsInvalidOp]) then exit(-2);
+  if (ast in [fsNaN, fsInvalidOp]) or (bst in [fsNaN, fsInvalidOp]) then exit(xqcrIncomparable);
   if ast = bst then
-    exit(0);
+    exit(xqcrEqual);
   case ast of
-    fsInf: exit(1);
-    fsNInf: exit(-1);
+    fsInf: exit(xqcrGreaterThan);
+    fsNInf: exit(xqcrLessThan);
     else case bst of //self is finite
-      fsInf: exit(-1);
-      fsNInf: exit(1);
-      else exit(-2); //not supposed to happen
+      fsInf: exit(xqcrLessThan);
+      fsNInf: exit(xqcrGreaterThan);
+      else exit(xqcrIncomparable); //not supposed to happen
     end;
   end;
 end;

@@ -15,7 +15,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils, xquery.namespaces, xquery.internals.protectionbreakers;
+uses xquery, internetaccess, simplehtmltreeparser, bbutils, xquery_json, xquery__regex, commontestutils, xquery.namespaces, xquery.internals.protectionbreakers, xquery.internals.common;
 
 
 
@@ -4308,9 +4308,9 @@ begin
   //test differences between value and (value)
   xqv := xqvalue(10);
   xqw := TXQValueSequence.create(xqvalue(10));
-  if ps.StaticContext.compareAtomic(xqv,xqw) <> 0 then raise Exception.Create('eq seq');
-  if ps.StaticContext.compareAtomic(xqw,xqv) <> 0 then raise Exception.Create('seq eq');
-  if ps.StaticContext.compareAtomic(xqw,xqw) <> 0 then raise Exception.Create('seq seq');
+  if ps.StaticContext.compareAtomic(xqv,xqw) <> xqcrEqual then raise Exception.Create('eq seq');
+  if ps.StaticContext.compareAtomic(xqw,xqv) <> xqcrEqual then raise Exception.Create('seq eq');
+  if ps.StaticContext.compareAtomic(xqw,xqw) <> xqcrEqual then raise Exception.Create('seq seq');
 
 
   //interface tests

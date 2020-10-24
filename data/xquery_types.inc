@@ -1503,7 +1503,7 @@ begin
   end else begin assert(false); result := ''; end;
 end;
 
-class function TXQValueBinary.compare(a, b: TXQValue): integer;
+class function TXQValueBinary.compare(a, b: TXQValue): TXQCompareResult;
 var sa, sb, temp: string;
     at, bt: (tBase64, tHex, tUntyped, tOther);
 begin
@@ -1519,31 +1519,32 @@ begin
     else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
     else bt := tOther;
 
-    result := 0;
+    result := xqcrEqual;
     if (at = tUntyped) or (bt = tUntyped) then begin
       try
         if at = tUntyped then temp := a.toString
         else temp := b.toString;
         if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
         else begin
-          if length(temp) and 1 = 1 then exit(-2);
+          if length(temp) and 1 = 1 then exit(xqcrIncomparable);
           temp := temp.DecodeHex;
         end;
         if at = tUntyped then sa := temp
         else sb := temp;
       except
-        on e: Exception do exit(-2); {StreamError for base64, exception for hex}
+        on e: Exception do  {StreamError for base64, exception for hex}
+          exit(xqcrIncomparable);
       end;
     end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
      //okay
     end else begin
       //if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
-      exit(-2);
+      exit(xqcrIncomparable);
     end;
   end;
   if sa = '' then sa := (a as TXQValueBinary).toRawBinary;
   if sb = '' then sb := (b as TXQValueBinary).toRawBinary;
-  result := compareStrSignCapped(sa, sb);
+  result := TXQCompareResult.compare(sa, sb);
   //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
 end;
 function TXQValueBinary.clone: IXQValue;
@@ -1987,7 +1988,7 @@ begin
   end;
 end;
 
-class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: integer): integer;
+class function TXQValueDateTime.compare(const a, b: TXQValueDateTime; implicitTimezone: integer): TXQCompareResult;
 const formatIds: string = 'ymdhns';
 const componentFiller: array[1..6] of integer = (1972, 1, 1, 0, 0, 0);
 var
@@ -1997,7 +1998,7 @@ var
 
   overlap: Integer;
 begin
-  result := 0;
+  result := xqcrEqual;
   adf := lowercase((a.typeAnnotation as TXSDateTimeType).fixedDateTimePattern);
   bdf := lowercase((b.typeAnnotation as TXSDateTimeType).fixedDateTimePattern);
   av := a.value;
@@ -2014,12 +2015,12 @@ begin
       bv.day:=1;
     end;}
   end;
-  if overlap = 0 then exit(-2); //not comparable
+  if overlap = 0 then exit(xqcrIncomparable); //not comparable
 
   //carefully here, the timezone difference might change every date component, even the year
   if av.timezone = high(Integer) then av.timezone := implicitTimezone;
   if bv.timezone = high(Integer) then bv.timezone := implicitTimezone;
-  result := compareValue(av.toMicroSecondStamp(), bv.toMicroSecondStamp());
+  result := TXQCompareResult.compare(av.toMicroSecondStamp(), bv.toMicroSecondStamp());
 end;
 
 

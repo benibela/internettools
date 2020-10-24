@@ -583,53 +583,53 @@ end;
 function xqvalueLessThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,-1,9999);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrLessThan,xqcrReservedInvalid);
 end;
 function xqvalueGreaterThanAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,1,9999);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrGreaterThan,xqcrReservedInvalid);
 end;
 function xqvalueLessEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,-1,0);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrLessThan,xqcrEqual);
 end;
 function xqvalueGreaterEqualAtomic(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareAtomic(a,b,result,1,0);
+  cxt.staticContext.compareAtomic(a,b,result,xqcrGreaterThan,xqcrEqual);
 end;
 
 function xqvalueEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,0);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrEqual);
 end;
 function xqvalueUnequalGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,-1,1);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrLessThan,xqcrGreaterThan);
 end;
 function xqvalueLessThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,-1);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrLessThan);
 end;
 function xqvalueGreaterThanGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,1);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrGreaterThan);
 end;
 function xqvalueLessEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,-1,0);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrLessThan,xqcrEqual);
 end;
 function xqvalueGreaterEqualGeneric(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   result := nil;
-  cxt.staticContext.compareGeneral(a,b,result,1,0);
+  cxt.staticContext.compareGeneral(a,b,result,xqcrGreaterThan,xqcrEqual);
 end;
 
 function xqvalueToSingleNode(const v: IXQValue): TTreeNode;
@@ -2370,7 +2370,7 @@ begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
   if args[0].isUndefined  or args[1].isUndefined then exit(xqvalue);
-  result := xqvalue(collation.compare(args[0].toString, args[1].toString));
+  result := xqvalue(ord(collation.compare(args[0].toString, args[1].toString)));
 end;
 
 function xqFunctionCodePoint_Equal({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -3781,7 +3781,7 @@ begin
         else if not result.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) then raiseError;
 
       for pv in enumerable do begin
-        if (context.staticContext.compareAtomic(result, pv^, nil) < 0) <> asmin then
+        if (ord(context.staticContext.compareAtomic(result, pv^, nil)) < 0) <> asmin then
           result := pv^;
         if ((pv^.typeAnnotation as TXSSimpleType).primitive <> baseType) then
           raiseError;
@@ -3852,7 +3852,7 @@ begin
       result := nil;
       for pv in enumerable do begin
         temps2 := pv^.toString;
-        if (collation.compare(temps2, temps) < 0) = asmin then begin
+        if (ord(collation.compare(temps2, temps)) < 0) = asmin then begin
           temps := temps2;
           xqvalueMoveNoRefCount(pv^, result);
         end;
@@ -3868,7 +3868,7 @@ begin
     pvkBinary: begin
       tempv := seq.get(1).toValue;
       for pv in enumerable do
-        if (TXQValueBinary.compare(pv^.toValue, tempv) < 0) = asmin then
+        if (ord(TXQValueBinary.compare(pv^.toValue, tempv)) < 0) = asmin then
           tempv := pv^.toValue;
       result := tempv;
     end;
@@ -6263,12 +6263,12 @@ function compareDirect(self: TObject; p1,p2: pointer): integer;
     raise EXQEvaluationException.Create('XPTY0004', 'Sorting failed, cannot compare ' + v1.toXQuery + ' with ' +v2.toXQuery, nil, nil, nil);
   end;
 var sortingContext: PSortingContext absolute self;
-  function compare(v1, v2: TXQValue): integer;
+  function compare(v1, v2: TXQValue): TXQCompareResult;
     procedure error; overload;
     begin
       error(v1,v2);
     end;
-    function compareStrings: integer;
+    function compareStrings: TXQCompareResult;
     begin
       result := sortingContext.collation.compare(v1.toString, v2.toString)
     end;
@@ -6287,7 +6287,7 @@ var sortingContext: PSortingContext absolute self;
         error;
     end;
     result := sortingContext^.staticContext.compareDeepAtomic(v1, v2, sortingContext^.collation);
-    if result = -2 then error;
+    if result <= xqcrIncomparable then error;
   end;
 
 var pv1: PIXQValue absolute p1;
@@ -6305,7 +6305,7 @@ begin
   c1 := v1.getSequenceCount;
   c2 := v2.getSequenceCount;
   if (k1 <> pvkArray) and (k2 <> pvkArray) and (c1 = 1 ) and (c2 = 1) then begin
-    result := compare(v1, v2);
+    result := ord(compare(v1, v2));
     exit;
   end;
 
@@ -6313,7 +6313,7 @@ begin
   e2 := v2.GetEnumeratorArrayTransparentUnsafe;
   while e1.MoveNext do begin
     if not e2.MoveNext then exit(1);
-    result := compare(e1.current, e2.current);
+    result := ord(compare(e1.current, e2.current));
     if result <> 0 then exit;
   end;
   if e2.MoveNext then result := -1

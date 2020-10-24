@@ -1693,7 +1693,7 @@ var xpathText: TTreeNode;
         if not result then exit;
         if e.valuepxp = nil then exit;
         evaluatedvalue := performPXPEvaluation(e.valuepxp);
-        result := FQueryEngine.StaticContext.compareGeneral(evaluatedvalue, value, nil, 0);
+        result := FQueryEngine.StaticContext.compareGeneral(evaluatedvalue, value, nil, xqcrEqual);
       end;
 
     begin

@@ -39,5 +39,5 @@
 //internal flags
 {$mode objfpc} {$H+}
 {$modeswitch advancedrecords}
-
+{$ModeSwitch typehelpers}
 

@@ -177,8 +177,8 @@ type
     property documentCache[url: string]: TTreeDocument read GetdocumentCache write SetdocumentCache;
   end;
 
-  //============================XQUERY CONTEXTS==========================
 
+  //============================XQUERY CONTEXTS==========================
 
   //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   TXQStaticContext = class
@@ -251,26 +251,26 @@ type
     function findVariableDeclaration(const namespace, varname: string): TXQTermDefineVariable;
     function isLibraryModule: boolean;
   protected
-    function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+    function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): TXQCompareResult;
   public
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+    function compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
     //**Compares two values atomically (eq,ne,..) and returns 0 if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation = nil): integer; inline;
-    procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
+    function compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation = nil): TXQCompareResult; inline;
+    procedure compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid);
     function equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
     function equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
-    function compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
+    function compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
     //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
-    function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
+    function compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
     //**Compares two values (=,!=,...) and returns true if the compare value is \in [accept1,accept2]@br
     //**(Remember that these xpath comparison operators search for a matching pair in the product of the sequences)
-    function compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer = 9999): boolean;
-    procedure compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer = 9999);
+    function compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
+    procedure compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid);
     //**Compares two atomic values and returns 0 as the deepEqual function would if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
-    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer; inline;
+    function compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
+    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult; inline;
     function equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
     function equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean; inline;
     //**internally used (Returns if the eq operator is defined for the types of a and b)
@@ -849,7 +849,7 @@ type
 
     function toRawBinary: string;
 
-    class function compare(a, b: TXQValue): integer; static;
+    class function compare(a, b: TXQValue): TXQCompareResult; static;
 
     function clone: IXQValue; override;
   end;
@@ -921,7 +921,7 @@ type
 
     procedure truncateRange();
 
-    class function compare(const a,b: TXQValueDateTime; implicitTimezone: integer): integer; static;
+    class function compare(const a,b: TXQValueDateTime; implicitTimezone: integer): TXQCompareResult; static;
 //    class procedure subtract(S, D: TXQValueDateTimeData; out E: TXQValueDateTimeData);
   end;
   TXQValueDateTimeClass = class of TXQValueDateTime;
@@ -6687,15 +6687,15 @@ end;
 
 
 
-function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): integer;
+function TXQStaticContext.compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): TXQCompareResult;
 var ak, bk: TXQValueKind;
-  function compareCommonFloat(): integer;
+  function compareCommonFloat(): TXQCompareResult;
   var
     cmpClass: TXSType;
     ad, bd: xqfloat;
   begin
     if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan()) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan()) then
-      exit(-2);
+      exit(xqcrIncomparable);
     cmpClass := TXSType.commonDecimalType(a, b);
     ad := a.toFloatChecked(Self);
     bd := b.toFloatChecked(self);
@@ -6704,29 +6704,16 @@ var ak, bk: TXQValueKind;
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
       result := xqfloat(single(ad)).compare(Single(bd));
     end else
-      result := -2; //should not happen, but hides warning
+      result := xqcrIncomparable; //should not happen, but hides warning
   end;
 
-  function compareCommonAsStrings(): integer;
+  function compareCommonAsStrings(): TXQCompareResult;
   begin
     if overrideCollation = nil then begin
       overrideCollation := collation;
-      if overrideCollation = nil then exit(compareStrSignCapped(a.toString, b.toString));
+      if overrideCollation = nil then exit(TXQCompareResult.fromIntegerResult(compareStr(a.toString, b.toString)));
     end;
     result := overrideCollation.compare(a.toString, b.toString)
-  end;
-  function compareBooleans(const ab, bb: boolean): integer; inline;
-  begin
-    if ab = bb then result := 0
-    else if ab then result := 1
-    else result := -1;
-  end;
-
-  function compareInts(delta: int64): integer;inline;
-  begin
-    if delta = 0 then exit(0)
-    else if delta < 0 then exit(-1)
-    else exit(1);
   end;
 
   function vtodecimalstr(k: TXQValueKind; v: txqvalue): string; //faster implementation of cast, mixed with vtod
@@ -6747,7 +6734,7 @@ var ak, bk: TXQValueKind;
       end
     end;
   end;
-  function compareAsBigDecimals: integer;
+  function compareAsBigDecimals: TXQCompareResult;
   var bda, bdb: BigDecimal;
       temps: string;
   begin
@@ -6769,50 +6756,49 @@ var ak, bk: TXQValueKind;
           else raiseFORG0001InvalidConversion(b, 'decimal');
       end;
     end;
-    result := compareBigDecimals(bda, bdb);
+    result := TXQCompareResult.fromIntegerResult(compareBigDecimals(bda, bdb));
   end;
-  function compareAsBigDecimals(const i: TXQValue; const s: string): integer;
+  function compareAsBigDecimals(const i: TXQValue; const s: string): TXQCompareResult;
   var
     temp: BigDecimal;
   begin
     if not tryStrToBigDecimal(s, @temp) then
       if strContains(s, 'N') then exit(compareCommonFloat())
       else raiseFORG0001InvalidConversion(xqvalue(s), 'decimal');
-    result := compareBigDecimals(i.toInt64, temp);
+    result := TXQCompareResult.fromIntegerResult(compareBigDecimals(i.toInt64, temp));
   end;
 
-  function compareAsPossibleInt64: integer; //assumption ak != bk; ak, bk != pvkBigDecimal
+  function compareAsPossibleInt64: TXQCompareResult; //assumption ak != bk; ak, bk != pvkBigDecimal
   const MaxInt64LogDec = 18;
   var
-    temp: Int64;
     s: String;
+    temp: int64;
   begin
     if ak = pvkInt64 then begin
       s := vtodecimalstr(bk, b);
       if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then exit(compareAsBigDecimals(a, s));
-      temp := TXQValueInt64(a).value - temp;
+      result := TXQCompareResult.compare( TXQValueInt64(a).value, temp);
     end else if bk = pvkInt64 then begin
       s := vtodecimalstr(ak, a);
-      if length(s) >= MaxInt64LogDec then exit(-compareAsBigDecimals(b, s));
+      if length(s) >= MaxInt64LogDec then exit(compareAsBigDecimals(b, s).inverted());
         if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then
           if strContains(s, 'N') then exit(compareCommonFloat())
-          else exit(-compareAsBigDecimals(b, s));
-      temp := temp - TXQValueInt64(b).value;
-    end else begin raisePXPInternalError; temp := 0; end;
-    result := compareInts(temp);
+          else exit(compareAsBigDecimals(b, s).inverted());
+      result := TXQCompareResult.compare(temp,  TXQValueInt64(b).value);
+    end else begin raisePXPInternalError; result := xqcrIncomparable; end;
   end;
 
-  function compareMultiple(enuma, enumb: TXQValueEnumeratorPtrUnsafe): integer;
+  function compareMultiple(enuma, enumb: TXQValueEnumeratorPtrUnsafe): TXQCompareResult;
   begin
-    if not enuma.MoveNext then exit(-2);
-    if not enumb.MoveNext then exit(-2);
+    if not enuma.MoveNext then exit(xqcrEmptySequence);
+    if not enumb.MoveNext then exit(xqcrEmptySequence);
     result := compareCommon(enuma.Current.toValue, enumb.Current.toValue, overrideCollation, castUnknownToString);
     if enuma.MoveNext then raiseXPTY0004TypeError(a, 'singleton');
     if enumb.MoveNext then raiseXPTY0004TypeError(b, 'singleton');
   end;
 
 
-  function compareCommonEqualKind(): integer;
+  function compareCommonEqualKind(): TXQCompareResult;
   var
     adate: PXQValueDateTimeData;
     bdate: PXQValueDateTimeData;
@@ -6820,37 +6806,37 @@ var ak, bk: TXQValueKind;
 
     case ak of
       pvkBoolean:
-        result := compareBooleans(TXQValueBoolean(a).bool, TXQValueBoolean(b).bool);
+        result := TXQCompareResult.compare(TXQValueBoolean(a).bool, TXQValueBoolean(b).bool);
       pvkInt64:
-        result := compareInts(TXQValueInt64(a).value - TXQValueInt64(b).value);
+        result := TXQCompareResult.compare(TXQValueInt64(a).value, TXQValueInt64(b).value);
       pvkBigDecimal: result := compareAsBigDecimals();
       pvkFloat: result := compareCommonFloat();
       pvkDateTime: begin
-        if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(-2);
+        if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(xqcrIncomparable);
         adate := @TXQValueDateTime(a).value;
         bdate := @TXQValueDateTime(b).value;
         if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
-          result := compareValue(adate^.toMonths(), bdate^.toMonths());
-          if result <> 0 then exit;
-          result := compareValue(adate^.toDayTime(), bdate^.toDayTime());
+          result := TXQCompareResult.compare(adate^.toMonths(), bdate^.toMonths());
+          if result <> xqcrEqual then exit;
+          result := TXQCompareResult.compare(adate^.toDayTime(), bdate^.toDayTime());
         end else //result := compareValue(TXQValueDateTime(a).toDateTime, TXQValueDateTime(b).toDateTime);
           result := TXQValueDateTime.compare(TXQValueDateTime(a),TXQValueDateTime(b),ImplicitTimezoneInMinutes);
       end;
       pvkQName: begin
-        result := -2;
+        result := xqcrIncomparable;
         if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
            or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
           if (TXQValueQName(a).url = TXQValueQName(b).url) and (TXQValueQName(a).local = TXQValueQName(b).local) then //ignore prefix
-            result := 0
+            result := xqcrEqual;
       end;
-      pvkNull: result := 0;
-      pvkUndefined: result := -2;
+      pvkNull: result := xqcrEqual;
+      pvkUndefined: result := xqcrEmptySequence;
       pvkNode, pvkString: result := compareCommonAsStrings;
       pvkBinary: result := TXQValueBinary.compare(a, b);
       pvkSequence: result := compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe);
       pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
       pvkArray: result := compareMultiple(a.GetEnumeratorMembersPtrUnsafe, b.GetEnumeratorMembersPtrUnsafe);
-      else begin result := -2; raisePXPInternalError; end;
+      else begin result := xqcrIncomparable; raisePXPInternalError; end;
     end;
   end;
 
@@ -6882,7 +6868,7 @@ begin
   ak := a.kind; bk := b.kind;
   if ak = bk then exit(compareCommonEqualKind());
   case ak of
-    pvkUndefined: exit(-2);
+    pvkUndefined: exit(xqcrEmptySequence);
     pvkSequence: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe));
     pvkString, pvkNode: if bk in [pvkString, pvkNode] then exit(compareCommonEqualKind());
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
@@ -6890,14 +6876,14 @@ begin
     else;
   end;
   case bk of
-    pvkUndefined: exit(-2);
+    pvkUndefined: exit(xqcrEmptySequence);
     pvkSequence: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe));
-    pvkNull: exit(1);
+    pvkNull: exit(xqcrGreaterThan);
     pvkFunction: raise EXQEvaluationException.create('FOTY0013', 'Functions are incomparable');
     pvkArray: exit(compareMultiple(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorMembersPtrUnsafe));
     else;
   end;
-  if ak = pvkNull then exit(-1); //can only test this after checkin b's sequence state
+  if ak = pvkNull then exit(xqcrLessThan); //can only test this after checkin b's sequence state
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
     exit(compareCommonAsStrings());
   if strictTypeChecking then begin
@@ -6948,30 +6934,29 @@ begin
   exit(compareCommonAsStrings());
 end;
 
-function TXQStaticContext.compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 begin
   result := compareCommon(a, b, overrideCollation, true);
 end;
 
-function TXQStaticContext.compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 begin
   result := compareAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
-procedure TXQStaticContext.compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
+procedure TXQStaticContext.compareAtomic(const a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult);
 var
- compres: Integer;
+ compres: TXQCompareResult;
 begin
-  if not (a.kind in [pvkUndefined]) and not (b.kind in [pvkUndefined]) then begin
-    compres := compareAtomic(a,b, nil);
-    result := xqvalue((compres = accept1) or (compres = accept2) );
-  end else
-    result := xqvalue();
+  compres := compareAtomic(a,b, nil);
+  if (compres = accept1) or (compres = accept2) then result := xqvalueTrue
+  else if compres = xqcrEmptySequence then result := xqvalue
+  else result := xqvalueFalse;
 end;
 
 function TXQStaticContext.equalAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result:=compareAtomic(a,b,overrideCollation)=0;
+  result:=compareAtomic(a,b,overrideCollation)=xqcrEqual;
 end;
 
 function TXQStaticContext.equalAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
@@ -6979,9 +6964,9 @@ begin
   result := equalAtomic(a.toValue,b.toValue,overrideCollation);
 end;
 
-function TXQStaticContext.compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+function TXQStaticContext.compareGeneral(const a, b: TXQValueEnumeratorPtrUnsafe; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult): boolean;
 var enum1, enum2: TXQValueEnumeratorPtrUnsafe;
-  compres: Integer;
+  compres: TXQCompareResult;
   va, vb: TXQValue;
 begin
   enum1 := a;
@@ -7014,44 +6999,44 @@ begin
   result := false;
 end;
 
-function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+function TXQStaticContext.compareGeneral(a, b: TXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult): boolean;
 begin
   result := compareGeneral(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe, overrideCollation,  accept1, accept2);
 end;
 
-function TXQStaticContext.compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: integer; accept2: integer): boolean;
+function TXQStaticContext.compareGeneral(a, b: IXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult): boolean;
 begin
   result := compareGeneral(a.GetEnumeratorPtrUnsafe, b.GetEnumeratorPtrUnsafe, overrideCollation,  accept1, accept2);
 end;
 
-procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: integer; accept2: integer);
+procedure TXQStaticContext.compareGeneral(a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult);
 begin
   result := xqvalue(compareGeneral(a,b, nil, accept1,accept2));
 end;
 
-function TXQStaticContext.compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 var
   ak: TXQValueKind;
   bk: TXQValueKind;
 begin
-  if not comparableTypes(a, b) then exit(-2); //todo:   nodes?
+  if not comparableTypes(a, b) then exit(xqcrIncomparable); //todo:   nodes?
 
   ak := a.kind; bk := b.kind;
   if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) then begin
-    if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(0)
-    else exit(-1); //move NaNs first for fn:sort
-  end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(1);
+    if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(xqcrEqual)
+    else exit(xqcrLessThan); //move NaNs first for fn:sort
+  end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(xqcrGreaterThan);
   result := compareAtomic(a,b,overrideCollation);
 end;
 
-function TXQStaticContext.compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): integer;
+function TXQStaticContext.compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult;
 begin
   result := compareDeepAtomic(a.toValue, b.toValue, overrideCollation);
 end;
 
 function TXQStaticContext.equalDeepAtomic(a, b: TXQValue; overrideCollation: TXQCollation): boolean;
 begin
-  result := compareDeepAtomic(a,b,overrideCollation) = 0;
+  result := compareDeepAtomic(a,b,overrideCollation) = xqcrEqual;
 {var
   ak: TXQValueKind;
   bk: TXQValueKind;

@@ -29,6 +29,17 @@ uses
   classes, SysUtils, bbutils;
 
 type
+  TXQCompareResult = (xqcrReservedInvalid = -4, xqcrEmptySequence = -3, xqcrIncomparable = -2, xqcrLessThan = -1, xqcrEqual = 0, xqcrGreaterThan = 1);
+  TXQCompareResultHelper = type helper for TXQCompareResult
+    class function fromIntegerResult(i: integer): TXQCompareResult; static;
+    class function compare(a, b: int64): TXQCompareResult; static;
+    class function compare(a, b: integer): TXQCompareResult; static;
+    class function compare(a, b: boolean): TXQCompareResult; static;
+    class function compare(a, b: string): TXQCompareResult; static;
+    function inverted(): TXQCompareResult;
+  end;
+
+type
   TXQHashCode = uint32;
   TXQBaseTypeInfo = object
 //    class procedure markKeyAsDeleted(var key: string); static;
@@ -320,8 +331,6 @@ function jsonStrEscape(s: string):string;
 function strSplitOnAsciiWS(s: string): TStringArray;
 function urlHexDecode(s: string): string;
 
-function compareStrSignCapped(const sa, sb: string): integer;
-
 
 function nodeNameHash(const s: RawByteString): cardinal;
 function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
@@ -353,6 +362,45 @@ const
 
 implementation
 uses math;
+
+class function TXQCompareResultHelper.fromIntegerResult(i: integer): TXQCompareResult;
+begin
+  if i = 0 then result := xqcrEqual
+  else if i < 0 then result := xqcrLessThan
+  else result := xqcrGreaterThan;
+end;
+
+class function TXQCompareResultHelper.compare(a, b: int64): TXQCompareResult;
+begin
+  if a < b then result := xqcrLessThan
+  else if a > b then result := xqcrGreaterThan
+  else result := xqcrEqual;
+end;
+
+class function TXQCompareResultHelper.compare(a, b: integer): TXQCompareResult;
+begin
+  if a < b then result := xqcrLessThan
+  else if a > b then result := xqcrGreaterThan
+  else result := xqcrEqual;
+end;
+
+class function TXQCompareResultHelper.compare(a, b: boolean): TXQCompareResult;
+begin
+  if a = b then result := xqcrEqual
+  else if a then result := xqcrGreaterThan
+  else result := xqcrLessThan;
+end;
+
+class function TXQCompareResultHelper.compare(a, b: string): TXQCompareResult;
+begin
+  result := fromIntegerResult(CompareStr(a,b));
+end;
+
+function TXQCompareResultHelper.inverted(): TXQCompareResult;
+const temp: array[TXQCompareResult] of TXQCompareResult = (xqcrReservedInvalid, xqcrEmptySequence, xqcrIncomparable, xqcrGreaterThan{!}, xqcrEqual, xqcrLessThan{!});
+begin
+  result := temp[self];
+end;
 
 
 {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
@@ -1366,13 +1414,6 @@ begin
   setlength(result, p-1);
 end;
 
-function compareStrSignCapped(const sa, sb: string): integer;
- begin
-   result := CompareStr(sa, sb);
-   if result <> 0 then
-     if result < 0 then result := -1
-     else result := 1
- end;
 
 
 

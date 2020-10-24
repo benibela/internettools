@@ -743,7 +743,7 @@ function comparison(data: TObject; a, b: PIXQValue): integer;
 begin
   if not xq.StaticContext.comparableTypes(a^ as TXQValue, b^ as TXQValue) then
     exit(strCompareClever(a^.typeName, b^.typeName));
-  result := xq.StaticContext.compareAtomic(a^, b^, nil);
+  result := ord(xq.StaticContext.compareAtomic(a^, b^, nil));
 end;
 
 
@@ -926,7 +926,7 @@ begin
     case kind of
       aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
       aakEq: try
-        result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = 0];
+        result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = xqcrEqual];
       except
         on e: EXQEvaluationException do
           if e.errorCode = 'XPTY0004' then result := OK[false]

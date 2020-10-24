@@ -5,13 +5,13 @@ unit xquery.internals.collations;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, xquery.internals.common;
 type
 //** Class to perform string comparisons, so they different comparison rules can be used in different languages
 TXQCollation = class
   id: string;
   constructor Create(const aid: string);
-  function compare(const a, b: string): integer;
+  function compare(const a, b: string): TXQCompareResult;
   function equal(const a, b: string): boolean; virtual;
   function find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean; virtual;
   function indexOf(const strToBeExaminated, searched: string): SizeInt; virtual;
@@ -72,7 +72,7 @@ function internalGetCollations: TStringList;
 
 implementation
 
-uses bbutils, bbutilsbeta, xquery.internals.common;
+uses bbutils, bbutilsbeta;
 
 const MY_NAMESPACE_PREFIX_URL = 'http://www.benibela.de/2012/pxp/';
 
@@ -122,12 +122,9 @@ begin
   if strBeginsWith(id, MY_NAMESPACE_PREFIX_URL) then id := strCopyFrom(id, length(MY_NAMESPACE_PREFIX_URL)+1);
 end;
 
-function TXQCollation.compare(const a, b: string): integer;
+function TXQCollation.compare(const a, b: string): TXQCompareResult;
 begin
-  result := docompare(a,b);
-  if result <> 0 then
-    if result < 0 then result := -1
-    else result := 1;
+  result := TXQCompareResult.fromIntegerResult(docompare(a,b));
 end;
 
 function TXQCollation.compare(a, b: pansichar; len: SizeInt): integer;
@@ -163,7 +160,7 @@ end;
 
 function TXQCollation.equal(const a, b: string): boolean;
 begin
-  result := compare(a,b) = 0;
+  result := compare(a,b) = xqcrEqual;
 end;
 
 function TXQCollation.find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean;

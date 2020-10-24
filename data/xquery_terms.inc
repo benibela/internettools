@@ -1968,7 +1968,7 @@ var meta: PFlowerSortingData;
 
   function isGreaterThan(w, v: IXQValue; emptyLeast: boolean; const collation: TXQCollation): boolean;
   var
-    temp: integer;
+    temp: TXQCompareResult;
   begin
     result := false;
     if emptyLeast then begin
@@ -1984,9 +1984,9 @@ var meta: PFlowerSortingData;
     end;
 
     if (collation <> nil) and (v is TXQValueString) and (w is TXQValueString) then
-      exit(collation.compare(v.toString, w.toString) < 0);
+      exit(ord(collation.compare(v.toString, w.toString)) < 0);
     temp := meta^.context^.staticContext.compareAtomic(v,w,nil) ;
-    result := (temp <> -2) and (temp < 0);
+    result := temp = xqcrLessThan;
   end;
 
 var
@@ -2037,7 +2037,7 @@ begin
       end;
       1: if b.vars[k].getSequenceCount = 0 then exit(1);
     end;
-    result :=  context^.staticContext.compareDeepAtomic(a.vars[k], b.vars[k], collation);
+    result :=  ord(context^.staticContext.compareDeepAtomic(a.vars[k], b.vars[k], collation));
     if result <> 0 then exit;
   end;
 end;
