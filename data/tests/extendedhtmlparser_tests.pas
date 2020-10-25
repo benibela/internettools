@@ -67,6 +67,12 @@ var i:longint;
     extParser:THtmlTemplateParser;
     sl:TStringList;
   procedure checklog(s:string);
+    function xsafestr(const v: ixqvalue): string;
+    begin
+      if v.kind <> pvkObject then result := v.toString
+      else result := '';
+    end;
+
   var j: Integer;
     errormsg: String;
   begin
@@ -77,8 +83,8 @@ var i:longint;
       end;
       for j:=0 to sl.count-1 do
         if (extParser.variableChangeLog.getName(j)<>sl.Names[j]) or
-           ((extParser.variableChangeLog.get(j).toString)<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
-             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+extParser.variableChangeLog.get(j).toString+'" (btw. "'+extParser.variableChangeLog.debugTextRepresentation+'") expected: "'+s+'"';
+           (xsafestr(extParser.variableChangeLog.get(j))<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
+             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+xsafestr(extParser.variableChangeLog.get(j)) +'" (btw. "'+extParser.variableChangeLog.debugTextRepresentation+'") expected: "'+s+'"';
              //errormsg:= StringReplace(errormsg, #13, '#13', [rfReplaceAll]);
              //errormsg:= StringReplace(errormsg, #10, '#10', [rfReplaceAll]);
              WriteLn(errormsg);
@@ -1041,7 +1047,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   q('string-join(match("<t:loop><a>{.}</a></t:loop>",  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
   q('string-join(match("<template:loop><a>{.}</a></template:loop>",  <r><a>1</a><a>2</a><a>3</a></r>), " ")', '1 2 3');
 
-  q('match(<a>{{$var}}</a>, <r><a>123</a></r>)', '');
+  q('serialize-json(match(<a>{{$var}}</a>, <r><a>123</a></r>))', '{"var": "<a>123</a>"}');
   q('match(<a>{{$var}}</a>, <r><a>123</a></r>).var', '123');
   q('match(<r><a>{{$var}}</a><b>{{$var2}}</b></r>, <r><a>123</a><b>456</b></r>).var', '123');
   q('match(<r><a>{{$var}}</a><b>{{$var2}}</b></r>, <r><a>123</a><b>456</b></r>).var2', '456');
@@ -1060,7 +1066,7 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
 
   q('count(match(<r><a>{{obj := object(), obj.name := text(), obj.url := @href}}</a>*</r>, <r><a href="x">1</a><a href="y">2</a><a href="z">3</a></r>).obj)', '3');
   q('string-join(for $i in match(<r><a>{{obj := object(), obj.name := text(), obj.url := @href}}</a>*</r>, <r><a href="x">1</a><a href="y">2</a><a href="z">3</a></r>).obj return concat($i.name, ":",$i.url), " ")', '1:x 2:y 3:z');
-  q('declare function x(){0}; for $link in match(<a/>, <a/>) return $link', '');
+  q('declare function x(){0}; serialize-json(for $link in match(<a/>, <a/>) return $link)', '{}');
   q('declare function x(){17}; match(<a id="{x()}">{{.}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', 'B');
   q('declare function x(){17}; match(<a id="{x()}">{{concat(., x())}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', 'B17');
   q('declare function x($arg){concat(17, $arg)}; match(<a id="{x("")}">{{x(.)}}</a>, <r><a id="1">A</a><a id="17">B</a><a id="30">C</a></r>)', '17B');

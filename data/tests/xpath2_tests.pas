@@ -2166,7 +2166,7 @@ begin
   ps.ParsingOptions.AllowPropertyDotNotation:=xqpdnAllowFullDotNotation;
 
                //Objects extension
-  t('obj := object()', '', '');
+  t('(obj := object())[0]', '', '');
   t('type-of($obj)', 'object()');
   t('obj.foo := "bar"', 'bar', '');
   t('$obj.foo', 'bar', '');
@@ -2177,7 +2177,7 @@ begin
 //  t('($obj) . foo', 'bar', '');
   t('obj.foo := 123', '123', '');
   t('obj.foo := $obj.foo * 2', '246', '');
-  t('obj.o := $obj', '', '');
+  t('(obj.o := $obj)[0]', '', '');
   t('$obj.o.foo', '246', '');
   t('$obj.bar := 17', '17', '');
   t('$obj.o.bar', '', '');
@@ -2185,14 +2185,14 @@ begin
   t('$obj.o.foo', 'new', '');
   t('$obj.foo', '246', '');
   t('$obj.bar', '17', '');
-  t('obj.o.p := $obj', '', '');
+  t('(obj.o.p := $obj)[0]', '', '');
   t('$obj.o.p.foo', '246', '');
   t('$obj.o.p.o.foo', 'new', '');
-  t('obj.o.p.o := object()', '', '');
+  t('(obj.o.p.o := object())[4]', '', '');
   t('$obj.o.p.o.foo', '', '');
   t('obj.o.p.o.foo := 99', '99', '');
   t('$obj.o.p.o.foo', '99', '');
-  t('test := object()', '', '');
+  t('(test := object())[112]', '', '');
   t('test.t1 := 1', '1', '');
   t('test.t2 := 2', '2', '');
   t('test.t3 := 3', '3', '');
@@ -2205,7 +2205,7 @@ begin
   t('$test.foo:bar', '123', '');
   t('$test.foo:bar := 456', '456', ''); //good idea to allow both??
   t('$test.foo:bar', '456', '');}
-  t('obj := object(("a", "b", "c", 123))', '', '');
+  t('(obj := object(("a", "b", "c", 123)))[-1]', '', '');
   t('$obj.a', 'b', '');
   t('$obj.b', '', '');
   t('$obj.c', '123', '');
@@ -2213,15 +2213,15 @@ begin
   t('''a$obj.c;b''', 'a$obj.c;b', '');
   t('x"a{$obj.c}b"', 'a123b', '');
   t('type-of($obj.c)', 'integer', '');
-  t('(object(("x", "y")), object(("u", "v")))', '', '');
+  t('serialize-json((object(("x", "y")), object(("u", "v"))))', '[{"x": "y"}, {"u": "v"}]');
   t('(object(("x", "y")), object(("u", "v")))[1].x', 'y', '');
   t('(object(("x", "y")), object(("u", "v")))[1].u', '', '');
   t('(object(("x", "y")), object(("u", "v")))[2].u', 'v', '');
 
-  t('obj := {"b": {"c": {"d": 1}}}', '');
+  t('(obj := {"b": {"c": {"d": 1}}})[false()]', '');
   t('serialize-json($obj)', '{"b": {"c": {"d": 1}}}');
   t('$obj.b.c.d', '1');
-  t('x := $obj', '');
+  t('(x := $obj)[0]', '');
   t('serialize-json($x)', '{"b": {"c": {"d": 1}}}');
   t('$x.b.c.d := 2', '2');
   t('$x.b.c.d', '2');
@@ -2241,7 +2241,7 @@ begin
   t('$x("b")("c").d := 6', '6');
   t('$x.b.c.d', '6');
   t('serialize-json($x)', '{"b": {"c": {"d": 6}}}');
-  t('$x("b").c := {"y": 123}', '');
+  t('($x("b").c := {"y": 123})[0]', '');
   t('$x.b.c.d', '');
   t('$x.b.c.y', '123');
   t('serialize-json($x)', '{"b": {"c": {"y": 123}}}');
@@ -2254,9 +2254,9 @@ begin
   t('string-join(for $i in object(("a", "x", "b", "Y", "c", "Z")) return ($i.b,$i.c), "|")', 'Y|Z', '');
   t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return $i.abc, "|")', '123|456|789', '');
   t('string-join(for $i in (object(("abc", "123")), object(("abc", "456")), object(("abc", "789"))) return x"{$i.abc}", "|")', '123|456|789', '');
-  t('join((i := object(("a", 1)), for $i in object(("a", "2")) return $i.a), "|")', '|2', '');
-  t('join((i := object(("a", 1)), for $i in object(("b", "2")) return $i.a), "|")', '', '');
-  t('join((i := object(("a", 1)), for $i in (object(("b", "2")),object(("a", "3"))) return $i.a), "|")', '|3', '');
+  t('join((i := object(("a", 1))[0], for $i in object(("a", "2")) return $i.a), "|")', '2', '');
+  t('join((i := object(("a", 1))[0], for $i in object(("b", "2")) return $i.a), "|")', '', '');
+  t('join((i := object(("a", 1))[0], for $i in (object(("b", "2")),object(("a", "3"))) return $i.a), "|")', '3', '');
 
   //New object syntax
   t('object(("hallo", 123)).hallo', '123'); //old
@@ -2518,7 +2518,7 @@ begin
 
   t('join(([1,2,3], {"a": 17}, {}, [], {"c": 7, "d": 1})())', '1 2 3 a c d');
   t('join(({}, [], {}, [1,2,3], {"a": 17}, {}, [], {"c": 7, "d": 1})())', '1 2 3 a c d');
-  t('xyz := {"mu": "mi"}', '');
+  t('(xyz := {"mu": "mi"})[0]', '');
   t('$xyz.abc := 17', '17');
   t('join($xyz())', 'mu abc');
 
@@ -2530,7 +2530,7 @@ begin
   t('$a', '123');
   t('$a.b.c', '456');
   f('$a.b', 'err:XPST0008');
-  t('$a := {"b": 17}', '');
+  t('($a := {"b": 17})[false()]', '');
   f('$a.b', 'err:XPST0008');
   f('$a. b', 'err:XPST0003');
   t('$a .b', '17');
@@ -2549,7 +2549,7 @@ begin
   t('{"a.b.c": "miza"}("a.b.c")', 'miza');
   t('{"a.b.c": "miza"}.a.b.c', '');
 
-  t('$obj := {}', '');
+  t('($obj := {})[0]', '');
   t('$obj("x.y.z") := 17', '17');
   t('$obj("x.y.z")', '17');
   t('serialize-json($obj)', '{"x.y.z": 17}');
@@ -2559,7 +2559,7 @@ begin
   t('[$a] / b', '17');
   t('[$a] // b', '17');
   t('join(({}/(a:=123),":", $a))', '123 : 123');
-  t('($seq := ({"a": 1, "b": 2, "c": 3}, {"b": 4, "c": 5, "d": 6, "e": [{"a": 10, "b": 11}], "f": {"a": 20, "b": 21}}))[2]', '');
+  t('(($seq := ({"a": 1, "b": 2, "c": 3}, {"b": 4, "c": 5, "d": 6, "e": [{"a": 10, "b": 11}], "f": {"a": 20, "b": 21}}))[2])[0]', '');
   t('join($seq / a)', '1');
   t('join($seq / b)', '2 4');
   t('join([$seq] / b)', '2 4');
@@ -2578,11 +2578,11 @@ begin
   t('join($seq[1] / *)', '1 2 3');
   f('join($seq[1] / @*)', 'err:XPTY0019');
   f('join($seq[1] / attribute::*)', 'err:XPTY0019');
-  t('join($seq[2] / *)', '4 5 6  '); //2 space because objects become empty strings
-  t('join($seq / *)', '1 2 3 4 5 6  '); //2 space because objects become empty strings
+  t('serialize-json($seq[2] / *)', '[4, 5, 6, [{"a": 10, "b": 11}], {"a": 20, "b": 21}]');
+  t('serialize-json($seq / *)', '[1, 2, 3, 4, 5, 6, [{"a": 10, "b": 11}], {"a": 20, "b": 21}]');
 
   t('join($seq[1] // *)', '1 2 3');
-  t('join($seq // *)', '1 2 3 4 5 6   10 11 20 21');
+  t('serialize-json($seq // *)', '[1, 2, 3, 4, 5, 6, [{"a": 10, "b": 11}], {"a": 20, "b": 21}, 10, 11, 20, 21]');
 
   t('join([{"a": 1}, {"a": 2}, {"a": 3}] / a)', '1 2 3');
   f('join([{"a": 1}, {"a": 2}, {"a": 3}, 80, 90] / a)', 'pxp:JSON');
@@ -2593,7 +2593,7 @@ begin
   t('join($obj / a)', '123');
   t('$obj.a := 456', '456');
   t('join($obj / a)', '456');
-  t('$obj.a := {"b": 7}', '');
+  t('($obj.a := {"b": 7})[0]', '');
   t('serialize-json($obj / a)', '{"b": 7}');
   t('serialize-json($obj // b)', '7');
   t('$obj.a := 8', '8');
@@ -2721,7 +2721,7 @@ begin
     f('serialize-json(jn:object(({"a": 1}, {"b": 2}, {"a": 3})))', 'jerr:JNDY0003');
 
     //Tests based on examples in the JSONiq spec
-    t('if (jn:null()) then "T" else "F"', 'F');
+(*    t('if (jn:null()) then "T" else "F"', 'F');
     t('if ({}) then "T" else "F"', 'T');
     t('if ({ "foo": false } ) then "T" else "F"', 'T');
     t('if ( { "foo": 3, "bar":4 }) then "T" else "F"', 'T');
@@ -2731,6 +2731,11 @@ begin
     t('if ( [null] ) then "T" else "F"', 'T');
     t('if ( [] ) then "T" else "F"', 'T');
     t('if (()) then "T" else "F"', 'F');
+    t('([]) and true()', 'true');
+    t('({}) and true()', 'true');
+    t('([], 1) and true()', 'true');
+    t('({}, 2) and true()', 'true');
+    todo FORG0006*)
 
     t('() + 1', '');
     f('null + 1', 'err:XPTY0004');
@@ -4281,10 +4286,6 @@ begin
   t('(xs:untypedAtomic("s")) and true()', 'true');
   t('(xs:anyURI("d")) and true()', 'true');
   if UsingFLRE then   t('(xs:NCName("e")) and true()', 'true');
-  t('([]) and true()', 'true');
-  t('({}) and true()', 'true');
-  t('([], 1) and true()', 'true');
-  t('({}, 2) and true()', 'true');
   t('(jn:null()) and true()', 'false');
   f('(xs:string("a"), 1) and true()', 'err:FORG0006');
   f('(xs:string("a"), 1) and true()', 'err:FORG0006');
