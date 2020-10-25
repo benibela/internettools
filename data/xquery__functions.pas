@@ -1088,8 +1088,8 @@ end;
 function xqFunctionString(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if argc <> 1 then result := xqvalue(context.SeqValueAsString)
-  else begin
-    if args[0].kind = pvkFunction then begin raiseXQEvaluationError('FOTY0014', 'Cannot pass function item to fn:string', args[0]); result := nil; end
+  else case args[0].kind of
+    pvkFunction, pvkArray: begin raiseXQEvaluationError('FOTY0014', 'Cannot pass function item to fn:string', args[0]); result := nil; end;
     else result := xqvalue(args[0].toString);
   end;
 end;
