@@ -665,6 +665,7 @@ type
     class function hash(const v: IXQValue): uint32; static;
     class function equal(const v, w: IXQValue): boolean; static;
     class function isStringKeyLike(const v: TXQValue): boolean; static;
+    class function isAtomicKeyValue(const v: IXQValue): boolean; static; inline;
   end;
 
   TXQHashmapStrOwningXQValue = specialize TXQHashmapStrOwning<TXQValue, TXQValueOwnershipTracker>;
@@ -1167,6 +1168,7 @@ type
 
     function Size: SizeInt; override;
     function getPropertyKeyKind: TXQMapPropertyKeyKind; override;
+    function findKeyValuePair(const key: IXQValue): TXQHashmapXQValue.TKeyValuePairOption;
     function hasProperty(const name: string; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function hasProperty(const key: IXQValue; value: PXQValue): boolean; override; //**< Checks if the object (or its prototype) has a certain property, and returns the property value directly (i.e. changing value^ will change the value stored in the object). @br (You can pass nil for value, if you don't need the value)
     function getProperty(const name: string): IXQValue; override; //**< Returns the value of a property
@@ -2158,9 +2160,6 @@ type
     function getContextDependencies: TXQContextDependencies; override;
   end;
 
-  { TXQDynamicFunctionCall }
-
-  { TXQTermDynamicFunctionCall }
 
   TXQTermDynamicFunctionCall = class (TXQTermWithChildren)
     constructor create(func: TXQTerm = nil; arg: TXQTerm = nil);
@@ -5087,6 +5086,15 @@ class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): bool
 begin
   result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
 end;
+
+class function TXQValueOwnershipTracker.isAtomicKeyValue(const v: IXQValue): boolean;
+begin
+  case v.kind of
+    pvkSequence, pvkNode, pvkArray, pvkFunction, pvkObject, pvkUndefined: result := false;
+    else result := true;
+  end;
+end;
+
 {$ImplicitExceptions on}
 
 

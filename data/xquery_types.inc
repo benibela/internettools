@@ -282,7 +282,7 @@ end;
 
 function TXQValue.setImmutable(const name, value: IXQValue): TXQValueMapLike;
 begin
-  result := setImmutable(name.toString, value);
+  result := setImmutable(name.toString, value); //todo setting non-string key should work on string maps (e.g. map:put on empty map)
 end;
 
 function TXQValue.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
@@ -2948,6 +2948,18 @@ begin
   Result:=xqmpkkStandardKeys;
 end;
 
+function TXQValueStandardMap.findKeyValuePair(const key: IXQValue): TXQHashmapXQValue.TKeyValuePairOption;
+  function getAtomized: TXQHashmapXQValue.TKeyValuePairOption;
+  begin
+    result := mapdata.findKeyValuePair(xqvalueAtomize(key))
+  end;
+begin
+  if TXQValueOwnershipTracker.isAtomicKeyValue(key) then
+    result := mapdata.findKeyValuePair(key)
+   else
+    result := getAtomized
+end;
+
 function TXQValueStandardMap.hasProperty(const name: string; value: PXQValue): boolean;
 begin
   result := hasProperty(xqvalue(name), value);
@@ -2963,7 +2975,7 @@ function TXQValueStandardMap.hasProperty(const key: IXQValue; value: PXQValue): 
 var
   p: TXQHashmapXQValue.TKeyValuePairOption;
 begin
-  p := mapdata.findKeyValuePair(key);
+  p := findKeyValuePair(key);
   result := p.isAssigned;
   if result and assigned(value) then value^ := p.value;
 end;
@@ -2972,7 +2984,7 @@ function TXQValueStandardMap.getProperty(const key: IXQValue): IXQValue;
 var
   p: TXQHashmapXQValue.TKeyValuePairOption;
 begin
-  p := mapdata.findKeyValuePair(key);
+  p := findKeyValuePair(key);
   if p.isAssigned then result := p.value
   else result := xqvalue();
 end;
@@ -3044,8 +3056,19 @@ begin
 end;
 
 procedure TXQValueStandardMap.setMutable(const key: IXQValue; const v: IXQValue);
+  procedure setAtomized;
+  var temp: IXQValue;
+  begin
+    temp := xqvalueAtomize(key);
+    if temp.getSequenceCount <> 1 then raiseXPTY0004TypeError(key, 'map key');
+    mapdata.include(temp, v.toValue);
+  end;
+
 begin
-  mapdata.include(key, v.toValue);
+  if TXQValueOwnershipTracker.isAtomicKeyValue(key) then
+    mapdata.include(key, v.toValue)
+   else
+    setAtomized;
 end;
 
 function TXQValueStandardMap.setImmutable(const name, value: IXQValue): TXQValueMapLike;
