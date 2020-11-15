@@ -2497,7 +2497,6 @@ begin
 end;
 
 
-
 class function TXQValueMapLike.classKind: TXQValueKind;
 begin
   Result:=pvkObject;
@@ -2506,20 +2505,21 @@ end;
 function TXQValueMapLike.toBooleanEffective: boolean;
 begin
   Result:=true;
-  //xpath 3.1:
-  //todo
-  raise EXQEvaluationException.create('FORG0006', 'Object cannot be used as boolean', nil, self);
+  if not globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion then
+    raise EXQEvaluationException.create('FORG0006', 'Object cannot be used as boolean', nil, self);
 end;
 
 function TXQValueMapLike.toString: string;
 begin
   Result:=inherited toString;
-  raise EXQEvaluationException.create('FOTY0014', 'Object cannot be used as string', nil, self);
+  if not globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion then
+    raise EXQEvaluationException.create('FOTY0014', 'Object cannot be used as string', nil, self);
 end;
 
 function TXQValueMapLike.toJoinedString(const sep: string): string;
 begin
-  raise EXQEvaluationException.create('FOTY0013', 'Object cannot be used as string', nil, self); //0013 because it is implicitly calling fn:data
+  if not globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion then
+    raise EXQEvaluationException.create('FOTY0013', 'Object cannot be used as string', nil, self); //0013 because it is implicitly calling fn:data
   Result:=inherited toJoinedString(sep);
 end;
 
@@ -3180,7 +3180,8 @@ end;
 function TXQValueJSONArray.toBooleanEffective: boolean;
 begin
   result := true;
-  raise EXQEvaluationException.create('FORG0006', 'Array cannot be used as boolean', nil, self);
+  if not globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion then
+    raise EXQEvaluationException.create('FORG0006', 'Array cannot be used as boolean', nil, self);
 end;
 
 function TXQValueJSONArray.toString: string;
