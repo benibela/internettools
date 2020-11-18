@@ -6515,6 +6515,7 @@ begin
     result.strictTypeChecking:=strictTypeChecking;
     Result.useLocalNamespaces:=useLocalNamespaces;
     result.jsonPXPExtensions := jsonPXPExtensions;
+    result.AllowJSONiqBooleanStringConversion := AllowJSONiqBooleanStringConversion;
     if decimalNumberFormats <> nil then begin
       result.decimalNumberFormats:= TFPList.Create;
       for i := 0 to decimalNumberFormats.Count - 1 do
@@ -8037,6 +8038,7 @@ begin
   if AllowJSONDefaultInternal then begin
     DefaultJSONParser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
     StaticContext.AllowJSONiqBooleanStringConversion := true;
+    globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion := true;
   end;
 end;
 
