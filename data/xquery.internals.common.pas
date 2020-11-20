@@ -148,6 +148,10 @@ type
     function getEnumerator: TKeyPairEnumerator;
   end;
 
+  generic TXQBaseHashmapValuePointerLike<TKey, TValue, TKeyInfo> = object(specialize TXQBaseHashmapValuePointerLikeReadOnly<TKey, TValue, TKeyInfo>)
+    procedure include(const Key: TKey; const aValue: TValue; allowOverride: boolean=true);
+  end;
+
   generic TXQBaseHashmapValuePointerLikeOwning<TKey, TValue, TKeyInfo, TValueOwnershipTracker> = object(specialize TXQBaseHashmapValuePointerLikeReadOnly<TKey, TValue, TKeyInfo>)
   type PXQBaseHashmapValuePointerLikeOwning = ^TXQBaseHashmapValuePointerLikeOwning;
   protected
@@ -362,6 +366,7 @@ const
 
 implementation
 uses math;
+
 
 class function TXQCompareResultHelper.fromIntegerResult(i: integer): TXQCompareResult;
 begin
@@ -977,6 +982,12 @@ end;
 
 //default maps
 
+procedure TXQBaseHashmapValuePointerLike.include(const Key: TKey; const aValue: TValue; allowOverride: boolean);
+begin
+  inherited include(key, pointer(avalue), allowOverride);
+end;
+
+
 {procedure TXQHashmapStr.SetValue(const Key: string; const AValue: TValue);
 begin
   SetBaseValue(key, pointer(avalue));
@@ -1011,6 +1022,7 @@ procedure TXQBaseHashmapValuePointerLikeOwning.SetValue(const Key: TKey; const A
 begin
   include(key, avalue, true);
 end;
+
 
 procedure TXQBaseHashmapValuePointerLikeOwning.clear;
 var
