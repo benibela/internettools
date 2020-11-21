@@ -4361,14 +4361,18 @@ begin
         end;
         for i:= 0 to high(children) do
           TTreeAttribute(tree).realvalue := TTreeAttribute(tree).realvalue + valueToString(children[i].evaluate(context));
-        if (typ = tetNamespace) or ( (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) ) then begin
+        if (typ = tetNamespace)
+            or ( (tree.namespace <> nil) and (tree.value = 'id') and (tree.namespace.getURL = XMLNamespaceUrl_XML) ) then begin
           TTreeAttribute(tree).realvalue := strTrimAndNormalize(TTreeAttribute(tree).realvalue);
-          if typ = tetNamespace then
+          if typ = tetNamespace then begin
             if ((tree.value = 'xml') <> (TTreeAttribute(tree).realvalue = XMLNamespaceUrl_XML)) or
                (tree.value = 'xmlns') or
                (TTreeAttribute(tree).realvalue = XMLNamespaceUrl_XMLNS) or
                (TTreeAttribute(tree).realvalue = '') then
                  raise EXQEvaluationException.create('XQDY0101', 'Invalid namespace binding');
+          end else
+            if not isValidNCName(TTreeAttribute(tree).realvalue) then
+              raise EXQEvaluationException.create('XQDY0091', 'Invalid xml:id');
         end;
       end;
       tetOpen, tetDocument: begin
