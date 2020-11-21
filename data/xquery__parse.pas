@@ -1016,7 +1016,12 @@ begin
 end;
 
 function TXQParsingContext.nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
-const NONCNAME = (SYMBOLS + START_SYMBOLS + WHITE_SPACE - ['*']);
+  procedure wildCardError;
+  begin
+    raiseSyntaxError('Expected QName, got wildcards: '+prefix+':'+localpart);
+  end;
+
+const NCNAMEStartByte = ['A'..'Z', '_', 'a'..'z', #$C3..#$CB, #$CD..#$ED,#$EF..#$F3];
 var
   marker: PChar;
 begin
@@ -1044,19 +1049,35 @@ begin
       localpart := nextTokenNCName();
     end;
     result := xqnmURL;
-  end else if (pos^ = ':') and not ((pos+1)^ in NONCNAME) then begin //same check in parseValue for matchers
-    expect(':');
-    prefix := localpart;
-    if pos^ <> '*' then localpart := nextTokenNCName()
-    else localpart := nextToken();
-    if prefix = '*' then
-      result := xqnmNone;
-  end else begin
-    url := '';
-    prefix := '';
-    if allowWildcards and (localpart = '*') then result := xqnmNone;
+    exit;
+  end else if pos^ = ':' then begin
+    if ((pos+1)^ in NCNAMEStartByte) then begin //same check in parseValue for matchers
+      inc(pos);
+      prefix := localpart;
+      localpart := nextTokenNCName();
+      if prefix = '*' then begin           // case *:name
+        result := xqnmNone;
+        if not allowWildcards then wildCardError;
+      end;                             //else case prefix:name
+      exit;
+    end else if (pos+1)^ = '*' then begin
+      if localpart <> '*' then begin      //  case prefix:*
+        inc(pos);
+        prefix := localpart;
+        localpart := nextToken();
+        if not allowWildcards then wildCardError;
+        exit;
+      end else result := xqnmNone;        //  invalid *:*
+    end else begin                        //  name:21            (e.g. in map {name:21} )
+    end;
   end;
-  if (not allowWildcards) and ((result = xqnmNone) or (localpart = '*')) then raiseSyntaxError('Expected QName, got wildcards: '+prefix+':'+localpart);
+  //no relevant colon found
+  url := '';
+  prefix := '';
+  if localpart = '*' then begin
+    result := xqnmNone;
+    if not allowWildcards then wildCardError;
+  end;
 end;
 
 function TXQParsingContext.parsePendingEQName(pending: TXQTermPendingEQNameTokenPending): TXQTermPendingEQNameToken;

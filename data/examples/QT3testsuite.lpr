@@ -247,7 +247,7 @@ var
   f: TTreeNode;
   v: IXQValue;
 begin
-  for v in xq.parseQuery('./*:*', xqpmXPath2).evaluate(e) do begin
+  for v in xq.parseQuery('./*', xqpmXPath2).evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'all-of', 'any-of', 'not': begin
@@ -1067,7 +1067,7 @@ begin
 
   name := e['name'];
   coversName := e['covers'];
-  for v in xq.parseQuery('./*:*', xqpmXPath2).evaluate(e) do begin
+  for v in xq.parseQuery('./*', xqpmXPath2).evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'description', 'created', 'modified': ;
@@ -1354,7 +1354,7 @@ begin
 
   name := e['name'];
   coversName := e['covers'];
-  for v in xq.parseQuery('./*:*', xqpmXPath2).evaluate(e) do begin
+  for v in xq.parseQuery('./*', xqpmXPath2).evaluate(e) do begin
     f := v.toNode;
     case f.value of
       'description': ;
@@ -1744,7 +1744,7 @@ begin
     xq.ImplicitTimezoneInMinutes := -GetLocalTimeOffset;
   end;
   basePath := strBeforeLast(cat.documentURI,'/');
-  for v in xq.parseQuery('/*:catalog/*:*', xqpmXPath2).evaluate(cat) do begin
+  for v in xq.parseQuery('/*:catalog/*', xqpmXPath2).evaluate(cat) do begin
     e :=  v.toNode;
     case e.value of
       'environment': //environments.AddObject(e['name'], TEnvironment.load(e));
