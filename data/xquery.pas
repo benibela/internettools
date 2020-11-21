@@ -217,7 +217,7 @@ type
     strictTypeChecking: boolean;  //**< Activates strict type checking. If enabled, things like "2" + 3 raise an exception, otherwise it is evaluated to 5. Does not affect *correct* queries (and it makes it slower, so there is no reason to enable this option unless you need compatibility to other interpreters)
     useLocalNamespaces: boolean;  //**< When a statically unknown namespace is encountered in a matching expression it is resolved using the in-scope-namespaces of the possible matching elements
     jsonPXPExtensions: boolean; //**< Allows further json extensions, going beyond jsoniq (especially child and descendant axis test matching object properties) (for dot operator, see TXQParsingOptions) (default is true)
-    AllowJSONiqBooleanStringConversion: boolean;
+    AllowJSONiqOperations: boolean; //**< Allows implicit casting of objects/arrays to boolean/string.
 
     model: TXQParsingModel;
 
@@ -3412,7 +3412,7 @@ var
   const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
 
 threadvar globalCurrentQueryInfo: record
-  AllowJSONiqBooleanStringConversion: boolean;
+  AllowJSONiqOperations: boolean;
 end;
 
 
@@ -6515,7 +6515,7 @@ begin
     result.strictTypeChecking:=strictTypeChecking;
     Result.useLocalNamespaces:=useLocalNamespaces;
     result.jsonPXPExtensions := jsonPXPExtensions;
-    result.AllowJSONiqBooleanStringConversion := AllowJSONiqBooleanStringConversion;
+    result.AllowJSONiqOperations := AllowJSONiqOperations;
     if decimalNumberFormats <> nil then begin
       result.decimalNumberFormats:= TFPList.Create;
       for i := 0 to decimalNumberFormats.Count - 1 do
@@ -7269,11 +7269,11 @@ end;
 function TXQuery.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   stackSize: Integer;
-  oldAllowJSONiqBooleanStringConversion: Boolean;
+  oldAllowJSONiqOperations: Boolean;
 begin
   if fterm = nil then exit(xqvalue());
   stackSize := context.temporaryVariables.Count;
-  oldAllowJSONiqBooleanStringConversion := globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion;
+  oldAllowJSONiqOperations := globalCurrentQueryInfo.AllowJSONiqOperations;
   try
     if (context.staticContext <> nil) and (staticContext.importedModules = nil) and not objInheritsFrom(fterm, TXQTermModule) then begin
       //fast track. also we want to use the functions declared in the old static context
@@ -7283,10 +7283,10 @@ begin
       staticContext.temporaryNodes.release;
       staticContext.temporaryNodes := nil;
     end;
-    globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion := staticContext.AllowJSONiqBooleanStringConversion;
+    globalCurrentQueryInfo.AllowJSONiqOperations := staticContext.AllowJSONiqOperations;
     result := fterm.evaluate(context);
   finally
-    globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion := oldAllowJSONiqBooleanStringConversion;
+    globalCurrentQueryInfo.AllowJSONiqOperations := oldAllowJSONiqOperations;
     context.temporaryVariables.popTo(stackSize);
   end;
 end;
@@ -8037,8 +8037,8 @@ begin
   DefaultJSONParser.init;
   if AllowJSONDefaultInternal then begin
     DefaultJSONParser.options := [jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoJSONiq];
-    StaticContext.AllowJSONiqBooleanStringConversion := true;
-    globalCurrentQueryInfo.AllowJSONiqBooleanStringConversion := true;
+    StaticContext.AllowJSONiqOperations := true;
+    globalCurrentQueryInfo.AllowJSONiqOperations := true;
   end;
 end;
 
