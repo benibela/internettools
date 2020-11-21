@@ -58,6 +58,7 @@ type
     class function equal(const key1, key2: string): boolean; static;
   end;
   TXQVoid = record end;
+  TXQHashMapCellArray = array of int32;
   {** Hashmap based on Bero's FLRECacheHashMap
 
       TXQHashmapStrOwning, e.g. TXQHashmapStrStr
@@ -83,13 +84,14 @@ type
     //if a cell with key = Key exists, return that cell; otherwise return empty cell at expected position
     function findCell(const Key: TKey): UInt32; inline;
     function findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32;
+    function findEmptyCell(const Key: TKey): UInt32; inline;
     procedure grow;
   protected
   {$if FPC_FULLVERSION <= 30004} public{$endif}
     LogSize: int32;
     Size: int32;
     Entities:array of THashMapEntity;
-    CellToEntityIndex: array of int32;
+    CellToEntityIndex: TXQHashMapCellArray;
     function getBaseValueOrDefault(const Key:TKey):TBaseValue;
     procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
     function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
@@ -340,7 +342,10 @@ function nodeNameHash(const s: RawByteString): cardinal;
 function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
 function nodeNameHash(p: pchar; len: sizeint): cardinal; inline;
 
-function calcCellCandidate(logsize: int32; hashcode: TXQHashCode; out mask, step: uint32): uint32; inline;
+type THashMapHelper = record
+  class function calcCellCandidate(logsize: int32; hashcode: TXQHashCode; out mask, step: uint32): uint32; inline; static;
+  class function findEmptyCellWithHash(const cells: TXQHashMapCellArray; logsize: int32; hashcode: TXQHashCode): UInt32; static;
+end;
 
 
 type  TRaiseXQEvaluationExceptionCallback = procedure (const code, message: string);
@@ -366,6 +371,7 @@ const
 
 implementation
 uses math;
+
 
 
 class function TXQCompareResultHelper.fromIntegerResult(i: integer): TXQCompareResult;
@@ -518,16 +524,35 @@ begin
 end;
 
 
-function TXQBaseHashmap.findCell(const key: TKey): UInt32;
+function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
 begin
   result := findCellWithHash(key, TInfo.hash(key));
 end;
 
-function calcCellCandidate(logsize: int32; hashcode: TXQHashCode; out mask, step: uint32): uint32; inline;
+class function THashMapHelper.calcCellCandidate(logsize: int32; hashcode: TXQHashCode; out mask, step: uint32): uint32;
 begin
-  result:=HashCode shr (32-LogSize);
-  Mask:=(2 shl LogSize)-1;
-  Step:=((HashCode shl 1)+1) and Mask;
+ result:=HashCode shr (32-LogSize);
+ Mask:=(2 shl LogSize)-1;
+ Step:=((HashCode shl 1)+1) and Mask;
+end;
+
+class function THashMapHelper.findEmptyCellWithHash(const cells: TXQHashMapCellArray; logsize: int32; hashcode: TXQHashCode): UInt32;
+var Mask,Step:uint32;
+    Entity:int32;
+begin
+ if LogSize<>0 then begin
+   result := calcCellCandidate(LogSize, hashcode, mask, step);
+ end else begin
+  result:=0;
+  exit
+ end;
+ repeat
+  Entity:=cells[result];
+  if (Entity=ENT_EMPTY) then begin
+   exit;
+  end;
+  result:=(result+Step) and Mask;
+ until false;
 end;
 
 function TXQBaseHashmap.findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32;
@@ -535,7 +560,7 @@ var Mask,Step:uint32;
     Entity:int32;
 begin
  if LogSize<>0 then begin
-   result := calcCellCandidate(LogSize, hashcode, mask, step);
+   result := THashMapHelper.calcCellCandidate(LogSize, hashcode, mask, step);
  end else begin
   result:=0;
   exit
@@ -548,6 +573,12 @@ begin
   result:=(result+Step) and Mask;
  until false;
 end;
+
+function TXQBaseHashmap.findEmptyCell(const Key: TKey): UInt32;
+begin
+  result := THashMapHelper.findEmptyCellWithHash(CellToEntityIndex, LogSize, TInfo.hash(key));
+end;
+
 
 procedure TXQBaseHashmap.grow;
 var NewLogSize,NewSize,OldSize,Counter, Entity:int32;
@@ -577,7 +608,7 @@ begin
  for Counter:=0 to OldSize-1 do
   with Entities[counter] do begin
    {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}if not tinfo.isKeyDeleted(@Key) then begin{$endif}
-     Cell := FindCell(Key);
+     Cell := findEmptyCell(Key);
      CellToEntityIndex[Cell]:=Entity;
      {$ifdef HASHMAP_SUPPORTS_MARKING_DELETIONS}
      if Entity <> Counter then begin
@@ -898,7 +929,7 @@ var Mask,Step:uint32;
     Entity:int32;
 begin
  if LogSize<>0 then begin
-   result := calcCellCandidate(LogSize, hashcode, mask, step);
+   result := THashMapHelper.calcCellCandidate(LogSize, hashcode, mask, step);
  end else begin
   result:=0;
   exit
