@@ -3000,6 +3000,7 @@ var
   resultSeq: TXQVList;
   v: PIXQValue;
   funcref: TXQValueFunction;
+  numindex: Int64;
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -3045,8 +3046,17 @@ begin
   for v in func.GetEnumeratorPtrUnsafe do
     case v^.kind of
       pvkArray: begin
-        if (index.toInt64 < 1) or (index.toInt64 > (v^ as TXQValueJSONArray).seq.Count) then continue;
-        resultSeq.add((v^ as TXQValueJSONArray).seq[index.toInt64-1]);
+        if (index.kind <> pvkInt64) and (context.staticContext.strictTypeChecking) then begin
+          if not (index.instanceOf(baseSchema.integer) or (index.kind = pvkNode) or (index.instanceOf(baseSchema.untypedAtomic))) then
+            raiseTypeError0004('Expected integer index', index)
+        end;
+        numindex := index.toInt64;
+        if (numindex < 1) or (numindex > (v^ as TXQValueJSONArray).seq.Count) then begin
+          if not context.staticContext.AllowJSONiqOperations then
+            raiseEvaluationError('FOAY0001', 'Array index out of range');
+          continue;
+        end;
+        resultSeq.add((v^ as TXQValueJSONArray).seq[numindex-1]);
       end;
       pvkObject: begin
         resultSeq.add(v^.getProperty(index));
