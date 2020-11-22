@@ -1066,6 +1066,21 @@ begin
   result := strDecodeUTF8Character(temp, pend)
 end;
 
+procedure TUTF8StringCodePointBlockEnumerator.mark;
+begin
+  markedPos := p;
+end;
+
+procedure TUTF8StringCodePointBlockEnumerator.markNext;
+begin
+  markedPos := p + FCurrentByteLength;
+end;
+
+function TUTF8StringCodePointBlockEnumerator.markedByteLength: SizeInt;
+begin
+  result := p - markedPos;
+end;
+
 
 procedure TUTF8StringCodePointBlockEnumerator.init(const s: string);
 begin
@@ -1109,20 +1124,6 @@ begin
   result.FCurrentByteLength:=0;
 end;
 
-procedure TUTF8StringCodePointBlockEnumerator.mark;
-begin
-  markedPos := p;
-end;
-
-procedure TUTF8StringCodePointBlockEnumerator.markNext;
-begin
-  markedPos := p + FCurrentByteLength;
-end;
-
-function TUTF8StringCodePointBlockEnumerator.markedByteLength: SizeInt;
-begin
-  result := p - markedPos;
-end;
 
 
 procedure TStrBuilder.appendWithEncodingConversion(const s: RawByteString);
