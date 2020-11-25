@@ -1438,7 +1438,7 @@ begin
   t('<a><b><c/></b><x/><y/></a> //c/ (for $i in 1 to 3 return (name((ancestor::*)[$i])))', 'a b ');
 
   t('outer-xml(<a xml:id="foobar"/>)', '<a xml:id="foobar"/>');
-  t('outer-xml(<a>{attribute {QName("'+XMLNamespaceUrl_XML+'", "id")} {123}}</a>)', '<a xml:id="123"/>');
+  t('outer-xml(<a>{attribute {QName("'+XMLNamespaceUrl_XML+'", "id")} {"x123"}}</a>)', '<a xml:id="x123"/>');
 
   m('declare base-uri "http://example.org"; base-uri(document { element a {1} })', 'http://example.org');
   m('declare base-uri "http://example.org"; base-uri(element a {1} )', 'http://example.org');
@@ -1611,8 +1611,8 @@ begin
   m('outer-xml(<a>&#x9;&#xA;&#xD;&#x85;&#x2028;</a>)', '<a>'#9#10'&#xD;&#x85;&#x2028;</a>');
   m('outer-xml(<a x="foobar&#x9;&#xA;&#xD;&#x85;&#x2028;"/>)', '<a x="foobar&#x9;&#xA;&#xD;&#x85;&#x2028;"/>');
 
-  t('outer-xml(<a id="  a  b "/>)', '<a id="  a  b "/>');
-  t('outer-xml(<a xml:id="  a  b "/>)', '<a xml:id="a b"/>');
+  t('outer-xml(<a id="  axxb "/>)', '<a id="  axxb "/>');
+  t('outer-xml(<a xml:id="  axxb "/>)', '<a xml:id="axxb"/>');
   t('(text {""}, text {""}, text {""}, comment {()}) /(position())', '1 2 3 4');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / @test:test', '123');
   m('declare namespace test = "foobar"; <a xmlns:test="foobar" test:test="123"/> / namespace-uri(@test:test)', 'foobar');

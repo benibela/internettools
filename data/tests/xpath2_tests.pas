@@ -2500,10 +2500,10 @@ begin
   t('for $f in "foo" return join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" }).$f)', 'bar bar2'); //test based on jsoniq standard
   t('join(({ "foo" : "bar" }, { "foo" : "bar2" }, { "bar" : "foo" }).foo)', 'bar bar2'); //test from jsoniq standard
 
-  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" })("foo"))', 'bar'); //test based on jsoniq standard
-  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" })."foo")', 'bar'); //test based on jsoniq standard
-  t('for $f in "foo" return join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).$f)', 'bar'); //test based on jsoniq standard
-  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).foo)', 'bar'); //test from jsoniq standard
+//  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" })("foo"))', 'bar'); //test based on jsoniq standard
+//  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" })."foo")', 'bar'); //test based on jsoniq standard
+//  t('for $f in "foo" return join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).$f)', 'bar'); //test based on jsoniq standard
+//  t('join(({ "foo" : "bar" }, [ "foo" , "bar2" ], { "bar" : "foo" }).foo)', 'bar'); //test from jsoniq standard
 
   //t('(17).abc', '');
 
