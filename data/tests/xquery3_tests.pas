@@ -400,6 +400,15 @@ begin
   m('outer-xml($test-doc!transform(function($x) { if ($x/@id eq "foo") then <a id="foo" href=".."/> else if ($x instance of comment()) then () else $x  }))', '<r> <a id="foo" href=".."/> <span class="bar"><a class="foo" href="index.html">...</a></span>  </r>');
   //that is not working because and is not shortcutted TODO m('outer-xml($test-doc!transform(function($x) { if ($x instance of text()) then normalize-space($x) else $x  }))', '<r><a id="foo">text</a><span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span></r>');
 
+  m('x:replace-nodes(<a x="y">b</a>, function($x) { if ($x instance of text()) then "foo" else $x  }) ! outer-xml(.)', '<a x="y">b</a>');
+  m('x:replace-nodes(<a x="y">b</a>/text(), function($x) { if ($x instance of text()) then "foo" else $x  }) ! outer-xml(.)', '<a x="y">foo</a>');
+  m('x:replace-nodes(<a x="y">b</a>/*, function($x) { if ($x instance of text()) then "foo" else $x  }) ! outer-xml(.)', '');
+  m('x:replace-nodes(<a x="y">b</a>/text(), 1 to 3) ! outer-xml(.)', '<a x="y">1 2 3</a>');
+  m('x:replace-nodes(<a x="y">b</a>/text(), ()) ! outer-xml(.)', '<a x="y"/>');
+  m('x:replace-nodes(<a x="y">b<z/>c</a>/text(), "T") ! outer-xml(.)', '<a x="y">T<z/>T</a>');
+  m('x:replace-nodes(<a x="y">b<z/>c</a>/*, "T") ! outer-xml(.)', '<a x="y">bTc</a>');
+  m('x:replace-nodes(<a x="y">b<z/>c</a>/text(), function ($t) { upper-case($t) } ) ! outer-xml(.)', '<a x="y">B<z/>C</a>');
+
   //serialization
   m('serialize(<abc>123</abc>)', '<abc>123</abc>');
   m('serialize((<abc>123&amp;</abc>, text { "foobar"} , <t/>, 1 to 3, "foo", <end/>))', '<abc>123&amp;</abc>foobar<t/>1 2 3 foo<end/>');

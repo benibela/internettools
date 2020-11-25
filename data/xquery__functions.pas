@@ -7435,6 +7435,10 @@ transform
   pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
   pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
+  x.registerInterpretedFunction('replace-nodes', '($nodes as item()*, $replacement as item()*) as item()*', 'pxp:transform(root($nodes[1]), function($i) {' +
+    ' if ($nodes[. is $i]) then if ($replacement instance of function(*)) then $replacement($i) else $replacement else $i'+
+  '})');
+
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
 
