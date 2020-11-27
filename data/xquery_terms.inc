@@ -328,7 +328,7 @@ var
 begin
   if unary then begin
     source := context.SeqValue;
-    if source = nil then raiseTypeError0004('No context item');
+    if source = nil then raiseXQEvaluationException('XPDY0002', 'No context item');
   end else source := children[0].evaluate(context);
   keys := nil;
   if mode = xqtjlmParenthesized then keys := xqvalueAtomize(children[high(children)].evaluate(context));
