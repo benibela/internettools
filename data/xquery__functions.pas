@@ -7043,8 +7043,8 @@ begin
         case pv^.getPropertyKeyKind of
           xqmpkkStandardKeys: begin
             for mp in pv^.getEnumeratorPropertiesUnsafe do begin
-              if TXQValueOwnershipTracker.equal(mp.key, key) then outseq.addInArray(mp.Value)
-              else mapFind(outseq, key, mp.Value);
+              if TXQValueOwnershipTracker.equal(mp.key, key) then outseq.addInArray(mp.Value);
+              mapFind(outseq, key, mp.Value);
             end;
           end;
           xqmpkkStringKeys: begin
@@ -7052,8 +7052,8 @@ begin
             if isStringKey then
               skey := key.toString;
             for smp in pv^.getEnumeratorStringPropertiesUnsafe do begin
-              if isStringKey and ( smp.key = skey) then outseq.addInArray(smp.Value)
-              else mapFind(outseq, key, smp.Value);
+              if isStringKey and ( smp.key = skey) then outseq.addInArray(smp.Value);
+              mapFind(outseq, key, smp.Value);
             end;
           end;
         end;
