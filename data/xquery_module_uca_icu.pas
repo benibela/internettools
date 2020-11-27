@@ -55,15 +55,15 @@ procedure registerModuleUCAICU;
 
 implementation
 
-uses bbutils;
+uses bbutils, xquery.internals.common;
 
 //based on FPC cwstring
 type
-  UErrorCode = SizeInt;
   int32_t = longint;
   PUCollator = pointer;
   PUStringSearch = pointer;
 //Dynamic loading of libicu
+  UErrorCode = int32_t;
 var
   hlibICU: TLibHandle = 0;
   hlibICUi18n: TLibHandle = 0;
@@ -246,22 +246,6 @@ begin
   Result:=True;
 end;
 
-//collation wrapper around libicu
-//indices are 1-based
-type TXQCollationUCAICU = class(TXQCollation)
-  col: PUCollator;
-  constructor Create(const aid: string; acol: PUCollator);
-  function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
-  function find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean; override;
-  function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
-  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
-  function key(s: string): string; override;
-protected
-  function ucol_compare(a,b: pansichar; len1, len2: SizeInt): integer;
-  function doCompare(a,b: pansichar; len: SizeInt): integer; override;
-  function doCompare(const a, b: string): integer; override;
-end;
-
 //helper wrapper around libicu search
 //indices are 0-based
 type TUColStringSearch = object
@@ -279,6 +263,24 @@ protected
   function countUtf8Bytes(endBefore: SizeInt): SizeInt;
   function countUtf8Bytes(from, endBefore: SizeInt): SizeInt;
 end;
+
+//collation wrapper around libicu
+//indices are 1-based
+type TXQCollationUCAICU = class(TXQCollation)
+  col: PUCollator;
+  constructor Create(const aid: string; acol: PUCollator);
+  function indexOf(const strToBeExaminated, searched: string): SizeInt; override;
+  function find(const strToBeExaminated, searched: string; out matchStart, matchLength: SizeInt): boolean; override;
+  function startsWith(const strToBeExaminated, expectedStart: string): boolean; override;
+  function endsWith(const strToBeExaminated, expectedEnd: string): boolean; override;
+  function key(s: string): string; override;
+protected
+  procedure makeSearch(out searcher: TUColStringSearch; const strToBeExaminated, searched: string);
+  function ucol_compare(a,b: pansichar; len1, len2: SizeInt): integer;
+  function doCompare(a,b: pansichar; len: SizeInt): integer; override;
+  function doCompare(const a, b: string): integer; override;
+end;
+
 
 constructor TUColStringSearch.open(pattern, text: string; acol: PUCollator);
 begin
@@ -358,7 +360,7 @@ end;
 function TXQCollationUCAICU.indexOf(const strToBeExaminated, searched: string): SizeInt;
 var search: TUColStringSearch;
 begin
-  search.open(searched, strToBeExaminated, col);
+  makeSearch(search, strToBeExaminated, searched);
   result := search.firstUtf8 + 1;
   search.close();
 end;
@@ -367,7 +369,7 @@ function TXQCollationUCAICU.find(const strToBeExaminated, searched: string; out 
 var search: TUColStringSearch;
   matchStartUtf16: int32_t;
 begin
-  search.open(searched, strToBeExaminated, col);
+  makeSearch(search, strToBeExaminated, searched);
   matchStartUtf16 := search.firstUtf16;
   result := matchStartUtf16 >= 0;
   if result then begin
@@ -393,7 +395,7 @@ function TXQCollationUCAICU.endsWith(const strToBeExaminated, expectedEnd: strin
 var search: TUColStringSearch;
   i: int32_t;
 begin
-  search.open(expectedEnd, strToBeExaminated, col);
+  makeSearch(search, strToBeExaminated, expectedEnd);
   i := search.lastUtf16;
   if i = -1 {USEARCH_DONE} then exit(false);
   i += search.getMatchedLengthUtf16;
@@ -417,6 +419,13 @@ begin
   end else if len > 0 then SetLength(result, len - 1);
   //writeln('Sort key: "', result, '" for ', temp);
   //writeln('using '+id);
+end;
+
+procedure TXQCollationUCAICU.makeSearch(out searcher: TUColStringSearch; const strToBeExaminated, searched: string);
+begin
+  searcher.open(searched, strToBeExaminated, col);
+  if searcher.error > 0 then
+    raiseXQEvaluationException('FOCH0004', 'Collation '+id+' does not support search, error code: '+inttostr(searcher.error));
 end;
 
 function TXQCollationUCAICU.ucol_compare(a, b: pansichar; len1, len2: SizeInt): integer;
