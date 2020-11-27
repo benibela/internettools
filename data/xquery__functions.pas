@@ -6685,6 +6685,7 @@ begin
     if len < 0 then raise EXQEvaluationException.create('FOAY0002', 'Negative length', nil, argv^);
   end else begin
     len := a.Size - p;
+    if len < 0 then len := 0;
   end;
   if (p < 0) or (p + len >= a.Size + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
   iter := a.GetEnumeratorMembersPtrUnsafe;
