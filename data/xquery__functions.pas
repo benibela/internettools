@@ -6856,8 +6856,7 @@ var
   i: Integer;
 begin
   list := arrayAsList(argv^);
-  f.init(context, argv[2]);
-  f.stack.topptr(0)^ := argv[1];
+  f.init(context, argv[2], argv[1]);
   for i := list.count -1 downto 0 do with f do begin
     stack.topptr(1)^ := list[i];
     stack.topptr(0)^ := call();
@@ -7162,12 +7161,14 @@ function xqFunctionMapFor_Each(const context: TXQEvaluationContext; {%H-}argc: S
 var f: TXQBatchFunctionCall;
     l: TXQVList;
     pp: TXQStandardProperty;
+    map: TXQValue;
 begin
   l := TXQVList.create(argv[0].Size);
   result := TXQValueSequence.create(l);
+  map := argv[0].toValue;
   with f do begin
     init(context, argv[1]);
-    for pp in argv[0].getEnumeratorPropertiesUnsafe do begin
+    for pp in map.getEnumeratorPropertiesUnsafe do begin
       l.add(call2(pp.key, pp.Value));
     end;
     done;
