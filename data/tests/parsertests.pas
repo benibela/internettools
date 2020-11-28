@@ -53,6 +53,7 @@ var
   var
     tn: TTreeNode;
     parents: TList;
+    oxml: rawbyteString;
   begin
     if strActualEncoding(DefaultSystemCodePage) <> CP_UTF8 then
       o := strConvertFromUtf8(o, CP_ACP);
@@ -74,8 +75,13 @@ var
       tn := tn.next;
     end;
     parents.free;
-    if tp.getLastTree.outerXML() <> o then
-      raise Exception.Create('Parsing result invalid: '+tp.getLastTree.outerXML()+ ' != '+o + LineEnding + 'DefaultEncoding: ' + IntToStr(DefaultSystemCodePage));
+    oxml := tp.getLastTree.outerXML();
+    //todo: it is parsed as CP_ACP, but outerXML always returns CP_UTF8 ??
+    //writeln(StringCodePage(o));
+    //writeln(StringCodePage(oxml));
+    //SetCodePage(oxml, CP_ACP, false);
+    if oxml <> o then
+      raise Exception.Create('Parsing result invalid: '+oxml+ ' != '+o + LineEnding + 'DefaultEncoding: ' + IntToStr(DefaultSystemCodePage));
   end;
 
 begin
@@ -119,7 +125,8 @@ begin
   t('<html><body></body></html>aaa', '<html><head/><body>aaa</body></html>');
   t('<html><body></body>u</html> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '<html><head/><body>u aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</body></html>');
   t('<html><body></body>  </html> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '<html><head/><body>   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</body></html>');
-
+  if DefaultSystemCodePage <> CP_WINDOWS1252 then
+    t('<html><a href="&{x}&#x85;"/>', '<html><head/><body><a href="&amp;{x}'#$e2#$80#$a6'"/></body></html>');
 
   t('<table>', '<html><head/><body><table/></body></html>');
   t('<table><tr><td>1</td></tr></table>', '<html><head/><body><table><tbody><tr><td>1</td></tr></tbody></table></body></html>');
@@ -138,6 +145,8 @@ begin
   t('<!doctype xml [<!ENTITY abc>]><a>', '<a/>');
   t('<!doctype xml [<!ENTITY>><a>', '<a/>');
   t('<!doctype xml [<!ENTITY foo bar><!NOTATION ass PUBLIC "->>>--">]><a>', '<a/>');
+  if (DefaultSystemCodePage <> CP_LATIN1) and (DefaultSystemCodePage <> CP_WINDOWS1252) and (DefaultSystemCodePage <> CP_ASCII) then
+    t('<xml><a href="&{x}&#x85;"/>', '<xml><a href="&amp;{x}&#x85;"/></xml>');
 
 
   tp.parsingModel := pmStrict;

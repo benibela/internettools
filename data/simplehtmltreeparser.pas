@@ -91,7 +91,8 @@ end;
 
 
 TTreeNodeIntOffset = longint;
-
+TChangeEncodingFlag = (cefSubstituteEntities, cefTrim, cefWindows1252Extensions);
+TChangeEncodingFlags = set of TChangeEncodingFlag;
 
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
@@ -133,7 +134,7 @@ TTreeNode = class
 //otherwise use the functions
   //procedure deleteNext(); delete the next node (you have to delete the reverse tag manually)
   procedure freeAll(); //**< deletes the tree
-  procedure changeEncoding(from,toe: TSystemCodePage; substituteEntities: boolean; trimText: boolean); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
+  procedure changeEncoding(from,toe: TSystemCodePage; flags: TChangeEncodingFlags); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
   //Complex search functions.
@@ -845,10 +846,17 @@ begin
 end;
 
 procedure TTreeDocument.setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
+var flags: TChangeEncodingFlags;
 begin
   if self = nil then exit;
   if (FEncoding = CP_NONE) or not convertFromOldToNew then FEncoding:= new;
-  if convertFromOldToNew or convertEntities then changeEncoding(FEncoding, new, convertEntities, FCreator.FTrimText);
+  if convertFromOldToNew or convertEntities then begin
+    flags := [];
+    if convertEntities then include(flags, cefSubstituteEntities);
+    if FCreator.FTrimText then include(flags, cefTrim);
+    if FCreator.parsingModel = pmHTML then include(flags, cefWindows1252Extensions);
+    changeEncoding(FEncoding, new, flags);
+  end;
   FEncoding := new;
 end;
 
@@ -897,20 +905,22 @@ begin
   end;
 end;
 
-procedure TTreeNode.changeEncoding(from, toe: TSystemCodePage; substituteEntities: boolean; trimText: boolean);
+procedure TTreeNode.changeEncoding(from, toe: TSystemCodePage; flags: TChangeEncodingFlags);
   function change(s: string): string;
   begin
     result := strConvert(s, from, toe);
     result := strNormalizeLineEndings(result);
-    if substituteEntities then result := strDecodeHTMLEntities(result, toe, []);
-    if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
+    if cefSubstituteEntities in flags then
+      if cefWindows1252Extensions in flags then result := strDecodeHTMLEntities(result, toe, [dhefWindows1252Extensions])
+      else result := strDecodeHTMLEntities(result, toe, []);
+    if cefTrim in flags then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
   end;
 
 var tree: TTreeNode;
   attrib: TTreeAttribute;
 begin
   if (from = CP_NONE) or (toe = CP_NONE) then exit;
-  if (from = toe) and not substituteEntities then exit;
+  if (from = toe) and not (cefSubstituteEntities in flags) then exit;
   tree := self;
   while tree <> nil do begin
     case tree.typ of

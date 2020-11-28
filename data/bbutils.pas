@@ -451,7 +451,7 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
 
-type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute);
+type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions);
      EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -5398,10 +5398,11 @@ begin
                 parseError;
               end else case entity of
                 $0001..$0008, $000B, $000D..$001F, $007F, $FDD0..$FDEF: parseError;
-                low(ENCODING_MAP_WINDOWS1252_TO_UNICODE)..high(ENCODING_MAP_WINDOWS1252_TO_UNICODE): begin
-                  entity := ENCODING_MAP_WINDOWS1252_TO_UNICODE[entity];
-                  parseError;
-                end;
+                low(ENCODING_MAP_WINDOWS1252_TO_UNICODE)..high(ENCODING_MAP_WINDOWS1252_TO_UNICODE):
+                  if dhefWindows1252Extensions in flags then begin
+                    entity := ENCODING_MAP_WINDOWS1252_TO_UNICODE[entity];
+                    parseError;
+                  end;
                 else if (entity and $FFFE) = $FFFE then parseError;
               end;
               appendCodePoint(entity);
