@@ -1023,12 +1023,18 @@ var known: TNamespaceList;
             if not attrib.isNamespaceNode then begin
               append(' ');
               appendNodeName(attrib);
-              append('="');
-              if inCDATAElement then append(attrib.realvalue)
-              else if assigned(builder.onInterceptAppendXMLHTMLAttribute) then builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement)
-              else if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
-              else appendXMLAttrib(attrib.realvalue);
-              append('"');
+              if isHTMLElement
+                 and (length(attrib.value) = length(attrib.realvalue)) and striEqual(attrib.value, attrib.realvalue)
+                 and htmlAttributeIsBooleanAttribute(attrib) then begin
+                //skip
+              end else begin
+                append('="');
+                if inCDATAElement then append(attrib.realvalue)
+                else if assigned(builder.onInterceptAppendXMLHTMLAttribute) then builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement)
+                else if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
+                else appendXMLAttrib(attrib.realvalue);
+                append('"');
+              end;
             end;
 
         includeContentTypeHere := isHTMLElement and (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);

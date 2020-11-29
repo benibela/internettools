@@ -20,15 +20,19 @@ function htmlElementIsHead(n: TTreeNode): boolean;
 function htmlElementIsMetaContentType(n: TTreeNode): boolean;
 function htmlElementIsFormattedWhitespace(n: TTreeNode): boolean;
 function htmlAttributeIsURI(n: TTreeAttribute): boolean;
+function htmlAttributeIsBooleanAttribute(n: TTreeAttribute): boolean;
 
 type HTMLNodeNameHashs = object
   const a = $820103F0;
   const abbr = $4F9E14C1;
   const action = $80934BDB;
+  const allowfullscreen = $47F2E537;
   const applet = $05E2ACFE;
   const archive = $4B622EB4;
   const area = $B61A9737;
+  const async = $985AD0C9;
   const audio = $56F37910;
+  const autoplay = $72B9F08D;
   const b = $B7346E56;
   const background = $1BFC86A9;
   const base = $36BAA821;
@@ -41,25 +45,33 @@ type HTMLNodeNameHashs = object
   const br = $2CF50F7A;
   const button = $CA7C1BA4;
   const canvas = $16B3637C;
+  const checked = $132193C6;
   const cite = $87DC46C0;
   const classid = $AD3010FA;
   const code = $0EA6D335;
   const codebase = $B59E7ECC;
   const col = $C52DFF23;
   const command = $F9FE87AB;
+  const controls = $45331B13;
   const data = $A77F762D;
   const datalist = $41BB801A;
   const datasrc = $8D44B614;
+  const &default = $DFE2DA74;
+  const defer = $713E1F97;
   const del = $1693E292;
+  const details = $FC5E27EF;
   const dfn = $136283CB;
+  const disabled = $D0E6A314;
   const &div = $E550A8D4;
   const em = $4FC4D1A1;
   const embed = $D054CDAA;
   const &for = $FCAB20A3;
   const form = $4D706AFE;
   const formaction = $DF8C1BDC;
+  const formnovalidate = $54595EF4;
   const frame = $A45C5C57;
   const head = $FB1A74A6;
+  const hidden = $07EB76BA;
   const hr = $B60E9A97;
   const href = $8D043786;
   const html = $AEB82870;
@@ -70,36 +82,50 @@ type HTMLNodeNameHashs = object
   const input = $34286C01;
   const ins = $53AE343D;
   const isindex = $F2F96899;
+  const ismap = $7B7DE5DB;
   const itemprop = $7BD8D34A;
+  const itemscope = $EC283297;
   const kbd = $BD8BF137;
   const keygen = $A54D33BB;
   const &label = $CDE39663;
   const link = $21E329D3;
   const longdesc = $62E556AF;
+  const loop = $9784214E;
   const manifest = $10754E89;
   const map = $BE0D93C6;
   const mark = $7861CBEE;
   const meta = $53F6A414;
   const meter = $6D5A5336;
+  const muted = $E603FF4B;
   const name = $1DAD61B1;
   const noembed = $35DC71D8;
   const noframes = $8EF9275D;
+  const nomodule = $BDEFF3BD;
   const noscript = $997BA521;
+  const novalidate = $838F640A;
   const &object = $FB129865;
+  const ol = $B3418D2D;
+  const open = $9E48B810;
+  const optgroup = $1A563A10;
+  const option = $90ABF090;
   const output = $75DCAEF3;
   const param = $EA036F5E;
   const picture = $AB918FDD;
   const plaintext = $7DA5BF41;
+  const playsinline = $00B86F98;
   const poster = $4373E9B6;
   const pre = $781F9978;
   const profile = $F2E597AF;
   const progress = $0D2309F5;
   const q = $A51FCA29;
+  const readonly = $EDD24136;
+  const reversed = $34684711;
   const ruby = $747940C8;
   const s = $CA8B9500;
   const samp = $7350DA45;
   const script = $75469FD3;
   const select = $8DCBDF5D;
+  const selected = $86DD5F44;
   const slot = $8E0AD6CD;
   const small = $EC0538D9;
   const source = $B04BAA1E;
@@ -136,6 +162,22 @@ end;
 XMLAttributeNameHashs = object
   const space = $219D3C61;
 end;
+
+(*
+How to update hashes:
+uses sysutils,bbutils,xquery.internals.common;
+var s: string;
+begin
+  while not eof(input) do begin
+    readln(s);
+    s := trim(s);
+    if s = '' then writeln()
+    else begin
+      if s.contains('=') then s := trim(StringReplace(s, 'const', '', []).split('=')[0]);
+      writeln('  const ', s, ' = $', inttohex(nodeNameHash(StringReplace(s, '&', '', [])), 8), ';');
+    end;
+  end;
+            *)
 
 implementation
 
@@ -414,6 +456,79 @@ begin
       HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input') and striequal(n.getParent().getAttribute('type'), 'url');
     end;
    end;
+end;
+
+function htmlAttributeIsBooleanAttribute(n: TTreeAttribute): boolean;
+  function isMediaParent: boolean;
+  begin
+    case n.getParent().hash  of
+      HTMLNodeNameHashs.audio: result := striequal(n.getParent().value, 'audio');
+      HTMLNodeNameHashs.video: result := striequal(n.getParent().value, 'video');
+      else result := false;
+    end;
+  end;
+begin
+  result := false;
+  if n.namespace <> nil then exit;
+
+  case n.hash of
+    HTMLNodeNameHashs.disabled: if striequal(n.value, 'disabled') then case n.getParent().hash  of
+      HTMLNodeNameHashs.link: result := striequal(n.getParent().value, 'link');
+      HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input');
+      HTMLNodeNameHashs.button: result := striequal(n.getParent().value, 'button');
+      HTMLNodeNameHashs.select: result := striequal(n.getParent().value, 'select');
+      HTMLNodeNameHashs.option: result := striequal(n.getParent().value, 'option');
+      HTMLNodeNameHashs.optgroup: result := striequal(n.getParent().value, 'optgroup');
+    end;
+    HTMLNodeNameHashs.reversed: if striequal(n.value, 'reversed') then case n.getParent().hash  of
+      HTMLNodeNameHashs.ol: result := striequal(n.getParent().value, 'ol');
+    end;
+    HTMLNodeNameHashs.ismap: if striequal(n.value, 'ismap') then case n.getParent().hash  of
+      HTMLNodeNameHashs.img: result := striequal(n.getParent().value, 'img');
+    end;
+    HTMLNodeNameHashs.allowfullscreen: if striequal(n.value, 'allowfullscreen') then case n.getParent().hash  of
+      HTMLNodeNameHashs.iframe: result := striequal(n.getParent().value, 'iframe');
+    end;
+    HTMLNodeNameHashs.playsinline: if striequal(n.value, 'playsinline') then case n.getParent().hash  of
+      HTMLNodeNameHashs.video: result := striequal(n.getParent().value, 'video');
+    end;
+    HTMLNodeNameHashs.default: if striequal(n.value, 'default') then case n.getParent().hash  of
+      HTMLNodeNameHashs.track: result := striequal(n.getParent().value, 'track');
+    end;
+    HTMLNodeNameHashs.selected: if striequal(n.value, 'selected') then case n.getParent().hash  of
+      HTMLNodeNameHashs.option: result := striequal(n.getParent().value, 'option');
+    end;
+    HTMLNodeNameHashs.loop: if striequal(n.value, 'loop') then result := isMediaParent;
+    HTMLNodeNameHashs.autoplay: if striequal(n.value, 'autoplay') then result := isMediaParent;
+    HTMLNodeNameHashs.controls: if striequal(n.value, 'controls') then result := isMediaParent;
+    HTMLNodeNameHashs.muted: if striequal(n.value, 'muted') then result := isMediaParent;
+    HTMLNodeNameHashs.checked: if striequal(n.value, 'checked') then case n.getParent().hash  of
+      HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input');
+    end;
+    HTMLNodeNameHashs.readonly: if striequal(n.value, 'readonly') then case n.getParent().hash  of
+      HTMLNodeNameHashs.input: result := striequal(n.getParent().value, 'input');
+    end;
+    HTMLNodeNameHashs.novalidate: if striequal(n.value, 'novalidate') then case n.getParent().hash  of
+      HTMLNodeNameHashs.form: result := striequal(n.getParent().value, 'form');
+    end;
+    HTMLNodeNameHashs.formnovalidate: if striequal(n.value, 'formnovalidate') then case n.getParent().hash  of
+      HTMLNodeNameHashs.form: result := striequal(n.getParent().value, 'form');
+    end;
+    HTMLNodeNameHashs.nomodule: if striequal(n.value, 'nomodule') then case n.getParent().hash  of
+      HTMLNodeNameHashs.script: result := striequal(n.getParent().value, 'script');
+    end;
+    HTMLNodeNameHashs.async: if striequal(n.value, 'async') then case n.getParent().hash  of
+      HTMLNodeNameHashs.script: result := striequal(n.getParent().value, 'script');
+    end;
+    HTMLNodeNameHashs.defer: if striequal(n.value, 'defer') then case n.getParent().hash  of
+      HTMLNodeNameHashs.script: result := striequal(n.getParent().value, 'script');
+    end;
+    HTMLNodeNameHashs.open: if striequal(n.value, 'open') then case n.getParent().hash  of
+      HTMLNodeNameHashs.details: result := striequal(n.getParent().value, 'details');
+    end;
+    HTMLNodeNameHashs.itemscope: result := striequal(n.value, 'itemscope');
+    HTMLNodeNameHashs.hidden: result := striequal(n.value, 'hidden');
+  end;
 end;
 
 end.
