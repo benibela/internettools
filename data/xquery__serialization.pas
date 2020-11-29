@@ -654,7 +654,7 @@ type TSpecialStringHandler = object
   procedure appendXMLHTMLAttributeText(const s:string; html: boolean);
   procedure appendXMLHTMLCharacterMappedText(const s: string; attrib, html: boolean);
   function appendXMLHTMLText(const n: TTreeNode; html: boolean): boolean;
-  function appendXMLHTMLAttribute(const n: TTreeAttribute; html: boolean): boolean;
+  procedure appendXMLHTMLAttributeTextFromNode(const n: TTreeAttribute; html: boolean);
   procedure init;
 end;
 procedure TSpecialStringHandler.init;
@@ -814,8 +814,8 @@ begin
   result := false;
 end;
 
-function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute; html: boolean): boolean;
-  procedure appendURIEscapedAttribute(n: TTreeAttribute);
+procedure TSpecialStringHandler.appendXMLHTMLAttributeTextFromNode(const n: TTreeAttribute; html: boolean);
+  procedure appendURIEscapedAttribute();
   var
     temp: String;
   begin
@@ -827,15 +827,10 @@ function TSpecialStringHandler.appendXMLHTMLAttribute(const n: TTreeAttribute; h
   end;
 
 begin
-  serializer.append(' ');
-  serializer.append(n.getNodeName());
-  serializer.append('="');
   if params^.escapeURIAttributes and html and htmlAttributeIsURI(n) then
-    appendURIEscapedAttribute(n)
+    appendURIEscapedAttribute()
    else
     appendXMLHTMLCharacterMappedText(n.realvalue, true, html);
-  serializer.append('"');
-  result := true;
 end;
 
 function isUnicodeEncoding(e: TSystemCodePage): boolean;
@@ -1026,18 +1021,14 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in getEnumeratorAttributes do
             if not attrib.isNamespaceNode then begin
-              if not inCDATAElement and assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement) then begin
-                //empty
-              end else begin
-                append(' ');
-                appendNodeName(attrib);
-                append('="');
-                if inCDATAElement then append(attrib.realvalue)
-                else
-                if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
-                else appendXMLAttrib(attrib.realvalue);
-                append('"');
-              end;
+              append(' ');
+              appendNodeName(attrib);
+              append('="');
+              if inCDATAElement then append(attrib.realvalue)
+              else if assigned(builder.onInterceptAppendXMLHTMLAttribute) then builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement)
+              else if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
+              else appendXMLAttrib(attrib.realvalue);
+              append('"');
             end;
 
         includeContentTypeHere := isHTMLElement and (includeContentType = ictSearchingForHead) and htmlElementIsHead(n);
@@ -1350,7 +1341,7 @@ begin
     interceptor.serializer := @serializer;
     interceptor.isUnicodeEncoding := isUnicodeEncoding(params.encodingCP);
     if params.hasNormalizationForm or (params.characterMaps <> nil) or params.escapeURIAttributes then
-      serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttribute;
+      serializer.onInterceptAppendXMLHTMLAttribute := @interceptor.appendXMLHTMLAttributeTextFromNode;
     if params.hasNormalizationForm or assigned(params.characterMaps) or assigned(params.cdataSectionElements) then
       serializer.onInterceptAppendXMLHTMLText := @interceptor.appendXMLHTMLText;
   end;

@@ -349,7 +349,7 @@ type
   TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
   TXQSerializerOnString = procedure (const s: string) of object;
   TXQSerializerOnNode = function (const n: TTreeNode; html: boolean): boolean of object;
-  TXQSerializerOnAttribute = function (const n: TTreeAttribute; html: boolean): boolean of object;
+  TXQSerializerOnAttribute = procedure (const n: TTreeAttribute; html: boolean) of object;
   TXQSerializer = object(TJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     allowDuplicateNames: boolean;
