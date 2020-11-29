@@ -7,8 +7,10 @@ interface
 uses
   Classes, SysUtils, simplehtmltreeparser;
 
-function htmlElementIsImplicitCDATA(const marker: pchar; const tempLen: integer): boolean;
-function htmlElementIsImplicitCDATA(const name: string): boolean;
+function htmlElementIsImplicitCDATA(const marker: pchar; const tempLen: integer): boolean; inline;
+function htmlElementIsImplicitCDATA(hash: cardinal; const marker: pchar; const tempLen: integer): boolean;
+//function htmlElementIsImplicitCDATA(const name: string): boolean;
+function htmlElementIsImplicitCDATA(hash: cardinal; const name: string): boolean;
 function htmlElementIsChildless(hash: cardinal; const s: string): boolean;
 function htmlElementIsPhrasing(n: TTreeNode): boolean;
 function htmlElementIsExpectedEmpty(n: TTreeNode; isHTML5: boolean): boolean;
@@ -143,8 +145,13 @@ uses bbutils, xquery.internals.common;
 
 function htmlElementIsImplicitCDATA(const marker: pchar; const tempLen: integer): boolean;
 begin
+  result :=  htmlElementIsImplicitCDATA(nodeNameHash(marker, tempLen), marker, tempLen);
+end;
+
+function htmlElementIsImplicitCDATA(hash: cardinal; const marker: pchar; const tempLen: integer): boolean;
+begin
   //    If the parent of current node is a style, script, xmp, iframe, noembed, noframes, or plaintext element, or if the parent of current node is noscript element
-  case nodeNameHash(marker, tempLen) of
+  case hash of
     HTMLNodeNameHashs.style: result := strliequal(marker,'style',tempLen);
     HTMLNodeNameHashs.script: result := strliequal(marker,'script',tempLen);
     HTMLNodeNameHashs.xmp: result := strliequal(marker,'xmp',tempLen);
@@ -156,9 +163,9 @@ begin
   end;
 end;
 
-function htmlElementIsImplicitCDATA(const name: string): boolean;
+function htmlElementIsImplicitCDATA(hash: cardinal; const name: string): boolean;
 begin
-  result := htmlElementIsImplicitCDATA(pchar(name), length(name));
+  result := htmlElementIsImplicitCDATA(hash, pchar(name), length(name));
 end;
 
 function htmlElementIsChildless(hash: cardinal; const s: string): boolean;

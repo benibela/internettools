@@ -851,7 +851,7 @@ procedure serializeNodes(base: TTreeNode; var builder: TXQSerializer; nodeSelf: 
 type TIncludeContentType = (ictIgnore, ictSearchingForHead, ictRemoveOld);
 var known: TNamespaceList;
     deadPrefixes: TNamespaceList;
-    indentationAllowed, undeclarePrefixes: boolean;
+    indentationAllowed, inCDATAElement, undeclarePrefixes: boolean;
     xhtml, representsHTML, isHTML5: boolean;
 
     includeContentType: TIncludeContentType;
@@ -964,7 +964,7 @@ var known: TNamespaceList;
         if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n, parentIsHTMLElement) then begin
           //empty
         end else if not parentIsHTMLElement then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
-        else if (getParent() <> nil) and htmlElementIsImplicitCDATA(getParent().value) then append(value)
+        else if inCDATAElement then append(value)
         else appendHTMLText(value);
       end;
       tetClose: appendXMLElementEndTag2(n);
@@ -1026,12 +1026,14 @@ var known: TNamespaceList;
         if attributes <> nil then
           for attrib in getEnumeratorAttributes do
             if not attrib.isNamespaceNode then begin
-              if assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement) then begin
+              if not inCDATAElement and assigned(builder.onInterceptAppendXMLHTMLAttribute) and builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement) then begin
                 //empty
               end else begin
                 append(' ');
                 appendNodeName(attrib);
                 append('="');
+                if inCDATAElement then append(attrib.realvalue)
+                else
                 if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
                 else appendXMLAttrib(attrib.realvalue);
                 append('"');
@@ -1051,7 +1053,11 @@ var known: TNamespaceList;
         end else begin
           append('>');
           if includeContentTypeHere then appendContentTypeNow;
-          inner(n, isHTMLElement);
+          if not inCDATAElement then begin
+            inCDATAElement := isHTMLElement and htmlElementIsImplicitCDATA(hash, value);
+            inner(n, isHTMLElement);
+            inCDATAElement := false;
+          end else inner(n, isHTMLElement);
           appendXMLElementEndTag2(n);
         end;
 
@@ -1143,6 +1149,7 @@ var known: TNamespaceList;
 begin
   if builder.insertWhitespace = xqsiwIndent then indentationAllowed := true and (base.typ <> tetText)
   else indentationAllowed := false;
+  inCDATAElement := false;
   xhtml := assigned(params) and (params.method = xqsmXHTML);
   representsHTML := html or xhtml;
   isHTML5 := representsHTML and (not assigned(params) or params.isHTML5);
