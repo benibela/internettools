@@ -1220,7 +1220,8 @@ begin
   reserveadd(len);
   while inbuffer < inbufferend do begin
     case inbuffer^ of
-      '&': append('&amp;');
+      '&': if ((inbuffer + 1) >= inbufferend) or ((inbuffer + 1)^ <> '{') then append('&amp;')
+           else append('&'); //HTML4 Script Macro &{}
       '"': append('&quot;');
       '''': append('&apos;');
       else append(inbuffer^);
