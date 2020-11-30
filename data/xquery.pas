@@ -5934,6 +5934,7 @@ begin
     if (jpoEscapeCharacters in options) then
       raise EXQEvaluationException.create('FOJS0005', 'fallback can''t be used with escape', nil, map);
     escapeFunction := vo as TXQValueFunction;
+    if length(escapeFunction.parameters) <> 1 then raiseInvalidParam();
   end;
   if jpoJSONiq in options then begin
     if map.hasProperty('jsoniq-multiple-top-level-items', @vo) then begin

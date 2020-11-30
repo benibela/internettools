@@ -7196,6 +7196,8 @@ begin
 
   parser.init;
   parser.context := @context;
+  if (argc = 2) then
+    parser.setConfigFromMap(args[1]);
   result := parser.parse(data);
 end;
 
