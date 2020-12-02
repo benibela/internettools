@@ -4274,21 +4274,35 @@ end;
 
 procedure TXQFunctionParameterTypes.raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext;
   term: TXQTerm; const addendum: string);
+var errCode: string = 'XPTY0004';
+  function needsSpecialErrorCode(st: TXQTermSequenceType; const v: IXQValue): boolean;
+  begin
+    result := false;
+    if not (st.kind in [tikFunctionTest, tikElementTest, tikAny, tikArrayTest, tikMapTest, tikJSONiqTest]) then begin
+      case v.kind of
+        pvkFunction, pvkObject: begin
+          errCode := 'FOTY0013';
+          exit(true);
+        end;
+        pvkArray: if v.Size = 1 then exit(needsSpecialErrorCode(st, (v as TXQValueJSONArray).seq[0]));
+        else;
+      end;
+    end;
+    if (context.staticContext.model in PARSING_MODEL3)
+              and (st.kind = tikAtomic) and (st.atomicTypeInfo.storage = TXQValueQName)
+              and ((v.kind = pvkNode) or v.instanceOf(baseSchema.untypedAtomic)) then begin
+     errCode := 'XPTY0117';
+     exit(true);
+    end;
+  end;
+
 var
-  errCode, errMessage, name: String;
+  errMessage, name: String;
   i: Integer;
 begin
-  errCode := 'XPTY0004';
   for i := 0 to high(types) do
-    if not (types[i].kind in [tikFunctionTest, tikElementTest, tikAny, tikArrayTest, tikMapTest, tikJSONiqTest]) and (values[i].kind in [pvkFunction, pvkObject]) then begin
-     errCode := 'FOTY0013'; //wtf?
-     break;
-    end else if (context.staticContext.model in PARSING_MODEL3)
-              and (types[i].kind = tikAtomic) and (types[i].atomicTypeInfo.storage = TXQValueQName)
-              and ((values[i].kind = pvkNode) or values[i].instanceOf(baseSchema.untypedAtomic)) then begin
-     errCode := 'XPTY0117'; //wtf?
-     break;
-    end;
+    if needsSpecialErrorCode(types[i], values[i]) then
+      break;
   name := '';
   if (term is TXQTermNamedFunction) and (TXQTermNamedFunction(term).func is TXQAbstractFunctionInfo) then
     name := 'function ' + TXQAbstractFunctionInfo(TXQTermNamedFunction(term).func).name
