@@ -131,6 +131,9 @@ var
   parser: TXQJsonParser;
   s, contenttype, data: String;
 begin
+  if assigned(context.staticContext.sender.OnWarningDeprecated) then
+    context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'json is deprecated. Use json-doc or parse-json functions.');
+
   parser.init;
   parser.options := context.staticContext.sender.DefaultJSONParser.options;
   if argc = 2 then parser.setConfigFromMap(args[1]);
