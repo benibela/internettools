@@ -102,6 +102,30 @@ const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray,
 
 //================================Operators=====================================
 
+function arrayAsList(const a: IXQValue): TXQVList;
+begin
+  result := (a as TXQValueJSONArray).seq;
+end;
+
+function arrayHeadOrEmpty(const a: IXQValue): IXQValue;
+var
+  l: TXQVList;
+begin
+  l := arrayAsList(a);
+  if l.Count = 0 then result := xqvalue
+  else result := l[0];
+end;
+
+function binaryOperatorOnUnwrappedArrays(op: TXQBinaryOp; const cxt: TXQEvaluationContext; const aa, ab: IXQValue): IXQValue;
+var
+  a, b: IXQValue;
+begin
+  if aa.kind = pvkArray then a := arrayHeadOrEmpty(aa)
+  else a := aa;
+  if ab.kind = pvkArray then b := arrayHeadOrEmpty(ab)
+  else b := ab;
+  result := op(cxt, a, b);
+end;
 
 function xqvalueUnaryMinus(const cxt: TXQEvaluationContext; const nothing, arg: IXQValue): IXQValue;
 var
@@ -123,6 +147,7 @@ begin
     pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toFloat);
     pvkUndefined: result := xqvalue();
     pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.get(1));
+    pvkArray: result := xqvalueUnaryMinus(cxt, nothing, arrayHeadOrEmpty(arg));
     else result := TXQValueFloat.create(- arg.toFloat);
   end;
 end;
@@ -136,6 +161,7 @@ begin
     pvkFloat: result := TXQValueFloat.create(arg.typeAnnotation, arg.toFloat);
     pvkUndefined: result := xqvalue();
     pvkSequence: result := xqvalueUnaryPlus(cxt, nothing, arg.get(1));
+    pvkArray: result := xqvalueUnaryPlus(cxt, nothing, arrayHeadOrEmpty(arg));
     else result := TXQValueFloat.create(arg.toFloat);
   end;
 end;
@@ -170,9 +196,13 @@ begin
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
     exit(xqvalueAddDecimals(a,b));
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueAdd, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) or
@@ -251,9 +281,13 @@ begin
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
     exit(xqvalueSubtractDecimals(a,b));
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueSubtract, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if (ak <> pvkDateTime) or (bk <> pvkDateTime) then exit(xqvalue);
@@ -341,9 +375,13 @@ begin
   if (ak in [pvkInt64, pvkBigDecimal]) and (bk in [pvkInt64, pvkBigDecimal]) then
     exit(xqvalueMultiplyDecimals(a,b));
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueMultiply, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) or (bk = pvkDateTime) then begin
     if ((ak = pvkDateTime) and (bk = pvkDateTime)) then exit(xqvalue);
@@ -400,9 +438,13 @@ begin
     end else raiseDivisionBy0NotAllowed;
   end;
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueDivide, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if (ak = pvkDateTime) then begin
     if not (a.typeAnnotation as TXSDateTimeType).isDuration then exit(xqvalue);
@@ -476,9 +518,13 @@ begin
     exit(baseSchema.integer.createValue(i));
   end;
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueDivideInt, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
   if not (bk in [pvkInt64, pvkBigDecimal]) then begin
     bf := b.toFloat;
@@ -517,9 +563,13 @@ begin
     exit(xqvalueI(i, a, b));
   end;
 
-  if (ak = pvkNull) or (bk = pvkNull) then
-    raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
-  if (ak in NonNumericKind) or (bk in NonNumericKind) then exit(xqvalue());
+  if (ak in NonNumericKind) or (bk in NonNumericKind) then begin
+    if (ak = pvkArray) or (bk = pvkArray) then
+      exit(binaryOperatorOnUnwrappedArrays(@xquery__functions.xqvalueMod, cxt, a, b));
+    if (ak = pvkNull) or (bk = pvkNull) then
+      raise EXQEvaluationException.create('err:XPTY0004', 'json null is not allowed in arithmetic expressions');
+    exit(xqvalue());
+  end;
 
 
   if ak in [pvkInt64, pvkBigDecimal] then
@@ -6621,10 +6671,6 @@ end;
 
 
 
-function arrayAsList(const a: IXQValue): TXQVList;
-begin
-  result := (a as TXQValueJSONArray).seq;
-end;
 
 procedure raiseInvalidArrayOutOfBounds(const a: IXQValue; index: Int64);
 begin
