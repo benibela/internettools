@@ -1213,6 +1213,8 @@ var
 begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
   //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.toXQuery());
+
+  //note: function coercion is only used with strict type checking enabled
   if length(arguments) = 0 then exit(v);
   case v.kind of
     pvkFunction: begin
@@ -1220,8 +1222,7 @@ begin
       if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
       needCoercion := false;
       for i := 0 to high(fun.parameters) do
-        if (not arguments[i].isItemStar)
-           and ((fun.parameters[i].seqtype = nil) or not fun.parameters[i].seqtype.subtypeOf(arguments[i])) then begin
+        if (fun.parameters[i].seqtype = nil) or not arguments[i].subtypeOf(fun.parameters[i].seqtype) then begin
           needCoercion:=true;
           break;
         end;
