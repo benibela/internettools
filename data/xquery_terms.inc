@@ -2993,6 +2993,10 @@ begin
 end;
 
 function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
+  procedure raiseOutofBounds(numindex: int64; a: TXQValueJSONArray);
+  begin
+    raiseEvaluationError('FOAY0001', 'Array index out of bounds: '+inttostr(numindex)+LineEnding+'Array size: ' + inttostr(a.Size));
+  end;
 var
   func: IXQValue;
   index: IXQValue;
@@ -3002,6 +3006,7 @@ var
   v: PIXQValue;
   funcref: TXQValueFunction;
   numindex: Int64;
+
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
   func := children[0].evaluate(context);
@@ -3054,7 +3059,7 @@ begin
         numindex := index.toInt64;
         if (numindex < 1) or (numindex > (v^ as TXQValueJSONArray).seq.Count) then begin
           if not context.staticContext.AllowJSONiqOperations then
-            raiseEvaluationError('FOAY0001', 'Array index out of range');
+            raiseOutofBounds(numindex, v^ as TXQValueJSONArray);
           continue;
         end;
         resultSeq.add((v^ as TXQValueJSONArray).seq[numindex-1]);
