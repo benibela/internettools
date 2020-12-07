@@ -3319,6 +3319,15 @@ begin
   t('form(//form)[2].url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('form(//form)[3].url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
 
+  t('count(form())', '1', '');
+  t('form().url', 'pseudo://test/abc', '');
+  t('(//form[1]/form()).url', 'pseudo://test/abc', '');
+  t('(//form[2]/form()).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
+  t('(//form[3]/form()).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
+  t('(//form[2]/form("tt=xyz")).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456&tt=xyz', '');
+  t('(//form[3]/form("tt=xyz")).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl&tt=xyz', '');
+  t('(//form[3]/form({"tt": "xyz"})).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl&tt=xyz', '');
+
   baseboundary := '---------------------------1212jhjg2ypsdofx0235p2z5as09';
   t('form(//form[4]).headers', 'Content-Type: multipart/form-data; boundary='+baseboundary);
   t('($f := form(//form[4])).post', #13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="foo"'#13#10#13#10'bar'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09'#13#10'Content-Disposition: form-data; name="Y"'#13#10#13#10'456'#13#10'-----------------------------1212jhjg2ypsdofx0235p2z5as09--');

@@ -1723,6 +1723,18 @@ check for <form method=dialog>
 enctype=text/plain
 }
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+    function findFirstForm(n: TTreeNode): IXQValue;
+    var
+      f: TTreeNode = nil;
+    begin
+      if n.typ in [tetOpen, tetDocument] then begin
+        if striEqual(n.value, 'form') then f := n
+        else f := n.findNext(tetOpen, 'form', [], n.reverse );
+      end;
+      if f = nil then raise EXQEvaluationException.create('XPDY0002', 'Could not find a form element');
+      result := xqvalue(f)
+    end;
+
 var requestOverride: THttpRequestParams;
     cmp: TStringComparisonFunc;
 
@@ -1781,21 +1793,42 @@ var requestOverride: THttpRequestParams;
 
 var v: PIXQValue;
   resseq: TXQValueSequence;
+  form, overrideOptions: IXQValue;
 begin
-  requiredArgCount(argc, 1, 2);
+  requiredArgCount(argc, 0, 2);
 
-  if args[0].getSequenceCount = 0 then
+  case argc of
+    0: begin
+      form := findFirstForm(context.contextNode(true));
+      overrideOptions := xqvalue;
+    end;
+    1: begin
+      overrideOptions := nil; //hide uninitialized warning
+      form := args[0];
+      if (form.kind = pvkSequence) and (form.count = 1) then form := args[0].get(1);
+      case form.kind of
+        pvkNode, pvkSequence: overrideOptions := xqvalue;
+        pvkObject, pvkString: begin overrideOptions := form; form := findFirstForm(context.contextNode(true)); end;
+        else raiseXPTY0004TypeError(form, 'form argument');
+      end;
+    end;
+    2: begin
+      form := args[0];
+      overrideOptions := args[1];
+    end;
+    else exit(nil);
+  end;
+
+  if form.getSequenceCount = 0 then
     exit(xqvalue);
 
   cmp := @context.staticContext.nodeCollation.equal;
   requestOverride.init;
-
-  if argc = 2 then
-    requestOverride.addXQValue(args[1], context.staticContext);
+  requestOverride.addXQValue(overrideOptions, context.staticContext);
 
   resseq := TXQValueSequence.create();
   result := resseq;
-  for v in args[0].GetEnumeratorPtrUnsafe do
+  for v in form.GetEnumeratorPtrUnsafe do
     resseq.add(encodeForm(v^.toNode));
   xqvalueSeqSqueeze(result);
   requestOverride.done;
@@ -7442,7 +7475,7 @@ begin
   pxpold.registerFunction('inner-html',0,1,@xqFunctionInner_HTML, []);
   pxpold.registerFunction('inner-text',0,1,@xqFunctionInner_Text, []);
   pxpold.registerFunction('matched-text',0,0,@xqFunctionMatched_Text, []);
-  pxpold.registerFunction('form',1,2,@xqFunctionForm, []);
+  pxpold.registerFunction('form',0,2,@xqFunctionForm, []);
   pxpold.registerFunction('resolve-html',0,2,@xqFunctionResolve_Html, []);
   resolveHTMLCallback := @xqFunctionResolve_Html;
   pxpold.registerFunction('random',0,1,@xqFunctionRandom, []);
