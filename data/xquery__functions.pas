@@ -1807,7 +1807,7 @@ begin
       form := args[0];
       if (form.kind = pvkSequence) and (form.count = 1) then form := args[0].get(1);
       case form.kind of
-        pvkNode, pvkSequence: overrideOptions := xqvalue;
+        pvkNode, pvkSequence, pvkUndefined: overrideOptions := xqvalue;
         pvkObject, pvkString: begin overrideOptions := form; form := findFirstForm(context.contextNode(true)); end;
         else raiseXPTY0004TypeError(form, 'form argument');
       end;

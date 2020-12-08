@@ -3319,6 +3319,8 @@ begin
   t('form(//form)[2].url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('form(//form)[3].url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
 
+  t('count(form(()))', '0', '');
+  t('count(form((), "x=y"))', '0', '');
   t('count(form())', '1', '');
   t('form().url', 'pseudo://test/abc', '');
   t('(//form[1]/form()).url', 'pseudo://test/abc', '');
