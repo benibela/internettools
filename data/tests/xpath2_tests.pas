@@ -3321,14 +3321,19 @@ begin
 
   t('count(form(()))', '0', '');
   t('count(form((), "x=y"))', '0', '');
-  t('count(form())', '1', '');
+  t('count(form())', '4', '');
+  t('count(form("Y=..."))', '3', '');
+  f('count(form("Yxxxxxxxxxx=..."))', 'XPDY0002');
+  t('form("foo2=hi").url', 'pseudo://test/abc22?foo2=hi&X=123&Y=456', '');
+  t('form("T=hi").url', 'pseudo://test/next/haus/bimbam?k=y&T=hi&fy=ihl', '');
   t('form().url', 'pseudo://test/abc', '');
   t('(//form[1]/form()).url', 'pseudo://test/abc', '');
   t('(//form[2]/form()).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('(//form[3]/form()).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
-  t('(//form[2]/form("tt=xyz")).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456&tt=xyz', '');
-  t('(//form[3]/form("tt=xyz")).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl&tt=xyz', '');
-  t('(//form[3]/form({"tt": "xyz"})).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl&tt=xyz', '');
+  t('(//form[2]/form("X=xyz")).url', 'pseudo://test/abc22?foo2=bar2&X=xyz&Y=456', '');
+  f('(//form[3]/form("X=xyz")).url', 'XPDY0002');
+  t('(//form[3]/form("fy=xyz")).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=xyz', '');
+  t('(//form[3]/form({"fy": "xyz"})).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=xyz', '');
 
   baseboundary := '---------------------------1212jhjg2ypsdofx0235p2z5as09';
   t('form(//form[4]).headers', 'Content-Type: multipart/form-data; boundary='+baseboundary);

@@ -40,7 +40,7 @@ procedure finalizeFunctions;
 implementation
 
 uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
-  simplehtmltreeparser, simplehtmlparser,
+  simplehtmltreeparser, simplehtmlparser, htmlInformation,
   bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng, xquery__serialization,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
@@ -1368,8 +1368,10 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   procedure addXQValue(const value: IXQValue; const staticContext: TXQStaticContext);
   procedure addMime(const mime: TMIMEMultipartData);
 
-  procedure mergeOverride(const requestOverride: THttpRequestParams);
-  procedure addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams);
+  //returns true if a value has been overridden
+  function mergeOverride(const requestOverride: THttpRequestParams): boolean;
+  //returns true if a value has been overridden
+  function addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams): boolean;
 
   function toUrlEncodedRequest: string;
   function toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
@@ -1570,7 +1572,7 @@ begin
   end;
 end;
 
-procedure THttpRequestParams.mergeOverride(const requestOverride: THttpRequestParams);
+function THttpRequestParams.mergeOverride(const requestOverride: THttpRequestParams): boolean;
 var
   requestOverrideUsed: array of boolean = nil;
   requestOverrideNextKeyOccurrence: array of SizeInt = nil; //this is used to build a multimap
@@ -1626,6 +1628,7 @@ var
 var oldData: array of THttpRequestParam;
   oldSize, i, replaced: SizeInt;
 begin
+  result := false;
   if (requestOverride.urlencoded <> urlencoded) or
      (urlencoded and (requestOverride.charset <> charset)) then
     raise EHttpRequestParamsException.Create('Incompatible http params');
@@ -1637,10 +1640,11 @@ begin
   SetLength(data, oldSize + requestOverride.size);
   for i := 0 to oldSize - 1 do begin
     replaced := requestOverrideKeyIndex.get(oldData[i].key, -2);
-    //replaced = -2: not overriden; replaced = -1: to remove; >= 0: override
+    //replaced = -2: not overridden; replaced = -1: to remove; >= 0: override
     if replaced <> -1 then begin
       addRawParam(oldData[i]);
       if replaced > -1 then begin
+        result := true;
         requestOverrideKeyIndex.include(oldData[i].key, requestOverrideNextKeyOccurrence[replaced]);
         requestOverrideUsed[replaced] := true;
         if requestOverride.data[replaced].hasValue then data[size-1].value := requestOverride.data[replaced].value;
@@ -1655,7 +1659,8 @@ begin
   compress;
 end;
 
-procedure THttpRequestParams.addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams);
+function THttpRequestParams.addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams
+  ): boolean;
 var temp: TTreeNode;
   name, value: string;
 begin
@@ -1669,7 +1674,7 @@ begin
     end;
   end;
 
-  mergeOverride(requestOverride);
+  result := mergeOverride(requestOverride);
 end;
 
 function THttpRequestParams.toUrlEncodedRequest: string;
@@ -1723,21 +1728,32 @@ check for <form method=dialog>
 enctype=text/plain
 }
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-    function findFirstForm(n: TTreeNode): IXQValue;
-    var
-      f: TTreeNode = nil;
+var onlyFormsWithOverriddenValue: boolean = false;
+    procedure failedToFindForm();
     begin
-      if n.typ in [tetOpen, tetDocument] then begin
-        if striEqual(n.value, 'form') then f := n
-        else f := n.findNext(tetOpen, 'form', [], n.reverse );
+      raise EXQEvaluationException.create('XPDY0002', 'Could not find a form element');
+    end;
+
+    function findForms(n: TTreeNode): IXQValue;
+    var
+      nodeseq: TXQValueSequence;
+      nlast: TTreeNode;
+    begin
+      nodeseq := TXQValueSequence.create();
+      result := nodeseq;
+      if n.typ in [tetOpen, tetDocument] then nlast := n.reverse
+      else nlast := n.next;
+      while (n <> nlast) and (n <> nil) do begin
+        if (n.typ = tetOpen) and (n.hash = HTMLNodeNameHashs.form) and striEqual(n.value, 'form') then nodeseq.add(xqvalue(n));
+        n := n.next;
       end;
-      if f = nil then raise EXQEvaluationException.create('XPDY0002', 'Could not find a form element');
-      result := xqvalue(f)
+      if nodeseq.seq.Count = 0 then failedToFindForm();
+      xqvalueSeqSqueeze(result);
     end;
 
 var requestOverride: THttpRequestParams;
     cmp: TStringComparisonFunc;
-
+    lastFormHadOverriddenValue: boolean = false;
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
@@ -1759,7 +1775,7 @@ var requestOverride: THttpRequestParams;
       multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
       request.charset := getFormEncoding(form);
 
-      request.addFormAndMerge(form, cmp, requestOverride);
+      lastFormHadOverriddenValue := request.addFormAndMerge(form, cmp, requestOverride);
       request.done;
 
       actionURI := form.getAttribute('action', cmp);
@@ -1793,13 +1809,12 @@ var requestOverride: THttpRequestParams;
 
 var v: PIXQValue;
   resseq: TXQValueSequence;
-  form, overrideOptions: IXQValue;
+  form, overrideOptions, nresult: IXQValue;
 begin
   requiredArgCount(argc, 0, 2);
-
   case argc of
     0: begin
-      form := findFirstForm(context.contextNode(true));
+      form := findForms(context.contextNode(true));
       overrideOptions := xqvalue;
     end;
     1: begin
@@ -1808,7 +1823,11 @@ begin
       if (form.kind = pvkSequence) and (form.count = 1) then form := args[0].get(1);
       case form.kind of
         pvkNode, pvkSequence, pvkUndefined: overrideOptions := xqvalue;
-        pvkObject, pvkString: begin overrideOptions := form; form := findFirstForm(context.contextNode(true)); end;
+        pvkObject, pvkString: begin
+          overrideOptions := form;
+          form := findForms(context.contextNode(true));
+          onlyFormsWithOverriddenValue := true;
+        end;
         else raiseXPTY0004TypeError(form, 'form argument');
       end;
     end;
@@ -1828,10 +1847,15 @@ begin
 
   resseq := TXQValueSequence.create();
   result := resseq;
-  for v in form.GetEnumeratorPtrUnsafe do
-    resseq.add(encodeForm(v^.toNode));
+  for v in form.GetEnumeratorPtrUnsafe do begin
+    nresult := encodeForm(v^.toNode);
+    if lastFormHadOverriddenValue or not onlyFormsWithOverriddenValue then begin
+      resseq.add(nresult);
+    end;
+  end;
   xqvalueSeqSqueeze(result);
   requestOverride.done;
+  if onlyFormsWithOverriddenValue and (result.Count = 0) then failedToFindForm();
 end;
 
 function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
