@@ -3308,6 +3308,9 @@ begin
   t('form(//form[1], ({"foo": {}, "X": (7,8), "Y": (9,10,11)})).post', 'foo=bar&X=7&Y=9&X=8&Y=10&Y=11');
   t('form(//form[1], ({"foo": {"value": "def"}, "X": (7,8), "Y": (9,10,11)})).post', 'foo=def&X=7&Y=9&X=8&Y=10&Y=11');
 
+  t('form(//form[1], {"foo": {"x": 1, "y": 2}, "X": (), "Y": ()}).post', 'foo=bar&foo.x=1&foo.y=2'); //or should it override foo?
+
+
   t('form(//form[2]).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('form(//form[2]).method', 'GET', '');
   t('form(//form[2]).post', '', '');

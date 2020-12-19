@@ -1474,6 +1474,13 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     i: Integer;
   begin
     if urlEncoded then n := formEncode(n, charset);
+
+    if v.hasProperty('x', @temp) and v.hasProperty('y', nil) then begin
+      addRawKey(n + '.x').value:=temp.toString;
+      addRawKey(n + '.y').value:=v.getProperty('y').toString;
+      exit;
+    end;
+
     param := addRawKey(n);
 
     headers := '';
