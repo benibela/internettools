@@ -115,6 +115,17 @@ begin
   t('<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"/></head>'#$FC'</html>', '<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"/></head>'#$C3#$BC'</html>', 'text/html; charset=latin1');
 
 
+
+  t('<html><head><meta charset="utf-8"/></head>'#$C3#$BC'</html>', '<html><head><meta charset="utf-8"/></head>'#$C3#$BC'</html>'); //utf-8 -> utf-8
+  t('<html><head><meta charset="ISO-8859-1"/></head>'#$FC'</html>', '<html><head><meta charset="ISO-8859-1"/></head>'#$C3#$BC'</html>');
+  t('<html><head><meta charset="UTF-8"/></head>'#$FC'</html>', '<html><head><meta charset="UTF-8"/></head>'#$FC'</html>'); //is this correct? #$FC is invalid utf-8
+  t('<html><head><meta charset="ISO-8859-1"/></head>'#$C3#$BC'</html>', '<html><head><meta charset="ISO-8859-1"/></head>'#$C3#$83#$C2#$BC'</html>');
+
+  t('<html><head><meta charset="ISO-8859-1"/></head>'#$FC'</html>', '<html><head><meta charset="ISO-8859-1"/></head>'#$FC'</html>', 'text/html; charset=utf-8'); //invalid utf-8 again
+  t('<html><head><meta charset="ISO-8859-1"/></head>'#$C3#$BC'</html>', '<html><head><meta charset="ISO-8859-1"/></head>'#$C3#$BC'</html>', 'text/html; charset=utf-8');
+  t('<html><head><meta charset="utf-8"/></head>'#$C3#$BC'</html>', '<html><head><meta charset="utf-8"/></head>'#$C3#$83#$C2#$BC'</html>', 'text/html; charset=latin1');
+  t('<html><head><meta charset="UTF-8"/></head>'#$FC'</html>', '<html><head><meta charset="UTF-8"/></head>'#$C3#$BC'</html>', 'text/html; charset=latin1');
+
   if (DefaultSystemCodePage <> CP_ASCII) {$ifndef windows}or (true){$endif} then begin
     t('<'#0'h'#0't'#0'm'#0'l'#0'>'#0#$FC#$0'<'#0'/'#0'h'#0't'#0'm'#0'l'#0'>'#0, '<html>'#$C3#$BC'</html>',  'text/html; charset=utf-16le');
     t(#0'<'#0'h'#0't'#0'm'#0'l'#0'>'#0#$FC#$0'<'#0'/'#0'h'#0't'#0'm'#0'l'#0'>', '<html>'#$C3#$BC'</html>',  'text/html; charset=utf-16be');

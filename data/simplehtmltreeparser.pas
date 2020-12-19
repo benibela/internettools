@@ -5,7 +5,7 @@
 }
 unit simplehtmltreeparser;
 {
-Copyright (C) 2008 - 2019 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2020 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -35,7 +35,7 @@ uses
 type
 //**The type of a tree element. <Open>, text, or </close>
 TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument,
-                 tetInternalDoNotUseCDATAText, //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
+                 //tetInternalDoNotUseCDATAText, //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
                  tetNamespace); //not used here, only for XQuery
 TTreeNodeTypes = set of TTreeNodeType;
 //**Controls the search for a tree element.@br
@@ -91,8 +91,7 @@ end;
 
 
 TTreeNodeIntOffset = longint;
-TChangeEncodingFlag = (cefSubstituteEntities, cefTrim, cefWindows1252Extensions);
-TChangeEncodingFlags = set of TChangeEncodingFlag;
+TNodeNameHash = cardinal;
 
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
@@ -119,7 +118,7 @@ TTreeNode = class
 //use the fields if you know what you're doing
   typ: TTreeNodeType; //**<open, close, text or comment node
   value: string; //**< tag name for open/close nodes, text for text/comment nodes
-  hash: cardinal; //**< nodeNameHash(value)
+  hash: TNodeNameHash; //**< nodeNameHash(value)
   attributes: TTreeAttribute;  //**<nil if there are no attributes
   next: TTreeNode; //**<next element as in the file (first child if there are childs, else next on lowest level), so elements form a linked list
   previous: TTreeNode; //**< previous element (self.next.previous = self)
@@ -134,7 +133,6 @@ TTreeNode = class
 //otherwise use the functions
   //procedure deleteNext(); delete the next node (you have to delete the reverse tag manually)
   procedure freeAll(); //**< deletes the tree
-  procedure changeEncoding(from,toe: TSystemCodePage; flags: TChangeEncodingFlags); //**<converts the tree encoding from encoding from to toe, and substitutes entities (e.g &auml;)
 
 
   //Complex search functions.
@@ -204,7 +202,7 @@ TTreeNode = class
 
   procedure addAttribute(a: TTreeAttribute);
   function addAttribute(const aname, avalue: string): TTreeAttribute;
-  procedure addAttributes(const props: array of THTMLProperty);
+  //procedure addAttributes(const props: array of THTMLProperty);
   procedure addNamespaceDeclaration(n: TNamespace; overrides: boolean );
   procedure addNamespaceDeclaration(const prefix, url: string; overrides: boolean );
   procedure addChild(child: TTreeNode);
@@ -294,12 +292,8 @@ public
   function addNamespace(const url, prefix: string): TNamespace;
   procedure addNamespace(const ns: TNamespace);
 
-  //**Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
-  function getEncoding: TSystemCodePage;
-  //**Changes the tree encoding
-  //**If convertExistingTree is true, the strings of the tree are actually converted, otherwise only the meta encoding information is changed
-  //**If convertEntities is true, entities like &ouml; are replaced (which is only possible if the encoding is known)
-  procedure setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
+  //Returns the current encoding of the tree. After the parseTree-call it is the detected encoding, but it can be overriden with setEncoding.
+  function getEncoding: TSystemCodePage; deprecated 'support for different encodings is being removed, everything should be set to utf8';
 
   procedure addRef; //inline;
   procedure release; //inline;
@@ -344,12 +338,16 @@ protected
   FTrimText, FReadComments: boolean;
   FTrees: TFPList;
   FCurrentTree: TTreeDocument;
-  FXmlHeaderEncoding: TSystemCodePage;
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
+  FEncodingActual, FEncodingCurrent, FEncodingMeta: TSystemCodePage;
+  FReparseWithChangedEncoding: boolean;
+  function abortIfEncodingMismatch: TParsingResult;
+  function parseRawText(t: pchar; len: SizeInt): string;
+  function parseCDATA(t: pchar; len: SizeInt): string;
+  function parseTextAttribute(t: pchar; len: SizeInt): string;
 
-  function newTreeNode(typ:TTreeNodeType; text: pchar; len:SizeInt):TTreeNode;
-  function newTreeNode(typ:TTreeNodeType; s: string; offset: SizeInt):TTreeNode;
+  function appendTreeNode(typ:TTreeNodeType; s: string; offset: SizeInt):TTreeNode;
   procedure autoCloseLastTag();
   function autoCloseTill(const ctag: string): TTreeNode;
 
@@ -358,7 +356,7 @@ protected
 
   function enterXMLTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
   function enterHTMLTag(tagName: pchar; tagNameLen: SizeInt; properties: THTMLProperties):TParsingResult;
-  procedure enterTagCommon(const tag: string; tagName: pchar; const properties: THTMLProperties);
+  function enterTagCommon(const tag: string; tagName: pchar; const properties: THTMLProperties): TTreeNode;
   function leaveXMLTag(tagName: pchar; tagNameLen: SizeInt):TParsingResult;
   function leaveHTMLTag(tagName: pchar; tagNameLen: SizeInt):TParsingResult;
   function leaveTagCommon(tagName: pchar; tagNameLen: SizeInt): TTreeNode;
@@ -850,21 +848,6 @@ begin
   result := FEncoding;
 end;
 
-procedure TTreeDocument.setEncoding(new: TSystemCodePage; convertFromOldToNew: Boolean; convertEntities: boolean);
-var flags: TChangeEncodingFlags;
-begin
-  if self = nil then exit;
-  if (FEncoding = CP_NONE) or not convertFromOldToNew then FEncoding:= new;
-  if convertFromOldToNew or convertEntities then begin
-    flags := [];
-    if convertEntities then include(flags, cefSubstituteEntities);
-    if FCreator.FTrimText then include(flags, cefTrim);
-    if FCreator.parsingModel = pmHTML then include(flags, cefWindows1252Extensions);
-    changeEncoding(FEncoding, new, flags);
-  end;
-  FEncoding := new;
-end;
-
 procedure TTreeDocument.addRef;
 begin
   InterlockedIncrement(FRefCount);
@@ -910,52 +893,6 @@ begin
   end;
 end;
 
-procedure TTreeNode.changeEncoding(from, toe: TSystemCodePage; flags: TChangeEncodingFlags);
-  function change(s: string): string;
-  begin
-    result := strConvert(s, from, toe);
-    result := strNormalizeLineEndings(result);
-    if cefSubstituteEntities in flags then
-      if cefWindows1252Extensions in flags then result := strDecodeHTMLEntities(result, toe, [dhefWindows1252Extensions])
-      else result := strDecodeHTMLEntities(result, toe, []);
-    if cefTrim in flags then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
-  end;
-
-var tree: TTreeNode;
-  attrib: TTreeAttribute;
-begin
-  if (from = CP_NONE) or (toe = CP_NONE) then exit;
-  if (from = toe) and not (cefSubstituteEntities in flags) then exit;
-  tree := self;
-  while tree <> nil do begin
-    case tree.typ of
-      tetText: tree.value := change(tree.value);
-      tetInternalDoNotUseCDATAText: begin
-        tree.value:=strNormalizeLineEndings(strConvert(tree.value, from, toe));
-        tree.typ := tetText;
-      end;
-      tetComment: tree.value:=strConvert(tree.value, from, toe);
-      tetProcessingInstruction: begin
-        tree.value:=trim(strNormalizeLineEndings(strConvert(tree.value, from, toe))); //line endings/trim needed?
-        tree.hash := nodeNameHash(tree.value);
-      end;
-      tetDocument, tetOpen, tetClose: begin
-        tree.value := change(tree.value);
-        if tree.hash = 0 then tree.hash := nodeNameHash(tree.value);
-        attrib := tree.attributes;
-        while attrib <> nil do begin
-          attrib.value := change(attrib.value);
-          if attrib.hash = 0 then attrib.hash := nodeNameHash(attrib.value);
-          attrib.realvalue := change(attrib.realvalue);
-          if attrib.isNamespaceNode then attrib.realvalue := xmlStrWhitespaceCollapse(attrib.realvalue);
-          attrib := TTreeAttribute(attrib.next);
-        end;
-      end;
-      else raise ETreeParseException.Create('Unkown tree element: '+tree.outerXML());
-    end;
-    tree := tree.next;
-  end;
-end;
 
 {$ImplicitExceptions off}
 function TTreeNode.findNext(withTyp: TTreeNodeType; const withText: string; findOptions: TTreeNodeFindOptions =[]; sequenceEnd: TTreeNode = nil): TTreeNode;
@@ -1658,16 +1595,6 @@ begin
   addAttribute(result);
 end;
 
-procedure TTreeNode.addAttributes(const props: array of THTMLProperty);
-var
-  i: Integer;
-  doc: TTreeDocument;
-begin
-  if length(props) = 0 then exit();
-  doc := getDocument();
-  for i := 0 to high(props) do
-    addAttribute(doc.createAttribute(strFromPchar(props[i].name, props[i].nameLen), strFromPchar(props[i].value, props[i].valueLen)));
-end;
 
 procedure TTreeNode.addNamespaceDeclaration(n: TNamespace; overrides: boolean );
 begin
@@ -2017,24 +1944,22 @@ begin
       break;
     end;
   if ws < 0 then begin
-    target := strFromPchar(text, textLen);
+    target := trim(parseCDATA(text, textLen));
     content := '';
   end else begin
-    target := strFromPchar(text, ws);
+    target := trim(parseCDATA(text, ws));
     inc(ws);
     //while ((text + ws)^ in WHITE_SPACE) and (ws < textLen)  do inc(ws); to trim or to not trim?
-    content := strFromPchar(text + ws, textLen - ws);
+    content := parseCDATA(text + ws, textLen - ws);
   end;
 
   if target = 'xml' then begin
     tempcontent := content;
     while tempcontent <> '' do begin
       case cutproperty(tempcontent, value) of
-        'encoding': begin
-          case lowercase(value) of
-            'utf-8': FXmlHeaderEncoding:=CP_UTF8;
-            'windows-1252', 'iso-8859-1', 'iso-8859-15', 'latin1': FXmlHeaderEncoding:=CP_Windows1252;
-          end;
+        'encoding': if FEncodingMeta = CP_NONE then begin
+          FEncodingMeta := strEncodingFromName(value);
+          result := abortIfEncodingMismatch;
         end;
         'standalone':
           if allowTextAtRootLevel and (parsingModel = pmStrict) then
@@ -2045,18 +1970,55 @@ begin
     exit;
   end;
   if not FReadProcessingInstructions then exit;
-  new := newTreeNode(tetProcessingInstruction, text, length(target));
-  if content <> '' then new.addAttribute('', strNormalizeLineEndings(content));
-  new.hash := nodeNameHashCheckASCII(new.value);
+  new := appendTreeNode(tetProcessingInstruction, target, longint(text - @FCurrentFile[1]));
+  if content <> '' then new.addAttribute('', content);
+  new.hash := nodeNameHash(new.value);
   new.initialized;
 end;
 
-function TTreeParser.newTreeNode(typ:TTreeNodeType; text: pchar; len: SizeInt): TTreeNode;
+function TTreeParser.abortIfEncodingMismatch: TParsingResult;
 begin
-  result := newTreeNode(typ, strFromPchar(text, len), longint(text - @FCurrentFile[1]));
+  result := prContinue;
+  if (FParsingModel = pmHTML) and (FEncodingMeta = CP_LATIN1) then FEncodingMeta := CP_WINDOWS1252;
+  if FEncodingCurrent = FEncodingMeta then exit;
+  if (FEncodingCurrent = CP_NONE) or (FEncodingMeta = CP_NONE) then exit;
+  if (FEncodingActual <> CP_NONE) and (FEncodingActual <> FEncodingMeta) then exit;
+  case FEncodingCurrent of
+    CP_WINDOWS1252: case FEncodingMeta of
+      CP_WINDOWS1252, CP_ASCII, CP_LATIN1: exit;
+    end;
+    CP_LATIN1: case FEncodingMeta of CP_ASCII: exit; end;
+    CP_UTF8: case FEncodingMeta of
+      CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE, CP_ASCII: exit;
+    end;
+  end;
+  FReparseWithChangedEncoding := true;
+  result := prStop;
 end;
 
-function TTreeParser.newTreeNode(typ: TTreeNodeType; s: string; offset: SizeInt): TTreeNode;
+function TTreeParser.parseRawText(t: pchar; len: SizeInt): string;
+begin
+  result := strConvert(strFromPchar(t, len), FEncodingCurrent, FTargetEncoding);
+end;
+
+function TTreeParser.parseCDATA(t: pchar; len: SizeInt): string;
+begin
+  result := parseRawText(t, len);
+  result := strNormalizeLineEndings(result);
+end;
+
+function TTreeParser.parseTextAttribute(t: pchar; len: SizeInt): string;
+begin
+  result := parseCDATA(t, len);
+  if parsingModel = pmHTML then
+    result := strDecodeHTMLEntities(result, FTargetEncoding, [dhefWindows1252Extensions])
+   else
+    result := strDecodeHTMLEntities(result, FTargetEncoding, []);
+  if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
+end;
+
+
+function TTreeParser.appendTreeNode(typ: TTreeNodeType; s: string; offset: SizeInt): TTreeNode;
 begin
   result:=FCurrentTree.createNode();
   result.typ := typ;
@@ -2089,8 +2051,8 @@ begin
   last := TTreeNode(FElementStack.Last);
   Assert(last<>nil);
   if last.typ = tetOpen then begin
-    new := newTreeNode(tetClose, last.value, last.offset);
-    new.hash := nodeNameHashCheckASCII(new.value);
+    new := appendTreeNode(tetClose, last.value, last.offset);
+    new.hash := nodeNameHash(new.value);
     //new := treeElementClass.create();
     //new.typ:=tetClose;
     //new.value:=last.value;
@@ -2125,8 +2087,8 @@ end;
 
 function TTreeParser.prependTag(const tag: string): TTreeNode;
 begin
-  result := newTreeNode(tetOpen, tag, FCurrentElement.offset+1);
-  result.hash := nodeNameHashCheckASCII(result.value);
+  result := appendTreeNode(tetOpen, tag, FCurrentElement.offset+1);
+  result.hash := nodeNameHash(result.value);
   if result.parent <> nil then
     result.namespace := result.parent.namespace;
   FElementStack.Add(result);
@@ -2211,9 +2173,12 @@ begin
 
 
 function TTreeParser.enterXMLTag(tagName: pchar; tagNameLen: SizeInt;  properties: THTMLProperties): TParsingResult;
+var
+  tag: String;
 begin
   result:=prContinue;
-  enterTagCommon(strFromPchar(tagName, tagNameLen), tagName, properties);
+  tag := parseRawText(tagName, tagNameLen);
+  enterTagCommon(tag, tagName, properties);
 end;
 
 function TTreeParser.enterHTMLTag(tagName: pchar; tagNameLen: SizeInt;  properties: THTMLProperties): TParsingResult;
@@ -2249,20 +2214,42 @@ var
       autoCloseTill('p')
   end;
 
+var new: TTreeNode;
+  function checkMetaForEncoding: TParsingResult;
+  var
+    enc: TSystemCodePage;
+    attrib, attrib2: TTreeAttribute;
+  begin
+    result := prContinue;
+    enc := CP_NONE;
+    for attrib in new.getEnumeratorAttributes do begin
+      if striEqual(attrib.value, 'charset') then begin
+        enc := strEncodingFromName(attrib.realvalue);
+       end else if striEqual(attrib.value, 'http-equiv') and striEqual(attrib.realvalue, 'content-type')  then
+         for attrib2 in new.getEnumeratorAttributes do
+           if striEqual(attrib2.value, 'content') then
+             enc := strEncodingFromContentType(attrib2.realvalue);
+    end;
+    if (enc = CP_NONE) then exit;
+    FEncodingMeta := enc;
+    result := abortIfEncodingMismatch;
+    exit;
+  end;
 
+var hash: TNodeNameHash;
 begin
   result:=prContinue;
 
   if FAutoCloseTag then autoCloseLastTag();
 
-  tag := strFromPchar(tagName, tagNameLen);
+  tag := parseRawText(tagName, tagNameLen);
+  hash := nodeNameHash(tag);
   if (FBasicParsingState = bpmInBody) and repairMissingStartTags and striEqual(tag, 'body') then exit;
   if repairMissingEndTags then doRepairMissingEndTags;
   if repairMissingStartTags then doRepairMissingStartTags(tag)
   else if striEqual(tag, 'body') then FBasicParsingState:=bpmInBody;
 
   FHasOpenedPTag := FHasOpenedPTag or (tag = 'p') or (tag = 'P');
-
 
   //normal auto close
   case FBasicParsingState of
@@ -2275,25 +2262,33 @@ begin
     bpmInBody: if repairMissingStartTags and (striEqual(tag, 'body') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
     bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
   end;
-  FAutoCloseTag:=htmlElementIsChildless(nodeNameHash(tag), tag);
+  FAutoCloseTag:=htmlElementIsChildless(hash, tag);
   if striEqual(tag, 'table') and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, 'table') then
     leaveHTMLTag(tagName, tagNameLen);
 
-  enterTagCommon(tag, tagName, properties);
+  new := enterTagCommon(tag, tagName, properties);
+  if (new.hash = HTMLNodeNameHashs.meta) and (FEncodingMeta = CP_NONE) and (striEqual(tag, 'meta')) then
+    result := checkMetaForEncoding;
 end;
 
-procedure TTreeParser.enterTagCommon(const tag: string; tagName: pchar; const properties: THTMLProperties);
+function TTreeParser.enterTagCommon(const tag: string; tagName: pchar; const properties: THTMLProperties): TTreeNode;
 var
   new: TTreeNode;
   attrib: TTreeAttribute;
+  i: SizeInt;
 begin
-  new := newTreeNode(tetOpen, tag, longint(tagName - @FCurrentFile[1]));
+  new := appendTreeNode(tetOpen, tag, longint(tagName - @FCurrentFile[1]));
+  result := new;
 
   FElementStack.Add(new);
   if length(properties)>0 then begin
-    new.addAttributes(properties);
+    for i := 0 to high(properties) do
+      with properties[i] do
+        new.addAttribute(FCurrentTree.createAttribute(parseTextAttribute(name, nameLen), parseTextAttribute(value, valueLen)));
+
     for attrib in new.getEnumeratorAttributes do
       if strBeginsWith(attrib.value, 'xmlns') then begin
+        attrib.realvalue := xmlStrWhitespaceCollapse(attrib.realvalue);
         if attrib.value = 'xmlns' then
            pushNamespace(attrib.realvalue, '')
          else if strBeginsWith(attrib.value, 'xmlns:') then begin
@@ -2305,7 +2300,7 @@ begin
     for attrib in new.getEnumeratorAttributes do begin
       if pos(':', attrib.value) > 0 then
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
-      attrib.hash := nodeNameHashCheckASCII(attrib.value);
+      attrib.hash := nodeNameHash(attrib.value);
     end;
     if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and ( (FCurrentTree.baseURI = '') or (FCurrentTree.baseURI = FCurrentTree.documentURI) ) and new.hasAttribute('href') then
       FCurrentTree.baseURI := strResolveURI(new.getAttribute('href'), FCurrentTree.documentURI);
@@ -2317,12 +2312,12 @@ begin
   if new.value = '' then
     if parsingModel = pmStrict then raise ETreeParseException.Create('Invalid node with empty name: '+tag)
     else begin
-      new.value:= 'x';// '<' +  strFromPchar(tagName, tagNameLen);
+      new.value:= 'x';
       //new.typ :=tetText;
       if pos(':', tag) > 0 then
         new.value:=tag;
     end;
-  new.hash := nodeNameHashCheckASCII(new.value);
+  new.hash := nodeNameHash(new.value);
 
   new.initialized;
 end;
@@ -2411,7 +2406,7 @@ var
 begin
   last := TTreeNode(FElementStack.Last);
   if (FParsingModel = pmStrict) and (last = nil) then
-    raise ETreeParseException.create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but none was open');
+    raise ETreeParseException.create('The tag <'+parseRawText(tagName,tagNameLen)+'> was closed, but none was open');
 
   if (tagNameLen = 0) then
     if  (tagName <> nil) then exit  //skip tags like </ br>
@@ -2427,19 +2422,20 @@ var
   i: Integer;
   weight: LongInt;
   parenDelta: integer;
-  name: String;
+  tag: String;
   removedCurrentNamespace: Boolean;
 begin
+  tag := parseRawText(tagName, tagNameLen);
   last := TTreeNode(FElementStack.Last);
   result := nil;
   if (strliequal(tagName, last.getNodeName, tagNameLen)) then begin
-    result := newTreeNode(tetClose, tagName, tagNameLen);
-    result.hash := nodeNameHashCheckASCII(result.value);
+    result := appendTreeNode(tetClose, tag, longint(tagName - @FCurrentFile[1]));
+    result.hash := nodeNameHash(result.value);
     result.reverse := last; last.reverse := result;
     FElementStack.Delete(FElementStack.Count-1);
     result.initialized;
   end else if FParsingModel = pmStrict then
-    raise ETreeParseException.Create('The tag <'+strFromPchar(tagName,tagNameLen)+'> was closed, but the latest opened was <'+last.value+'>  (url: '+FCurrentTree.FBaseURI+')')
+    raise ETreeParseException.Create('The tag <'+tag+'> was closed, but the latest opened was <'+last.value+'>  (url: '+FCurrentTree.FBaseURI+')')
   else if FParsingModel in [pmHTML, pmUnstrictXML] then begin
     //try to auto detect unclosed tags
     match:=-1;
@@ -2451,36 +2447,35 @@ begin
     if match > -1 then begin
       //there are unclosed tags, but a tag opening the currently closed exist, close all in between
       if FParsingModel = pmHTML then begin
-        weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
+        weight := htmlTagWeight(tag);
         for i:=match+1 to FElementStack.Count-1 do
           if htmlTagWeight(TTreeNode(FElementStack[i]).value) > weight then
               exit;
       end;
       for i:=match+1 to FElementStack.Count-1 do
         autoCloseLastTag();
-      result := newTreeNode(tetClose, tagName, tagNameLen);
-      result.hash := nodeNameHashCheckASCII(result.value);
+      result := appendTreeNode(tetClose, tag, longint(tagName - @FCurrentFile[1]));
+      result.hash := nodeNameHash(result.value);
       last := TTreeNode(FElementStack[match]);
       last.reverse := result; result.reverse := last;
       FElementStack.Count:=match;
       result.initialized;
     end;
 
-    name := strFromPchar(tagName, tagNameLen);
-    if (FParsingModel = pmHTML) and htmlElementIsChildless(nodeNameHash(name), name) then begin
+    if (FParsingModel = pmHTML) and htmlElementIsChildless(nodeNameHash(tag), tag) then begin
       parenDelta := 0;
       last := FCurrentElement;
-      weight := htmlTagWeight(strFromPchar(tagName, tagNameLen));
+      weight := htmlTagWeight(tag);
       while last <> nil do begin
         if last.typ = tetClose then parenDelta -= 1
         else if (last.typ = tetOpen) then begin
           if htmlTagWeight(last.value) > weight then break;//this will still crash with same weight elements
           parenDelta+=1;
-          if (last.value = name) then begin
+          if (last.value = tag) then begin
             if (last.reverse <> last.next) or (parenDelta <> 0) then break; //do not allow nested auto closed elements (reasonable?)
             //remove old closing tag, and insert new one at the end
-            result := newTreeNode(tetClose, tagName, tagNameLen);
-            result.hash := nodeNameHashCheckASCII(result.value);
+            result := appendTreeNode(tetClose, tag, longint(tagName - @FCurrentFile[1]));
+            result.hash := nodeNameHash(result.value);
             last.reverse.removeElementKeepChildren;
             last.reverse := result; result.reverse := last;
 
@@ -2524,6 +2519,7 @@ var
   tempLen: SizeInt;
   temp: PChar;
   typ: TTreeNodeType;
+  t: String;
 begin
   result:=prContinue;
 
@@ -2559,8 +2555,9 @@ begin
 
 
   typ := tetText;
-  if tfCDATA in tf then typ := tetInternalDoNotUseCDATAText;
-  newTreeNode(typ, text, textLen).initialized;
+  if tfCDATA in tf then t := parseCDATA(text, textLen)
+  else t := parseTextAttribute(text, textLen);
+  appendTreeNode(typ, t, longint(text - @FCurrentFile[1])).initialized;
 end;
 
 function TTreeParser.readComment(text: pchar; textLen: SizeInt): TParsingResult;
@@ -2570,7 +2567,7 @@ begin
     exit;
   if textLen <= 0 then
     exit;
-  newTreeNode(tetComment, text, textLen).initialized;
+  appendTreeNode(tetComment, parseRawText(text, textLen), longint(text - @FCurrentFile[1])).initialized;
 end;
 
 procedure TTreeParser.pushNamespace(const url, prefix: string);
@@ -2578,9 +2575,10 @@ var
   ns: TNamespace;
   nsurl: string;
 begin
-  nsurl := strConvert(url, FXmlHeaderEncoding, FTargetEncoding);
+{  nsurl := strConvert(url, FEncodingCurrent, FTargetEncoding);
   nsurl := strDecodeHTMLEntities(nsurl, FTargetEncoding, [dhefAttribute]);
-  nsurl := xmlStrWhitespaceCollapse(nsurl);
+  nsurl := xmlStrWhitespaceCollapse(nsurl);}
+  nsurl := url;
 
   ns := TNamespace.Make(nsurl, prefix);
   FCurrentNamespaces.Add(ns);
@@ -2719,9 +2717,7 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
 
 
 var
-  el: TTreeNode;
-  attrib: TTreeAttribute;
-  encMeta, encBOM: TSystemCodePage;
+  tempEncoding: TSystemCodePage;
 begin
   FTemplateCount:=0;
   FElementStack.Clear;
@@ -2747,6 +2743,7 @@ begin
   FCurrentTree.FBaseURI:=uri;
   FCurrentTree.FDocumentURI:=uri;
   FCurrentTree.root := FCurrentTree;
+  FCurrentTree.FBaseEncoding := CP_NONE;
   FCurrentElement:=FCurrentTree;
   FElementStack.Clear;
   FElementStack.Add(FCurrentElement);
@@ -2757,19 +2754,25 @@ begin
   flastbody := nil;
   flasthtml := nil;
 
-  encBOM := strEncodingFromBOMRemove(FCurrentFile);
-  if encBOM = CP_NONE then
-    encBOM := strEncodingFromContentType(contentType);
-  case encBOM of
-    CP_UTF8, CP_Windows1252, CP_NONE: ;
-    else begin //do no want to handle multi-byte chars
-      FCurrentFile := strConvert(FCurrentFile, encBOM, FTargetEncoding);
-      encBOM := FTargetEncoding;
+  //see https://www.w3.org/International/articles/spec-summaries/encoding
+  FEncodingMeta := CP_NONE;
+  tempEncoding := strEncodingFromBOMRemove(FCurrentFile); //call always to remove BOM, but ignore if content-type is set
+  FEncodingActual := strEncodingFromContentType(contentType);
+  if FEncodingActual = CP_NONE then FEncodingActual := tempEncoding;
+  FCurrentTree.FBaseEncoding := FEncodingActual;
+  FReparseWithChangedEncoding := false;
+
+  case FEncodingActual of
+    CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: begin
+      //do no want to handle multi-byte chars
+      FCurrentFile := strConvert(FCurrentFile, FEncodingActual, FTargetEncoding);
+      FEncodingCurrent := FTargetEncoding;
+      FEncodingActual := FTargetEncoding;
     end;
+    CP_NONE: if FAutoDetectHTMLEncoding and isInvalidUTF8(FCurrentFile) then FEncodingCurrent := CP_WINDOWS1252
+             else FEncodingCurrent := CP_UTF8;
+    else FEncodingCurrent := FEncodingActual;
   end;
-  FXmlHeaderEncoding := encBOM;
-
-
 
   //parse
   if FParsingModel = pmHTML then begin
@@ -2779,60 +2782,18 @@ begin
     simplehtmlparser.parseML(FCurrentFile,[poRespectXMLProcessingInstructions],@enterXMLTag, @leaveXMLTag, @readText, @readComment, @processingInstruction);
     leaveXMLTag(nil,0); //close root element
   end;
-
+  if FReparseWithChangedEncoding then begin
+    FCurrentTree.Free;
+    result := parseTree(FCurrentFile, uri, contentType + '; charset='+strEncodingName(FEncodingMeta));
+    exit;
+  end;
 
   addTree(FCurrentTree);
 
-  if FAutoDetectHTMLEncoding  then begin
-    FCurrentTree.FEncoding:=CP_NONE;
-    if (encBOM = CP_NONE) and (parsingModel = pmHTML) then
-      encMeta := strEncodingFromContentType(TXQueryEngine.evaluateStaticXPath2('html/head/meta[@http-equiv=''content-type'']/@content', FCurrentTree).toString)
-     else
-      encMeta := encBOM;
-
-    if encBOM = CP_NONE then encBOM := FXmlHeaderEncoding;
-    if encBOM = CP_NONE then encBOM := encMeta;
-    if encMeta  = CP_NONE then encMeta := encBOM;
-    if FXmlHeaderEncoding = CP_NONE then FXmlHeaderEncoding := encBOM;
-    if (encMeta = encBOM) and (encMeta = FXmlHeaderEncoding) and (encMeta <> CP_NONE) then
-      FCurrentTree.FEncoding := encMeta
-    else begin //if in doubt, detect encoding and ignore meta/header data
-      FCurrentTree.FEncoding:=CP_UTF8;
-      el := FCurrentTree.next;
-      while el <> nil do begin
-        case el.typ of
-          tetText, tetInternalDoNotUseCDATAText: if isInvalidUTF8(el.value) then begin
-            FCurrentTree.FEncoding:=CP_WINDOWS1252;
-            break;
-          end;
-          tetOpen, tetDocument: if el.attributes <> nil then begin
-            for attrib in el.getEnumeratorAttributes do
-              if isInvalidUTF8(attrib.value) or isInvalidUTF8(attrib.realvalue) then begin
-                FCurrentTree.FEncoding:=CP_WINDOWS1252;
-                break;
-              end;
-            if FCurrentTree.FEncoding <> CP_UTF8 then break;
-          end;
-        end;
-        el := el.next;
-      end;
-    end;
-
-  end;
-
   result := FCurrentTree;
-  FCurrentTree.FBaseEncoding := FCurrentTree.FEncoding;
-  if FTargetEncoding <> CP_NONE then begin
-    FCurrentTree.setEncoding(FTargetEncoding, true, true);
-  end else begin
-     el := FCurrentTree.next;
-     while el <> nil do begin
-       if el.typ = tetInternalDoNotUseCDATAText then el.typ := tetText;
-       el := el.next;
-     end;
-   end;
-//  if FRootElement = nil then
-//    raise ETemplateParseException.Create('Ungültiges/Leeres Template');
+
+  if FCurrentTree.FBaseEncoding = CP_NONE then FCurrentTree.fbaseEncoding := FEncodingCurrent;
+  FCurrentTree.FEncoding := TargetEncoding;
 end;
 
 function TTreeParser.parseTreeFromFile(filename: string): TTreeDocument;

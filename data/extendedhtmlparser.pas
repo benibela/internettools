@@ -2058,7 +2058,7 @@ begin
   oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 
   initializeCaches;
-  FTemplate.getLastTree.setEncoding(outputEncoding,true,false); //todo: check this for &amp; in templates!
+  //FTemplate.getLastTree.setEncoding(outputEncoding,true,false); //todo: check this for &amp; in templates!
   lastTrimTextNodes := FTrimTextNodes;
 
 

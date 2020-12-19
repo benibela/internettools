@@ -339,7 +339,6 @@ function urlHexDecode(s: string): string;
 
 
 function nodeNameHash(const s: RawByteString): cardinal;
-function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
 function nodeNameHash(p: pchar; len: sizeint): cardinal; inline;
 
 type THashMapHelper = record
@@ -1495,13 +1494,6 @@ end;
 function nodeNameHash(const s: RawByteString): cardinal;
 begin
   result := TXQCaseInsensitiveTypeInfo.hash(pointer(s), length(s));
-end;
-function nodeNameHashCheckASCII(const s: RawByteString): cardinal;
-var
-  i: Integer;
-begin
-  for i := 1 to length(s) do if s[i] >= #128 then exit(0);
-  result := nodeNameHash(s);
 end;
 
 function nodeNameHash(p: pchar; len: sizeint): cardinal;

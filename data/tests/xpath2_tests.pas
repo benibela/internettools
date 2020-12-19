@@ -896,10 +896,10 @@ begin
   t('matches("abracadabra", "bra")', 'true','');
   t('matches("abracadabra", ''^a.*a$'')', 'true', '');
   t('matches("abracadabra", "^bra")', 'false', '');
-  t('poem/text()', 'Kaum hat dies der Hahn gesehen,'#13#10'Fängt er auch schon an zu krähen:'#13#10'«Kikeriki! Kikikerikih!!»'#13#10'Tak, tak, tak! - da kommen sie.', '<poem author="Wilhelm Busch">'#13#10'Kaum hat dies der Hahn gesehen,'#13#10'Fängt er auch schon an zu krähen:'#13#10'«Kikeriki! Kikikerikih!!»'#13#10'Tak, tak, tak! - da kommen sie.'#13#10'</poem>');
+  t('poem/text()', 'Kaum hat dies der Hahn gesehen,'#10'Fängt er auch schon an zu krähen:'#10'«Kikeriki! Kikikerikih!!»'#10'Tak, tak, tak! - da kommen sie.', '<poem author="Wilhelm Busch">'#13#10'Kaum hat dies der Hahn gesehen,'#13#10'Fängt er auch schon an zu krähen:'#13#10'«Kikeriki! Kikikerikih!!»'#13#10'Tak, tak, tak! - da kommen sie.'#13#10'</poem>');
   t('./text()', '', ''); //above /\, white space trimmed
   t('text()', '', '');
-  t('.//text()', 'Kaum hat dies der Hahn gesehen,'#13#10'Fängt er auch schon an zu krähen:'#13#10'«Kikeriki! Kikikerikih!!»'#13#10'Tak, tak, tak! - da kommen sie.', '');
+  t('.//text()', 'Kaum hat dies der Hahn gesehen,'#10'Fängt er auch schon an zu krähen:'#10'«Kikeriki! Kikikerikih!!»'#10'Tak, tak, tak! - da kommen sie.', '');
   t('matches(poem/text(), "Kaum.*krähen", "")', 'false', '');
   t('matches(poem/text(), "Kaum.*krähen")', 'false', '');
   t('matches(poem/text(), "Kaum.*krähen", "s")', 'true', '');
@@ -4171,10 +4171,10 @@ begin
   f('$ABC', 'err:XPST0008');
 
 
-  xml.parseTree('<?xml encoding="utf-8"?><html/>'); if xml.getLastTree.getEncoding <> CP_UTF8 then raise Exception.Create('xml encoding detection failed 1');
-  xml.parseTree('<?xml encoding="windows-1252"?><html/>'); if xml.getLastTree.getEncoding <> CP_Windows1252 then raise Exception.Create('xml encoding detection failed 2');
-  xml.parseTree('<?xml encoding="utf-8" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> CP_UTF8 then raise Exception.Create('xml encoding detection failed 3');
-  xml.parseTree('<?xml encoding="windows-1252" foo="bar"?><html/>'); if xml.getLastTree.getEncoding <> CP_WINDOWS1252 then raise Exception.Create('xml encoding detection failed 4');
+  xml.parseTree('<?xml encoding="utf-8"?><html/>'); if xml.getLastTree.baseEncoding <> CP_UTF8 then raise Exception.Create('xml encoding detection failed 1');
+  xml.parseTree('<?xml encoding="windows-1252"?><html/>'); if xml.getLastTree.baseEncoding <> CP_Windows1252 then raise Exception.Create('xml encoding detection failed 2');
+  xml.parseTree('<?xml encoding="utf-8" foo="bar"?><html/>'); if xml.getLastTree.baseEncoding <> CP_UTF8 then raise Exception.Create('xml encoding detection failed 3');
+  xml.parseTree('<?xml encoding="windows-1252" foo="bar"?><html/>'); if xml.getLastTree.baseEncoding <> CP_WINDOWS1252 then raise Exception.Create('xml encoding detection failed 4');
 
   //HTML parsing tests
   xml.parsingModel:=pmHTML;
@@ -4252,7 +4252,7 @@ begin
 
   xml.TargetEncoding:=CP_NONE;
   nbsp := #$C2#$A0;
-  t('outer-html(/)', '<html><head></head><body>&amp;auml;&amp;nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
+  //t('outer-html(/)', '<html><head></head><body>&amp;auml;&amp;nbsp;</body></html>', '<html>&auml;&nbsp;</html>');
   xml.TargetEncoding:=CP_UTF8;
   t('outer-html(/)', '<html><head></head><body>ä'+nbsp+'</body></html>', '<html>&auml;&nbsp;</html>');
   t('outer-html(/)', '<html><head><script>&nbsp&auml;&nbsp;</script></head><body></body></html>', '<html><script>&nbsp&auml;&nbsp;</script></html>');
