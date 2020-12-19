@@ -452,7 +452,7 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
 
-type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions);
+type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions, dhefNormalizeLineEndings);
      EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -5375,6 +5375,14 @@ begin
       //see https://www.w3.org/TR/html5/syntax.html#tokenizing-character-references
       case p^ of
         //#0: break;
+        #13: begin
+          inc(p);
+          if dhefNormalizeLineEndings in flags then begin
+            append(#10);
+            if (p <= lastChar) and (p^ = #10) then inc(p);
+          end else append(#13);
+        end;
+
         '&': begin
           inc(p);
           marker := p;

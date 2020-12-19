@@ -2008,12 +2008,16 @@ begin
 end;
 
 function TTreeParser.parseTextAttribute(t: pchar; len: SizeInt): string;
+var decodeFlags: TDecodeHTMLEntitiesFlags;
 begin
-  result := parseCDATA(t, len);
-  if parsingModel = pmHTML then
-    result := strDecodeHTMLEntities(result, FTargetEncoding, [dhefWindows1252Extensions])
-   else
-    result := strDecodeHTMLEntities(result, FTargetEncoding, []);
+  if parsingModel = pmHTML then decodeFlags := [dhefNormalizeLineEndings, dhefWindows1252Extensions]
+  else decodeFlags := [dhefNormalizeLineEndings];
+  if FEncodingCurrent = FTargetEncoding then
+    result := strDecodeHTMLEntities(t, len, FTargetEncoding, decodeFlags)
+   else begin
+    result := strConvert(strFromPchar(t, len), FEncodingCurrent, FTargetEncoding);
+    result := strDecodeHTMLEntities(result, FTargetEncoding, decodeFlags)
+   end;
   if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
 end;
 
