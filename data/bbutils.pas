@@ -422,6 +422,7 @@ procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:uni
 {$IFDEF fpc}
 procedure registerFallbackUnicodeConversion; {$ifndef HAS_CPSTRING} deprecated 'Codepage aware extension requires fpc >=3';{$endif}
 function strEncodingFromName(str:string):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
+function strEncodingName(e: TSystemCodePage): string;
 //this can return CP_ACP (perhaps i will change that)
 function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
@@ -3176,6 +3177,21 @@ begin
       'utf-32': result := CP_UTF32;
       {$endif}
       else if strBeginsWith(str, 'cp') then result := StrToIntDef(strAfter(str, 'cp'), CP_NONE);
+    end;
+  end;
+end;
+function strEncodingName(e: TSystemCodePage): string;
+begin
+  e := strActualEncoding(e);
+  case e of
+    CP_UTF8: result := 'UTF-8'; //XML prefers uppercase
+    CP_UTF16BE, CP_UTF16: result := 'UTF-16'; //XML does not need BE/LE in name
+    CP_UTF32BE, CP_UTF32: result := 'UTF-32';
+    1250..1258: result := 'windows-'+IntToStr(e);
+    else begin
+      result := CodePageToCodePageName(e);
+      if result = '' then
+        result := 'cp' + inttostr(e);
     end;
   end;
 end;
