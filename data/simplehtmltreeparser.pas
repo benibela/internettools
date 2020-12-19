@@ -2245,13 +2245,6 @@ var
 begin
   result:=prContinue;
 
-  if tagName^ = '?' then begin //processing instruction
-    if length(properties) > 0 then tagNameLen := properties[high(properties)].value + properties[high(properties)].valueLen - tagName
-    else tagNameLen -= 1;
-    processingInstruction(tagName+1, tagNameLen, []);
-    exit;
-  end;
-
   if FAutoCloseTag then autoCloseLastTag();
 
   tag := strFromPchar(tagName, tagNameLen);

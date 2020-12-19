@@ -311,7 +311,7 @@ begin
             inc(pos);
             marker:=pos;
           end;
-          else if (pos^ = '?') and ([poRespectHTMLCDATAElements, poRespectXMLProcessingInstructions] * options <> []) then handleProcessingInstruction
+          else if (pos^ = '?') and ([poRespectHTMLCDATAElements, poRespectXMLProcessingInstructions, poRespectHTMLProcessingInstructions] * options <> []) then handleProcessingInstruction
           else begin //tag start
             marker:=pos;
 
