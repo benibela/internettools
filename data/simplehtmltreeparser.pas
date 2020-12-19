@@ -431,7 +431,7 @@ type TSerializationCallback = function (node: TTreeNode; includeSelf, insertLine
 var GlobalNodeSerializationCallback: TSerializationCallback;
 
 implementation
-uses xquery, xquery.internals.common, htmlInformation;
+uses xquery.internals.common, htmlInformation;
 
 type THTMLOmittedEndTagInfo = class
   siblings, parents, additionallyclosed: TStringArray;
@@ -1979,7 +1979,7 @@ end;
 function TTreeParser.abortIfEncodingMismatch: TParsingResult;
 begin
   result := prContinue;
-  if (FParsingModel = pmHTML) and (FEncodingMeta = CP_LATIN1) then FEncodingMeta := CP_WINDOWS1252;
+  if (FParsingModel = pmHTML) and ( (FEncodingMeta = CP_LATIN1) or (FEncodingMeta = CP_ASCII) ) then FEncodingMeta := CP_WINDOWS1252;
   if FEncodingCurrent = FEncodingMeta then exit;
   if (FEncodingCurrent = CP_NONE) or (FEncodingMeta = CP_NONE) then exit;
   if (FEncodingActual <> CP_NONE) and (FEncodingActual <> FEncodingMeta) then exit;
@@ -2758,6 +2758,7 @@ begin
   FEncodingMeta := CP_NONE;
   tempEncoding := strEncodingFromBOMRemove(FCurrentFile); //call always to remove BOM, but ignore if content-type is set
   FEncodingActual := strEncodingFromContentType(contentType);
+  if (FParsingModel = pmHTML) and (( FEncodingActual = CP_LATIN1) or (FEncodingActual = CP_ASCII) )  then FEncodingActual := CP_WINDOWS1252;
   if FEncodingActual = CP_NONE then FEncodingActual := tempEncoding;
   FCurrentTree.FBaseEncoding := FEncodingActual;
   FReparseWithChangedEncoding := false;
@@ -2909,20 +2910,21 @@ end;
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
 var
   encoding: String;
+  i: Integer;
 begin
-  encoding := lowercase(contenttype);
-  if pos('charset=utf-8', encoding) > 0 then exit(CP_UTF8);
-  if (pos('charset=windows-1252',encoding) > 0) or
-     (pos('charset=latin1',encoding) > 0) or
-     (pos('charset=iso-8859-1',encoding) > 0) then //also -15
-      exit(CP_Windows1252);
-  if (pos('charset=utf-16le',encoding) > 0) then exit(CP_UTF16);
-  if (pos('charset=utf-16be',encoding) > 0) then exit(CP_UTF16BE);
-  if (pos('charset=utf-16',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}CP_UTF16BE{$ELSE}CP_UTF16{$ENDIF});
-  if (pos('charset=utf-32le',encoding) > 0) then exit(CP_UTF32);
-  if (pos('charset=utf-32be',encoding) > 0) then exit(CP_UTF32BE);
-  if (pos('charset=utf-32',encoding) > 0) then exit({$IFDEF ENDIAN_BIG}CP_UTF32BE{$ELSE}CP_UTF32{$ENDIF});
-  exit(CP_NONE);
+  result := CP_NONE;
+  encoding := trim(striAfter(contenttype, 'charset'));
+  if not encoding.beginsWith('=') then exit;
+  delete(encoding, 1, 1);
+  encoding := trim(encoding);
+  if encoding = '' then exit;
+  if (encoding[1] in ['"', '''']) then
+    for i := 2 to length(encoding) do if encoding[i] = encoding[1] then begin //not standard, but it was suggested in one w3/whatwg document
+      delete(encoding, i, length(encoding));
+      delete(encoding, 1, 1);
+      break;
+    end;
+  result := strEncodingFromName(encoding);
 end;
 
 
