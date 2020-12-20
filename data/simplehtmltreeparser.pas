@@ -340,7 +340,7 @@ protected
   FCurrentTree: TTreeDocument;
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
-  FEncodingActual, FEncodingCurrent, FEncodingMeta: TSystemCodePage;
+  FEncodingInputCertain, FEncodingCurrent, FEncodingMeta: TSystemCodePage;
   FReparseWithChangedEncoding: boolean;
   function abortIfEncodingMismatch: TParsingResult;
   function parseRawText(t: pchar; len: SizeInt): string;
@@ -370,7 +370,7 @@ private
   FCurrentNamespaces: TNamespaceList;
   FCurrentNamespaceDefinitions: TList;
   FCurrentAndPreviousNamespaces: TNamespaceList; //all namespaces encountered during parsing
-  FTargetEncoding: TSystemCodePage;
+  FEncodingTarget, FEncodingTargetActual: TSystemCodePage;
   FHasOpenedPTag: boolean;
   FBasicParsingState: TBasicParsingState; //similar to html 5. Only used when repair start tags is enabled
   FLastHead, flastbody, flasthtml: TTreeNode;
@@ -410,7 +410,7 @@ published
   //** Determines if the encoding should be automatically detected (default true)
   property autoDetectHTMLEncoding: boolean read FAutoDetectHTMLEncoding write fautoDetectHTMLEncoding;
 //  property convertEntities: boolean read FConvertEntities write FConvertEntities;
-  property TargetEncoding: TSystemCodePage read FTargetEncoding write FTargetEncoding;
+  property TargetEncoding: TSystemCodePage read FEncodingTarget write FEncodingTarget;
 end;
 
 function CSSHasHiddenStyle(const style: string): boolean;
@@ -1982,7 +1982,7 @@ begin
   if (FParsingModel = pmHTML) and ( (FEncodingMeta = CP_LATIN1) or (FEncodingMeta = CP_ASCII) ) then FEncodingMeta := CP_WINDOWS1252;
   if FEncodingCurrent = FEncodingMeta then exit;
   if (FEncodingCurrent = CP_NONE) or (FEncodingMeta = CP_NONE) then exit;
-  if (FEncodingActual <> CP_NONE) and (FEncodingActual <> FEncodingMeta) then exit;
+  if (FEncodingInputCertain <> CP_NONE) and (FEncodingInputCertain <> FEncodingMeta) then exit;
   case FEncodingCurrent of
     CP_WINDOWS1252: case FEncodingMeta of
       CP_WINDOWS1252, CP_ASCII, CP_LATIN1: exit;
@@ -1998,7 +1998,7 @@ end;
 
 function TTreeParser.parseRawText(t: pchar; len: SizeInt): string;
 begin
-  result := strConvert(strFromPchar(t, len), FEncodingCurrent, FTargetEncoding);
+  result := strConvert(strFromPchar(t, len), FEncodingCurrent, FEncodingTargetActual);
 end;
 
 function TTreeParser.parseCDATA(t: pchar; len: SizeInt): string;
@@ -2012,11 +2012,11 @@ var decodeFlags: TDecodeHTMLEntitiesFlags;
 begin
   if parsingModel = pmHTML then decodeFlags := [dhefNormalizeLineEndings, dhefWindows1252Extensions]
   else decodeFlags := [dhefNormalizeLineEndings];
-  if FEncodingCurrent = FTargetEncoding then
-    result := strDecodeHTMLEntities(t, len, FTargetEncoding, decodeFlags)
+  if FEncodingCurrent = FEncodingTargetActual then
+    result := strDecodeHTMLEntities(t, len, FEncodingTargetActual, decodeFlags)
    else begin
-    result := strConvert(strFromPchar(t, len), FEncodingCurrent, FTargetEncoding);
-    result := strDecodeHTMLEntities(result, FTargetEncoding, decodeFlags)
+    result := strConvert(strFromPchar(t, len), FEncodingCurrent, FEncodingTargetActual);
+    result := strDecodeHTMLEntities(result, FEncodingTargetActual, decodeFlags)
    end;
   if trimText then result := trim(result); //retrim because &#x20; replacements could have introduced new spaces
 end;
@@ -2664,7 +2664,8 @@ begin
   FCurrentNamespaces := TNamespaceList.Create;
   FCurrentAndPreviousNamespaces := TNamespaceList.Create;
   globalNamespaces := TNamespaceList.Create;
-  FTargetEncoding:=CP_ACP;
+  FEncodingTarget:=CP_ACP;
+  FEncodingTargetActual:=strActualEncoding(FEncodingTarget);
 
   FRepairMissingStartTags:=false; //??
   FRepairMissingEndTags:=true;
@@ -2759,24 +2760,25 @@ begin
   flasthtml := nil;
 
   //see https://www.w3.org/International/articles/spec-summaries/encoding
+  FEncodingTargetActual:=strActualEncoding(FEncodingTarget);
   FEncodingMeta := CP_NONE;
   tempEncoding := strEncodingFromBOMRemove(FCurrentFile); //call always to remove BOM, but ignore if content-type is set
-  FEncodingActual := strEncodingFromContentType(contentType);
-  if (FParsingModel = pmHTML) and (( FEncodingActual = CP_LATIN1) or (FEncodingActual = CP_ASCII) )  then FEncodingActual := CP_WINDOWS1252;
-  if FEncodingActual = CP_NONE then FEncodingActual := tempEncoding;
-  FCurrentTree.FBaseEncoding := FEncodingActual;
+  FEncodingInputCertain := strEncodingFromContentType(contentType);
+  if (FParsingModel = pmHTML) and (( FEncodingInputCertain = CP_LATIN1) or (FEncodingInputCertain = CP_ASCII) )  then FEncodingInputCertain := CP_WINDOWS1252;
+  if FEncodingInputCertain = CP_NONE then FEncodingInputCertain := tempEncoding;
+  FCurrentTree.FBaseEncoding := FEncodingInputCertain;
   FReparseWithChangedEncoding := false;
 
-  case FEncodingActual of
+  case FEncodingInputCertain of
     CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE: begin
       //do no want to handle multi-byte chars
-      FCurrentFile := strConvert(FCurrentFile, FEncodingActual, FTargetEncoding);
-      FEncodingCurrent := FTargetEncoding;
-      FEncodingActual := FTargetEncoding;
+      FCurrentFile := strConvert(FCurrentFile, FEncodingInputCertain, FEncodingTargetActual);
+      FEncodingCurrent := FEncodingTargetActual;
+      FEncodingInputCertain := FEncodingTargetActual;
     end;
-    CP_NONE: if FAutoDetectHTMLEncoding and isInvalidUTF8(FCurrentFile) then FEncodingCurrent := CP_WINDOWS1252
+    CP_NONE: if FAutoDetectHTMLEncoding and isInvalidUTF8Guess(FCurrentFile, 32*1024) then FEncodingCurrent := CP_WINDOWS1252
              else FEncodingCurrent := CP_UTF8;
-    else FEncodingCurrent := FEncodingActual;
+    else FEncodingCurrent := FEncodingInputCertain;
   end;
 
   //parse
