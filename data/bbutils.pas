@@ -5366,9 +5366,11 @@ var
     nodeLen, i: Integer;
     acceptPos: pchar;
     nextNode: pchar;
+    noSpecialCharBlockStart: PAnsiChar;
 begin
   encoding := strActualEncoding(encoding);
   builder.init(@result, l, encoding);
+  noSpecialCharBlockStart := p;
   lastChar:=@p[l-1];
   with builder do begin
     while (p<=lastChar) do begin
@@ -5376,14 +5378,17 @@ begin
       case p^ of
         //#0: break;
         #13: begin
+          if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
           inc(p);
           if dhefNormalizeLineEndings in flags then begin
             append(#10);
             if (p <= lastChar) and (p^ = #10) then inc(p);
           end else append(#13);
+          noSpecialCharBlockStart := p;
         end;
 
         '&': begin
+          if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
           inc(p);
           marker := p;
           case p^ of
@@ -5411,6 +5416,7 @@ begin
                 //no characters match the range
                 append('&');
                 p := marker;
+                noSpecialCharBlockStart := p;
                 continue;
               end;
               case p^ of
@@ -5437,7 +5443,7 @@ begin
               case p^ of
                  'A'..'Z': entityCodeStartPtr := @entityCodeStarts[ord(p^)-ord('A'),0];
                  'a'..'z': entityCodeStartPtr := @entityCodeStarts[ord(p^)-ord('a') + 26,0];
-                 else begin append('&'); continue; end;
+                 else begin append('&'); noSpecialCharBlockStart := p; continue; end;
               end;
               inc(p);
               entity := -1;
@@ -5449,6 +5455,7 @@ begin
                  if p^ = ';' then parseError; //todo: add parse error, when digit and semicolon after arbitrary many alphas
                  append('&');
                  p := marker;
+                 noSpecialCharBlockStart := p;
                  continue;
               end;
 
@@ -5525,13 +5532,14 @@ begin
                 append('&');
             end;
           end;
+          noSpecialCharBlockStart := p;
         end;
-        else begin
-          append(p^);
-          inc(p);
-        end;
+
+
+        else inc(p);
       end;
     end;
+    if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
   end;
   builder.final;
 end;
