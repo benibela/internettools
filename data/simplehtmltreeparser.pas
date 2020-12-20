@@ -2100,11 +2100,11 @@ begin
 end;
 
 procedure TTreeParser.doRepairMissingStartTags(const tag: string);
-  procedure goBack(t: TTreeNode);  //remove t.reverse
+  procedure goBack(t: TTreeNode);  //remove t.reverse and put t in the stack of open elements
   var
     u: TTreeNode;
   begin
-    if t = nil  then exit;
+    if (t = nil) or (t.reverse = nil) then exit;
     if FCurrentElement = t.reverse then begin
       FCurrentElement := FCurrentElement.previous;
       FCurrentElement.next := nil;
@@ -2378,8 +2378,11 @@ begin
           FBasicParsingState:=bpmAfterAfterBody;
         end;
       end;
-    end else if (FBasicParsingState = bpmInBody) and strliEqual(tagname, 'body', tagNameLen) then begin
-      FBasicParsingState:=bpmAfterBody;
+      if tagNameLen > 0 then exit;
+    end else if strliEqual(tagname, 'body', tagNameLen) then begin
+      if FBasicParsingState = bpmInBody then
+        FBasicParsingState:=bpmAfterBody;
+      exit;
     end;
   end;
 
@@ -2390,16 +2393,6 @@ begin
   if (FBasicParsingState = bpmInHead) and strliEqual(tagName, 'head', tagNameLen)  then begin
     FBasicParsingState:=bpmAfterHead;
     FLastHead := new.reverse;
-  end else if (FBasicParsingState in [bpmInBody, bpmAfterBody]) and strliEqual(tagName, 'body', tagNameLen) then begin
-    FBasicParsingState:=bpmAfterBody;
-    if striEqual(new.value, 'body') then flastbody := new.reverse;
-  end else if (FBasicParsingState in [bpmInBody, bpmAfterBody, bpmAfterAfterBody]) and strliEqual(tagName, 'html', tagNameLen) then begin
-    FBasicParsingState:=bpmAfterAfterBody;
-    if striEqual(new.value, 'html') then flasthtml := new.reverse;
-    if flastbody = nil then begin
-      flastbody := flasthtml.previous;
-      while (flastbody <> nil) and (flastbody.typ <> tetClose) do flastbody := flastbody.previous;
-    end;
   end;
 
 end;
