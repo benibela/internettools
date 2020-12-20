@@ -423,7 +423,7 @@ type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<-
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
-function isInvalidUTF8(const s: string): boolean;
+function isInvalidUTF8Guess(const s: string; cutoff: integer): boolean;
 
 
 
@@ -2695,16 +2695,18 @@ end;
 
 
 //like in TeXstudio
-function isInvalidUTF8(const s: string): boolean;
+function isInvalidUTF8Guess(const s: string; cutoff: integer): boolean;
 var
-  prev, cur: Integer;
-  good, bad: Integer;
-  i: Integer;
+  prev, cur: sizeint;
+  good, bad: sizeint;
+  i, len: sizeint;
 begin
   prev := 0;
   good := 0;
   bad := 0;
-  for i := 1 to length(s) do begin
+  len := length(s);
+  if len > cutoff then len := cutoff;
+  for i := 1 to len do begin
     cur := ord(s[i]);
     if (cur and $C0) = $80 then begin
       if (prev and $C0) = $C0 then good += 1
