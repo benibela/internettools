@@ -55,6 +55,15 @@ THTTPSendWithFakeStream = class(THTTPSend)
   constructor Create;
 end;
 
+TSSLOpenSSLOverride = class(TSSLOpenSSL)
+protected
+  FOldSSLType: TSSLType;
+  internetAccess: TSynapseInternetAccess;
+  function customCertificateHandling: boolean;
+  function customQuickClientPrepare: boolean;
+  function Connect: boolean; override;
+end;
+
 { TSynapseInternetAccess }
 //**@abstract(Internet access class using the Synapse library)
 //**Set defaultInternetAccessClass to TSynapseInternetAccess to use it.@br
@@ -86,7 +95,7 @@ implementation
 
 uses synautil,ssl_openssl_lib,bbutils{$ifndef WINDOWS},netdb{$endif};
 
-resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Failed DNS lookup, failed to load OpenSSL, failed proxy, server does not exists or has no open port.';
+resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Failed DNS lookup, failed to load OpenSSL, failed proxy, server does not exists, has no open port or uses an unknown https certificate.';
 
 
 
@@ -139,6 +148,122 @@ begin
   FDocument.Free;
   FDocument := TSynapseSplitStream.Create;
 end;
+
+type
+  PX509_VERIFY_PARAM = pointer;
+  TSSL_get0_param = function(ctx: PSSL_CTX): PX509_VERIFY_PARAM; cdecl;
+  TX509_VERIFY_PARAM_set_hostflags = procedure(param: PX509_VERIFY_PARAM; flags: cardinal); cdecl;
+  TX509_VERIFY_PARAM_set1_host = function(param: PX509_VERIFY_PARAM; name: pchar; nameLen: SizeUInt): integer; cdecl;
+
+const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS = 4;
+var _SSL_get0_param: TSSL_get0_param = nil;
+var _X509_VERIFY_PARAM_set_hostflags: TX509_VERIFY_PARAM_set_hostflags = nil;
+var _X509_VERIFY_PARAM_set1_host: TX509_VERIFY_PARAM_set1_host = nil;
+
+function TSSLOpenSSLOverride.customCertificateHandling: boolean;
+var
+  param: PX509_VERIFY_PARAM;
+begin
+  result := false;
+  if VerifyCert then begin
+    //see https://wiki.openssl.org/index.php/Hostname_validation
+    if not assigned(_SSL_get0_param) or not assigned(_X509_VERIFY_PARAM_set_hostflags) or not assigned(_X509_VERIFY_PARAM_set1_host) then
+      raise EInternetException.create('OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+');
+    param := _SSL_get0_param(Fssl);
+    _X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+    if (_X509_VERIFY_PARAM_set1_host(param, pchar(SNIHost), length(SNIHost)) = 0) then
+      exit;
+  end;
+  result := true;
+end;
+
+function TSSLOpenSSLOverride.customQuickClientPrepare: boolean;
+begin
+  if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) then begin
+    result := Prepare(false);
+    if result then
+      if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then
+        result := false;
+  end else begin
+    sslfree(Fssl);
+    Fssl := SslNew(Fctx);
+    result := FSsl <> nil;
+    if not result then
+      SSLCheck;
+  end;
+  if result then
+    FOldSSLType := FSSLType;
+end;
+
+//copied from Synapse
+function TSSLOpenSSLOverride.Connect: boolean;
+type
+  TSocket = longint;
+const INVALID_SOCKET		= TSocket(NOT(0));
+var
+  x: integer;
+  b: boolean;
+  err: integer;
+begin
+  Result := False;
+  if FSocket.Socket = INVALID_SOCKET then
+    Exit;
+  if customQuickClientPrepare() then
+  begin
+
+    if not customCertificateHandling then
+      exit;
+
+
+{$IFDEF CIL}
+    if sslsetfd(FSsl, FSocket.Socket.Handle.ToInt32) < 1 then
+{$ELSE}
+    if sslsetfd(FSsl, FSocket.Socket) < 1 then
+{$ENDIF}
+    begin
+      SSLCheck;
+      Exit;
+    end;
+    if SNIHost<>'' then
+      SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
+    if FSocket.ConnectionTimeout <= 0 then //do blocking call of SSL_Connect
+    begin
+      x := sslconnect(FSsl);
+      if x < 1 then
+      begin
+        SSLcheck;
+        Exit;
+      end;
+    end
+    else //do non-blocking call of SSL_Connect
+    begin
+      b := Fsocket.NonBlockMode;
+      Fsocket.NonBlockMode := true;
+      repeat
+        x := sslconnect(FSsl);
+        err := SslGetError(FSsl, x);
+        if err = SSL_ERROR_WANT_READ then
+          if not FSocket.CanRead(FSocket.ConnectionTimeout) then
+            break;
+        if err = SSL_ERROR_WANT_WRITE then
+          if not FSocket.CanWrite(FSocket.ConnectionTimeout) then
+            break;
+      until (err <> SSL_ERROR_WANT_READ) and (err <> SSL_ERROR_WANT_WRITE);
+      Fsocket.NonBlockMode := b;
+      if err <> SSL_ERROR_NONE then
+      begin
+        SSLcheck;
+        Exit;
+      end;
+    end;
+  if FverifyCert then
+    if (GetVerifyCert <> 0) or (not DoVerifyCert) then
+      Exit;
+    FSSLEnabled := True;
+    Result := True;
+  end;
+end;
+
 
 procedure addHeader(data: pointer; headerKind: TSynapseInternetAccess.THeaderKind; const name, header: string);
 var
@@ -197,7 +322,7 @@ begin
       exit;
     end;
 
-
+  connection.Sock.SSL.VerifyCert := internetConfig^.checkSSLCertificates;
   initConnection;
   if (url.username <> '') then begin
     connection.UserName := strUnescapeHex(url.username, '%');
@@ -233,6 +358,7 @@ begin
 
   connection:=THTTPSendWithFakeStream.Create;
   (connection.Document as TSynapseSplitStream).internetAccess := self;
+  (connection.Sock.SSL as TSSLOpenSSLOverride).internetAccess := self;
 
   connection.UserAgent:=defaultInternetConfiguration.userAgent;
   if defaultInternetConfiguration.useProxy then begin
@@ -271,8 +397,17 @@ end;
 
 initialization
 
+
+if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
+  _SSL_get0_param := TSSL_get0_param(GetProcAddress(SSLLibHandle, 'SSL_get0_param'));
+  _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
+  _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
+end;
+
 {$IFDEF USE_SYNAPSE_WRAPPER}
 defaultInternetAccessClass := TSynapseInternetAccess;
+SSLImplementation := TSSLOpenSSLOverride;
+defaultInternetConfiguration.searchCertificates;
 {$ENDIF}
 
 

@@ -33,14 +33,15 @@ type
   Not all options are supported by all backends. Compatibility matrix:
 
       @table(
-        @rowHead( @cell(option)           @cell(wininet (w32)) @cell(synapse) @cell(OkHttp for Android) @cell((Android) Apache HttpComponents) )
-        @row(     @cell(useragent)        @cell(yes)           @cell(yes)     @cell(yes)            @cell(yes) )
-        @row(     @cell(tryDefaultConfig) @cell(yes)           @cell(no)      @cell(no)             @cell(no) )
-        @row(     @cell(http proxy)       @cell(yes)           @cell(yes)     @cell(no)             @cell(yes) )
-        @row(     @cell(https proxy)      @cell(yes)      @cell(should use http proxy) @cell(no)    @cell(should use http proxy) )
-        @row(     @cell(socks proxy)      @cell(yes)           @cell(yes)     @cell(no)             @cell(no) )
-        @row(     @cell(proxy user/pass)  @cell(same auth for all proxies)@cell(separate for http and socks)@cell(no)@cell(no) )
-        @row(     @cell(checkSSLCertificates) @cell(yes)       @cell(no, always @false)     @cell(no, depends on Android)   @cell(no, depends on Android) )
+        @rowHead( @cell(option)               @cell(wininet (w32)) @cell(synapse) @cell(OkHttp for Android) @cell((Android) Apache HttpComponents) )
+        @row(     @cell(useragent)            @cell(yes)           @cell(yes)     @cell(yes)            @cell(yes) )
+        @row(     @cell(tryDefaultConfig)     @cell(yes)           @cell(no)      @cell(no)             @cell(no) )
+        @row(     @cell(http proxy)           @cell(yes)           @cell(yes)     @cell(no)             @cell(yes) )
+        @row(     @cell(https proxy)          @cell(yes)           @cell(should use http proxy) @cell(no)    @cell(should use http proxy) )
+        @row(     @cell(socks proxy)          @cell(yes)           @cell(yes)     @cell(no)             @cell(no) )
+        @row(     @cell(proxy user/pass)      @cell(same auth for all proxies)@cell(separate for http and socks)@cell(no)@cell(no) )
+        @row(     @cell(checkSSLCertificates) @cell(yes)           @cell(yes)     @cell(no, depends on Android)   @cell(no, depends on Android) )
+        @row(     @cell(cafile/capath)        @cell(no, uses system CA) @cell(yes)     @cell(no)   @cell(no) )
       )
 
   You can always set more options on the internalHandle returned by TInternetAccess.
@@ -57,10 +58,12 @@ type
     connectionCheckPage: string; //**< url we should open to check if an internet connection exists (e.g. http://google.de)
 
     checkSSLCertificates: boolean; //**< If ssl certificates should be checked in HTTPS connections
+    CAFile, CAPath: string;  //**< CA certificates when using OpenSSL
 
     logToPath: string;
 
     procedure setProxy(proxy: string);
+    procedure searchCertificates;
   end;
   { TDecodedUrl }
 
@@ -798,6 +801,45 @@ begin
   useProxy:=true;
 end;
 
+procedure TInternetConfig.searchCertificates;
+//see https://serverfault.com/questions/62496/ssl-certificate-location-on-unix-linux
+const SystemCAFiles: array[1..2{$ifndef windows}+6{$endif}] of string = (
+{$ifndef windows}
+'/etc/ssl/certs/ca-certificates.crt',                // Debian/Ubuntu/Gentoo etc.
+'/etc/pki/tls/certs/ca-bundle.crt',                  // Fedora/RHEL 6
+'/etc/ssl/ca-bundle.pem',                            // OpenSUSE
+'/etc/pki/tls/cacert.pem',                           // OpenELEC
+'/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem', // CentOS/RHEL 7
+'/etc/ssl/cert.pem',                                 // Alpine Linux
+{$endif}
+'cacert.pem',
+'ca-bundle.crt'
+);
+{$ifndef windows}
+ const SystemCAPaths: array[1..6] of string = (
+'/etc/ssl/certs',               // SLES10/SLES11, https://golang.org/issue/12139
+'/system/etc/security/cacerts', // Android
+'/usr/local/share/certs',       // FreeBSD
+'/etc/pki/tls/certs',           // Fedora/RHEL
+'/etc/openssl/certs',           // NetBSD
+'/var/ssl/certs'               // AIX
+);
+ {$endif}
+ var
+   i: Integer;
+begin
+  for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
+    if CAFile <> '' then break;
+    if FileExists(SystemCAFiles[i]) then CAFile := SystemCAFiles[i];
+  end;
+  {$ifndef windows}
+  for i := low(SystemCAPaths) to high(SystemCAPaths) do begin
+    if CAPath <> '' then break;
+    if DirectoryExists(SystemCAPaths[i]) then CAPath := SystemCAPaths[i];
+  end;
+  {$endif}
+end;
+
 
 
 function TInternetAccess.request(method, protocol, host, url, data: string): string;
@@ -1486,7 +1528,8 @@ procedure freeThreadVars;
 begin
   FreeAndNil(theDefaultInternet);
 end;
-
+initialization
+  defaultInternetConfiguration.checkSSLCertificates := true;
 
 finalization
   freeThreadVars;
