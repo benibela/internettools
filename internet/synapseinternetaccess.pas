@@ -73,7 +73,7 @@ end;
 //**In contrast to native Synapse this will automatically load openssl, if it is called on HTTPS URLs.
 TSynapseInternetAccess=class(TInternetAccess)
 const
-  SSLFallbackMaxVersion = LT_TLSv1_2;
+  SSLFallbackMaxVersion = TSSLType(ord(LT_SSHv2) - 1);
   SSLFallbackMinVersion = LT_TLSv1;
 
 protected
@@ -267,7 +267,7 @@ begin
     end;
     if SNIHost<>'' then
       SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
-    if FSocket.ConnectionTimeout <= 0 then //do blocking call of SSL_Connect
+    if true {FSocket.ConnectionTimeout <= 0} then //do blocking call of SSL_Connect
     begin
       //this is the branch is used by internet tools
       x := sslconnect(FSsl);
@@ -277,7 +277,8 @@ begin
         setCustomError(rsSSLErrorConnectionFailed, -3);
         Exit;
       end;
-    end
+    end;
+    {$if false}
     else //do non-blocking call of SSL_Connect
     begin
       b := Fsocket.NonBlockMode;
@@ -299,6 +300,7 @@ begin
         Exit;
       end;
     end;
+    {$endif}
     if FverifyCert then //seems like this is not needed, since sslconnect already fails on an invalid certificate
       if (GetVerifyCert <> 0) or (not DoVerifyCert) then begin
         setCustomError(rsSSLErrorVerificationFailed, -3);
@@ -345,7 +347,7 @@ procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: 
      connection.MimeType := ContentTypeForData; //this pointless as addHeader overrides it. But it does not hurt either
    end;
    connection.Protocol:='1.1';
-   //fallback to TLS 1 for servers where auto detection fails
+   //fallback to TLS for servers where auto detection fails
    if striequal(url.protocol, 'https') then
      if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := lastHTTPSFallbackType
      else connection.Sock.SSL.SSLType := LT_all;
@@ -451,6 +453,7 @@ end;
 
 initialization
 
+assert(TSynapseInternetAccess.SSLFallbackMaxVersion >= LT_TLSv1_1);
 
 if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
   _SSL_get0_param := TSSL_get0_param(GetProcAddress(SSLLibHandle, 'SSL_get0_param'));
