@@ -244,8 +244,10 @@ type
 const INVALID_SOCKET		= TSocket(NOT(0));
 var
   x: integer;
+{$ifdef false}
   b: boolean;
   err: integer;
+{$endif}
 begin
   Result := False;
   if FSocket.Socket = INVALID_SOCKET then
@@ -456,9 +458,9 @@ initialization
 assert(TSynapseInternetAccess.SSLFallbackMaxVersion >= LT_TLSv1_1);
 
 if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
-  _SSL_get0_param := TSSL_get0_param(GetProcAddress(SSLLibHandle, 'SSL_get0_param'));
-  _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
-  _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
+  _SSL_get0_param := TSSL_get0_param(GetProcedureAddress(SSLLibHandle, 'SSL_get0_param'));
+  _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
+  _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
 end;
 
 {$IFDEF USE_SYNAPSE_WRAPPER}
