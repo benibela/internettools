@@ -7,7 +7,7 @@ object Form1: TForm1
   Caption = 'Form1'
   ClientHeight = 651
   ClientWidth = 866
-  LCLVersion = '1.6.5.0'
+  LCLVersion = '2.0.10.0'
   object Panel1: TPanel
     Left = 0
     Height = 165
@@ -20,7 +20,7 @@ object Form1: TForm1
     TabOrder = 0
     object Label1: TLabel
       Left = 1
-      Height = 18
+      Height = 15
       Top = 1
       Width = 864
       Align = alTop
@@ -29,8 +29,8 @@ object Form1: TForm1
     end
     object Memo1: TMemo
       Left = 1
-      Height = 145
-      Top = 19
+      Height = 148
+      Top = 16
       Width = 864
       Align = alClient
       Font.Name = 'Monospace,Courier'
@@ -48,17 +48,17 @@ object Form1: TForm1
   end
   object Panel2: TPanel
     Left = 0
-    Height = 161
+    Height = 160
     Top = 170
     Width = 866
     Align = alClient
     Caption = 'Panel2'
-    ClientHeight = 161
+    ClientHeight = 160
     ClientWidth = 866
     TabOrder = 1
     object Label2: TLabel
       Left = 1
-      Height = 18
+      Height = 15
       Top = 1
       Width = 864
       Align = alTop
@@ -67,8 +67,8 @@ object Form1: TForm1
     end
     object Memo2: TMemo
       Left = 1
-      Height = 141
-      Top = 19
+      Height = 143
+      Top = 16
       Width = 864
       Align = alClient
       Font.Name = 'Monospace,Courier'
@@ -102,7 +102,7 @@ object Form1: TForm1
     TabOrder = 2
     object Label3: TLabel
       Left = 1
-      Height = 18
+      Height = 15
       Top = 1
       Width = 864
       Align = alTop
@@ -111,8 +111,8 @@ object Form1: TForm1
     end
     object Memo3: TMemo
       Left = 1
-      Height = 145
-      Top = 19
+      Height = 148
+      Top = 16
       Width = 864
       Align = alClient
       Font.Height = -13
@@ -138,54 +138,39 @@ object Form1: TForm1
     Cursor = crVSplit
     Left = 0
     Height = 5
-    Top = 331
+    Top = 330
     Width = 866
     Align = alBottom
     ResizeAnchor = akBottom
   end
   object Panel4: TPanel
     Left = 0
-    Height = 150
-    Top = 336
+    Height = 151
+    Top = 335
     Width = 866
     Align = alBottom
     AutoSize = True
-    ClientHeight = 150
+    ClientHeight = 151
     ClientWidth = 866
     TabOrder = 5
     object options: TGroupBox
       Left = 1
-      Height = 115
+      Height = 116
       Top = 34
       Width = 864
       Align = alClient
-      ClientHeight = 113
+      ClientHeight = 114
       ClientWidth = 862
       Constraints.MinHeight = 115
       TabOrder = 0
       Visible = False
-      object CheckBoxEntities: TCheckBox
-        AnchorSideLeft.Control = Label4
-        AnchorSideLeft.Side = asrBottom
-        AnchorSideTop.Side = asrCenter
-        Left = 154
-        Height = 21
-        Top = 55
-        Width = 180
-        BorderSpacing.Around = 5
-        Caption = 'convert encoding/entities'
-        Checked = True
-        State = cbChecked
-        TabOrder = 0
-      end
       object trimming: TComboBox
-        AnchorSideLeft.Control = CheckBoxEntities
-        AnchorSideLeft.Side = asrBottom
+        AnchorSideLeft.Control = CheckBoxObjects
         AnchorSideTop.Control = Label4
         AnchorSideTop.Side = asrCenter
-        Left = 339
-        Height = 24
-        Top = 54
+        Left = 165
+        Height = 33
+        Top = 48
         Width = 186
         ItemHeight = 0
         ItemIndex = 1
@@ -195,117 +180,116 @@ object Form1: TForm1
           'trim: empty'
           'trim: all'
         )
-        TabOrder = 1
+        TabOrder = 0
         Text = 'trim: matching'
       end
       object Label4: TLabel
         Left = 0
-        Height = 18
+        Height = 15
         Top = 57
-        Width = 149
+        Width = 160
         Caption = 'Tree parsing options:      '
         ParentColor = False
       end
       object Label5: TLabel
         Left = 0
-        Height = 18
+        Height = 15
         Top = 0
-        Width = 110
+        Width = 122
         Caption = 'Template options:'
         ParentColor = False
       end
       object CheckBoxShortnotatin: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
-        Left = 154
-        Height = 21
+        Left = 165
+        Height = 23
         Top = 0
-        Width = 144
+        Width = 163
         BorderSpacing.Around = 5
         Caption = 'Allow short notation'
         Checked = True
         State = cbChecked
-        TabOrder = 2
+        TabOrder = 1
       end
       object Label6: TLabel
         Left = 0
-        Height = 18
+        Height = 15
         Top = 28
-        Width = 80
+        Width = 89
         Caption = 'PXP-Options:'
         ParentColor = False
       end
       object CheckBoxObjects: TCheckBox
         AnchorSideLeft.Control = Label4
         AnchorSideLeft.Side = asrBottom
-        Left = 154
-        Height = 21
+        Left = 165
+        Height = 23
         Top = 27
-        Width = 132
+        Width = 151
         BorderSpacing.Around = 5
         Caption = 'Allow dot notation'
         Checked = True
         State = cbChecked
-        TabOrder = 3
+        TabOrder = 2
       end
       object CheckBoxVarsInStrs: TCheckBox
-        AnchorSideLeft.Control = CheckBoxEntities
+        AnchorSideLeft.Control = CheckBoxObjects
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxObjects
         AnchorSideTop.Side = asrCenter
-        Left = 339
-        Height = 21
+        Left = 321
+        Height = 23
         Top = 27
-        Width = 209
+        Width = 234
         Caption = 'Allow variables in string literals'
         Checked = True
         State = cbChecked
-        TabOrder = 4
+        TabOrder = 3
       end
       object CheckBoxverbose: TCheckBox
-        AnchorSideLeft.Control = CheckBoxEntities
-        AnchorSideTop.Control = CheckBoxEntities
+        AnchorSideLeft.Control = CheckBoxShortnotatin
         AnchorSideTop.Side = asrBottom
-        Left = 154
-        Height = 21
+        Left = 165
+        Height = 23
         Top = 86
-        Width = 119
+        Width = 131
         BorderSpacing.Top = 10
         Caption = 'Verbose output'
         Checked = True
         State = cbChecked
-        TabOrder = 5
+        TabOrder = 4
       end
       object CheckBoxTextOnly: TCheckBox
         AnchorSideLeft.Control = CheckBoxverbose
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxverbose
         AnchorSideTop.Side = asrCenter
-        Left = 278
-        Height = 21
+        Left = 301
+        Height = 23
         Top = 86
-        Width = 76
+        Width = 84
         BorderSpacing.Around = 5
         Caption = 'text only'
         Checked = True
         State = cbChecked
-        TabOrder = 6
+        TabOrder = 5
       end
       object CheckBoxJSON: TCheckBox
         AnchorSideLeft.Control = CheckBoxVarsInStrs
         AnchorSideLeft.Side = asrBottom
         AnchorSideTop.Control = CheckBoxVarsInStrs
         AnchorSideTop.Side = asrCenter
-        Left = 563
-        Height = 21
+        Left = 570
+        Height = 23
         Top = 27
-        Width = 89
+        Width = 103
         BorderSpacing.Around = 15
         Caption = 'Allow JSON'
         Checked = True
         OnChange = CheckBoxJSONChange
         State = cbChecked
-        TabOrder = 7
+        TabOrder = 6
       end
     end
     object Panel5: TPanel
@@ -348,9 +332,9 @@ object Form1: TForm1
       end
       object CheckBoxOptions: TCheckBox
         Left = 487
-        Height = 21
+        Height = 23
         Top = 9
-        Width = 72
+        Width = 80
         Caption = 'Options'
         Color = clNone
         OnChange = CheckBoxOptionsChange

@@ -21,7 +21,6 @@ type
     CheckBoxTextOnly: TCheckBox;
     CheckBoxverbose: TCheckBox;
     CheckBoxOptions: TCheckBox;
-    CheckBoxEntities: TCheckBox;
     CheckBoxObjects: TCheckBox;
     CheckBoxShortnotatin: TCheckBox;
     CheckBoxVarsInStrs: TCheckBox;
@@ -72,7 +71,6 @@ var htmlparser: THtmlTemplateParser;
   i: Integer;
 begin
   htmlparser := THtmlTemplateParser.create;
-  if not CheckBoxEntities.Checked then htmlparser.OutputEncoding:=CP_NONE;
   try
     htmlparser.AllowVeryShortNotation:=CheckBoxShortnotatin.Checked;
     if CheckBoxObjects.Checked then htmlparser.QueryEngine.ParsingOptions.AllowPropertyDotNotation := xqpdnAllowFullDotNotation
@@ -170,7 +168,7 @@ begin
   tp.trimText := trimming.ItemIndex = 3;
   tp.autoDetectHTMLEncoding:=false;
   tp.parseTree(memo2.Lines.Text);
-  if CheckBoxEntities.Checked and assigned(tp.getLastTree) then tp.getLastTree.setEncoding(CP_UTF8, true, true);
+ // if CheckBoxEntities.Checked and assigned(tp.getLastTree) then tp.getLastTree.setEncoding(CP_UTF8, true, true);
   if trimming.ItemIndex = 2 then tp.removeEmptyTextNodes(true);
 end;
 
