@@ -58,6 +58,7 @@ end;
 TSSLOpenSSLOverride = class(TSSLOpenSSL)
 protected
   FOldSSLType: TSSLType;
+  FOldVerifyCert: boolean;
   internetAccess: TSynapseInternetAccess;
   function customCertificateHandling: boolean;
   function customQuickClientPrepare: boolean;
@@ -205,9 +206,9 @@ end;
 
 function TSSLOpenSSLOverride.customQuickClientPrepare: boolean;
 begin
-  if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) then begin
+  if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) or (VerifyCert <> FOldVerifyCert) then begin
     result := Prepare(false);
-    if result then
+    if result and VerifyCert then
       if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then begin
         SSLCheck;
         setCustomError(format(rsSSLErrorNoCA, [internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath]));
@@ -220,8 +221,10 @@ begin
     if not result then
       SSLCheck;
   end;
-  if result then
+  if result then begin
     FOldSSLType := FSSLType;
+    FOldVerifyCert := VerifyCert;
+  end;
 end;
 
 procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
