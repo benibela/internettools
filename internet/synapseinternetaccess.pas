@@ -108,7 +108,7 @@ resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Fa
                         'On Fedora/CentOS install openssl-devel.%s' +
                         'On Windows install OpenSSL from https://slproweb.com/products/Win32OpenSSL.html';
   rsSSLErrorOpenSSLTooOld = 'OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+';
-  rsSSLErrorNoCA = 'Failed to load CA files.';
+  rsSSLErrorNoCA = 'Failed to load CA files from "%s" and "%s".';
   rsSSLErrorSettingHostname = 'Failed to set hostname for certificate validation.';
   rsSSLErrorConnectionFailed = 'HTTPS connection failed after connecting to server. Some possible causes: handshake failure, mismatched HTTPS version/ciphers, invalid certificate';
   rsSSLErrorVerificationFailed = 'HTTPS certificate validation failed';
@@ -210,7 +210,7 @@ begin
     if result then
       if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then begin
         SSLCheck;
-        setCustomError(rsSSLErrorNoCA);
+        setCustomError(format(rsSSLErrorNoCA, [internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath]));
         result := false;
       end;
   end else begin
