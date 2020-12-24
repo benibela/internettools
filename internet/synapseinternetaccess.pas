@@ -72,10 +72,15 @@ end;
 //**You also have to install the Synapse package.@br
 //**In contrast to native Synapse this will automatically load openssl, if it is called on HTTPS URLs.
 TSynapseInternetAccess=class(TInternetAccess)
+const
+  SSLFallbackMaxVersion = LT_TLSv1_2;
+  SSLFallbackMinVersion = LT_TLSv1;
+
 protected
   //synapse will automatically handle keep alive
   connection: THTTPSendWithFakeStream;
   lastHTTPSFallbackHost: string;
+  lastHTTPSFallbackType: TSSLType;
   headersSet: boolean;
   procedure checkHeaders;
   //lastCompleteUrl: string;
@@ -342,7 +347,7 @@ procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: 
    connection.Protocol:='1.1';
    //fallback to TLS 1 for servers where auto detection fails
    if striequal(url.protocol, 'https') then
-     if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := LT_TLSv1
+     if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := lastHTTPSFallbackType
      else connection.Sock.SSL.SSLType := LT_all;
 
    enumerateAdditionalHeaders(url, @addHeader, data.count > 0, connection);
@@ -358,6 +363,7 @@ procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: 
    lastErrorDetails := Format(rsSSLErrorNoOpenSSL, [tempsep,tempsep,tempsep,tempsep]);
   end;
 var ok: Boolean;
+  tempSSLType: TSSLType;
 begin
   if striequal(url.protocol, 'https') then
     if (not IsSSLloaded) then begin//check if ssl is actually loaded
@@ -381,10 +387,15 @@ begin
     ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
   end;
 
+
   if (not ok) and (lastHTTPSFallbackHost <> url.host) then begin
     lastHTTPSFallbackHost := url.host;
-    initConnection;
-    ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+    for tempSSLType := SSLFallbackMaxVersion downto SSLFallbackMinVersion do begin
+      lastHTTPSFallbackType := tempSSLType;
+      initConnection;
+      ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+      if ok then break;
+    end;
   end;
 
   if ok then begin
