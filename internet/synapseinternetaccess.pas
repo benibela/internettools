@@ -61,6 +61,8 @@ protected
   internetAccess: TSynapseInternetAccess;
   function customCertificateHandling: boolean;
   function customQuickClientPrepare: boolean;
+  procedure setCustomError(msg: string; id: integer = -3);
+public
   function Connect: boolean; override;
 end;
 
@@ -96,6 +98,15 @@ implementation
 uses synautil,ssl_openssl_lib,bbutils{$ifndef WINDOWS},netdb{$endif};
 
 resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Failed DNS lookup, failed to load OpenSSL, failed proxy, server does not exists, has no open port or uses an unknown https certificate.';
+  rsSSLErrorNoOpenSSL = 'Couldn''t load ssl libraries: libopenssl and libcrypto%sThey must be installed separately.%s'+
+                        'On Debian/Ubuntu install libssl-dev.%s' +
+                        'On Fedora/CentOS install openssl-devel.%s' +
+                        'On Windows install OpenSSL from https://slproweb.com/products/Win32OpenSSL.html';
+  rsSSLErrorOpenSSLTooOld = 'OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+';
+  rsSSLErrorNoCA = 'Failed to load CA files.';
+  rsSSLErrorSettingHostname = 'Failed to set hostname for certificate validation.';
+  rsSSLErrorConnectionFailed = 'HTTPS connection failed after connecting to server. Some possible causes: handshake failure, mismatched HTTPS version/ciphers, invalid certificate';
+  rsSSLErrorVerificationFailed = 'HTTPS certificate validation failed';
 
 
 
@@ -163,18 +174,28 @@ var _X509_VERIFY_PARAM_set1_host: TX509_VERIFY_PARAM_set1_host = nil;
 function TSSLOpenSSLOverride.customCertificateHandling: boolean;
 var
   param: PX509_VERIFY_PARAM;
+label onError;
 begin
   result := false;
   if VerifyCert then begin
     //see https://wiki.openssl.org/index.php/Hostname_validation
-    if not assigned(_SSL_get0_param) or not assigned(_X509_VERIFY_PARAM_set_hostflags) or not assigned(_X509_VERIFY_PARAM_set1_host) then
-      raise EInternetException.create('OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+');
-    param := _SSL_get0_param(Fssl);
-    _X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-    if (_X509_VERIFY_PARAM_set1_host(param, pchar(SNIHost), length(SNIHost)) = 0) then
+    if not assigned(_SSL_get0_param) or not assigned(_X509_VERIFY_PARAM_set_hostflags) or not assigned(_X509_VERIFY_PARAM_set1_host) then begin
+      setCustomError(rsSSLErrorOpenSSLTooOld, -2);
       exit;
+    end;
+    param := _SSL_get0_param(Fssl);
+    if param = nil then
+      goto onError;
+    _X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+    if _X509_VERIFY_PARAM_set1_host(param, pchar(SNIHost), length(SNIHost)) = 0 then
+      goto onError;
   end;
   result := true;
+  exit;
+
+onError:
+  setCustomError(rsSSLErrorSettingHostname, -2);
+  result := false;
 end;
 
 function TSSLOpenSSLOverride.customQuickClientPrepare: boolean;
@@ -182,8 +203,11 @@ begin
   if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) then begin
     result := Prepare(false);
     if result then
-      if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then
+      if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then begin
+        SSLCheck;
+        setCustomError(rsSSLErrorNoCA);
         result := false;
+      end;
   end else begin
     sslfree(Fssl);
     Fssl := SslNew(Fctx);
@@ -193,6 +217,19 @@ begin
   end;
   if result then
     FOldSSLType := FSSLType;
+end;
+
+procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
+var
+  err: String;
+begin
+  internetAccess.lastHTTPResultCode := id;
+  err := msg;
+  if LastErrorDesc <> '' then err += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
+  if internetAccess.lastErrorDetails.contains(err) then exit;
+  if internetAccess.lastErrorDetails <> '' then internetAccess.lastErrorDetails += LineEnding;
+  internetAccess.lastErrorDetails += err;
+
 end;
 
 //copied from Synapse
@@ -214,7 +251,6 @@ begin
     if not customCertificateHandling then
       exit;
 
-
 {$IFDEF CIL}
     if sslsetfd(FSsl, FSocket.Socket.Handle.ToInt32) < 1 then
 {$ELSE}
@@ -228,10 +264,12 @@ begin
       SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
     if FSocket.ConnectionTimeout <= 0 then //do blocking call of SSL_Connect
     begin
+      //this is the branch is used by internet tools
       x := sslconnect(FSsl);
       if x < 1 then
       begin
         SSLcheck;
+        setCustomError(rsSSLErrorConnectionFailed, -3);
         Exit;
       end;
     end
@@ -256,9 +294,11 @@ begin
         Exit;
       end;
     end;
-  if FverifyCert then
-    if (GetVerifyCert <> 0) or (not DoVerifyCert) then
-      Exit;
+    if FverifyCert then //seems like this is not needed, since sslconnect already fails on an invalid certificate
+      if (GetVerifyCert <> 0) or (not DoVerifyCert) then begin
+        setCustomError(rsSSLErrorVerificationFailed, -3);
+        Exit;
+      end;
     FSSLEnabled := True;
     Result := True;
   end;
@@ -309,18 +349,23 @@ procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: 
    headersSet := false;
   end;
 
+  procedure errorFailedToLoadSSL;
+  var
+    tempsep: String;
+  begin
+   tempsep := LineEnding + ' ' + #9 ;
+   lastHTTPResultCode := -2;
+   lastErrorDetails := Format(rsSSLErrorNoOpenSSL, [tempsep,tempsep,tempsep,tempsep]);
+  end;
 var ok: Boolean;
 begin
   if striequal(url.protocol, 'https') then
     if (not IsSSLloaded) then begin//check if ssl is actually loaded
-      lastHTTPResultCode := -2;
-      lastErrorDetails := 'Couldn''t load ssl libraries: libopenssl and libcrypto' + LineEnding +
-                          'They must be installed separately.' + LineEnding +
-                          '  On Debian/Ubuntu install libssl-dev.' + LineEnding +
-                          '  On Fedora/CentOS install openssl-devel.' + LineEnding +
-                          '  On Windows install OpenSSL from https://slproweb.com/products/Win32OpenSSL.html';
+      errorFailedToLoadSSL;
       exit;
     end;
+
+  lastHTTPResultCode := -4;
 
   connection.Sock.SSL.VerifyCert := internetConfig^.checkSSLCertificates;
   initConnection;
@@ -344,10 +389,8 @@ begin
 
   if ok then begin
     checkHeaders;
-  end else begin
-    lastHTTPResultCode := -4;
+  end else if lastHTTPResultCode = -4 then
     lastErrorDetails := rsConnectionFailed;
-  end;
 end;
 
 constructor TSynapseInternetAccess.create();
