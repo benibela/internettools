@@ -803,7 +803,7 @@ end;
 
 procedure TInternetConfig.searchCertificates;
 //see https://serverfault.com/questions/62496/ssl-certificate-location-on-unix-linux
-const SystemCAFiles: array[1..2{$ifndef windows}+6{$endif}] of string = (
+const SystemCAFiles: array[1..2{$ifndef windows}+7{$endif}] of string = (
 {$ifndef windows}
 '/etc/ssl/certs/ca-certificates.crt',                // Debian/Ubuntu/Gentoo etc.
 '/etc/pki/tls/certs/ca-bundle.crt',                  // Fedora/RHEL 6
@@ -811,26 +811,35 @@ const SystemCAFiles: array[1..2{$ifndef windows}+6{$endif}] of string = (
 '/etc/pki/tls/cacert.pem',                           // OpenELEC
 '/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem', // CentOS/RHEL 7
 '/etc/ssl/cert.pem',                                 // Alpine Linux
+'/usr/local/ssl/cert.pem',                           // OpenSSL default
 {$endif}
 'cacert.pem',
 'ca-bundle.crt'
 );
 {$ifndef windows}
- const SystemCAPaths: array[1..6] of string = (
+ const SystemCAPaths: array[1..7] of string = (
 '/etc/ssl/certs',               // SLES10/SLES11, https://golang.org/issue/12139
 '/system/etc/security/cacerts', // Android
 '/usr/local/share/certs',       // FreeBSD
 '/etc/pki/tls/certs',           // Fedora/RHEL
 '/etc/openssl/certs',           // NetBSD
-'/var/ssl/certs'               // AIX
+'/var/ssl/certs',              // AIX
+'/usr/local/ssl/certs'         // OpenSSL default
 );
+
+
  {$endif}
  var
    i: Integer;
+   temp: AnsiString;
 begin
   for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
     if CAFile <> '' then break;
     if FileExists(SystemCAFiles[i]) then CAFile := SystemCAFiles[i];
+  end;
+  if (CAFile = '') then begin
+    temp := GetEnvironmentVariable('SSL_CERT_FILE');
+    if (temp <> '') and (FileExists(temp)) then CAFile := temp;
   end;
   {$ifndef windows}
   for i := low(SystemCAPaths) to high(SystemCAPaths) do begin
@@ -838,6 +847,10 @@ begin
     if DirectoryExists(SystemCAPaths[i]) then CAPath := SystemCAPaths[i];
   end;
   {$endif}
+  if (CAPath = '') then begin
+    temp := GetEnvironmentVariable('SSL_CERT_DIR');
+    if (temp <> '') and (DirectoryExists(temp)) then CAPath := temp;
+  end;
 end;
 
 
@@ -1518,7 +1531,7 @@ function defaultInternet: TInternetAccess;
 begin
   if theDefaultInternet <> nil then exit(theDefaultInternet);
   if defaultInternetAccessClass = nil then
-    raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android. Or you can add one of the units synapseinternetaccess, androidinternetaccecss or w32internetaccess to your uses clauses (if that unit actually will be compiled depends on the active defines).');
+    raise Exception.Create('You need to set defaultInternetAccessClass to choose between synapse, wininet or android. Or you can add one of the units synapseinternetaccess, okhttpinternetaccecss or w32internetaccess to your uses clauses (if that unit actually will be compiled depends on the active defines).');
   theDefaultInternet := defaultInternetAccessClass.create;
   result := theDefaultInternet;
 end;
