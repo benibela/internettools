@@ -1701,7 +1701,7 @@ type
   TXQFunctionParameterTypes = record
     types: array of TXQTermSequenceType;
     returnType: TXQTermSequenceType;
-    function serialize: string;
+    function serialize(separator: string = ''): string;
     function clone: TXQFunctionParameterTypes;
     procedure raiseErrorMessage(values: PIXQValue; count: integer; const context: TXQEvaluationContext; term: TXQTerm; const addendum: string);
     procedure checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm);
@@ -2915,6 +2915,7 @@ public
     LastDebugInfo: TXQDebugInfo;
 
     class procedure registerNativeModule(const module: TXQNativeModule);
+    {$ifdef DUMPFUNCTIONS}class procedure dumpFunctions;{$endif}
 
     function getEvaluationContext(staticContextOverride: TXQStaticContext = nil): TXQEvaluationContext;
 
@@ -3184,6 +3185,7 @@ public
   //function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
 
   function findSimilarFunctionsDebug(searched: TList; const localname: string): string;
+  {$ifdef DUMPFUNCTIONS}procedure dumpFunctions;{$endif}
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
@@ -4247,17 +4249,25 @@ begin
 end;
 
 
-function TXQFunctionParameterTypes.serialize: string;
+function TXQFunctionParameterTypes.serialize(separator: string = ''): string;
 var
   j: Integer;
+  humanReadable: Boolean;
 begin
-  result := '(';
+  result := '';
+  humanReadable := separator = '';
+  if humanReadable then separator := ', ';
+  if humanReadable then result := '(';
   for j := 0 to high(types) do begin
-    if j <> 0 then result += ', ';
+    if j <> 0 then result += separator;
     result += types[j].serialize;
   end;
-  result += ')';
-  if returnType <> nil then result += ' as ' + returnType.serialize
+  if humanReadable then result += ')';
+  if returnType <> nil then begin
+    if humanReadable then result += ' as '
+    else result += separator;
+    result += returnType.serialize
+  end;
 end;
 
 function TXQFunctionParameterTypes.clone: TXQFunctionParameterTypes;
@@ -4386,7 +4396,7 @@ begin
      case typ of
        tneaSameNode: result := 'self::';
        tneaDirectParent: result := 'parent::';
-       tneaDirectChild: result := 'child::';
+       tneaDirectChild: result := '';//child::';
        tneaDirectChildImplicit: result := '';
        tneaSameOrDescendant: result := 'same-or-descendant::';
        tneaDescendant: result := 'descendant::';
@@ -4400,17 +4410,22 @@ begin
        tneaFunctionSpecialCase: result := '(:special-case::)';
        else result := '???';
      end;
-   if qmElement in matching then result += 'element';
-   if qmText in matching then result += 'text';
-   if qmComment in matching then result += 'comment';
-   if qmProcessingInstruction in matching then result += 'document';
-   if qmAttribute in matching then result += 'attribute';
-   if qmDocument in matching then result += 'document';
+   if matching = [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute,qmDocument] then result += 'node'
+   else begin
+     if qmElement in matching then result += 'element';
+     if qmText in matching then result += 'text';
+     if qmComment in matching then result += 'comment';
+     if qmProcessingInstruction in matching then result += 'processing-instruction';
+     if qmAttribute in matching then result += 'attribute';
+     if qmDocument in matching then result += 'document-node';
+   end;
    result += '(';
-   if qmCheckNamespacePrefix in matching then result += 'Q{'+namespaceURLOrPrefix+'}';
-   if qmCheckNamespaceURL in matching then result += namespaceURLOrPrefix + ':';
+   if qmCheckNamespaceURL in matching then
+     if namespaceURLOrPrefix = 'http://www.w3.org/2010/xslt-xquery-serialization' then result += 'output:'
+     else result += 'Q{'+namespaceURLOrPrefix+'}';
+   if qmCheckNamespacePrefix in matching then result += namespaceURLOrPrefix + ':';
    if qmValue in matching then result += value;
-   if qmCheckOnSingleChild in matching then result += '(:single child:)';
+   if qmCheckOnSingleChild in matching then result += 'element(*)';
 
    if requiredType <> nil then result += ', '+requiredType.serialize;
    result += ')';
@@ -9104,6 +9119,15 @@ begin
   nativeModules.AddObject(module.namespace.getURL, module);
 end;
 
+{$ifdef DUMPFUNCTIONS}
+class procedure TXQueryEngine.dumpFunctions;
+var
+  i: Integer;
+begin
+  for i := 0 to nativeModules.count -  1 do
+    (nativeModules.Objects[i] as TXQNativeModule).dumpFunctions;
+end;
+{$endif}
 
 class function TXQueryEngine.getCollation(id: string; base: string; errCode: string): TXQCollation;
 var
@@ -9713,22 +9737,40 @@ end;
 
 
 {$ifdef dumpFunctions}
-procedure TXQNativeModule.logFunctionCreation(const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string);
+var dumpedModules: array of TXQNativeModule;
+procedure TXQNativeModule.dumpFunctions();
 var
-  i: Integer;
-  version: String;
+  prefix,version: String;
+  procedure logFunction(f: TXQAbstractFunctionInfo);
+  var i: Integer;
+  begin
+    with f do begin
+      if length(versions) = 0 then
+        writeln(prefix,' name="', xmlStrEscape(name,true), '" min-arg-count="',minArgCount,'" max-arg-count="', maxArgCount,'"/>')
+      else
+        for i := 0 to high(versions) do begin
+          write(prefix,' name="', xmlStrEscape(name,true), '" arg-count="',length(versions[i].types),'" args="');
+          if i < length(versions) then write(xmlStrEscape(versions[i].serialize(';'), true));
+          writeln('"/>');
+        end;
+    end;
+  end;
+
+var i: Integer;
 begin
+//  writeln(self.namespace.getURL);
+  for i := 0 to high(dumpedModules) do if dumpedModules[i] = self then exit;
+  dumpedModules := concat(dumpedModules, [self]);
+  //const name: string; const info: TXQAbstractFunctionInfo; const typeChecking: array of string
   if xqpmXQuery1 in acceptedModels then version := '1.0'
-  else version := '3.0';
-  i := 0;
-  repeat
-    write('<f m="', xmlStrEscape(trim(namespace.getURL),true), '" version="'+version+'" name="', xmlStrEscape(name,true), '" args="');
-    if i < length(typeChecking) then write(xmlStrEscape(typeChecking[i], true))
-    else if info.minArgCount = info.maxArgCount then write(info.minArgCount, ' argument', IfThen(info.minArgCount = 1, '', 's'))
-    else write(info.minArgCount, ' to ',info.maxArgCount, ' arguments');
-    writeln('"/>');
-    inc(i);
-  until i >= length(typeChecking);
+  else if xqpmXQuery3_0 in acceptedModels then version := '3.0'
+  else version := '3.1';
+  prefix := '<f m="' + xmlStrEscape(trim(namespace.getURL),true) + '" version="'+version+'"';
+  for i := 0 to basicFunctions.Count - 1 do logFunction(basicFunctions.Objects[i] as TXQAbstractFunctionInfo);
+  for i := 0 to complexFunctions.Count - 1 do logFunction(complexFunctions.Objects[i] as TXQAbstractFunctionInfo);
+  for i := 0 to interpretedFunctions.Count - 1 do logFunction(interpretedFunctions.Objects[i] as TXQAbstractFunctionInfo);
+
+  for i := 0 to high(parents) do parents[i].dumpFunctions;
 end;
 {$endif}
 

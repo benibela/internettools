@@ -791,13 +791,24 @@ begin
   case kind of
     tikNone: exit( 'empty-sequence()' );
     tikAny: result := 'item()';
-    tikAtomic, tikJSONiqTest: begin
+    tikAtomic: begin
       if atomicTypeInfo = nil then exit(name + '(TYPE NOT FOUND)');
-      if atomicTypeInfo.schema <> baseSchema then result := 'Q{' + atomicTypeInfo.schema.url + '}'
+      if (atomicTypeInfo.schema <> baseSchema) and (atomicTypeInfo.schema <> baseJSONiqSchema) then result := 'Q{' + atomicTypeInfo.schema.url + '}'
       else result :=  '';
       result += atomicTypeInfo.name;
     end;
-    tikFunctionTest: result := 'function';
+    tikJSONiqTest: result += atomicTypeInfo.name;
+    tikFunctionTest: begin
+      result := 'function(';
+      if length(arguments) = 0 then result += '*)'
+      else begin
+        for i := 0 to high(arguments) - 1 do begin
+          if i <> 0 then result += ', ';
+          result += arguments[i].serialize;
+        end;
+        result += ') as ' + arguments[high(arguments)].serialize;
+      end;
+    end;
     tikElementTest: result := nodeMatching.serialize();
     tikUnion: begin
       result := '';
@@ -805,8 +816,10 @@ begin
         result += '| ' + (children[i] as TXQTermSequenceType).serialize;
       delete(result, 1, 2);
     end;
-    tikArrayTest: result := 'array';
-    tikMapTest: result := 'map';
+    tikArrayTest: if length(children) = 0 then result := 'array(*)'
+                  else result := 'array('+(children[0] as TXQTermSequenceType).serialize+')';
+    tikMapTest: if length(children) = 0 then result := 'map(*)'
+                  else result := 'map('+(children[0] as TXQTermSequenceType).serialize+', '+(children[1] as TXQTermSequenceType).serialize+')';
   end;
   if allowNone and allowMultiple then result += '*'
   else if allowMultiple then result += '+'
