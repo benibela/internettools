@@ -9703,7 +9703,7 @@ begin
       moduleResult += '    ' + functionName(complexFunctions[i], TXQComplexFunctionInfo(complexFunctions.Objects[i]));
   if moduleResult <> '' then begin
     result += '  In module ' + namespaceGetURL(namespace);
-    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
+//    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
       result += acceptedModels.requiredModelToString;
     result += ':'+LineEnding+moduleResult+LineEnding;
   end;

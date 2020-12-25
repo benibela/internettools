@@ -7792,6 +7792,7 @@ transform
 
 
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
+  fnarray.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnarray);
   fnarray.registerFunction('size', @xqFunctionArraySize).setVersionsShared([arrayt, integer]);
   fnarray.registerFunction('get', @xqFunctionArrayGet).setVersionsShared([arrayt, integer, itemStar]);
@@ -7817,6 +7818,7 @@ transform
   fnarray.registerFunction('flatten', @xqFunctionArrayFlatten).setVersionsShared([itemStar, itemStar]);
 
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
+  fnmap.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnmap);
   fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
   fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
