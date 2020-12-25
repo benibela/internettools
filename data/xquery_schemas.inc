@@ -1429,7 +1429,7 @@ begin
 
 
   map := TXQTermSequenceType.create(tikMapTest); mapStar := star(map);
-  arrayt := TXQTermSequenceType.create(baseJSONiqSchema.array_); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
+  arrayt := TXQTermSequenceType.create(tikArrayTest); arrayOrEmpty := orEmpty(arrayt); arrayStar := star(arrayt);
   null := TXQTermSequenceType.create(baseJSONiqSchema.jsNull);
   jsonItemOrEmpty := TXQTermSequenceType.create(baseJSONiqSchema.jsonItem, true);  jsonItemStar := star(jsonItemOrEmpty);
 
