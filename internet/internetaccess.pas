@@ -832,7 +832,17 @@ const SystemCAFiles: array[1..2{$ifndef windows}+7{$endif}] of string = (
  var
    i: Integer;
    temp: AnsiString;
+{$ifdef windows}
+   programPath: String;
+{$endif}
 begin
+  {$ifdef windows}
+  programPath:=IncludeTrailingBackslash(ExtractFilePath(ParamStr(0)));
+  for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
+    if CAFile <> '' then break;
+    if FileExists(programPath + SystemCAFiles[i]) then CAFile := programPath + SystemCAFiles[i];
+  end;
+  {$endif}
   for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
     if CAFile <> '' then break;
     if FileExists(SystemCAFiles[i]) then CAFile := SystemCAFiles[i];
