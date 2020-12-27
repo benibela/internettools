@@ -101,7 +101,9 @@ implementation
 
 {$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 
-uses synautil,ssl_openssl_lib,bbutils{$ifndef WINDOWS},netdb{$endif};
+uses synautil,ssl_openssl_lib,bbutils
+     {$ifndef WINDOWS},netdb{$endif}
+     {$if FPC_FULLVERSION < 30101},dynlibs{$endif};
 
 resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Failed DNS lookup, failed to load OpenSSL, failed proxy, server does not exists, has no open port or uses an unknown https certificate.';
   rsSSLErrorNoOpenSSL = 'Couldn''t load ssl libraries: libopenssl and libcrypto%sThey must be installed separately.%s'+
