@@ -7757,7 +7757,7 @@ transform
 
 
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, dependencyAll).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
-  fn3.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())'], [xqcdContextOther]);
+  fn3_1.registerFunction('random-number-generator', @xqFunctionRandom_Number_Generator, ['() as map(xs:string, item())', '($seed as xs:anyAtomicType?) as map(xs:string, item())'], [xqcdContextOther]);
 
   fn3_1.registerFunction('apply', @xqFunctionApply, dependencyNone).setVersionsShared([functiont, arrayt, itemStar]);
   fn3_1.registerFunction('contains-token', @xqFunctionContains_Token, [xqcdContextCollation]).setVersionsShared([stringStar, stringt, boolean],  [stringStar, stringt, stringt, boolean]);
