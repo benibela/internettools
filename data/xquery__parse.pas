@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {$mode objfpc}{$H+}
 {$ModeSwitch advancedrecords}
+{$PackSet 4}
 interface
 
 uses
