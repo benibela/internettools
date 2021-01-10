@@ -2071,7 +2071,7 @@ begin
     else
       case seq[0].kind of
         pvkNode, pvkObject, pvkArray: exit(true);
-        else raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean');
+        else raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean', nil, self);
       end;
 
   end;
