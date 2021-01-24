@@ -1379,8 +1379,11 @@ begin
 
         //headers
         if (method <> xqsmHTML) then begin
-          if not omitXmlDeclaration then
+          if not omitXmlDeclaration then begin
             serializer.appendXMLHeader(version, encoding, standalone);
+            if indent = xqsiwIndent then
+              serializer.append(LineEnding);
+          end;
         end;
         if isHTML5 and (not hasDoctypeSystem)
            and (firstElement <> nil) and striEqual(firstElement.value, 'html')  {todo and only whitespace before firstelement}
