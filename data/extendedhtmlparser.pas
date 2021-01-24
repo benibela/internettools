@@ -149,7 +149,7 @@ TXQTermVariableArray = array of TXQTermVariable;
   @bold(Getting started)
 
 
-  Creating a template to analyze a XML-file/webpage:
+  Creating a template to analyze an XML-file/webpage:
 
   @orderedList(
 
@@ -2430,7 +2430,7 @@ begin
   { try to detect the type of an extract expression:
     Template:  if it is an xml file, i.e. starts with a <
     CSS:       If it contains many # or .    i.e. if there is a [#.] before any other non letter/space character
-    XQuery:    If it starts with a XQuery only command (i.e. xquery version, declare function, ...)
+    XQuery:    If it starts with an XQuery only command (i.e. xquery version, declare function, ...)
     XPath:     otherwise
   }
 

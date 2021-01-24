@@ -180,7 +180,9 @@ type
 
   //============================XQUERY CONTEXTS==========================
 
-  //** Static context containing values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
+  //** Static context containing default values and values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
+  //**
+  //** If a query contains multiple queries (e.g. from importing modules), each query can have its own static context.
   TXQStaticContext = class
   private
     FNodeCollation: TXQCollation;  // default collation used for node name comparisons (extension, does not exist in XQuery)
@@ -970,8 +972,8 @@ type
     function stringifyNodes: IXQValue; override;
     function hasNodes: boolean; override;
 
-    procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that a xpath sequence cannot contain another sequence, so they will be merged)
-    procedure addOrdered(const node: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that a xpath sequence cannot contain another sequence, so they will be merged)
+    procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that an xpath sequence cannot contain another sequence, so they will be merged)
+    procedure addOrdered(const node: IXQValue); inline; //**< Adds a value to a sequence of nodes sorted in document order(notice that an xpath sequence cannot contain another sequence, so they will be merged)
 
     destructor Destroy; override;
   end;
@@ -1761,7 +1763,7 @@ type
     procedure initialize();
     destructor Destroy; override;
   end;
-  //**Information about a xquery binary operator
+  //**Information about an xquery binary operator
   TXQOperatorFlags = set of (xqofAssociativeSyntax, //if the syntax is associative. (not the semantic!). e.g. @code(1 + 2 + 3) is valid, but @code(1 eq 2 = true()) is a syntax error;
                              xqofCastUntypedToString,
                              xqofCastUntypedToDouble,
@@ -2578,13 +2580,13 @@ type
   //TXQDefineVariableEvent = procedure(sender: TObject; const variable: string; const value: IXQValue) of object;
 
   (***
-    @abstract(Event callback that is called to set the @code(value) of a XQuery variable declared as "declare variable ... external").
+    @abstract(Event callback that is called to set the @code(value) of an XQuery variable declared as "declare variable ... external").
 
     The return value can be created with one of the xqvalue(..) functions.
   *)
   TXQDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue) of object;
   (***
-  @abstract(Event callback that is called to set a function @code(value) of a XQuery function declared as "declare function ... external").
+  @abstract(Event callback that is called to set a function @code(value) of an XQuery function declared as "declare function ... external").
 
   The function in @code(result) has already been initialized with the parameters and result type, only the term in @code(result.body) has to be set.@br
   You can either create an syntax tree for the function with the respective TXQTerm classes or derive a class from TXQTerm and override the evaluate function to calculate it natively.
@@ -2638,14 +2640,14 @@ type
   (***
     @abstract(@bold(This is the XPath/XQuery-engine))
 
-    You can use this class to evaluate a XPath/XQuery-expression on a certain document tree.@br
+    You can use this class to evaluate an XPath/XQuery-expression on a certain document tree.@br
     For example, @code(TXQueryEngine.evaluateStaticXPath2('expression', nil)) returns the value of the evaluation of expression.
 
     A simple functional interface is provided by the function query.@br@br
 
-    @bold(Syntax of a XQuery / XPath / Pseudo-XPath-Expression)
+    @bold(Syntax of an XQuery / XPath / Pseudo-XPath-Expression)
 
-    This query engine currently supports XPath 2.0, XQuery 1.0 and JSONiq, with some extensions and minor deviations, as well as parts of XPath 3.0 and XQuery 3.0.
+    This query engine currently supports XPath 3.1, XQuery 3.1, and JSONiq, with some extensions and minor deviations, as well as compatibility modes for older XPath and XQuery version.
     @br@br
 
     A formal syntax definition of these languages is given at: http://www.w3.org/TR/xpath20/ , http://www.w3.org/TR/xquery/ , http://www.jsoniq.org/ ,
@@ -2690,7 +2692,7 @@ type
     Extended syntax:@br
 
     @unorderedList(
-    @item(@code(x"something{$var}{1+2+3}...") @br If a string is prefixed with an x, all expressions within {..}-parenthesis are evaluated and concattenated to the raw text, similarily to the value of a xquery direct attribute constructor. (option: extended-strings))
+    @item(@code(x"something{$var}{1+2+3}...") @br If a string is prefixed with an x, all expressions within {..}-parenthesis are evaluated and concatenated to the raw text, similarily to the value of an xquery direct attribute constructor. (option: extended-strings))
     @item(@code(var:=value) @br This assigns the value @code(value) to the global variable @code(var) and returns @code(value)
                             @br So you can e.g. write @code(((a := 2) + 3)) and get @code(5) and a variable @code($a) with the value @code(2)
                             @br @code($a := 2) is also allowed
@@ -2801,8 +2803,8 @@ type
     VariableChangelog: TXQVariableChangeLog;  //**< All global variables that have been set (if a variable was overriden, it stores the old and new value)
 
     OnDeclareExternalVariable: TXQDeclareExternalVariableEvent;
-    OnDeclareExternalFunction: TXQDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in a XQuery expression.
-    OnImportModule: TXQImportModuleEvent;  //**< Event called to import a XQuery module that has not previously be defined
+    OnDeclareExternalFunction: TXQDeclareExternalFunctionEvent; //**< Event called to import a function that is declared as "declare function ... external" in an XQuery expression.
+    OnImportModule: TXQImportModuleEvent;  //**< Event called to import an XQuery module that has not previously be defined
 
     OnTrace: TXQTraceEvent; //**< Event called by fn:trace
     OnCollection, OnUriCollection: TXQEvaluateVariableEvent; //**< Event called by fn:collection
@@ -2870,7 +2872,7 @@ public
     //** Evaluates an expression with a certain tree element as current node.
     class function evaluateStaticCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
 
-    procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. A XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
+    procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. An XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
     function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
     function findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery; //**< Finds a certain registered XQuery module or tries to load one
     class function findNativeModule(const ns: string): TXQNativeModule; //**< Finds a native module.
@@ -2989,7 +2991,7 @@ public
 
 type
   (***
-  @abstract(A XQuery variable)
+  @abstract(An XQuery variable)
 
   consisting of a name with namespace and a value.
 

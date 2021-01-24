@@ -1314,7 +1314,7 @@ begin
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join((a/b) / (c/c), ",")', 'CC1', '');
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join(a/b[2]/c[1]/c[1], ",")', '', '');
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join(a/b[2]/c[2]/c[1], ",")', 'CC1', '');
-                //concattenate,union,intersect,except
+                //concatenate,union,intersect,except
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join((a/b, a/f), ",")', 'b1c1c2c3c4,b2cx1cx2CC1,f1,f2', '');
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join((a/f, a/b), ",")', 'f1,f2,b1c1c2c3c4,b2cx1cx2CC1', '');
   t('<r><a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2<c>cx1</c><c>cx2<c>CC1</c></c></b>al<d>d1</d><d>d2</d><d>d3<e>dxe1</e></d><f>f1</f><f>f2</f></a></r> / string-join((a/f, a/b, a/f), ",")', 'f1,f2,b1c1c2c3c4,b2cx1cx2CC1,f1,f2', '');

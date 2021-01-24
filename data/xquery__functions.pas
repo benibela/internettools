@@ -2684,7 +2684,7 @@ var term: TXQuery;
 begin
   requiredArgCount(argc, 1, 2);
   //result := context.staticContext.sender.evaluateXPath2(args[0].toString);
-  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:eval without a xquery engine (e.g. from an interpreted function in a native module)');
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:eval without an xquery engine (e.g. from an interpreted function in a native module)');
   model := xqpmXPath2;
   if argc = 2 then begin
     if args[1].kind <> pvkObject then raiseXPTY0004TypeError(args[1], 'object');
@@ -2710,7 +2710,7 @@ end;
 function xqFunctionCSS(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   requiredArgCount(argc, 1);
-  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:css without a xquery engine (e.g. from an interpreted function in a native module)');
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:css without an xquery engine (e.g. from an interpreted function in a native module)');
   result := context.staticContext.sender.evaluateCSS3(args[0].toString, context.contextNode(false));
 end;
 
@@ -3305,7 +3305,7 @@ begin
   {$ifndef ALLOW_EXTERNAL_DOC_DOWNLOAD}
   raise EXQEvaluationException.Create('pxp:CONFIG', 'Using fn:doc is not allowed');
   {$endif}
-  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:doc without a xquery engine (e.g. from an interpreted function in a native module)');
+  if context.staticContext.sender = nil then raise EXQEvaluationException.create('pxp:NOENGINE', 'cannot call pxp:doc without an xquery engine (e.g. from an interpreted function in a native module)');
 
   //if not TXQValue_anyURI.canCreateFromstring(url) then raise EXQEvaluationException.Create('FODC0005', 'Invalid url: '+url);
 

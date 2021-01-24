@@ -1,6 +1,6 @@
 {**
-  @abstract This file @bold(doesn't) contain a xml parser.@br
-  But you can use the procedure parseXML to parse a xml file stored in a string. (although you should not expect, that this can actually parse the xml data)
+  @abstract This file contain something similar to an XML parser.@br
+  Use procedure parseXML to parse an XML file. It actually calls the HTML parser, not an XML parser, but it works reasonable well
 
   @author Benito van der Zander (http://www.benibela.de)
 *}

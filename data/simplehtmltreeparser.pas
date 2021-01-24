@@ -95,7 +95,7 @@ TNodeNameHash = cardinal;
 
 //**@abstract This class representates an element of the html file
 //**It is stored in an unusual  tree representation: All elements form a linked list and the next element is the first children, or if there is none, the next node on the same level, or if there is none, the closing tag of the current parent.@br
-//**E.g. a xml file like @code(<foo><bar>x</bar></foo>) is stored as a quadro-linked list:
+//**E.g. an XML file like @code(<foo><bar>x</bar></foo>) is stored as a quadro-linked list:
 //**  @longCode(#
 //**   /---------------------------------\
 //**   |         |  -----------          |                                   link to parent (for faster access, it would work without it)
