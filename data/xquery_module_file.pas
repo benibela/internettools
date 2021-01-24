@@ -181,16 +181,21 @@ begin
   temp := DWORD(FileGetAttr(Filename));
   result := (temp <> $ffffffff) and ((temp and FILE_ATTRIBUTE_DIRECTORY) = 0);
   {$else}
-  result := FileExists(Filename) and not DirectoryExists(Filename);
+  result := FileExists(Filename){$if FPC_FULLVERSION < 30200} and not DirectoryExists(Filename){$endif};
   {$endif}
 end;
 
 function FileOrDirectoryExists(const Filename: string): boolean;
+{$ifndef windows}
+var
+  systemFilename: RawByteString;
+{$endif}
 begin
   {$ifdef windows}
   result := DWORD(FileGetAttr(Filename)) <> $ffffffff;
   {$else}
-  result := FileExists(Filename);
+  systemFilename:=ToSingleByteFileSystemEncodedFileName(Filename);
+  result:=fpAccess(pchar(systemFilename),F_OK) = 0;
   {$endif}
 end;
 
