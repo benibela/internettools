@@ -6548,6 +6548,7 @@ begin
     Result.useLocalNamespaces:=useLocalNamespaces;
     result.jsonPXPExtensions := jsonPXPExtensions;
     result.AllowJSONiqOperations := AllowJSONiqOperations;
+    result.model := model;
     if decimalNumberFormats <> nil then begin
       result.decimalNumberFormats:= TFPList.Create;
       for i := 0 to decimalNumberFormats.Count - 1 do
@@ -8050,6 +8051,7 @@ begin
   //OnDefineVariable:= @VariableChangelog.defineVariable;
   GlobalNamespaces := TNamespaceList.Create;
   StaticContext := TXQStaticContext.Create;
+  StaticContext.model := xqpmXPath3_1;
   StaticContext.defaultFunctionNamespace := XMLNamespace_MyExtensionsMerged; XMLNamespace_MyExtensionsMerged._AddRef;
   StaticContext.sender := self;
   StaticContext.collation := internalDefaultCollation;
