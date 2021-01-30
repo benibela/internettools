@@ -67,6 +67,7 @@ begin
   count:=0;
   ps := TXQueryEngine.Create;
   ps.StaticContext.baseURI := 'pseudo://test';
+  ps.StaticContext.model := xqpmXQuery3_1;
   ps.ImplicitTimezoneInMinutes:=-5 * 60;
   ps.ParsingOptions.AllowJSON := false;
   ps.ParsingOptions.AllowJSONLiterals:=false;

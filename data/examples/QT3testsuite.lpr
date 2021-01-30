@@ -1986,6 +1986,7 @@ begin
   xq.StaticContext.stripBoundarySpace:=true;
   xq.StaticContext.strictTypeChecking:=true;
   xq.StaticContext.defaultFunctionNamespace := TNamespace.make(XMLNamespaceURL_XPathFunctions, 'fn');
+  xq.StaticContext.model := config.version;
   TNamespace.releaseIfNonNil(xq.StaticContext.defaultTypeNamespace);
   xq.StaticContext.useLocalNamespaces:=false;
   xq.AutomaticallyRegisterParsedModules := true;

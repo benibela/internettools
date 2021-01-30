@@ -129,6 +129,7 @@ begin
   else untypedAtomic := '';
 
   ps := TXQueryEngine.Create;
+  ps.StaticContext.model := xqpmXPath2;
   ps.ParsingOptions.AllowJSONLiterals:=false;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.StaticContext.useLocalNamespaces:=false;

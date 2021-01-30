@@ -194,6 +194,7 @@ begin
 
   count:=0;
   ps := TXQueryEngine.Create;
+  ps.StaticContext.model := xqpmXQuery1;
   ps.StaticContext.baseURI := 'pseudo://test';
   ps.ImplicitTimezoneInMinutes:=-5 * 60;
   ps.OnCollection := TXQEvaluateVariableEvent(procedureToMethod(TProcedure(@collection)));
