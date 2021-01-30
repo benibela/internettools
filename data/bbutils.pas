@@ -586,6 +586,7 @@ end;
 
     function EncodeHex: String; inline;
     function DecodeHex: String; inline;
+    function DecodeHexToBytes: TBytes;
     function RemoveFromLeft(chopoff: SizeInt): String;
       {
       function AfterOrEmpty(const sep: String): String; inline;
@@ -3384,6 +3385,17 @@ begin
 end;
 
 
+procedure strDecodeHexToBuffer(const s:string; buffer: PByte; bufferlen: sizeint);
+var
+  i: SizeInt;
+begin
+  assert(length(s) and 1 = 0);
+  if 2*bufferlen > length(s) then bufferlen := length(s) div 2;
+  for i:=0 to bufferlen - 1 do
+    buffer[i] := (charDecodeHexDigit(s[2*i+1]) shl 4) or charDecodeHexDigit(s[2*i+2]);
+end;
+
+
 function strEscape(s: string; const toEscape: TCharSet; escapeChar: ansichar): string;
 var
   i: SizeInt;
@@ -3438,8 +3450,11 @@ var
   last: SizeInt;
   pescape: PChar;
 begin
+  result := '';
+  if length(s) = 0 then exit;
   if escape = '' then begin
-    result := {%H-}strDecodeHex(s);
+    setlength(result, length(s) div 2);
+    strDecodeHexToBuffer(s, pbyte(result), length(result));
     exit;
   end;
   start := pos(escape, s);
@@ -3482,15 +3497,10 @@ begin
   result:=strDecodeHTMLEntities(pansichar(s), length(s), encoding, flags);
 end;
 
+
 function strDecodeHex(s: string): string;
-var
-  i: SizeInt;
 begin
-  assert(length(s) and 1 = 0);
-  result := '';
-  setlength(result, length(s) div 2);
-  for i:=1 to length(result) do
-    result[i] := chr((charDecodeHexDigit(s[2*i-1]) shl 4) or charDecodeHexDigit(s[2*i]));
+  result := strUnescapeHex(s, '');
 end;
 
 function strEncodeHex(s: string; const code: string): string;
@@ -5589,7 +5599,15 @@ end;
 
 function TBBStringHelper.DecodeHex: String;
 begin
-  result := strDecodeHex(self);
+  result := strUnescapeHex(self, '');
+end;
+
+function TBBStringHelper.DecodeHexToBytes: TBytes;
+begin
+  result := nil;
+  if length = 0 then exit;
+  setlength(result, length div 2);
+  strDecodeHexToBuffer(self, pbyte(result), system.length(result));
 end;
 
 function TBBStringHelper.RemoveFromLeft(chopoff: SizeInt): String;
