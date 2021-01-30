@@ -36,6 +36,7 @@ type
     class function compare(a, b: integer): TXQCompareResult; static;
     class function compare(a, b: boolean): TXQCompareResult; static;
     class function compare(a, b: string): TXQCompareResult; static;
+    class function compare(a, b: TBytes): TXQCompareResult; static;
     function inverted(): TXQCompareResult;
   end;
 
@@ -404,6 +405,16 @@ end;
 class function TXQCompareResultHelper.compare(a, b: string): TXQCompareResult;
 begin
   result := fromIntegerResult(CompareStr(a,b));
+end;
+
+class function TXQCompareResultHelper.compare(a, b: TBytes): TXQCompareResult;
+begin
+  if pointer(a) = pointer(b) then exit(xqcrEqual);
+  if a = nil then exit(xqcrLessThan);
+  if b = nil then exit(xqcrGreaterThan);
+  result := fromIntegerResult(CompareMemRange(pointer(a), pointer(b), min(length(a), length(b))));
+  if (result = xqcrEqual) and (length(a) <> length(b)) then
+    result := compare(length(a), length(b));
 end;
 
 function TXQCompareResultHelper.inverted(): TXQCompareResult;

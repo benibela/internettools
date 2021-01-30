@@ -258,7 +258,7 @@ begin
   end;
 end;
 
-function writeOrAppendSomething(const filename: IXQValue; append: boolean; data: rawbytestring; offset: int64 = -1): IXQValue;
+function writeOrAppendSomething(const filename: IXQValue; append: boolean; databuffer: pchar; bufferlen: sizeint; offset: int64 = -1): IXQValue;
 var f: TFileStream;
     mode: word;
     path: AnsiString;
@@ -286,9 +286,9 @@ begin
       f.Position := offset;
       if offset > f.Size then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, filename);
     end else if append then f.position := f.size;
-    if length(data) > 0 then
+    if bufferlen > 0 then
       try
-        f.WriteBuffer(data[1], length(data));
+        f.WriteBuffer(databuffer^, bufferlen);
       except
         on e: EStreamError do
           raiseFileError(Error_Io_Error, 'Failed to write', filename);
@@ -298,6 +298,17 @@ begin
   end;
   result := xqvalue();
 end;
+
+function writeOrAppendSomething(const filename: IXQValue; append: boolean; data: TBytes; offset: int64 = -1): IXQValue;
+begin
+  result := writeOrAppendSomething(filename, append, pchar(pbyte(data)), length(data), offset);
+end;
+
+function writeOrAppendSomething(const filename: IXQValue; append: boolean; data: rawbytestring; offset: int64 = -1): IXQValue;
+begin
+  result := writeOrAppendSomething(filename, append, pchar(data), length(data), offset);
+end;
+
 
 function writeOrAppendSerialized(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue; append: boolean): IXQValue;
 var
@@ -334,7 +345,7 @@ end;
 function append_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
-  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueBinary).toRawBinary);
+  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueBinary).toBinaryBytes);
 end;
 function append_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -358,7 +369,7 @@ begin
   ignore(context);
   offset := -1;
   if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueBinary).toRawBinary, offset);
+  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueBinary).toBinaryBytes, offset);
 end;
 function write_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin

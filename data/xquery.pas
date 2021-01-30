@@ -502,6 +502,7 @@ type
     function toDateTime: TDateTime;  //**< Returns the value as dateTime; dynamically converted, if necessary
     function toNode: TTreeNode;  //**< Returns the value as node; or nil if it is no node
     function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single element, the array contains that element; if it is a sequence, the array contains each element of the sequence
+    function toBinaryBytes: TBytes;
     function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
     function toXQuery: string; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
     function toValue: TXQValue;
@@ -600,6 +601,7 @@ type
     function toDateTime: TDateTime; virtual; //**< Returns the value as dateTime; dynamically converted, if necessary
     function toNode: TTreeNode; virtual; //**< Returns the value as node, or nil if it is not a node
     function toArray: TXQVArray; virtual; //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single value, the array contains just this value; if it is a sequence, the array contains all members of the sequence
+    function toBinaryBytes: TBytes; virtual;
     function toXQVList: TXQVList; virtual; //**< Converts the TXQValue dynamically to a TXQVList sequence (Beware: you have to free the list)
     function toXQuery: string; virtual; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
     function toValue: TXQValue;
@@ -851,7 +853,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
     function hashCode: uint32; override;
 
-    function toRawBinary: string;
+    function toBinaryBytes: TBytes; override;
 
     class function compare(a, b: TXQValue): TXQCompareResult; static;
 

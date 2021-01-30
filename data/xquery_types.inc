@@ -160,6 +160,11 @@ begin
   result[0] := self;
 end;
 
+function TXQValue.toBinaryBytes: TBytes;
+begin
+  raiseXPTY0004TypeError(self, 'binary');
+end;
+
 {$ImplicitExceptions off}
 constructor TXQValue.create(atypeAnnotation: TXSType);
 begin
@@ -1494,21 +1499,40 @@ begin
   Result:=TXQDefaultTypeInfo.hash(pchar(encoded), length(encoded));
 end;
 
-function TXQValueBinary.toRawBinary: string;
+function base64ToBytes(const s:string):TBytes;
+
+var
+  ss: tstringstream;
+  decoder: TBase64DecodingStream = nil;
 begin
-  if instanceOf(baseSchema.hexBinary) then result := encoded.decodeHex
-  else if instanceOf(baseSchema.base64Binary) then begin
-    if encoded = '' then exit('');
-    result := base64.DecodeStringBase64(encoded)
-  end else begin assert(false); result := ''; end;
+  result := nil;
+  if Length(s) = 0 then exit;
+  ss := TStringStream.Create(s);
+  try
+    decoder := TBase64DecodingStream.Create(ss, bdmStrict);
+    setlength(Result, decoder.size);
+    decoder.Read(result[0], decoder.Size);
+  finally
+    decoder.free;
+    ss.Free;
+  end;
 end;
 
+
+function TXQValueBinary.toBinaryBytes: TBytes;
+begin
+  if instanceOf(baseSchema.hexBinary) then result := encoded.DecodeHexToBytes
+  else if instanceOf(baseSchema.base64Binary) then result := base64ToBytes(encoded)
+  else begin assert(false); result := nil; end;
+end;
+
+
 class function TXQValueBinary.compare(a, b: TXQValue): TXQCompareResult;
-var sa, sb, temp: string;
+var binaries: array[0..1] of tbytes = (nil, nil);
+    temp: string;
+    untypedIndex: integer;
     at, bt: (tBase64, tHex, tUntyped, tOther);
 begin
-  sa := '';
-  sb := '';
   if a.typeAnnotation <> b.typeAnnotation then begin
     if a.instanceOf(baseSchema.base64Binary) then at := tBase64
     else if a.instanceOf(baseSchema.hexBinary) then at := tHex
@@ -1521,30 +1545,38 @@ begin
 
     result := xqcrEqual;
     if (at = tUntyped) or (bt = tUntyped) then begin
+      //this branch is only taken if strict-type-checking is disabled and it is compared using eq/ne/..  ?? todo:can this be simplified
       try
-        if at = tUntyped then temp := a.toString
-        else temp := b.toString;
-        if (at = tBase64) or (bt = tBase64) then temp := base64.DecodeStringBase64(temp)
+        if at = tUntyped then begin
+          untypedIndex := 0;
+          temp := a.toString;
+          binaries[1] := b.toBinaryBytes;
+        end else begin
+          untypedIndex := 1;
+          binaries[0] := a.toBinaryBytes;
+          temp := b.toString
+        end;
+        if (at = tBase64) or (bt = tBase64) then binaries[untypedIndex] := base64ToBytes(temp)
         else begin
           if length(temp) and 1 = 1 then exit(xqcrIncomparable);
-          temp := temp.DecodeHex;
+          binaries[untypedIndex] := temp.DecodeHexToBytes;
         end;
-        if at = tUntyped then sa := temp
-        else sb := temp;
       except
         on e: Exception do  {StreamError for base64, exception for hex}
           exit(xqcrIncomparable);
       end;
     end else if ((at = tHex) and (bt = tHex)) or ((at = tBase64) and (bt = tBase64)) then begin
-     //okay
+      binaries[0] := a.toBinaryBytes;
+      binaries[1] := b.toBinaryBytes;
     end else begin
       //if strictTypeChecking then raiseXPTY0004TypeError(a, 'binary like ' + b.toXQuery);
       exit(xqcrIncomparable);
     end;
+  end else begin
+    binaries[0] := a.toBinaryBytes;
+    binaries[1] := b.toBinaryBytes;
   end;
-  if sa = '' then sa := (a as TXQValueBinary).toRawBinary;
-  if sb = '' then sb := (b as TXQValueBinary).toRawBinary;
-  result := TXQCompareResult.compare(sa, sb);
+  result := TXQCompareResult.compare(binaries[0], binaries[1]);
   //todo: less-than/greater-than should raise exception unless 3.1 mode is enabled
 end;
 function TXQValueBinary.clone: IXQValue;
