@@ -5,11 +5,6 @@
  Afterwards you can use e.g. @code(query('Q{http://expath.org/ns/file}exists("/tmp/")')) to test for the existence of a file.
  If you add the namespace to the namespaces in the static context, you can write it simpler as @code(query('f:exists("/tmp/")')).
 
-
-
-
-
- not much tested
 *)
 
 unit xquery_module_file;
@@ -803,8 +798,8 @@ begin
     module.registerFunction('line-separator', @line_separator).setVersionsShared([stringt]);
     module.registerFunction('path-separator', @path_separator).setVersionsShared([stringt]);
     module.registerFunction('temp-dir', @temp_dir).setVersionsShared([stringt]);
-    module.registerInterpretedFunction('base-dir', '() as xs:string', 'Q{http://expath.org/ns/file}parent(static-base-uri())');
-    module.registerInterpretedFunction('current-dir', '() as xs:string', 'Q{http://expath.org/ns/file}resolve-path(".")');
+    module.registerInterpretedFunction('base-dir', '() as xs:string', 'Q{'+XMLNamespaceURL_Expath_File+'}parent(static-base-uri())');
+    module.registerInterpretedFunction('current-dir', '() as xs:string', 'Q{'+XMLNamespaceURL_Expath_File+'}resolve-path(".")');
   end;
 
   TXQueryEngine.registerNativeModule(module);
@@ -813,7 +808,7 @@ end;
 
 
 initialization
-  XMLNamespace_Expath_File := TNamespace.makeWithRC1('http://expath.org/ns/file', 'file');
+  XMLNamespace_Expath_File := TNamespace.makeWithRC1(XMLNamespaceURL_Expath_File, 'file');
 
 finalization
   XMLNamespace_Expath_File._Release;

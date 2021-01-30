@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
-  <Package Version="4">
+  <Package Version="5">
     <Name Value="internettools"/>
     <Type Value="RunAndDesignTime"/>
     <Author Value="Benito van der Zander"/>
@@ -14,152 +14,161 @@
     </CompilerOptions>
     <Description Value="This package provides standard conformant XPath 2.0, XQuery 1.0 and XPath/XQuery 3.0 interpreters with extensions for - among others - JSONiq, pattern matching, CSS and HTML; as well as functions to perform HTTP/S requests on Windows/Linux/MacOSX/Android and an XSLT-inspired webscraping language"/>
     <License Value="GPLv3"/>
-    <Files Count="36">
+    <Files Count="38">
       <Item1>
-        <Filename Value="data/bbutils.pas"/>
-        <UnitName Value="bbutils"/>
+        <Filename Value="internettoolsconfig.inc"/>
+        <Type Value="Binary"/>
       </Item1>
       <Item2>
-        <Filename Value="data/extendedhtmlparser.pas"/>
-        <UnitName Value="extendedhtmlparser"/>
+        <Filename Value="data/bbutils.pas"/>
+        <UnitName Value="bbutils"/>
       </Item2>
       <Item3>
-        <Filename Value="internet/simpleinternet.pas"/>
-        <UnitName Value="simpleinternet"/>
-      </Item3>
-      <Item4>
-        <Filename Value="internet/internetaccess.pas"/>
-        <UnitName Value="internetaccess"/>
-      </Item4>
-      <Item5>
         <Filename Value="data/disableRangeOverflowChecks.inc"/>
         <Type Value="Include"/>
+      </Item3>
+      <Item4>
+        <Filename Value="data/extendedhtmlparser.pas"/>
+        <UnitName Value="extendedhtmlparser"/>
+      </Item4>
+      <Item5>
+        <Filename Value="data/htmlinformation.pas"/>
+        <UnitName Value="htmlinformation"/>
       </Item5>
       <Item6>
-        <Filename Value="data/simplehtmlparser.pas"/>
-        <UnitName Value="simplehtmlparser"/>
-      </Item6>
-      <Item7>
-        <Filename Value="data/simplehtmltreeparser.pas"/>
-        <UnitName Value="simplehtmltreeparser"/>
-      </Item7>
-      <Item8>
-        <Filename Value="data/simplexmlparser.pas"/>
-        <UnitName Value="simplexmlparser"/>
-      </Item8>
-      <Item9>
         <Filename Value="data/restoreRangeOverflowChecks.inc"/>
         <Type Value="Include"/>
+      </Item6>
+      <Item7>
+        <Filename Value="data/simplehtmlparser.pas"/>
+        <UnitName Value="simplehtmlparser"/>
+      </Item7>
+      <Item8>
+        <Filename Value="data/simplehtmltreeparser.pas"/>
+        <UnitName Value="simplehtmltreeparser"/>
+      </Item8>
+      <Item9>
+        <Filename Value="data/simplexmlparser.pas"/>
+        <UnitName Value="simplexmlparser"/>
       </Item9>
       <Item10>
-        <Filename Value="data/xquery.pas"/>
-        <UnitName Value="xquery"/>
-      </Item10>
-      <Item11>
-        <Filename Value="data/xquery_functions_generated.inc"/>
-        <Type Value="Include"/>
-      </Item11>
-      <Item12>
-        <Filename Value="data/xquery_functions_generated_template.inc"/>
-        <Type Value="Include"/>
-      </Item12>
-      <Item13>
-        <Filename Value="data/xquery_terms.inc"/>
-        <Type Value="Include"/>
-      </Item13>
-      <Item14>
-        <Filename Value="data/xquery_types.inc"/>
-        <Type Value="Include"/>
-      </Item14>
-      <Item15>
-        <Filename Value="internet/synapseinternetaccess.pas"/>
-        <UnitName Value="synapseinternetaccess"/>
-      </Item15>
-      <Item16>
-        <Filename Value="internet/w32internetaccess.pas"/>
-        <UnitName Value="w32internetaccess"/>
-      </Item16>
-      <Item17>
         <Filename Value="data/simplexmltreeparserfpdom.pas"/>
         <UnitName Value="simplexmltreeparserfpdom"/>
+      </Item10>
+      <Item11>
+        <Filename Value="data/xquery.pas"/>
+        <UnitName Value="xquery"/>
+      </Item11>
+      <Item12>
+        <Filename Value="data/xquery.internals.collations.pas"/>
+        <UnitName Value="xquery.internals.collations"/>
+      </Item12>
+      <Item13>
+        <Filename Value="data/xquery.internals.common.pas"/>
+        <UnitName Value="xquery.internals.common"/>
+      </Item13>
+      <Item14>
+        <Filename Value="data/xquery.internals.floathelpers.pas"/>
+        <UnitName Value="xquery.internals.floathelpers"/>
+      </Item14>
+      <Item15>
+        <Filename Value="data/xquery.internals.lclexcerpt.pas"/>
+        <UnitName Value="xquery.internals.lclexcerpt"/>
+      </Item15>
+      <Item16>
+        <Filename Value="data/xquery.internals.protectionbreakers.pas"/>
+        <UnitName Value="xquery.internals.protectionbreakers"/>
+      </Item16>
+      <Item17>
+        <Filename Value="data/xquery.internals.rng.pas"/>
+        <UnitName Value="xquery.internals.rng"/>
       </Item17>
       <Item18>
-        <Filename Value="data/xquery_json.pas"/>
-        <UnitName Value="xquery_json"/>
+        <Filename Value="data/xquery.namespaces.pas"/>
+        <UnitName Value="xquery.namespaces"/>
       </Item18>
       <Item19>
-        <Filename Value="internet/mockinternetaccess.pas"/>
-        <UnitName Value="mockinternetaccess"/>
+        <Filename Value="data/xquery__functions.pas"/>
+        <UnitName Value="xquery__functions"/>
       </Item19>
       <Item20>
-        <Filename Value="data/xquery_schemas.inc"/>
-        <Type Value="Include"/>
+        <Filename Value="data/xquery__parse.pas"/>
+        <UnitName Value="xquery__parse"/>
       </Item20>
       <Item21>
         <Filename Value="data/xquery__regex.pas"/>
         <UnitName Value="xquery__regex"/>
       </Item21>
       <Item22>
-        <Filename Value="data/xquery__parse.pas"/>
-        <UnitName Value="xquery__parse"/>
-      </Item22>
-      <Item23>
-        <Filename Value="data/xquery_module_math.pas"/>
-        <UnitName Value="xquery_module_math"/>
-      </Item23>
-      <Item24>
-        <Filename Value="data/xquery__functions.pas"/>
-        <UnitName Value="xquery__functions"/>
-      </Item24>
-      <Item25>
-        <Filename Value="internettoolsconfig.inc"/>
-        <Type Value="Binary"/>
-      </Item25>
-      <Item26>
-        <Filename Value="internet/multipagetemplate.pas"/>
-        <UnitName Value="multipagetemplate"/>
-      </Item26>
-      <Item27>
-        <Filename Value="data/xquery.internals.common.pas"/>
-        <UnitName Value="xquery.internals.common"/>
-      </Item27>
-      <Item28>
-        <Filename Value="data/xquery.namespaces.pas"/>
-        <UnitName Value="xquery.namespaces"/>
-      </Item28>
-      <Item29>
-        <Filename Value="data/xquery.internals.protectionbreakers.pas"/>
-        <UnitName Value="xquery.internals.protectionbreakers"/>
-      </Item29>
-      <Item30>
-        <Filename Value="data/xquery.internals.lclexcerpt.pas"/>
-        <UnitName Value="xquery.internals.lclexcerpt"/>
-      </Item30>
-      <Item31>
-        <Filename Value="data/xquery.internals.rng.pas"/>
-        <UnitName Value="xquery.internals.rng"/>
-      </Item31>
-      <Item32>
-        <Filename Value="data/htmlinformation.pas"/>
-        <UnitName Value="htmlinformation"/>
-      </Item32>
-      <Item33>
         <Filename Value="data/xquery__serialization.pas"/>
         <UnitName Value="xquery__serialization"/>
-      </Item33>
-      <Item34>
-        <Filename Value="data/xquery.internals.floathelpers.pas"/>
-        <UnitName Value="xquery.internals.floathelpers"/>
-      </Item34>
-      <Item35>
-        <Filename Value="data/xquery.internals.collations.pas"/>
-        <UnitName Value="xquery.internals.collations"/>
-      </Item35>
-      <Item36>
+      </Item22>
+      <Item23>
+        <Filename Value="data/xquery_functions_generated.inc"/>
+        <Type Value="Include"/>
+      </Item23>
+      <Item24>
+        <Filename Value="data/xquery_functions_generated_template.inc"/>
+        <Type Value="Include"/>
+      </Item24>
+      <Item25>
+        <Filename Value="data/xquery_json.pas"/>
+        <UnitName Value="xquery_json"/>
+      </Item25>
+      <Item26>
+        <Filename Value="data/xquery_module_binary.pas"/>
+        <UnitName Value="xquery_module_binary"/>
+      </Item26>
+      <Item27>
+        <Filename Value="data/xquery_module_file.pas"/>
+        <UnitName Value="xquery_module_file"/>
+      </Item27>
+      <Item28>
+        <Filename Value="data/xquery_module_math.pas"/>
+        <UnitName Value="xquery_module_math"/>
+      </Item28>
+      <Item29>
         <Filename Value="data/xquery_module_uca_icu.pas"/>
         <UnitName Value="xquery_module_uca_icu"/>
+      </Item29>
+      <Item30>
+        <Filename Value="data/xquery_schemas.inc"/>
+        <Type Value="Include"/>
+      </Item30>
+      <Item31>
+        <Filename Value="data/xquery_terms.inc"/>
+        <Type Value="Include"/>
+      </Item31>
+      <Item32>
+        <Filename Value="data/xquery_types.inc"/>
+        <Type Value="Include"/>
+      </Item32>
+      <Item33>
+        <Filename Value="internet/internetaccess.pas"/>
+        <UnitName Value="internetaccess"/>
+      </Item33>
+      <Item34>
+        <Filename Value="internet/mockinternetaccess.pas"/>
+        <UnitName Value="mockinternetaccess"/>
+      </Item34>
+      <Item35>
+        <Filename Value="internet/multipagetemplate.pas"/>
+        <UnitName Value="multipagetemplate"/>
+      </Item35>
+      <Item36>
+        <Filename Value="internet/simpleinternet.pas"/>
+        <UnitName Value="simpleinternet"/>
       </Item36>
+      <Item37>
+        <Filename Value="internet/synapseinternetaccess.pas"/>
+        <UnitName Value="synapseinternetaccess"/>
+      </Item37>
+      <Item38>
+        <Filename Value="internet/w32internetaccess.pas"/>
+        <UnitName Value="w32internetaccess"/>
+      </Item38>
     </Files>
+    <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="1">
       <Item1>
         <PackageName Value="FCL"/>

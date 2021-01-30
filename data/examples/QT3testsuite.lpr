@@ -12,7 +12,7 @@ uses
   windows,
   {$endif}
   Classes, sysutils, strutils, xquery, xquery_module_math,
-  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file,
+  simplehtmltreeparser, simplexmltreeparserfpdom, XMLRead, xquery__regex, xquery_module_file, xquery_module_binary,
   bbutils, math, rcmdline, internetaccess, mockinternetaccess, xquery.namespaces, xquery.internals.common, xquery.internals.collations,
   dynlibs, xquery_module_uca_icu;
   { you can add units after this }
@@ -1741,6 +1741,7 @@ begin
   cat.addRef;
   if cat.getFirstChild().getAttribute('test-suite') = 'EXPATH' then begin
     registerModuleFile;
+    registerModuleBinary;
     xq.ImplicitTimezoneInMinutes := -GetLocalTimeOffset;
   end;
   basePath := strBeforeLast(cat.documentURI,'/');

@@ -8,16 +8,11 @@ unit internettools;
 interface
 
 uses
-  bbutils, extendedhtmlparser, simpleinternet, internetaccess, 
-  simplehtmlparser, simplehtmltreeparser, simplexmlparser, xquery, 
-  synapseinternetaccess, w32internetaccess, simplexmltreeparserfpdom, 
-  xquery_json, mockinternetaccess, xquery__regex, xquery__parse, 
-  xquery_module_math, xquery__functions, multipagetemplate, 
-  xquery.internals.common, xquery.namespaces, 
-  xquery.internals.protectionbreakers, xquery.internals.lclexcerpt, 
-  xquery.internals.rng, htmlInformation, xquery__serialization, 
-  xquery.internals.floathelpers, xquery.internals.collations, 
-  xquery_module_uca_icu, LazarusPackageIntf;
+  bbutils, extendedhtmlparser, htmlInformation, simplehtmlparser, simplehtmltreeparser, simplexmlparser, simplexmltreeparserfpdom, xquery, 
+  xquery.internals.collations, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.lclexcerpt, 
+  xquery.internals.protectionbreakers, xquery.internals.rng, xquery.namespaces, xquery__functions, xquery__parse, xquery__regex, 
+  xquery__serialization, xquery_json, xquery_module_binary, xquery_module_file, xquery_module_math, xquery_module_uca_icu, internetaccess, 
+  mockinternetaccess, multipagetemplate, simpleinternet, synapseinternetaccess, w32internetaccess, LazarusPackageIntf;
 
 implementation
 
