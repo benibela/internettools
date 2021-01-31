@@ -65,6 +65,7 @@ protected
   procedure setCustomError(msg: string; id: integer = -3);
 public
   function Connect: boolean; override;
+  function LibVersion: String; override;
 end;
 
 { TSynapseInternetAccess }
@@ -111,7 +112,7 @@ resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Fa
                         'On Fedora/CentOS install openssl-devel.%s' +
                         'On Windows install OpenSSL from https://slproweb.com/products/Win32OpenSSL.html';
   rsSSLErrorOpenSSLTooOld = 'OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+';
-  rsSSLErrorNoCA = 'Failed to load CA files from "%s" and "%s".';
+  rsSSLErrorCAFileLoadingFailed = 'Failed to load CA files.';
   rsSSLErrorSettingHostname = 'Failed to set hostname for certificate validation.';
   rsSSLErrorConnectionFailed = 'HTTPS connection failed after connecting to server. Some possible causes: handshake failure, mismatched HTTPS version/ciphers, invalid certificate';
   rsSSLErrorVerificationFailed = 'HTTPS certificate validation failed';
@@ -170,6 +171,7 @@ end;
 
 type
   PX509_VERIFY_PARAM = pointer;
+  TOpenSSL_version = function(t: integer): pchar; cdecl;
   TSSL_get0_param = function(ctx: PSSL_CTX): PX509_VERIFY_PARAM; cdecl;
   TX509_VERIFY_PARAM_set_hostflags = procedure(param: PX509_VERIFY_PARAM; flags: cardinal); cdecl;
   TX509_VERIFY_PARAM_set1_host = function(param: PX509_VERIFY_PARAM; name: pchar; nameLen: SizeUInt): integer; cdecl;
@@ -178,6 +180,7 @@ const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS = 4;
 var _SSL_get0_param: TSSL_get0_param = nil;
 var _X509_VERIFY_PARAM_set_hostflags: TX509_VERIFY_PARAM_set_hostflags = nil;
 var _X509_VERIFY_PARAM_set1_host: TX509_VERIFY_PARAM_set1_host = nil;
+var _OpenSSL_version: TOpenSSL_version = nil;
 
 function TSSLOpenSSLOverride.customCertificateHandling: boolean;
 var
@@ -213,7 +216,7 @@ begin
     if result and VerifyCert then
       if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then begin
         SSLCheck;
-        setCustomError(format(rsSSLErrorNoCA, [internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath]));
+        setCustomError(rsSSLErrorCAFileLoadingFailed);
         result := false;
       end;
   end else begin
@@ -235,11 +238,22 @@ var
 begin
   internetAccess.lastHTTPResultCode := id;
   err := msg;
-  if LastErrorDesc <> '' then err += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
+  if LastErrorDesc <> '' then begin
+    err := LineEnding + err;
+    err += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
+    err += LineEnding+'OpenSSL information: CA file: '+internetAccess.internetConfig^.CAFile+' , CA dir: '+internetAccess.internetConfig^.CAPath+' , '+GetSSLVersion+', '+LibVersion;
+  end;
   if internetAccess.lastErrorDetails.contains(err) then exit;
   if internetAccess.lastErrorDetails <> '' then internetAccess.lastErrorDetails += LineEnding;
   internetAccess.lastErrorDetails += err;
 
+end;
+
+function TSSLOpenSSLOverride.LibVersion: String;
+begin
+  Result:=inherited LibVersion;
+  if assigned(_OpenSSL_version) then
+    result += _OpenSSL_version(0);
 end;
 
 //copied from Synapse
@@ -466,6 +480,7 @@ if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
   _SSL_get0_param := TSSL_get0_param(GetProcedureAddress(SSLLibHandle, 'SSL_get0_param'));
   _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
   _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
+  _OpenSSL_version := TOpenSSL_version(GetProcedureAddress(SSLLibHandle, 'OpenSSL_version'));
 end;
 
 {$IFDEF USE_SYNAPSE_WRAPPER}
