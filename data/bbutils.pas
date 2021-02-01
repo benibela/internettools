@@ -1159,15 +1159,16 @@ procedure TStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: T
 begin
   buffer := abuffer;
   if basecapacity <= 0 then basecapacity := 1;
-  SetLength(buffer^, basecapacity); //need to create a new string to prevent aliasing
-  //if length(buffer^) < basecapacity then
-  //else UniqueString(buffer^);    //or could uniquestring be enough?
+  if length(abuffer^) <> basecapacity then
+    SetLength(abuffer^, basecapacity)
+  else
+    UniqueString(abuffer^);  //need to create a new string to prevent aliasing
 
-  next := pchar(buffer^);
-  bufferend := next + length(buffer^);
+  next := pointer(abuffer^);
+  bufferend := next + basecapacity;
 
   //encoding := strActualEncoding(buffer^);
-  SetCodePage(RawByteString(buffer^), aencoding, false);
+  SetCodePage(RawByteString(abuffer^), aencoding, false);
   encoding := strActualEncoding(aencoding);
 end;
 
@@ -1198,15 +1199,19 @@ end;
 procedure TStrBuilder.reserveadd(delta: SizeInt);
 var
   oldlen: SizeInt;
+  newlen: SizeInt;
+  temp: pchar;
 begin
-  if next + delta > bufferend then begin
+  temp := next;
+  if temp + delta > bufferend then begin
     oldlen := count;
-    SetLength(buffer^, max(min(2*length(buffer^), oldlen + 32*1024*1024), oldlen + delta));
-    next := pchar(buffer^) + oldlen;
-    bufferend := pchar(buffer^) + length(buffer^);
+    newlen := max(min(2*length(buffer^), oldlen + 32*1024*1024), oldlen + delta);
+    SetLength(buffer^, newlen);
+    temp := pchar(buffer^);
+    next := temp + oldlen;
+    bufferend := temp + newlen;
   end;
 end;
-
 procedure TStrBuilder.append(c: char);
 begin
   if next >= bufferend then reserveadd(1);
