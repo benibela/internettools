@@ -1218,6 +1218,37 @@ begin
   next^ := c;
   inc(next);
 end;
+(*
+slightly faster on linux amd64
+appending 100MB
+from 188 ms (with resize 210 ms)
+to 180ms    (with resize 203 ms)
+{$AsmMode intel}
+procedure TStrBuilder.append(c: char); assembler; register; nostackframe;
+//c in rsi (aka. esi/sil)
+//self in rdi
+label appendnow,resize;
+asm
+  mov rax, qword ptr [ rdi + next ]
+  cmp rax, qword ptr [ rdi + bufferend ]
+  jge resize
+
+appendnow:
+  mov byte ptr [rax], sil
+  inc rax
+  mov qword ptr [ rdi + next ], rax
+  ret
+
+resize:
+  push rsi
+  push rdi
+  mov esi, 1
+  call reserveadd
+  pop rdi
+  pop rsi
+  mov rax, qword ptr [ rdi + next ]
+  jmp appendnow
+end;*)
 
 procedure TStrBuilder.append(const s: RawByteString);
 var
