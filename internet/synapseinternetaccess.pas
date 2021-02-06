@@ -104,7 +104,9 @@ implementation
 
 uses synautil,ssl_openssl_lib,bbutils
      {$ifndef WINDOWS},netdb{$endif}
-     {$if FPC_FULLVERSION < 30101},dynlibs{$endif};
+     {$if FPC_FULLVERSION < 30101},dynlibs{$endif}
+     {$if not (defined(WINDOWS) or defined(android))},BaseUnix{$endif}
+     ;
 
 resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Failed DNS lookup, failed to load OpenSSL, failed proxy, server does not exists, has no open port or uses an unknown https certificate.';
   rsSSLErrorNoOpenSSL = 'Couldn''t load ssl libraries: libopenssl and libcrypto%sThey must be installed separately.%s'+
@@ -151,6 +153,21 @@ begin
       LeaveCriticalsection(resolvConfCS);
     end;
   end;
+end;
+
+procedure disableSIGPIPECrash;
+var sa, osa: sigactionrec;
+begin
+  sa := default(sigactionrec);
+  osa := default(sigactionrec);
+  writeln(strFromPtr(osa.sa_handler));
+  FPSigaction(SIGPIPE, nil, @osa);
+  writeln(strFromPtr(osa.sa_handler));
+  if osa.sa_handler <> sigactionhandler(SIG_DFL) then
+    exit;
+  writeln(strFromPtr(osa.sa_handler));
+  sa.sa_handler := sigactionhandler(SIG_IGN);
+  FPSigaction(SIGPIPE, @sa, nil);
 end;
 
 {$endif}
@@ -492,6 +509,9 @@ defaultInternetConfiguration.searchCertificates;
 
 {$if not (defined(WINDOWS) or defined(android))}
 InitCriticalSection(resolvConfCS{%H-});
+
+disableSIGPIPECrash;
+
 {$endif}
 finalization
 
