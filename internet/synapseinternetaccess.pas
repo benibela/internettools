@@ -160,12 +160,9 @@ var sa, osa: sigactionrec;
 begin
   sa := default(sigactionrec);
   osa := default(sigactionrec);
-  writeln(strFromPtr(osa.sa_handler));
   FPSigaction(SIGPIPE, nil, @osa);
-  writeln(strFromPtr(osa.sa_handler));
   if osa.sa_handler <> sigactionhandler(SIG_DFL) then
     exit;
-  writeln(strFromPtr(osa.sa_handler));
   sa.sa_handler := sigactionhandler(SIG_IGN);
   FPSigaction(SIGPIPE, @sa, nil);
 end;
