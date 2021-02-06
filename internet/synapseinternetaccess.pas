@@ -211,9 +211,9 @@ end;
 
 function TSSLOpenSSLOverride.customQuickClientPrepare: boolean;
 begin
-  if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) or (VerifyCert <> FOldVerifyCert) then begin
+  if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) or (VerifyCert <> FOldVerifyCert)  then begin
     result := Prepare(false);
-    if result and VerifyCert then
+    if result and VerifyCert and assigned(internetAccess) then
       if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then begin
         SSLCheck;
         setCustomError(rsSSLErrorCAFileLoadingFailed);
@@ -236,6 +236,8 @@ procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
 var
   err: String;
 begin
+  if internetAccess = nil then
+    exit;
   internetAccess.lastHTTPResultCode := id;
   err := msg;
   if LastErrorDesc <> '' then begin
@@ -263,14 +265,13 @@ type
 const INVALID_SOCKET		= TSocket(NOT(0));
 var
   x: integer;
-{$ifdef false}
   b: boolean;
   err: integer;
-{$endif}
 begin
   Result := False;
   if FSocket.Socket = INVALID_SOCKET then
     Exit;
+
   if customQuickClientPrepare() then
   begin
 
@@ -288,9 +289,9 @@ begin
     end;
     if SNIHost<>'' then
       SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
-    if true {FSocket.ConnectionTimeout <= 0} then //do blocking call of SSL_Connect
+    if (internetAccess <> nil) or (FSocket.ConnectionTimeout <= 0) then //do blocking call of SSL_Connect
     begin
-      //this is the branch is used by internet tools
+      //this is the branch used by internet tools
       x := sslconnect(FSsl);
       if x < 1 then
       begin
@@ -298,8 +299,7 @@ begin
         setCustomError(rsSSLErrorConnectionFailed, -3);
         Exit;
       end;
-    end;
-    {$if false}
+    end
     else //do non-blocking call of SSL_Connect
     begin
       b := Fsocket.NonBlockMode;
@@ -321,7 +321,7 @@ begin
         Exit;
       end;
     end;
-    {$endif}
+
     if FverifyCert then //seems like this is not needed, since sslconnect already fails on an invalid certificate
       if (GetVerifyCert <> 0) or (not DoVerifyCert) then begin
         setCustomError(rsSSLErrorVerificationFailed, -3);
