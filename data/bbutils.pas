@@ -549,6 +549,7 @@ protected
   procedure appendCodePointToUtf8String(const codepoint: integer); inline;
   procedure appendCodePointWithEncodingConversion(const codepoint: integer);
   procedure appendRaw(const s: RawByteString); inline;
+  procedure reserveAdd1;
 public
   buffer: pstring;
   procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
@@ -1214,7 +1215,7 @@ begin
 end;
 procedure TStrBuilder.append(c: char);
 begin
-  if next >= bufferend then reserveadd(1);
+  if next >= bufferend then reserveadd1;
   next^ := c;
   inc(next);
 end;
@@ -1267,6 +1268,11 @@ end;
 procedure TStrBuilder.appendRaw(const s: RawByteString);
 begin
   append(pchar(pointer(s)), length(s));
+end;
+
+procedure TStrBuilder.reserveAdd1;
+begin
+  reserveadd(1);
 end;
 
 procedure TStrBuilder.appendCodePoint(const codepoint: integer);
