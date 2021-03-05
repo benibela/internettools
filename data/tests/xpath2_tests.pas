@@ -1007,6 +1007,17 @@ begin
   t('subsequence((6,7), 2, 1)', '7', '');
   t('subsequence((6), 2, 1)', '', '');
   t('subsequence(6, 2, 1)', '', '');
+  t('subsequence(6, xs:double("2"))', '');
+  t('subsequence(6, xs:double("0"))', '6');
+  t('subsequence(6, xs:double("-INF"))', '6');
+  t('subsequence(6, xs:double("-2"), 3)', '');
+  t('subsequence(6, xs:double("-2"), 4)', '6');
+  t('subsequence(6, xs:double("-2"), 30)', '6');
+  t('subsequence(1 to 3,-123456789123456789123, 1)', '');
+{  t('subsequence(1 to 3,-123456789123456789123, 123456789123456789123)', '');
+  t('subsequence(1 to 3,-123456789123456789123, 123456789123456789124)', '');
+  t('subsequence(1 to 3,-123456789123456789123, 123456789123456789125)', '1');//this is supposed to fail, since the numbers should be converted to double  }
+  t('join(subsequence(1 to 3,0))', '1 2 3');
   t('join(subsequence((1,2,3,4,5), 3, 2), ",")', '3,4', '');
   t('concat(join(subsequence((1,2,3,4,5), 3, 2147483646), ","), ":", join(subsequence((1,2,3,4,5), 3, 2147483648), ","))', '3,4,5:3,4,5', '');
   t('join(unordered((1,2,3,4,5)), ",")', '1,2,3,4,5', '');
