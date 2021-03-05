@@ -5239,74 +5239,106 @@ begin
   result := true;
 end;
 
-
+type TRangeSpecial = (rsNormal, rsInfinity, rsBigDecimal);
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: sizeint; out from, len: SizeInt);
-var unti: SizeInt64;  //excluding last
-  temp: BigDecimal;
-  from64, temp64: SizeInt64;
+  function getLength(out l64: int64): TRangeSpecial;
+  var
+    f: xqfloat;
+  begin
+    if argc = 3 then begin
+      result := rsNormal;
+      case args[2].kind of
+        pvkInt64: l64 := args[2].toInt64;
+        //pvkBigDecimal: result := rsBigDecimal;
+        else begin
+          f := args[2].toFloat;
+          if f.isFinite() then l64 := round(f.round)
+          else if f.IsPositiveInfinity then result := rsInfinity
+          else l64 := 0 //nan, -inf
+        end;
+      end;
+    end else result := rsInfinity;
+  end;
+
+
+  procedure rangesAsBigDecimal(from64: SizeInt64);
+  var fromBCD, lenBCD: BigDecimal;
+    temp64: int64;
+  begin
+    if from64 = 0 then fromBCD := round(args[1].toDecimal)
+    else fromBCD := from64;
+
+    case getLength(temp64) of
+      rsNormal: lenBCD := temp64;
+      rsInfinity: begin
+        if fromBCD.signed or isZero(fromBCD) then fromBCD := 1;
+        lenBCD := maxLen;
+      end;
+      rsBigDecimal: lenBCD := round(args[2].toDecimal);
+    end;
+
+    if fromBCD.signed or isZero(fromBCD) then begin
+      lenBCD += fromBCD; lenBCD -= 1;
+      fromBCD := 1;
+    end;
+    if fromBCD <= maxLen then from := fromBCD.toInt64
+    else begin from := 1; lenBCD := 0; end;
+    if lenBCD > maxLen - from + 1 then lenBCD := maxLen - from + 1;
+    if lenBCD.signed then lenBCD := 0;
+    len := lenBCD.toInt64;
+  end;
+
+
+
+var
+  from64, len64: SizeInt64;
   f: xqfloat;
-label failWithZeroLength;
+  temp64: int64;
+label exitWithZeroLength;
 begin
   case args[1].kind of
     pvkInt64: from64 := args[1].toInt64;
-    pvkFloat: begin
+    pvkBigDecimal: begin rangesAsBigDecimal(0); exit; end;
+    else begin
       f := args[1].toFloat;
-      if f.isFinite() then
-        from64 := round(f.round())
-       else if f.IsNegativeInfinity() then begin
+      if f.isFinite() then begin
+        f := f.round();
+        if abs(f) > high(from64) then begin rangesAsBigDecimal(0); exit; end;
+        from64 := round(f)
+       end else if f.IsNegativeInfinity() then begin
          from := 1;
          if argc <= 2 then len := maxLen
          else len := 0;
          exit;
-       end else goto failWithZeroLength; //+inf, nan
-    end;
-    {pvkBigDecimal:}else begin
-      temp := round(args[1].toDecimal);
-      if temp.signed then from64 := 1
-      else if temp > high(SizeInt) then goto failWithZeroLength
-      else from64 := BigDecimalToInt64(temp);
+       end else goto exitWithZeroLength; //+inf, nan
     end;
   end;
 
-  if from64 > SizeInt64(maxLen) then goto failWithZeroLength;
+  if from64 > maxLen then goto exitWithZeroLength;
 
-  from := from64;
-
-  if argc = 3 then begin
-    case args[2].kind of
-      pvkInt64: begin
-        temp64 := args[2].toInt64;
-        if temp64 < 0 then unti := from
-        else if {$ifdef cpu32}(temp64 > high(SizeInt))  or{$endif} ( (from > 0) and (temp64 > high(SizeInt) - from) ) then unti := maxlen + 1
-        else unti := from + temp64;
-      end;
-      pvkFloat: begin
-        f := args[2].toFloat;
-        if f.isFinite() then
-          unti := from + round(f.round)
-        else if f.IsPositiveInfinity then unti := maxLen+1
-        else begin //nan, -inf
-          len := 0;
-          exit;
-        end;
-      end;
-      else begin
-        temp := round(args[2].toDecimal);
-        if temp.signed then unti := from
-        else if (temp > high(SizeInt)) or ( (from > 0) and (temp > high(SizeInt) - from ) ) then unti := maxLen + 1
-        else unti := from + BigDecimalToInt64(temp);
-      end;
+  case getLength(temp64) of
+    rsNormal: len64 := temp64;
+    rsInfinity: begin
+      if from64 >= 1 then from := from64
+      else from := 1;
+      len := maxLen - from + 1;
+      exit;
     end;
-  end else unti := maxLen + 1;
+    rsBigDecimal: begin rangesAsBigDecimal(from64); exit; end;
+  end;
 
-  if from < 1 then from := 1;
-  if unti > maxLen + 1 then unti := maxLen + 1;
-  len := unti-from;
-  if len < 0 then len := 0;
+  if from64 >= 1 then from := from64
+  else begin
+    len64 += from64; len64 -= 1;
+    from := 1;
+  end;
+  if len64 > maxLen - from + 1 then len64 := maxLen - from + 1;
+  if len64 < 0 then len64 := 0;
+  len := len64;
 
   exit;
 
-failWithZeroLength:
+exitWithZeroLength:
   from := 1;
   len := 0;
   exit;
