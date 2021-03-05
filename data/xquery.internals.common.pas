@@ -253,31 +253,31 @@ end;
 generic TFastInterfaceList<IT> = class
   type PIT = ^IT;
 protected
-  fcount, fcapacity: integer; // count
+  fcount, fcapacity: SizeInt; // count
   fbuffer: PIT; // Backend storage
-  procedure raiseInvalidIndexError(i: integer);  //**< Raise an exception
-  procedure checkIndex(i: integer); inline; //**< Range check
-  procedure reserve(cap: integer); //**< Allocates new memory if necessary
+  procedure raiseInvalidIndexError(i: SizeInt);  //**< Raise an exception
+  procedure checkIndex(i: SizeInt); inline; //**< Range check
+  procedure reserve(cap: SizeInt); //**< Allocates new memory if necessary
   procedure compress; //**< Deallocates memory by shorting list if necessary
-  procedure setCount(c: integer); //**< Forces a count (elements are initialized with )
-  procedure setCapacity(AValue: integer);
-  procedure setBufferSize(c: integer);
-  procedure insert(i: integer; child: IT);
-  procedure put(i: integer; const AValue: IT); inline; //**< Replace the IT at position i
+  procedure setCount(c: SizeInt); //**< Forces a count (elements are initialized with )
+  procedure setCapacity(AValue: SizeInt);
+  procedure setBufferSize(c: SizeInt);
+  procedure insert(i: SizeInt; child: IT);
+  procedure put(i: SizeInt; const AValue: IT); inline; //**< Replace the IT at position i
 public
-  constructor create(capacity: integer = 0);
+  constructor create(capacity: SizeInt = 0);
   destructor Destroy; override;
-  procedure delete(i: integer); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
+  procedure delete(i: SizeInt); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
   procedure remove(const value: IT);
   procedure add(const value: IT);
   procedure addAll(other: TFastInterfaceList);
-  function get(i: integer): IT; inline; //**< Gets an interface from the list.
+  function get(i: SizeInt): IT; inline; //**< Gets an interface from the list.
   function last: IT; //**< Last interface in the list.
   function first: IT; //**< First interface in the list.
   procedure clear;
-  property items[i: integer]: IT read get write put; default;
-  property Count: integer read fcount write setCount;
-  property Capacity: integer read fcapacity write setCapacity;
+  property items[i: SizeInt]: IT read get write put; default;
+  property Count: SizeInt read fcount write setCount;
+  property Capacity: SizeInt read fcapacity write setCapacity;
 end;
 
 TXMLDeclarationStandalone = (xdsOmit, xdsYes, xdsNo);
@@ -1446,8 +1446,8 @@ end;
 
 function urlHexDecode(s: string): string;
 var
-  p: Integer;
-  i: Integer;
+  p: SizeInt;
+  i: SizeInt;
 begin
   result := '';
   SetLength(result, length(s));
@@ -1555,32 +1555,32 @@ end;
 
 
 
-procedure TFastInterfaceList.setCapacity(AValue: integer);
+procedure TFastInterfaceList.setCapacity(AValue: SizeInt);
 begin
   if avalue > fcapacity then setBufferSize(AValue)
   else if avalue < fcount then setCount(AValue)
   else if avalue < fcapacity then setBufferSize(AValue);
 end;
 
-procedure TFastInterfaceList.raiseInvalidIndexError(i: integer);
+procedure TFastInterfaceList.raiseInvalidIndexError(i: SizeInt);
 begin
   raiseXQEvaluationException('pxp:INTERNAL', 'Invalid index: '+IntToStr(i));
 end;
 
-procedure TFastInterfaceList.checkIndex(i: integer);
+procedure TFastInterfaceList.checkIndex(i: SizeInt);
 begin
   if (i < 0) or (i >= fcount) then raiseInvalidIndexError(i);
 end;
 
 
-procedure TFastInterfaceList.put(i: integer; const AValue: IT); inline;
+procedure TFastInterfaceList.put(i: SizeInt; const AValue: IT); inline;
 begin
   assert(AValue <> nil);
   checkIndex(i);
   fbuffer[i] := AValue;
 end;
 
-procedure TFastInterfaceList.delete(i: integer);
+procedure TFastInterfaceList.delete(i: SizeInt);
 begin
   checkIndex(i);
   fbuffer[i] := nil;
@@ -1594,7 +1594,7 @@ end;
 
 procedure TFastInterfaceList.remove(const value: IT);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := fcount - 1 downto 0 do
     if fbuffer[i] = value then
@@ -1613,14 +1613,14 @@ end;
 
 procedure TFastInterfaceList.addAll(other: TFastInterfaceList);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   reserve(fcount + other.Count);
   for i := 0 to other.Count - 1 do
     add(other.fbuffer[i]);
 end;
 
-function TFastInterfaceList.get(i: integer): IT;
+function TFastInterfaceList.get(i: SizeInt): IT;
 begin
   checkIndex(i);
   result := fbuffer[i];
@@ -1643,9 +1643,9 @@ end;
 
 {$ImplicitExceptions off}
 
-procedure TFastInterfaceList.setBufferSize(c: integer);
+procedure TFastInterfaceList.setBufferSize(c: SizeInt);
 var
-  oldcap: Integer;
+  oldcap: SizeInt;
 begin
   oldcap := fcapacity;
   ReAllocMem(fbuffer, c * sizeof(IT));
@@ -1654,9 +1654,9 @@ begin
     FillChar(fbuffer[oldcap], sizeof(IT) * (fcapacity - oldcap), 0);
 end;
 
-procedure TFastInterfaceList.reserve(cap: integer);
+procedure TFastInterfaceList.reserve(cap: SizeInt);
 var
-  newcap: Integer;
+  newcap: SizeInt;
 begin
   if cap <= fcapacity then exit;
 
@@ -1675,9 +1675,9 @@ begin
   else if fcount <= fcapacity - 1024 then setBufferSize(fcapacity - 1024);
 end;
 
-procedure TFastInterfaceList.setCount(c: integer);
+procedure TFastInterfaceList.setCount(c: SizeInt);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   reserve(c);
   if c < fcount then begin
@@ -1695,7 +1695,7 @@ end;
 
 procedure TFastInterfaceList.clear;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to fcount - 1 do begin
     assert(fbuffer[i] <> nil);
@@ -1711,7 +1711,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TFastInterfaceList.insert(i: integer; child: IT);
+procedure TFastInterfaceList.insert(i: SizeInt; child: IT);
 begin
   assert(child <> nil);
   reserve(fcount + 1);
@@ -1724,7 +1724,7 @@ begin
   fcount+=1;
 end;
 
-constructor TFastInterfaceList.create(capacity: integer);
+constructor TFastInterfaceList.create(capacity: SizeInt);
 begin
   reserve(capacity);
   fcount := 0;

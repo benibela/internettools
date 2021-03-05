@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 procedure copyAnnotations(var target: TXQAnnotations; const source: TXQAnnotations);
 var
-  i: Integer;
-  j: Integer;
+  i: SizeInt;
+  j: SizeInt;
 begin
   target:= source;
   SetLength(target, length(target));
@@ -36,8 +36,8 @@ end;
 
 procedure freeAnnotations(annotations: TXQAnnotations);
 var
-  i: Integer;
-  j: Integer;
+  i: SizeInt;
+  j: SizeInt;
 begin
   for i := 0 to high(annotations) do begin
     annotations[i].name.Free;
@@ -104,7 +104,7 @@ end;
 
 function TXQTermWithChildren.debugTermToString: string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := '(' + ClassName;
   if length(children) >= 1 then result += ': '+children[0].debugTermToString();
@@ -114,7 +114,7 @@ end;
 
 destructor TXQTermWithChildren.destroy;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(children) do children[i].free;
   inherited destroy;
@@ -128,7 +128,7 @@ end;
 
 function TXQTermWithChildren.push(t: array of TXQTerm): TXQTerm;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(t) do push(t[i]);
   result := self;
@@ -136,7 +136,7 @@ end;
 
 function TXQTermWithChildren.getChildrenContextDependencies: TXQContextDependencies;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := [];
   for i := 0 to high(children) do
@@ -146,7 +146,7 @@ end;
 
 function TXQTermWithChildren.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := xqtvaContinue;
   for i := 0 to high(children) do begin
@@ -157,7 +157,7 @@ end;
 
 function TXQTermWithChildren.clone: TXQTerm;
 var
-  i: Integer;
+  i: SizeInt;
   tr: TXQTermWithChildren;
 begin
   result := TXQTermWithChildren(newinstance);
@@ -172,7 +172,7 @@ var globalUnnamedVariable: TXQTermVariable;
 function TXQTermWithChildrenOnStack.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   tempvar: TXQTermVariable;
-  i: Integer;
+  i: SizeInt;
 begin
   result := xqtvaContinue;
   tempvar := globalUnnamedVariable;
@@ -447,7 +447,7 @@ end;
 
 function TXQTermFilterSequence.getContextDependencies: TXQContextDependencies;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := [];
   if length(children) = 0 then exit;
@@ -494,16 +494,16 @@ var varname: string;
     properties: TStringArray; //properties or array elements
     v: TXQTerm;
     assignmentMode: (amOverride, amArrayOverride, amArrayInsert, amArrayAppend);
-    arrayIndex: integer;
+    arrayIndex: SizeInt;
     value: IXQValue;
 
     seq: TXQValueSequence;
     temp: PIXQValue;
 
     procedure applyProperties;
-    var i: Integer;
+    var i: SizeInt;
       temp: TXQValueJSONArray;
-      j: Integer;
+      j: SizeInt;
     begin
       for i := 0 to high(properties) do
         case value.kind of
@@ -768,7 +768,7 @@ end;
 
 destructor TXQTermSequenceType.destroy;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(arguments) do arguments[i].free;
   if kind = tikElementTest then
@@ -785,7 +785,7 @@ end;
 
 function TXQTermSequenceType.serialize: string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := name;
   case kind of
@@ -834,7 +834,7 @@ end;
 
 function TXQTermSequenceType.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   Result:=inherited visitchildren(visitor);
   if result <> xqtvaContinue then exit;
@@ -951,7 +951,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   end;
 
   function checkAtomicSequence: boolean;
-  var atomicCount: integer;
+  var atomicCount: SizeInt;
     function checkAtomicRecursion(v: TXQValue): boolean;
     var
       w: PIXQValue;
@@ -987,7 +987,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   var
     sub, pw: PIXQValue;
     fun: TXQValueFunction;
-    i: Integer;
+    i: SizeInt;
     returnType: TXQTermSequenceType;
     w: TXQValue;
   begin
@@ -1070,7 +1070,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   end;
 
 var
-  i: Integer;
+  i: SizeInt;
 begin
   case kind of
     tikNone: result := ta.isUndefined;
@@ -1116,7 +1116,7 @@ end;
 
 class function TXQTermSequenceType.subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   if xsa.derivedFrom(xsb) then exit(true);
   result := false;
@@ -1132,9 +1132,9 @@ end;
 
 function TXQTermSequenceType.subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
 var
-  i: Integer;
+  i: SizeInt;
   tempExpectedKeyType: TXSType;
-  tempExpectedValueChild: integer;
+  tempExpectedValueChild: SizeInt;
 begin
   if (kind = tikAtomic) and (tb.kind = tikAtomic) and subtypeItemTypeAtomic(atomicTypeInfo, tb.atomicTypeInfo) then
     exit(true);
@@ -1220,7 +1220,7 @@ function TXQTermSequenceType.functionCoercion(const v: IXQValue): IXQValue;
 var
   fun: TXQValueFunction;
   needCoercion: Boolean;
-  i: Integer;
+  i: SizeInt;
   fresult: TXQValueFunction;
   tempvar: TXQTermVariable;
 begin
@@ -1277,7 +1277,7 @@ end;
 
 function TXQTermSequenceType.isItemStar(): boolean;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := (kind = tikAny) and allowMultiple and allowNone;
   if kind = tikUnion then
@@ -1292,7 +1292,7 @@ end;
 function TXQTermSequenceType.clone: TXQTerm;
 var
   other: TXQTermSequenceType;
-  i: Integer;
+  i: SizeInt;
 begin
   result := inherited clone;
   other := TXQTermSequenceType(result);
@@ -1311,9 +1311,9 @@ end;
 
 function TXQTermSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
   tempSeq: TXQValueSequence;
-  targetLength, ccount, stacksize: Integer;
+  targetLength, ccount, stacksize: SizeInt;
   stack: TXQEvaluationStack;
   evilkids: PIXQValue;
 begin
@@ -1350,7 +1350,7 @@ end;
 
 function TXQTermSequence.getContextDependencies: TXQContextDependencies;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := [];
   for i:= 0 to high(children) do result += children[i].getContextDependencies;
@@ -1365,7 +1365,7 @@ end;
 
 function TXQTermArrayBase.getContextDependencies: TXQContextDependencies;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := [];
   for i:= 0 to high(children) do result += children[i].getContextDependencies;
@@ -1373,7 +1373,7 @@ end;
 
 function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
   tempSeq: TXQValueJSONArray;
 begin
   tempSeq := TXQValueJSONArray.create(length(children));
@@ -1385,7 +1385,7 @@ end;
 
 function TXQTermArray3_1.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
   list: TXQVList;
 begin
   list := TXQVList.create(length(children));
@@ -1398,7 +1398,7 @@ end;
 
 function TXQTermJSONiqArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
   tempSeq: TXQValueJSONArray;
   v: IXQValue;
 begin
@@ -1422,7 +1422,7 @@ begin
 end;
 
 function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
-  function evaluateSomeEvery(pos:integer): boolean;
+  function evaluateSomeEvery(pos:SizeInt): boolean;
   var seq: IXQValue;
       typeDelta: integer;
       v: PIXQValue;
@@ -1445,7 +1445,7 @@ function TXQTermSomeEvery.evaluate(var context: TXQEvaluationContext): IXQValue;
   end;
 
 var
-  stackCount: Integer;
+  stackCount: SizeInt;
 begin
   stackCount := context.temporaryVariables.Count;
   result:=xqvalue(evaluateSomeEvery(0));
@@ -1458,7 +1458,7 @@ begin
 end;
 
 function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
-  function visitSomeEvery(pos:integer): TXQTerm_VisitAction;
+  function visitSomeEvery(pos:SizeInt): TXQTerm_VisitAction;
   var typeDelta: integer;
   begin
     if pos = high(children) then
@@ -1719,7 +1719,7 @@ end;
 function TXQTermFlowerWindow.findDuplicatedVariable: TXQTermVariable;
 var
   l: TFPList;
-  i,j: Integer;
+  i,j: SizeInt;
 begin
   l := TFPList.Create;
   try
@@ -1768,7 +1768,7 @@ end;
 
 function TXQTermFlowerLetPattern.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  j: Integer;
+  j: SizeInt;
 begin
   result := visitor.simpleTermVisit(@expr, self);
   if result = xqtvaAbort then exit;
@@ -1787,7 +1787,7 @@ end;
 
 procedure TXQTermFlowerLetPattern.visitchildrenToUndeclare(visitor: TXQTerm_Visitor);
 var
-  j: Integer;
+  j: SizeInt;
 begin
   for j := high(pattern.vars) downto 0 do
     visitor.undeclare(@pattern.vars[j]);
@@ -1913,7 +1913,7 @@ end;
 
 function TXQTermFlowerGroup.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(vars) do
     visitor.simpleTermVisit(@vars[i], self);
@@ -1936,7 +1936,7 @@ end;
 
 function TXQTermFlowerGroup.clone: TXQTerm;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   Result:=inherited clone;
   TXQTermFlowerGroup(result).collation := collation;
@@ -1951,7 +1951,7 @@ end;
 
 destructor TXQTermFlowerGroup.destroy;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(vars) do
     vars[i].free;
@@ -1970,7 +1970,7 @@ type TOrderedTuple = class
 end;
   TFlowerSortingData = record
     //flower: TXQTermFlower;
-    minOrderIndex, maxOrderIndex: integer;
+    minOrderIndex, maxOrderIndex: SizeInt;
     orders: array of TXQTermFlowerOrder;
     collations: array of TXQCollation;
     context: ^TXQEvaluationContext;
@@ -2006,7 +2006,7 @@ var meta: PFlowerSortingData;
 var
   a, b: TOrderedTuple;
   orders: array of TXQTermFlowerOrder;
-  i: Integer;
+  i: SizeInt;
   emptyLeast: Boolean;
   order: TXQTermFlowerOrder;
 begin
@@ -2029,7 +2029,7 @@ end;
 
 type TFlowerGroupingData = record
   //flower: TXQTermFlower;
-  groupingIndices: array of integer;
+  groupingIndices: array of SizeInt;
   collation: TXQCollation;
   context: ^TXQEvaluationContext;
   function compareTuples(a, b: TOrderedTuple): integer; inline;
@@ -2038,8 +2038,7 @@ PFlowerGroupingData = ^TFlowerGroupingData;
 
 function TFlowerGroupingData.compareTuples(a, b: TOrderedTuple): integer;
 var
-  i: Integer;
-  k: LongInt;
+  i, k: SizeInt;
 begin
   result := 0;
   for i := 0 to high(groupingIndices) do begin
@@ -2069,15 +2068,15 @@ var
   sortingCache: TFPList;
   finalResult: TXQValueSequence;
   currentTuple: TOrderedTuple;
-  counts: array of integer = nil;
+  counts: array of SizeInt = nil;
 
 
-  procedure evaluateForLoop(const pos: Integer);
+  procedure evaluateForLoop(const pos: SizeInt);
   var clausekind: TXQTermFlowerSubClauseKind;
-    procedure addVariableBinding(v: IXQValue; index: integer = 1);
+    procedure addVariableBinding(v: IXQValue; index: SizeInt = 1);
     var
       letclause: TXQTermFlowerLet;
-      stackSize: Integer;
+      stackSize: SizeInt;
     begin
       letclause := TXQTermFlowerLet(children[pos]);
       if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then
@@ -2098,7 +2097,7 @@ var
 
     procedure addWindowVariableBinding();
     var
-      variableIndex: integer;
+      variableIndex: SizeInt;
       procedure addVar(const v: TXQTermVariable; const value: IXQValue);
       begin
         context.temporaryVariables.push(v, value);
@@ -2117,8 +2116,8 @@ var
 
     var
       binding: IXQValue;
-      stackSizes: array[1..2] of integer;
-      stackSizeIndex: integer;
+      stackSizes: array[1..2] of SizeInt;
+      stackSizeIndex: SizeInt;
 
       procedure popAll;
       begin
@@ -2126,10 +2125,10 @@ var
         context.temporaryVariables.popTo(stackSizes[stackSizeIndex]);
       end;
 
-      function subsequence(const from, toi: integer): IXQValue;
+      function subsequence(const from, toi: SizeInt): IXQValue;
       var
         seq: TXQValueSequence;
-        i: Integer;
+        i: SizeInt;
       begin
         if from = toi then exit(binding.get(from));
         seq := TXQValueSequence.create(toi-from+1);
@@ -2138,9 +2137,9 @@ var
         result := seq;
       end;
 
-      function checkCondition(at: integer; const condition: TXQTermFlowerWindowVarsAndCondition; forceTrue: boolean = false): boolean;
+      function checkCondition(at: SizeInt; const condition: TXQTermFlowerWindowVarsAndCondition; forceTrue: boolean = false): boolean;
       var
-        oldIndex: Integer;
+        oldIndex: SizeInt;
       begin
         oldIndex := variableIndex;
         stackSizes[stackSizeIndex] := context.temporaryVariables.Count;
@@ -2158,7 +2157,7 @@ var
         end;
       end;
 
-      var start, endi, length: Integer;
+      var start, endi, length: SizeInt;
           window: TXQTermFlowerWindow;
 
       procedure nextStep;
@@ -2172,7 +2171,7 @@ var
       end;
 
     var
-      matchIdxList: array of integer;
+      matchIdxList: array of SizeInt;
       matchIdxListLength, i: SizeInt;
     begin
       stackSizeIndex := 1;
@@ -2223,9 +2222,9 @@ var
     procedure addPatternVariableBinding(node: IXQValue);
     var
         patternClause: TXQTermFlowerLetPattern;
-        function hasStaticVariable(const name, url: string): integer;
+        function hasStaticVariable(const name, url: string): SizeInt;
         var
-          i: Integer;
+          i: SizeInt;
         begin
           for i := 0 to high(patternClause.pattern.vars) do //todo: optimize stringhash
             if (patternClause.pattern.vars[i].value = name)
@@ -2234,14 +2233,14 @@ var
         end;
 
     var oldContextItem: IXQValue;
-        oldSeqIndex: Integer;
-        oldSeqLength: Integer;
+        oldSeqIndex: SizeInt;
+        oldSeqLength: SizeInt;
     var
         oldLog: TXQVariableChangeLog;
-        i: Integer;
+        i: SizeInt;
         log: TXQVariableChangeLog;
         hasContextItem: Boolean;
-        varIndex, curcount, stackSize: integer;
+        varIndex, curcount, stackSize: SizeInt;
         value, empty: IXQValue;
     begin
       patternClause := TXQTermFlowerLetPattern(children[pos]);
@@ -2317,7 +2316,7 @@ var
       end;
     end;
 
-   var i, stackSize:integer;
+   var i, stackSize:SizeInt;
        clause: TXQTermFlowerSubClause;
        newTuple: TOrderedTuple;
        tempv: PIXQValue;
@@ -2394,22 +2393,22 @@ var
 
    end;
 
-  procedure groupTuple(pos: integer);
+  procedure groupTuple(pos: SizeInt);
   var data: TFlowerGroupingData;
     group: TXQTermFlowerGroup;
-    varindex: LongInt;
-    i, j: Integer;
+    varindex: SizeInt;
+    i, j: SizeInt;
     tuple: TOrderedTuple;
-    k: LongInt;
+    k: SizeInt;
     oldSortingCache: TFPList;
     lastTuple: TOrderedTuple;
     //Grouping collects for all tuples that have the same value in the grouping vars all values of the nonGroupingVars
     //We put these values for each nonGroupingVars in a tempList
     tempLists: array of TXQVList = nil;
-    nonGroupingVars: array of integer = nil;
+    nonGroupingVars: array of SizeInt = nil;
 
     procedure closeGroupedTuple;
-    var k: integer;
+    var k: SizeInt;
     begin
       for k in nonGroupingVars do
         case tempLists[k].Count of
@@ -2423,7 +2422,7 @@ var
     end;
 
     procedure newGroupedTuple;
-    var k: integer;
+    var k: SizeInt;
     begin
       if lastTuple <> nil then closeGroupedTuple;
       sortingCache.Add(oldSortingCache[i]);
@@ -2494,13 +2493,13 @@ var
 
   end;
 
-var i: Integer;
+var i: SizeInt;
     sortingData: TFlowerSortingData;
-    j: Integer;
+    j: SizeInt;
     oldSortingCache: TFPList;
     isJoinClause: Boolean;
-    joinVar: LongInt;
-    k, stackSize: Integer;
+    joinVar: SizeInt;
+    k, stackSize: SizeInt;
 
 
 begin
@@ -2587,7 +2586,7 @@ end;
 procedure TXQTermFlower.precompute;
 
 var
-  i, j: Integer;
+  i, j: SizeInt;
 
   procedure initialAddVariable(v: TXQTermVariable);
   begin
@@ -2717,7 +2716,7 @@ end;
 
 function TXQTermFlower.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(children) - 1 do
     visitor.simpleTermVisit(@children[i], self);
@@ -2778,7 +2777,7 @@ function TXQTermNamedFunction.evaluate(var context: TXQEvaluationContext): IXQVa
 //{$define checkreturntypes}  there is no point in testing the return type for native functions. but it might spot internal inconsistencies
 var
   evilkids: PIXQValue;
-  argcount, i, stacksize: Integer;
+  argcount, i, stacksize: SizeInt;
   stack: TXQEvaluationStack;
 begin
   //evaluateChildren(context, evilkids);
@@ -2856,7 +2855,7 @@ end;
 
 function TXQTermNamedFunction.ToString: ansistring;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := '';
   if name <> nil then
@@ -2934,7 +2933,7 @@ end;
 
 procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
 var
-  i: Integer;
+  i: SizeInt;
   f: TXQValueFunction;
 begin
   if not (kind in [xqfkNativeInterpreted, xqfkUnknown]) or (interpretedFunction <> nil) then exit;
@@ -3014,7 +3013,7 @@ var
   func: IXQValue;
   index: IXQValue;
   ara: TXQValueJSONArray;
-  i, stackSize: Integer;
+  i, stackSize: SizeInt;
   resultSeq: TXQVList;
   v: PIXQValue;
   funcref: TXQValueFunction;
@@ -3089,7 +3088,7 @@ end;
 function TXQTermDynamicFunctionCall.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
   tempvar: TXQTermVariable;
-  i: Integer;
+  i: SizeInt;
 begin
   result := visitor.simpleTermVisit(@children[0], self);
   if result = xqtvaAbort then exit;
@@ -3141,7 +3140,7 @@ end;
 function TXQTermBinaryOp.evaluate(var context: TXQEvaluationContext): IXQValue;
 
 var
-  i, oldsize: Integer;
+  i, oldsize: SizeInt;
   stack: TXQEvaluationStack;
   evilkids: PIXQValue;
 begin
@@ -3174,7 +3173,7 @@ end;
 
 function TXQTermBinaryOp.debugTermToString: string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := '(' + ClassName + ' ';
   if length(children) >= 1 then result += children[0].debugTermToString();
@@ -3202,7 +3201,7 @@ var
   seq, oldContextItem: IXQValue;
   list: TXQVList;
   pe: TTreeNode;
-  oldSeqIndex, oldSeqLength: integer;
+  oldSeqIndex, oldSeqLength: SizeInt;
   pv: PIXQValue;
 begin
   seq := children[0].evaluate(context);
@@ -3253,7 +3252,7 @@ end;
 
 destructor TXQTermPath.Destroy;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(path) do path[i].destroy;
   inherited Destroy;
@@ -3261,7 +3260,7 @@ end;
 
 function TXQTermPath.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := TXQueryEngine.evaluateSingleStepQuery(path[0], context, high(path) = 0);
   for i:=1 to high(path) do
@@ -3272,7 +3271,7 @@ end;
 
 function TXQTermPath.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i, j: Integer;
+  i, j: SizeInt;
 begin
   result := xqtvaContinue;
   for i := 0 to high(path) do begin
@@ -3287,7 +3286,7 @@ end;
 
 function TXQTermPath.debugTermToString: string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := '';
   for i := 0 to high(path) do begin
@@ -3298,7 +3297,7 @@ end;
 
 function TXQTermPath.getContextDependencies: TXQContextDependencies;
 var
-  i, j: Integer;
+  i, j: SizeInt;
 begin
   if length(path) = 0 then exit([]);
   if path[0].typ = tneaFunctionSpecialCase then result := path[0].specialCase.getContextDependencies
@@ -3312,7 +3311,7 @@ end;
 
 procedure TXQTermPath.addToPath(term: TXQTerm);
 var
-  last, len: Integer;
+  last, len: SizeInt;
   b: TXQTermBinaryOp;
   isDoubleSlash: Boolean;
   filter: TXQTermFilterSequence;
@@ -3372,7 +3371,7 @@ end;
 
 function TXQTermPath.clone: TXQTerm;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   Result := inherited;
   SetLength(TXQTermPath(Result).path, length(path));
@@ -3728,7 +3727,7 @@ end;
 
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  j: Integer;
+  j: SizeInt;
 begin
   if pattern = nil then begin
     if variable <> nil then visitor.declare(@variable, self);
@@ -3801,11 +3800,11 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.matched(var context: TXQEvalu
   function evaluateWithChangedVariableLog(log: TXQVariableChangeLog; const vars: array of TXQtermVariable): IXQValue;
   var
     value: IXQValue;
-    i: Integer;
+    i: SizeInt;
 
     oldContextItem: IXQValue;
-    oldSeqIndex: Integer;
-    oldSeqLength, stackSize: Integer;
+    oldSeqIndex: SizeInt;
+    oldSeqLength, stackSize: SizeInt;
     hasContextItem: Boolean;
     oldlog: TXQVariableChangeLog;
   begin
@@ -3853,7 +3852,7 @@ end;
 function TXQTermTypeSwitch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   v: IXQValue;
-  i: Integer;
+  i: SizeInt;
 begin
   v := children[0].evaluate(context);
   for i:=1 to high(children) do
@@ -3877,7 +3876,7 @@ end;
 function TXQTermSwitch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   v: IXQValue;
-  i, j: Integer;
+  i, j: SizeInt;
   operand: IXQValue;
   seq: TXQTermWithChildren;
 begin
@@ -4252,7 +4251,7 @@ var
         addImplicitNamespace(tree.namespace);
       end;
     var
-      i: Integer;
+      i: SizeInt;
     begin
       if (context.namespaces <> nil) and ((prefix <> '') or (defkind = xqdnkElementType)) then begin
         i := context.namespaces.lastIndexOfNamespacePrefix(prefix);
@@ -4533,7 +4532,7 @@ end;
 function TXQTermMapConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   obj: TXQValueStandardMap;
-  i: integer;
+  i: SizeInt;
   v: IXQValue;
 begin
   obj := TXQValueStandardMap.create();
@@ -4570,8 +4569,8 @@ end;
 
 var
   obj: TXQValueStringMap;
-  i: integer;
-  skippedOptionals: Integer = 0;
+  i: SizeInt;
+  skippedOptionals: SizeInt = 0;
   v: IXQValue;
 begin
   obj := TXQValueStringMap.create();
@@ -4686,7 +4685,7 @@ end;
 
 
 
-function makeNumberedVariable(i: integer; index: integer = -1): TXQTermVariable;
+function makeNumberedVariable(i: SizeInt; index: SizeInt = -1): TXQTermVariable;
 var temp: string = '';
 begin
   SetLength(temp, sizeof(i)+1);
@@ -4717,7 +4716,7 @@ function TXQTermDefineFunction.evaluate(var context: TXQEvaluationContext): IXQV
 var
   temp: TXQValueFunction;
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
-  i: Integer;
+  i: SizeInt;
   dfv: IXQValue;
 begin
 
@@ -4775,7 +4774,7 @@ end;
 
 function TXQTermDefineFunction.define(var context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
 var
-  i: Integer;
+  i: SizeInt;
   v: TXQTermVariable;
 begin
   result := TXQValueFunction.create();
@@ -4838,7 +4837,7 @@ end;
 
 function TXQTermDefineFunction.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i: Integer;
+  i: SizeInt;
   varDef: TXQTermDefineVariable;
 begin
   visitor.parent := self;
@@ -4892,7 +4891,7 @@ end;
 function TXQTermDefineFunction.findNamedFunctionVersion(const context: TXQEvaluationContext): PXQFunctionParameterTypes;
 var
   f: TXQTermNamedFunction;
-  i: Integer;
+  i: SizeInt;
 begin
   f := TXQTermNamedFunction(children[high(children)]);
   if f.kind in [xqfkUnknown, xqfkNativeInterpreted] then
@@ -4934,7 +4933,7 @@ var
   version: ^TXQFunctionParameterTypes;
   resulttype: TXQTermSequenceType;
   f: TXQTermNamedFunction;
-  i: Integer;
+  i: SizeInt;
 begin
   if (kind <> xqtdfNamedReference) or initialized then exit;
 
@@ -4980,8 +4979,8 @@ function TXQTermDefineFunction.defineStaticPartialApplication(var context: TXQEv
 var
   f: TXQTermNamedFunction;
   version: PXQFunctionParameterTypes;
-  j: Integer;
-  i, stacksize: Integer;
+  j: SizeInt;
+  i, stacksize: SizeInt;
 begin
   version := findNamedFunctionVersion(context);
   f := TXQTermNamedFunction(children[high(children)]);
@@ -5035,8 +5034,8 @@ end;
 
 function TXQTermDefineFunction.defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
 var
-  j: Integer;
-  i, stackSize: Integer;
+  j: SizeInt;
+  i, stackSize: SizeInt;
   ch: array of TXQTerm;
 begin
   ch := (children[0] as TXQTermWithChildren).children;
@@ -5088,8 +5087,8 @@ function TXQTermTryCatch.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   ns: String;
   matches: Boolean;
-  i: Integer;
-  j, stackSize: Integer;
+  i: SizeInt;
+  j, stackSize: SizeInt;
   nsprefix: String;
 begin
   stackSize := context.temporaryVariables.count;
@@ -5141,7 +5140,7 @@ end;
 
 function TXQTermTryCatch.getContextDependencies: TXQContextDependencies;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := body.getContextDependencies;
   for i := 0 to high(catches) do
@@ -5150,7 +5149,7 @@ end;
 
 function TXQTermTryCatch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := visitor.simpleTermVisit(@body, self);
   if result = xqtvaAbort then exit;
@@ -5167,7 +5166,7 @@ end;
 
 function TXQTermTryCatch.clone: TXQTerm;
 var
-  i, j: Integer;
+  i, j: SizeInt;
   r: TXQTermTryCatch;
 begin
   result := TXQTermTryCatch.create(body.clone);
@@ -5184,8 +5183,8 @@ end;
 
 destructor TXQTermTryCatch.Destroy;
 var
-  i: Integer;
-  j: Integer;
+  i: SizeInt;
+  j: SizeInt;
 begin
   body.free;
   for i := 0 to high(catches) do begin

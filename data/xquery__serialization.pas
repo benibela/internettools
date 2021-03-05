@@ -1215,7 +1215,7 @@ end;
 procedure serializeXMLHTMLText(var serializer: TXQSerializer; const v: IXQValue; var params: TXQSerializationParams);
 var firstElement: TTreeNode = nil;
 
-  function findRootNodeCount(const v: IXQValue): integer;
+  function findRootNodeCount(const v: IXQValue): SizeInt;
   var
     w, m: PIXQValue;
     n: TTreeNode;

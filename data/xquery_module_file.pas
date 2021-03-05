@@ -657,7 +657,7 @@ end;
 
 function strFileName({normalized}path: string): string;
 var
-  lastSep: LongInt;
+  lastSep: SizeInt;
 begin
   lastSep := strlastIndexOf(path, AllowDirectorySeparators);
   if lastsep = length(path) then begin

@@ -355,7 +355,7 @@ procedure strSplit(out splitted: TStringArray;s: string; sep:string=',';includeE
 function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
 
 function strWrapSplit(const Line: string; MaxCol: SizeInt = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
-function strWrap(Line: string; MaxCol: Integer = 80; const BreakChars: TCharSet = [' ', #9]): string;
+function strWrap(Line: string; MaxCol: SizeInt = 80; const BreakChars: TCharSet = [' ', #9]): string;
 
 function strReverse(s: string): string; //**< reverses a string. Assumes the encoding is utf-8
 
@@ -374,7 +374,7 @@ function strAfterLast(const s: string; const sep: TCharSet): string; overload;
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
 //**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
-function strJoin(const sl: TStrings; const sep: string = ', '; limit: Integer=0; const limitStr: string='...'): string;overload;
+function strJoin(const sl: TStrings; const sep: string = ', '; limit: integer=0; const limitStr: string='...'): string;overload;
 //**Joins all string list items to a single string separated by @code(sep).@br
 function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt=0; const limitStr: string='...'): string;overload;//{$ifdef HASINLINE} inline; {$endif}
 function strJoin(strings: PString; stringsLength: SizeInt; const sep: string = ', '): string;overload;
@@ -2360,7 +2360,7 @@ begin
   if length(result) = 0 then arrayAdd(result, '');
 end;
 
-function strWrap(Line: string; MaxCol: Integer; const BreakChars: TCharSet): string;
+function strWrap(Line: string; MaxCol: SizeInt; const BreakChars: TCharSet): string;
 begin
   result := strJoin(strWrapSplit(line, MaxCol, BreakChars), LineEnding);
 end;
@@ -3599,7 +3599,7 @@ end;
 
 
 
-function strJoin(const sl: TStrings; const sep: string  = ', '; limit: Integer=0; const limitStr: string='...'): string; overload;
+function strJoin(const sl: TStrings; const sep: string  = ', '; limit: integer=0; const limitStr: string='...'): string; overload;
 var i:Integer;
 begin
   Result:='';
@@ -3676,7 +3676,7 @@ function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
 
 Var
   foundDot, foundExp: boolean;
-  i: Integer;
+  i: sizeint;
 begin
   if s = '' then
     result := def //good idea? probably for StrToBoolDef(@attribute, def) and if @attribute is missing (=> '') it should def
@@ -3973,7 +3973,7 @@ function strResolveURI(rel, base: string): string;
 var
   schemaLength: SizeInt;
   baseIsAbsolute: Boolean;
-  fileSchemaPrefixLength: Integer;
+  fileSchemaPrefixLength: sizeint;
   returnBackslashes: Boolean;
   i: SizeInt;
 begin
@@ -4087,7 +4087,7 @@ function strSimilarity(const s, t: string): SizeInt;
 //see http://en.wikipedia.org/wiki/Levenshtein_distance
 var v: array[0..1] of array of SizeInt;
   i,j : SizeInt;
-  cost, v0, v1: Integer;
+  cost, v0, v1: sizeint;
 begin
   if s = t then begin result := 0; exit; end;
   if s = '' then begin result := length(t); exit; end;

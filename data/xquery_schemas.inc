@@ -323,7 +323,7 @@ end;
 
 constructor TXSUnionType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; amembers: array of TXSType);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   inherited Create(aname, aparent, astorage);
   SetLength(members, length(amembers));
@@ -334,7 +334,7 @@ end;
 
 function TXSUnionType.containsTransitive(t: TXSType): boolean;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(members) do
     if t.derivedFrom(members[i]) then exit(true);
@@ -343,7 +343,7 @@ end;
 
 function TXSUnionType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
 var
-  i: Integer;
+  i: SizeInt;
   temp: TXSCastingError;
 begin
   if v.typeAnnotation.derivedFrom(self) then begin
@@ -364,7 +364,7 @@ end;
 
 function TXSUnionType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
 var
-  i: Integer;
+  i: SizeInt;
   temp: TXSCastingError;
 begin
   if length(members) > 0 then result := xsceXPTY0004
@@ -382,7 +382,7 @@ end;
 
 constructor TXSListType.Create(aname: string; aparent: TXSType; aitemType: TXSSimpleType);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   inherited create(aname, aparent, TXQValueSequence);
   itemType := aitemType;
@@ -409,7 +409,7 @@ var
   l: TStringArray;
   temp: TXQValue;
   ptemp: PXQValue;
-  i: Integer;
+  i: SizeInt;
 begin
   l := strSplit(v, ' ');
   if outv <> nil then begin
@@ -695,7 +695,7 @@ end;
 
 function TXSNumericType.constraintsSatisfied(const v: BigDecimal): boolean;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := true;
   for i := 0 to high(constrainingFacets) do
@@ -914,7 +914,7 @@ end;
 
 function TXSDateTimeType.constraintsSatisfied(const v: TXQValueDateTimeData): boolean;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := true;
   for i := 0 to high(constrainingFacets) do
@@ -1024,7 +1024,7 @@ begin
 end;
 
 class function TXSSchema.isValidQName(s: string): boolean;
-var i: integer;
+var i: SizeInt;
 begin
   i := pos(':', s);
   if i = 0 then result := isValidNCName(s)

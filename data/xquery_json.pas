@@ -78,7 +78,7 @@ var resobj: TXQValueStringMap;
     end;
 
 var v: IXQValue;
-  i: Integer;
+  i: SizeInt;
 begin
   resobj := TXQValueStringMap.create();
   try
@@ -161,7 +161,7 @@ function xqFunctionMembers({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
   ara: TXQValueJSONArray;
-  i: Integer;
+  i: SizeInt;
   list: TXQVList;
 begin
   list := TXQVList.create();

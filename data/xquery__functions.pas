@@ -725,7 +725,7 @@ end;
 
 function xqvalueToNormalizedNodeSeq(const v: IXQValue): TXQVList;
 var
- i: Integer;
+ i: SizeInt;
  x: PIXQValue;
 begin
   case v.kind of
@@ -770,7 +770,8 @@ end;
 function xqvalueIntersect(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 var a,b: TXQVList;
     resseq: TXQValueSequence;
-    ia,ib,cmp: integer;
+    ia,ib: sizeint;
+    cmp: integer;
 begin
   ignore(cxt);
   if not (ta.kind in [pvkNode,pvkSequence,pvkUndefined]) or not (tb.kind in [pvkNode,pvkSequence,pvkUndefined]) then
@@ -808,8 +809,8 @@ end;
 
 function xqvalueExcept(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 var a,b: TXQVList;
-    ia,ib,cmp: integer;
-    i: Integer;
+    ia,ib,i: SizeInt;
+    cmp: Integer;
     resseq: TXQValueSequence;
 begin
   ignore(cxt);
@@ -1457,7 +1458,7 @@ procedure THttpRequestParams.addUrlEncodedList(s: string);
 
 var
   split: TStringArray;
-  i: Integer;
+  i: SizeInt;
 begin
   if s = '' then exit;
   split := strSplit(s, '&');
@@ -1471,7 +1472,7 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     param: PHttpRequestParam;
     value, filename, contenttype, headers, h: String;
     temp: TXQValue;
-    i: Integer;
+    i: SizeInt;
   begin
     if urlEncoded then n := formEncode(n, charset);
 
@@ -1866,7 +1867,7 @@ begin
 end;
 
 function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var i: Integer;
+var i: SizeInt;
     encoding: TSystemCodePage;
     requests: array[0..1] of THttpRequestParams;
 begin
@@ -2032,7 +2033,7 @@ var paramobj: TXQValueStringMap;
   procedure parseParamsUriEncoded(const q: ixqvalue);
   var
     request: THttpRequestParams;
-    i: Integer;
+    i: SizeInt;
   begin
     if paramobj = nil then paramobj := TXQValueStringMap.create();
     request.init;
@@ -2043,7 +2044,7 @@ var paramobj: TXQValueStringMap;
   end;
   procedure parseParamsMime(const data, boundary: string);
   var mime: TMIMEMultipartData;
-    i: Integer;
+    i: SizeInt;
   begin
     if paramobj = nil then paramobj := TXQValueStringMap.create();
     mime.parse(data, boundary);
@@ -2373,7 +2374,7 @@ end;
 
 function xqFunctionSubstring({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var s:string;
-var from, len: integer;
+var from, len: sizeint;
 
 begin
   s:=args[0].toString;
@@ -2388,7 +2389,7 @@ end;
 function xqFunctionString_length(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   temp: String;
-  len: LongInt;
+  len: SizeInt;
 begin
   if argc = 1 then temp := args[0].toString
   else temp := context.SeqValueAsString;
@@ -2562,7 +2563,7 @@ var
   list: String;
   split: string;
   splitted: TStringArray;
-  i: Integer;
+  i: sizeint;
 begin
   list := args[0].toString;
   searched := args[1].toString;
@@ -2583,7 +2584,8 @@ end;
 
 function xqFunctionTranslate({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- i,j,cp: Integer;
+ i,j: sizeint;
+ cp: Integer;
  resstr: RawByteString;
  inIterator, mapIterator, transIterator: TStrIterator;
  found: Boolean;
@@ -2771,7 +2773,7 @@ end;
 function xqFunctionObject(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   seq: TXQVList;
-  i: Integer;
+  i: sizeint;
   obj: TXQValueStringMap;
   v: IXQValue;
 begin
@@ -2821,7 +2823,7 @@ begin
 end;
 function guessDateFormat(const d: string): string;
 var state: (gdfsFirstDigits, gdfsFirstSeparator, gdfsMiddleDigits, gdfsMiddleLetters, gdfsSecondSeparator);
-  i, start: Integer;
+  i, start: SizeInt;
   builder: TStrBuilder;
   direction: (gdfsYMD, gdfsDMY) = gdfsYMD;
 begin
@@ -3366,7 +3368,7 @@ end;
 
 function xqFunctionConcatenate({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- i: Integer;
+ i: SizeInt;
  resseq: TXQValueSequence;
 begin
   resseq := TXQValueSequence.create(argc);
@@ -3384,7 +3386,7 @@ var
       result :=comparableTypes(a.toValue, b.toValue) and equalAtomic(a, b, collationOverride);
   end;
 
-var  i: Integer;
+var  i: sizeint;
      v: TXQValue;
      resseq: TXQValueSequence;
 begin
@@ -3419,7 +3421,7 @@ end;
 
 function xqFunctionDistinct_values(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- i: Integer;
+ i: sizeint;
  v: TXQValue;
  resseq: TXQValueSequence;
  collation: TXQCollation;
@@ -3447,7 +3449,7 @@ end;
 
 function xqFunctionInsert_before({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- index: Integer;
+ index: SizeInt;
  a: PIXQValue;
  resseq: TXQValueSequence;
 begin
@@ -3469,7 +3471,7 @@ end;
 
 function xqFunctionRemove({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
- i, count: Integer;
+ i, count: SizeInt;
  iterator: TXQValueEnumeratorPtrUnsafe;
  list: TXQVList;
 begin
@@ -3504,7 +3506,7 @@ begin
 end;
 
 function xqFunctionsubsequence({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var from,len,oldlen: Integer;
+var from,len,oldlen: SizeInt;
  resseq: TXQValueSequence;
  resseqseq: TXQVList;
  iterator: TXQValueEnumeratorPtrUnsafe;
@@ -3795,7 +3797,7 @@ end;
 var tempf: xqfloat;
     tempf2: xqfloat;
     tempd: BigDecimal;
- i: Integer;
+ i: SizeInt;
  seq: IXQValue;
  enumerable: TXQValueEnumeratorPtrUnsafe;
  pv: PIXQValue;
@@ -4284,9 +4286,9 @@ end;
 
 function xqFunctionTail({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  len: Integer;
+  len: SizeInt;
   seq: TXQValueSequence;
-  i: Integer;
+  i: SizeInt;
 begin
   len := args[0].getSequenceCount;
   if len < 2 then exit(xqvalue);
@@ -4308,7 +4310,7 @@ end;
 
 function xqFunctionPath(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
   function path(n: TTreeNode): string;
-    function getPosition(checkValue: boolean): integer;
+    function getPosition(checkValue: boolean): SizeInt;
     var cur: TTreeNode;
     begin
       result := 1;
@@ -4429,8 +4431,7 @@ end;
 
 function xqFunctionFold(const context: TXQEvaluationContext; left: boolean; args: PIXQValue): IXQValue;
 var
-  count: Integer;
-  i: Integer;
+  i, count: SizeInt;
   seq: IXQValue;
   f: TXQBatchFunctionCall;
 begin
@@ -4471,9 +4472,8 @@ var
   seq1: TXQValue;
   seq2: TXQValue;
   func: TXQValueFunction;
-  count: Integer;
   resseq: TXQValueSequence;
-  i, stacksize: Integer;
+  i, stacksize, count: SizeInt;
   stack: TXQEvaluationStack;
 begin
   seq1 := args[0].toValue;
@@ -4757,8 +4757,8 @@ end;
 function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
   function permute(const v: IXQValue): TXQValue;
   var
-    n, i: Integer;
-    pos: array of integer = nil;
+    n, i: SizeInt;
+    pos: array of SizeInt = nil;
     resseq: TXQValueSequence;
   begin
     n := v.getSequenceCount;
@@ -5217,10 +5217,10 @@ var shortLang: String;
 
 
 var
-  separator: LongInt;
+  separator: SizeInt;
   i: Integer;
   formatted: String;
-  j: LongInt;
+  j: SizeInt;
   signed: Boolean;
   lang: String;
   procedure raiseInvalidPicture();
@@ -5425,7 +5425,7 @@ var
   allDigits: Boolean;
   tz, tempcount: Integer;
   fallbackOccured: String = '';
-  tempcountopt: LongInt;
+  tempcountopt: SizeInt;
   tempxqv: array of IXQValue;
 begin
   if argc = 5 then begin
@@ -5797,7 +5797,7 @@ var
     scalingFactor: integer;// = integerMandatory
   end;
   arabic: String;
-  dot: LongInt;
+  dot: SizeInt;
   integerActual: Integer;
   fractionActual: Integer;
   resstr: String;
@@ -6082,7 +6082,7 @@ function xqFunctionApply(const context: TXQEvaluationContext; {%H-}argc: SizeInt
 var
   pv: PIXQValue;
   stack: TXQEvaluationStack;
-  stacksize: Integer;
+  stacksize: SizeInt;
   f: TXQValueFunction;
 begin
   case args[0].kind of
@@ -6115,7 +6115,7 @@ var
   input, token: string;
   splitted: TStringArray;
   v: TXQValue;
-  i: Integer;
+  i: SizeInt;
 begin
   if argc = 3 then collation := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collation := context.staticContext.collation;
@@ -6164,9 +6164,9 @@ var p: pchar;
   end;
 
 
-  function getStringFromArray(a: PString; ahigh: integer; required: boolean = true): integer;
+  function getStringFromArray(a: PString; ahigh: SizeInt; required: boolean = true): SizeInt;
   var
-    i: Integer;
+    i: SizeInt;
     q: pchar;
   begin
     skipWhitespace;
@@ -6452,7 +6452,7 @@ var
   sortContext: TSortingContext;
   keyfunc: TXQValueFunction;
   tempArray: array of TXPair = nil;
-  count, i, stacksize: Integer;
+  count, i, stacksize: SizeInt;
   stack: TXQEvaluationStack;
   w: TXQValue;
 begin
@@ -6963,7 +6963,7 @@ function xqFunctionArrayFold_right(const context: TXQEvaluationContext; {%H-}arg
 var
   f: TXQBatchFunctionCall;
   list: TXQVList;
-  i: Integer;
+  i: SizeInt;
 begin
   list := arrayAsList(argv^);
   f.init(context, argv[2], argv[1]);
@@ -6978,7 +6978,7 @@ end;
 function xqFunctionArrayFor_each_pair(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQVList;
-  i: Integer;
+  i: SizeInt;
   a, b: TXQValueJSONArray;
   count: Int64;
   f: TXQBatchFunctionCall;
@@ -7207,7 +7207,7 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
     stringkeys: array of string = nil;
     obj: TXQValueStringMap;
     pp: TXQProperty;
-    i: Integer;
+    i: SizeInt;
     v: TXQValue;
     keep: Boolean;
   begin
@@ -7237,7 +7237,7 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
     map: TXQValueStandardMap;
     keys: array of TXQValue = nil;
     mp: TXQStandardProperty;
-    i: Integer;
+    i: SizeInt;
     v: TXQValue;
     keep: Boolean;
   begin

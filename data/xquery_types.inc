@@ -32,7 +32,7 @@ begin
   Result:=TXQVList.Create;
 end;
 
-function TXQValueUndefined.getSequenceCount: integer;
+function TXQValueUndefined.getSequenceCount: SizeInt;
 begin
   Result := 0 ;
 end;
@@ -398,12 +398,12 @@ begin
   result := self;
 end;
 
-function TXQValue.getSequenceCount: integer;
+function TXQValue.getSequenceCount: SizeInt;
 begin
   result := 1;
 end;
 
-function TXQValue.get(i: integer): IXQValue;
+function TXQValue.get(i: SizeInt): IXQValue;
 begin
   if i = 1 then exit(self);
   exit(xqvalue);
@@ -493,7 +493,7 @@ end;
 
 function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
 var
-  i: Integer;
+  i: SizeInt;
   prop: TXQStandardProperty;
   first: Boolean;
 begin
@@ -870,7 +870,7 @@ var tempContext: TXQEvaluationContext;
   end;
 
 var v: IXQValue;
-    i: Integer;
+    i: SizeInt;
 begin
   tempContext := defaultQueryEngine.getEvaluationContext();
   resseq := TXQValueSequence.create();
@@ -2058,7 +2058,7 @@ end;
 
 {$ImplicitExceptions off}
 
-constructor TXQValueSequence.create(capacity: integer);
+constructor TXQValueSequence.create(capacity: SizeInt);
 begin
   inherited create(baseSchema.sequence);
   seq := TXQVList.Create(capacity);
@@ -2136,7 +2136,7 @@ end;
 {$ImplicitExceptions on}
 
 function TXQValueSequence.toJoinedString(const sep: string): string;
-var i: integer;
+var i: SizeInt;
     builder: TStrBuilder;
 begin
   if seq.count = 0 then exit('');
@@ -2189,20 +2189,20 @@ end;
 
 function TXQValueSequence.toXQVList: TXQVList;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := TXQVList.Create;
   for i:=0 to seq.Count-1 do
     result.add(seq[i]);
 end;
 
-function TXQValueSequence.getSequenceCount: integer;
+function TXQValueSequence.getSequenceCount: SizeInt;
 begin
   Result:=seq.Count;
 end;
 
 
-function TXQValueSequence.get(i: integer): IXQValue;
+function TXQValueSequence.get(i: SizeInt): IXQValue;
 begin
   if (i < 1) or (i > seq.Count) then exit(xqvalue);
   exit(seq[i-1]);
@@ -2223,7 +2223,7 @@ function TXQValueSequence.map(const q: string): IXQValue;
 var
   term: TXQuery;
   resseq: TXQValueSequence;
-  i: Integer;
+  i: SizeInt;
 begin
   term := defaultQueryEngine.parseTerm(q, xqpmXQuery3_1, defaultQueryEngine.StaticContext);
   try
@@ -2244,7 +2244,7 @@ end;
 
 function TXQValueSequence.clone: IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
   seqr: TXQValueSequence;
 begin
   seqr := TXQValueSequence.Create(seq.Count);
@@ -2255,7 +2255,7 @@ end;
 
 procedure TXQValueSequence.jsonSerialize(var serializer: TXQSerializer);
 var
-  i: Integer;
+  i: SizeInt;
   ws: TXQSerializerInsertWhitespace;
 begin
   case seq.Count of
@@ -2288,7 +2288,7 @@ end;
 
 procedure TXQValueSequence.xmlSerialize(var serializer: TXQSerializer);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   with serializer do
     if seq.Count = 0 then
@@ -2309,7 +2309,7 @@ end;
 
 procedure TXQValueSequence.adaptiveSerialize(var serializer: TXQSerializer);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   case getSequenceCount of
     0: serializer.append('()');
@@ -3173,7 +3173,7 @@ begin
   seq := takeList
 end;
 
-constructor TXQValueJSONArray.create(capacity: integer);
+constructor TXQValueJSONArray.create(capacity: SizeInt);
 begin
   inherited create(baseJSONiqSchema.array_);
   seq := TXQVList.create(capacity);
@@ -3241,7 +3241,7 @@ end;
 
 function TXQValueJSONArray.clone: IXQValue;
 var
-  i: Integer;
+  i: SizeInt;
   seqr: TXQValueJSONArray;
 begin
   seqr := TXQValueJSONArray.Create(seq.Count);
@@ -3253,12 +3253,12 @@ end;
 function TXQValueJSONArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): TXQValue;
 var
   newValue: IXQValue;
-  i: Integer;
-  idx: Integer;
+  i: SizeInt;
+  idx: SizeInt;
   resultArray: TXQValueJSONArray;
   resseq: TXQVList;
 begin
-  idx := StrToInt(props^);
+  idx := StrToInt64(props^);
   if idx < 0 then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
 
   if (len = 1) then
@@ -3282,7 +3282,7 @@ end;
 
 procedure TXQValueJSONArray.jsonSerialize(var serializer: TXQSerializer);
 var
-  i: Integer;
+  i: SizeInt;
   ws: TXQSerializerInsertWhitespace;
 begin
   case seq.Count of
@@ -3313,7 +3313,7 @@ end;
 
 procedure TXQValueJSONArray.xmlSerialize(var serializer: TXQSerializer);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   with serializer do
     if seq.Count = 0 then
@@ -3334,7 +3334,7 @@ end;
 
 procedure TXQValueJSONArray.adaptiveSerialize(var serializer: TXQSerializer);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   serializer.appendJSONArrayStart;
   if seq.Count > 0 then begin
@@ -3420,7 +3420,7 @@ end;
 
 destructor TXQValueFunction.Destroy;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   if ownsTerms then begin
     body.free;
@@ -3449,7 +3449,7 @@ end;
 function TXQValueFunction.evaluate(const outerContext: TXQEvaluationContext; const term: TXQTerm): IXQValue;
 var
   tempcontext: TXQEvaluationContext;
-  j: Integer;
+  j: SizeInt;
   evilkids: PIXQValue;
 begin
   tempcontext := context;
@@ -3466,7 +3466,7 @@ end;
 
 function TXQValueFunction.evaluateInContext(var inContext: TXQEvaluationContext; const term: TXQTerm): IXQValue;
 var
-  j: Integer;
+  j: SizeInt;
   evilkids: PIXQValue;
 begin
   if length(parameters) > 0 then begin
@@ -3478,11 +3478,11 @@ begin
   TXQAbstractFunctionInfo.convertType(result, resulttype, inContext, term);
 end;
 
-procedure TXQValueFunction.contextOverrideParameterNames(const inContext: TXQEvaluationContext; count: integer);
+procedure TXQValueFunction.contextOverrideParameterNames(const inContext: TXQEvaluationContext; count: SizeInt);
 {$IFDEF TRACK_STACK_VARIABLE_NAMES}
 var
   stack: TXQEvaluationStack;
-  i: Integer;
+  i: SizeInt;
 {$endif}
 begin
   if count <> length(parameters) then
@@ -3520,7 +3520,7 @@ end;
 
 function TXQValueFunction.toXQuery: string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   result := 'function (';
   for i := 0 to high(parameters) do begin
@@ -3534,7 +3534,7 @@ end;
 
 function TXQValueFunction.debugAsStringWithTypeAnnotation(textOnly: boolean): string;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   ignore(textOnly);
   result := 'function (';
@@ -3549,7 +3549,7 @@ end;
 
 procedure TXQValueFunction.assignCopiedTerms(const func: TXQValueFunction);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   body := func.body.clone;
   SetLength(parameters, length(func.parameters));
@@ -3587,7 +3587,7 @@ end;
 
 procedure TXQValueFunction.visit(visitor: TXQTerm_Visitor);
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 0 to high(parameters) do
     visitor.declare(@parameters[i].variable, nil);

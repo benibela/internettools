@@ -137,7 +137,7 @@ end;
 
 function TXQCollation.doCompare(a, b: pansichar; len: SizeInt): integer;
 var
-  i: Integer;
+  i: SizeInt;
 begin
   for i := 1 to len do begin
     if a^ <> b^ then begin
