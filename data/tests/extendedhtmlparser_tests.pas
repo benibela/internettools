@@ -583,9 +583,9 @@ t('',
         '</bookstore>'#13#10
        ,'');
 
-t('<book style="autobiography"><template:read source="./author" var="test"/></book>','','test=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention');
-t('<book style="autobiography"><template:read source="author" var="test2"/></book>','','test2=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention');
-t('<book style="autobiography"><template:read source="//author" var="test3"/></book>','','test3=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention');
+t('<book style="autobiography"><template:read source="./author[1]" var="test"/></book>','','test=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention');
+t('<book style="autobiography"><template:read source="author[1]" var="test2"/></book>','','test2=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention');
+t('<book style="autobiography"><template:read source="(//author)[1]" var="test3"/></book>','','test3=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention');
 t('<book style="autobiography"><template:read source="string-join(//author,'','')" var="test"/></book>','','test=Joe[[#10]]      Bob[[#10]]      Trenton Literary Review Honorable Mention,Mary[[#10]]      Bob[[#10]]      Selected Short Stories of[[#10]]        Mary[[#10]]        Bob,Toni[[#10]]      Bob[[#10]]      B.A.[[#10]]      Ph.D.[[#10]]      Pulitzer[[#10]]      Still in Trenton[[#10]]      Trenton Forever');
 t('<bookstore><template:read source="/bookstore/@specialty" var="test"/></bookstore>','','test=novel');
 t('<bookstore><template:read source="book[/bookstore/@specialty=@style]/@id" var="test"/></bookstore>','','test=myfave');
@@ -607,7 +607,7 @@ t('<bookstore><book><author><template:read source="string-join( ./first-name,'',
 t('<bookstore><book><author><template:read source="string-join( first-name,'','')" var="test"/></author></book></bookstore>  ','','test=Joe');
 t('<bookstore><book style="textbook"><template:read source="string-join( author[1],'','')" var="test"/></book></bookstore>  ','','test=Mary[[#10]]      Bob[[#10]]      Selected Short Stories of[[#10]]        Mary[[#10]]        Bob');
 t('<bookstore><book style="textbook"><template:read source="string-join( author[first-name][1],'','')" var="test"/></book></bookstore>  ','','test=Mary[[#10]]      Bob[[#10]]      Selected Short Stories of[[#10]]        Mary[[#10]]        Bob');
-t('<bookstore><template:read source="book[last()]//text()" var="test"/></bookstore>  ','','test=');
+t('<bookstore><template:read source="(book[last()]//text())[1]" var="test"/></bookstore>  ','','test=');
 t('<bookstore><template:read source="string-join(book/author[last()]/first-name,'','')" var="test"/></bookstore>','','test=Joe,Mary,Toni');
 t('<bookstore><template:read source="string-join((book/author)[last()]/first-name,'','')" var="test"/></bookstore>','','test=Toni');
 t('<bookstore><template:read source="string-join( book[excerpt]/@style,'','')" var="test"/></bookstore>','','test=novel');
@@ -989,8 +989,8 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   if extParser.variables.ValuesString['abc']<>'maus' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="x" var="nodes"/><template:read source="string-join($nodes,'','')" var="joined"/><template:read source="type-of($nodes[1])" var="type"/></a>');
   extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
-  checklog('nodes=A1'#13'joined=A1,B2,C3,D4'#13'type=node()');
-  if extParser.variables.ValuesString['nodes']<>'A1' then raise Exception.Create('invalid var');
+  checklog('nodes=A1B2C3D4'#13'joined=A1,B2,C3,D4'#13'type=node()');
+  if extParser.variables.ValuesString['nodes']<>'A1B2C3D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['joined']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['type']<>'node()' then raise Exception.Create('invalid var');
   extParser.parseTemplate('<a><template:read source="$nodes" var="oldnodes"/>'+
@@ -1000,8 +1000,8 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
                              '<template:read source="type-of($nodes[1])" var="newtype"/>'+
                              '</a>');
   extParser.parseHTML('<a>yyyy<x>A1</x><x>B2</x><x>C3</x><x>D4</x>xxxx</a>');
-  checklog('oldnodes=A1'#13'oldjoined=A1,B2,C3,D4'#13'newjoinedold=A1,B2,C3,D4'#13'newjoinednew=A1,B2,C3,D4'#13'newtype=string'); //test node to string reduction
-  if extParser.variables.ValuesString['oldnodes']<>'A1' then raise Exception.Create('invalid var');
+  checklog('oldnodes=A1B2C3D4'#13'oldjoined=A1,B2,C3,D4'#13'newjoinedold=A1,B2,C3,D4'#13'newjoinednew=A1,B2,C3,D4'#13'newtype=string'); //test node to string reduction
+  if extParser.variables.ValuesString['oldnodes']<>'A1B2C3D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['newjoinedold']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['newjoinednew']<>'A1,B2,C3,D4' then raise Exception.Create('invalid var');
   if extParser.variables.ValuesString['newtype']<>'string' then raise Exception.Create('invalid var');
@@ -1170,9 +1170,9 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
     '_result='#10'_result='#10'_result='#10'def=317');
 
   t('<r><a>{text()}</a></r>', '<r><a>1</a><a>2</a></r>', '_result=1');
-  t('<r><a>{following-sibling::a/text()}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=2');
-  t('<r><a>{following-sibling::a/(text())}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=2');
-  t('<r><a>{following-sibling::a/concat("-",text(),"-")}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=-2-');
+  t('<r><a>{following-sibling::a/text()}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=23');
+  t('<r><a>{following-sibling::a/(text())}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=23');
+  t('<r><a>{following-sibling::a/concat("-",text(),"-")}</a></r>', '<r><a>1</a><a>2</a><a>3</a></r>', '_result=-2--3-');
 
   t( '<r><a>{$t}</a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 't=1'#10't=2'#10't=3'#10't=4');
   t( '<r><a><t:read var="u" source="."/></a>*</r>', '<r><a>1</a><a>2</a><a>3</a><a>4</a></r>', 'u=1'#10'u=2'#10'u=3'#10'u=4');

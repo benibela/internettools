@@ -1680,7 +1680,7 @@ begin
   m('number("17")', '17');
   m('number(text {"17"} )', '17');
   m('number(comment {"17"} )', '17');
-  m('string-to-codepoints("ABC")', '65');
+  m('string-to-codepoints("ABC")', '656667');
   m('string-to-codepoints(processing-instruction XYZ {"A"})', '65');
   t('collection()', 'foobar');
   m('123 castable as xs:integer', 'true');

@@ -2130,8 +2130,7 @@ end;
 {$ImplicitExceptions off}
 function TXQValueSequence.toString: string;
 begin
-  if seq.Count >= 1 then result := seq[0].toString
-  else result := '';
+  result := toJoinedString('')
 end;
 {$ImplicitExceptions on}
 

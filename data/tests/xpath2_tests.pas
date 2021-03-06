@@ -249,16 +249,16 @@ begin
   t('html/@attrib2',             'SECOND ATTRIBUTE',                 '');
   t('html/@attrib3',             'THIRD ATTRIBUTE',                  '');
   t('html/adv/text()',           '',                                 '');
-  t('html/adv/table/deep-text('' '')','first col 2nd col',           ''); //additional spaces!
-  t('html/adv/table/inner-text()','first col'#9'2nd col',           '');
-  t('html/adv/table/inner-text(tr/td[2])','2nd col',           '');
-  t('html/adv/table/@id',        't1',                               '');
-  t('html/adv/table/tr/td/text()', 'first col',                      '');
-  t('html/adv/table/tr/td/comment()', 'cya',                         '');
-  t('html/adv/table[@id=''t2'']/@id','t2',                           '');
-  t('html/adv/table[@id=''t2'']/tr/td/@colspan','3',                 '');
-  t('html/adv/table[@id=''t2'']/tr/td/text()','A',                   ''); //if this fails with OMG!! direct child also matches a direct grand child
-  t('html/adv/table[@id=''t2'']/tr/td/deep-text('' '')','OMG!!',     '');
+  t('string-join(html/adv/table/deep-text('' ''), "|")','first col 2nd col|OMG!! A B C'); //additional spaces!
+  t('string-join(html/adv/table/inner-text(), "|")','first col'#9'2nd col|OMG!!'#10#9'A'#9'B'#9'C');
+  t('string-join(html/adv/table/inner-text(tr/td[2]), "|")','2nd col|B');
+  t('string-join(html/adv/table/@id, "|")',        't1|t2');
+  t('string-join(html/adv/table/tr/td/text(), "|")', 'first col|2nd col|A|B|C');
+  t('html/adv/table/tr/td/comment()', 'cya');
+  t('html/adv/table[@id=''t2'']/@id','t2');
+  t('html/adv/table[@id=''t2'']/tr/td/@colspan','3');
+  t('html/adv/table[@id=''t2'']/tr/td/text()','ABC'); //if this fails with OMG!! direct child also matches a direct grand child
+  t('html/adv/table[@id=''t2'']/tr/td/deep-text('' '')','OMG!!ABC');
   t('html/adv/table[@id=''t2'']/tr/td[@colspan!=''3'']/text()','',''); //not existing property != 3
 
                 //Comparison tests
@@ -404,14 +404,14 @@ begin
   t('a/b/text()', 'Hallo', '');
   t('a/c/text()', '', '');
   t('a/d/text()', 'xyz', '');
-  t('a//text()', 'Hallo', '');
-  t('a/*/text()', 'Hallo', '');
+  t('a//text()', 'HalloxyzFFFGGGHHHhhhez');
+  t('string-join(a/*/text(),"|")', 'Hallo|xyz|ez');
   t('a/g/h/text()', '', '');
-  t('a/e/g/h/text()', 'HHH', '');
-  t('a/e/./g/././h/text()', 'HHH', '');
+  t('a/e/g/h/text()', 'HHHhhh', '');
+  t('a/e/./g/././h/text()', 'HHHhhh', '');
   t('a/e/g/h/../text()', 'GGG', '');
   t('a/e/../e/../e/../e/g/h/../text()', 'GGG', '');
-  t('a//h/text()', 'HHH', '');
+  t('a//h/text()', 'HHHhhh', '');
   t('a/e.z/text()', 'ez', '');
 
   //case (in-)sensitivesnes
@@ -438,11 +438,11 @@ begin
   t('''A''=''a''', 'true', '');
   t('  ''A''  =  ''a''  ', 'true', '');
   t('A/attribute::*', 'att1', '');
-  t('A/b/attribute::*', 'man', '');
+  t('A/b/attribute::*', 'manSLEEP', '');
   t('(A/b/attribute::*)[1]', 'man', '');
   t('(A/b/attribute::*)[2]', 'SLEEP', '');
   t('A/@*', 'att1', '');
-  t('A/b/@*', 'man', '');
+  t('A/b/@*', 'manSLEEP', '');
   t('A/b/@*[1]', 'man', '');
   t('A/b/@*[2]', 'SLEEP', '');
   t('A/b/@*[3]', '', '');
@@ -474,11 +474,11 @@ begin
   t('r/a[exists(@wtf)]/@href', '/some/people/use/this!', '<r><a href=/some/people/use/this! wtf/></r>');
                 //path rules
   t('a/b/c/../../x/text()', '3', '<a><b><x>1</x><c><x>2</x></c></b><x>3</x></a>');
-  t('a//(x/text())', '1', '');
-  t('a//string(x/text())', '3', '');
-  t('a//x/text()', '1', ''); //if this returns 3 it is probably evaluated as a//(x/text()) and not ordered
-  t('a//x/string(text())', '1', ''); //if this returns 3 it is probably evaluated as a//(x/text()) and not ordered
-  t('a/b/c/../..//x/text()', '1', '');
+  t('join(a//(x/text()))', '1 2 3', '');
+  t('join(a//string(x/text()))', '3 1   2    ', '');
+  t('a//x/text()', '123', ''); //if this returns 3 it is probably evaluated as a//(x/text()) and not ordered
+  t('a//x/string(text())', '123', ''); //if this returns 3 it is probably evaluated as a//(x/text()) and not ordered
+  t('a/b/c/../..//x/text()', '123', '');
   t('a/b/./c/../../x/text()', '3', '');
   t('html/body/t[@id="right"]/text()', '123', '<html>A<body>B<t>xy</t>C<t id="right">123</t>D</body>E</html>');
   t('html//t[@id="right"]/text()', '123', '');
@@ -644,7 +644,7 @@ begin
   t('3 = --3.0', 'true','');
   t('-3= ---3.0', 'true','');
 
-  t('1 to 3', '1','');
+  t('1 to 3', '123','');
   t('join(1 to 3,",")', '1,2,3','');
   t('join(3 to 1,",")', '','');
   t('join(5 to 5,",")', '5','');
@@ -845,13 +845,13 @@ begin
   t('string-join(("a","b","c",("d","e"), (("f"))), '':'')', 'a:b:c:d:e:f', '');
   t('codepoints-to-string(65)', 'A', '');
   t('codepoints-to-string((65,66,67,68))', 'ABCD', '');
-  t('string-to-codepoints("ABCD")', '65', '');
+  t('string-to-codepoints("ABCD")', '65666768', '');
   t('join(string-to-codepoints("ABCD"),",")', '65,66,67,68', '');
 
 
   DefaultSystemCodePage := CP_UTF8;
   t('codepoints-to-string((2309, 2358, 2378, 2325))', 'अशॊक', ''); //if these tests fail, but those above work, fpc probably compiled the file with the wrong encoding (must be utf8);
-  t('string-to-codepoints("Thérèse")', '84', '');
+  t('string-to-codepoints("Thérèse")', '84104233114232115101', '');
   t('join(string-to-codepoints("Thérèse"),",")', '84,104,233,114,232,115,101', '');
   t('substring("motor car", 6)', ' car', '');
   t('substring("metadata", 4, 3)', 'ada', '');
@@ -961,17 +961,17 @@ begin
                 //Sequences
   t('index-of ((10, 20, 30, 40), 35)', '', '');
   t('index-of ((10, 20, 30, 30, 10), 20)', '2', '');
-  t('index-of ((10, 20, 30, 30, 20, 10), 20)', '2', '');
+  t('index-of ((10, 20, 30, 30, 20, 10), 20)', '25', '');
   t('join(index-of ((10, 20, 30, 30, 10), 20), ",")', '2', '');
   t('join(index-of ((10, 20, 30, 30, 20, 10), 20), ",")', '2,5', '');
   t('join(index-of (("a", "sport", "and", "a", "pastime"), "a"), ",")', '1,4', '');
-  t('("MEMLEAKTEST1", "MEMLEAKTEST2")', 'MEMLEAKTEST1', '');
+  t('("MEMLEAKTEST1", "MEMLEAKTEST2")', 'MEMLEAKTEST1MEMLEAKTEST2', '');
   t('string-join(("MEMLEAKTEST3", "MEMLEAKTEST4"), "-")', 'MEMLEAKTEST3-MEMLEAKTEST4', '');
   t('empty(())', 'true', '');
   t('empty((4))', 'false', '');
   t('empty((false()))', 'false', '');
   t('empty((true(),1,2,3))', 'false', '');
-  t('distinct-values((1, 2.0, 3, 2))', '1', '');
+  t('distinct-values((1, 2.0, 3, 2))', '123', '');
   t('join(distinct-values((1, 2.0, 3, 2)),",")', '1,2,3', '');
   t('string-join(insert-before(("a", "b", "c"), 0, "z"), ",")', 'z,a,b,c', '');
   t('string-join(insert-before(("a", "b", "c"), 1, "z"), ",")', 'z,a,b,c', '');
@@ -1095,7 +1095,7 @@ begin
   t('sum((xs:unsignedByte(200), xs:unsignedByte(200)))', '400', '');
   t('(x:product(()), x:product(1 to 3))', '6');
 
-  t('(1,2,3)[true()]', '1', '');
+  t('(1,2,3)[true()]', '123', '');
   t('(1,2,3)[false()]', '', '');
   t('join((1,2,3)[true()], ",")', '1,2,3', '');
   t('join((1,2,3)[false()], ",")', '', '');
@@ -1143,14 +1143,14 @@ begin
   t('','','<a><b>b1<c>c1</c><c>c2</c><c>c3</c><c>c4</c></b><b>b2</b>al</a>');
 
                 //Iterator
-  t('a/b/text()', 'b1', '');
-  t('a/b/c/text()', 'c1', '');
+  t('a/b/text()', 'b1b2', '');
+  t('a/b/c/text()', 'c1c2c3c4', '');
   t('a/b/c[text()="c2"]/text()', 'c2', '');
   t('a/b/c[.="c3"]/text()', 'c3', '');
   t('a/b/c[1]/text()', 'c1', '');
   t('a/b/c[2]/text()', 'c2', '');
   t('a/b/c[position() = 2]/text()', 'c2', '');
-  t('a/b/c[.="c2" or .="c3"]/text()', 'c2', '');
+  t('a/b/c[.="c2" or .="c3"]/text()', 'c2c3', '');
 
                 //Full sequence
   t('a/b/c[.="c2" or .="c3"][2]/text()', 'c3', '');
@@ -1269,9 +1269,9 @@ begin
   t('a/b[2]/c[1] >> a/b/c/c', 'false', '');
   t('a/b[2]/c[2]/c[1] >> a/b/c/c', 'false', '');
                 //axes
-  t('a/child::b', 'b1c1c2c3c4', '');
-  t('child::a/child::b', 'b1c1c2c3c4', '');
-  t('child::a/child::b/child::text()', 'b1', '');
+  t('a/child::b', 'b1c1c2c3c4b2cx1cx2CC1', '');
+  t('join(child::a/child::b)', 'b1c1c2c3c4 b2cx1cx2CC1', '');
+  t('child::a/child::b/child::text()', 'b1b2', '');
   t('string-join(a/child::b,",")', 'b1c1c2c3c4,b2cx1cx2CC1', '');
   t('string-join(child::a/child::b,",")', 'b1c1c2c3c4,b2cx1cx2CC1', '');
   t('string-join(child::a/child::b/child::text(),",")', 'b1,b2', '');
@@ -1323,7 +1323,7 @@ begin
   t('string-join(descendant::para,",")', 'p1,p2,p3,p4,np1,np2,cdp1,cdp2,CDP1,CDP2', '');
   t('string-join(chapter/div/para/ancestor::div,",")', 'cdp1cdp2,CDP1CDP2', '');
   t('string-join(chapter/div/ancestor::div,",")', '', '');
-  t('chapter/div/para/ancestor-or-self::div', 'cdp1cdp2', '');
+  t('chapter/div/para/ancestor-or-self::div', 'cdp1cdp2CDP1CDP2', '');
   t('string-join(chapter/div/para/ancestor-or-self::div,",")', 'cdp1cdp2,CDP1CDP2', '');
   t('string-join(chapter/div/ancestor-or-self::div,",")', 'cdp1cdp2,CDP1CDP2', '');
   t('string-join(chapter/ancestor-or-self::div,",")', '', '');
@@ -1413,15 +1413,15 @@ begin
   t('string-join( (:..:) x[1](:x:)/(::)y[2]  , ",")', 'b', '');
 
                //block structures
-  t('for $x in (1,2,3) return $x', '1', '');
+  t('for $x in (1,2,3) return $x', '123', '');
   t('join(for $x in (1,2,3) return $x,",")', '1,2,3', '');
   t('join(for $x in (1,2,3,"4","5") return $x,",")', '1,2,3,4,5', '');
   t('join(for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return ($x + 1),",")', '2,3,4,5,6', '');
   t('join(for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return $x + 1,",")', '2,3,4,5,6', '');
-  t('for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return $x + 1', '2', '');
-  t('for $x in (1,2,3) return (for $y in (10,20,30) return $x)', '1', '');
-  t('for $x in (1,2,3) return (for $y in (10,20,30) return $y)', '10', '');
-  t('for $x in (1,2,3) return (for $y in (10,20,30) return $x + $y)', '11', '');
+  t('for $x in (1,2,3,'+untypedAtomic+'("4"),'+untypedAtomic+'("5")) return $x + 1', '23456', '');
+  t('for $x in (1,2,3) return (for $y in (10,20,30) return $x)', '111222333', '');
+  t('for $x in (1,2,3) return (for $y in (10,20,30) return $y)', '102030102030102030', '');
+  t('for $x in (1,2,3) return (for $y in (10,20,30) return $x + $y)', '112131122232132333', '');
   t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $x),",")', '1,1,1,2,2,2,3,3,3', '');
   t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $y),",")', '10,20,30,10,20,30,10,20,30', '');
   t('join(for $x in (1,2,3) return (for $y in (10,20,30) return $x + $y),",")', '11,21,31,12,22,32,13,23,33', '');
@@ -1430,13 +1430,13 @@ begin
   t('join(for $x in (1,2,3) return for $y in (10,20,30) return $x + $y,",")', '11,21,31,12,22,32,13,23,33', '');
   t('join(for $x in (1,2,3), $y in (10,20,30) return $x + $y,",")', '11,21,31,12,22,32,13,23,33', '');
   t('join(for $x in (1,2,3), $y in (10,20,30) return $x + $y + 1 * 5,",")', '16,26,36,17,27,37,18,28,38', '');
-  t('for $i in (10, 20), $j in (1, 2)  return ($i + $j)', '11', '');
-  t('for $i in (10, 20), $j in (1, 2)  return $i + $j', '11', '');
+  t('for $i in (10, 20), $j in (1, 2)  return ($i + $j)', '11122122', '');
+  t('for $i in (10, 20), $j in (1, 2)  return $i + $j', '11122122', '');
   t('join(for $i in (10, 20), $j in (1, 2)  return ($i + $j), ",")', '11,12,21,22', '');
                //For-example of the standard. Attention: The example is wrong in the standard
-  t('for $a in fn:distinct-values(bib/book/author) return (bib/book/author[. = $a][1], bib/book[author = $a]/title)','Stevens','<bib>' + '  <book>' + '    <title>TCP/IP Illustrated</title>' + '    <author>Stevens</author>' + '    <publisher>Addison-Wesley</publisher>' + '  </book>' + '  <book>' + '    <title>Advanced Programming in the Unix Environment</title>' + '    <author>Stevens</author>' + '    <publisher>Addison-Wesley</publisher>' + '  </book>' + '  <book>' + '    <title>Data on the Web</title>' + '    <author>Abiteboul</author>' + '    <author>Buneman</author>' + '    <author>Suciu</author>' + '  </book>' + '</bib>' );
+  t('(for $a in fn:distinct-values(bib/book/author) return (bib/book/author[. = $a][1], bib/book[author = $a]/title))[1]','Stevens','<bib>' + '  <book>' + '    <title>TCP/IP Illustrated</title>' + '    <author>Stevens</author>' + '    <publisher>Addison-Wesley</publisher>' + '  </book>' + '  <book>' + '    <title>Advanced Programming in the Unix Environment</title>' + '    <author>Stevens</author>' + '    <publisher>Addison-Wesley</publisher>' + '  </book>' + '  <book>' + '    <title>Data on the Web</title>' + '    <author>Abiteboul</author>' + '    <author>Buneman</author>' + '    <author>Suciu</author>' + '  </book>' + '</bib>' );
   t('string-join(for $a in fn:distinct-values(bib/book/author) return (bib/book/author[. = $a][1], bib/book[author = $a]/title), ",")','Stevens,Stevens,TCP/IP Illustrated,Advanced Programming in the Unix Environment,Abiteboul,Data on the Web,Buneman,Data on the Web,Suciu,Data on the Web','');
-  t('for $a in fn:distinct-values(bib/book/author) return ((bib/book/author[. = $a])[1], bib/book[author = $a]/title)','Stevens','');
+  t('(for $a in fn:distinct-values(bib/book/author) return ((bib/book/author[. = $a])[1], bib/book[author = $a]/title))[1]','Stevens','');
   t('string-join(for $a in fn:distinct-values(bib/book/author) return ((bib/book/author[. = $a])[1], bib/book[author = $a]/title), ",")','Stevens,TCP/IP Illustrated,Advanced Programming in the Unix Environment,Abiteboul,Data on the Web,Buneman,Data on the Web,Suciu,Data on the Web','');
 
   t('some $x in (1,2,3) satisfies $x', 'true', '');
@@ -1501,7 +1501,7 @@ begin
   t('if (true()) then 4*7+3 else 5+2*2', '31', '');
   t('if (false()) then 4*7+3 else 5+2*2', '9', '');
 
-  t('if (true()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x', '1', '');
+  t('if (true()) then for $x in (1,2,3) return $x else for $x in (4,5,6) return $x', '123', '');
   t('join(if (true()) then (for $x in (1,2,3) return $x) else for $x in (4,5,6) return $x,",")', '1,2,3', '');
   t('join(if (false()) then (for $x in (1,2,3) return $x) else for $x in (4,5,6) return $x,",")', '4,5,6', '');
   t('join(if (true()) then for $x in (1,2,3) return $x else (for $x in (4,5,6) return $x),",")', '1,2,3', '');
@@ -1529,15 +1529,15 @@ begin
   t('some $x in 1 to 3 satisfies ($x > 0)', 'true', '');
   t('every $x in 1 to 3 satisfies ($x > 0)', 'true', '');
   t('join(for $x in 1 to 10 return 2*$x,",")', '2,4,6,8,10,12,14,16,18,20', '');
-  t('for $x in (1,2,3), $y in (1,2) return concat("x",$x,"y",$y)', 'x1y1', '');
+  t('(for $x in (1,2,3), $y in (1,2) return concat("x",$x,"y",$y))[1]', 'x1y1', '');
   t('join(for $x in (1,2,3), $y in (1,2) return concat("x",$x,"y",$y),",")', 'x1y1,x1y2,x2y1,x2y2,x3y1,x3y2', '');
-  t('for $i in (1, 2), $j in (1, 2)  return $i + $j', '2', '');
-  t('for $i in (1,2  ), $j in (1,2) return $i + $j', '2', '');
-  t('for $i in (1,2,3), $j in (1,2) return $i+$j', '2', '');
-  t('for $x in (1,2,3), $y in (1,2) return $y+$x', '2', '');
-  t('for $x in (1,2,3), $y in (1,2) return ($y*$x)', '1', '');
-  t('for $x in (1,2,3), $y in (1,2) return $y*$x', '1', '');
-  t('for $x in 1 to 3, $y in (1,2) return $y*$x', '1', '');
+  t('for $i in (1, 2), $j in (1, 2)  return $i + $j', '2334', '');
+  t('for $i in (1,2  ), $j in (1,2) return $i + $j', '2334', '');
+  t('for $i in (1,2,3), $j in (1,2) return $i+$j', '233445', '');
+  t('for $x in (1,2,3), $y in (1,2) return $y+$x', '233445', '');
+  t('for $x in (1,2,3), $y in (1,2) return ($y*$x)', '122436', '');
+  t('for $x in (1,2,3), $y in (1,2) return $y*$x', '122436', '');
+  t('for $x in 1 to 3, $y in (1,2) return $y*$x', '122436', '');
   t('join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
   t('join(for $x in 1 to 3, $y in (1,2) return $y*$x,",")', '1,2,2,4,3,6', '');
   t('some $x in 1 to 3, $y in (1,2) satisfies $x = $y', 'true', '');
@@ -1547,10 +1547,10 @@ begin
   t('every $x in 1 to 3, $y in (1,2) satisfies $x > $y', 'false', '');
   t('every $x in 1 to 3, $y in (-1,-2) satisfies $x > $y', 'true', '');
   t('every $x in 1 to 3, $y in (for $k in (1,2) return -1*$k) satisfies $x > $y', 'true', '');
-  t('for $x in 1 to 3, $y in (for $k in (1,2) return -1*$k) return concat($x,">",$y)', '1>-1', '');
+  t('for $x in 1 to 3, $y in (for $k in (1,2) return -1*$k) return concat($x,">",$y)', '1>-11>-22>-12>-23>-13>-2', '');
                //Amazing overloaded meanings
   t('', '', '<for><return>RR</return><in>a<return>ar</return><return>ar2</return></in><in>b</in><in><return>cr</return>c<return>cr2</return></in><return>RX</return><if>F<then>THN</then><else>LS</else></if></for>');
-  t('for $for in for/in return $for/return', 'ar', '');
+  t('for $for in for/in return $for/return', 'arar2crcr2', '');
   t('string-join(for $for in for/in return $for/return,",")', 'ar,ar2,cr,cr2', '');
   t('string-join(for $for in for/in return $for,",")', 'aarar2,b,crccr2', '');
   t('string-join(for $for in for/in return for/return,",")', 'RR,RX,RR,RX,RR,RX', '');
@@ -1615,8 +1615,7 @@ begin
   t('every $satisfies in satisfies/satisfies/satisfies/satisfies satisfies $satisfies', 'true', '');
   t('if (true) then some $satisfies in satisfies satisfies satisfies else every $satisfies in satisfies satisfies satisfies', 'true', '');
   t('if (false) then some $satisfies in satisfies satisfies satisfies else every $satisfies in satisfies satisfies satisfies', 'true', '');
-  t('for $in in in return in', 'A', '<in>A</in><in>B</in>');
-  t('string-join(for $in in in return in,",")', 'A,B,A,B', '<in>A</in><in>B</in>');
+  t('for $in in in return in', 'ABAB', '<in>A</in><in>B</in>');
   t('for $in in return return return', 't', '<return>t</return>');
   t('for $in in if return if', 't', '<if>t</if>');
   t('for $in in some return some', 't', '<some>t</some>');
@@ -1651,20 +1650,20 @@ begin
   t('$maus', 'haus3', '');
   t('$maus:= "haus4"', 'haus4', '');
   t('$maus', 'haus4', '');
-  t('a := 1, b:= 2', '1', '');
+  t('a := 1, b:= 2', '12', '');
   t('$a', '1', '');
   t('$b', '2', '');
-  t('a := 10, A:= 20', '10', '');
+  t('a := 10, A:= 20', '1020', '');
   t('$a', '10', '');
   t('$b', '2', '');
   t('$A', '20', '');
   t('concat($a,";",$b,";",$A)', '10;2;20', '');
-  t('a := 1, b:= ($a * 3), c := $b + 7', '1', '');
+  t('a := 1, b:= ($a * 3), c := $b + 7', '1310', '');
   t('concat($a,";",$b,";",$c)', '1;3;10', '');
-  t('a := (1,2,3,42), b:= 4+5, c:=2*3 + 1, d:=a/text()', '1', '<a>hallo</a>');
+  t('a := (1,2,3,42), b:= 4+5, c:=2*3 + 1, d:=a/text()', '1234297hallo', '<a>hallo</a>');
   t('join($a,";")', '1;2;3;42', '');
   t('concat($b,";",$c,";",$d)', '9;7;hallo', '');
-  t('x := for $y in $a return $y+10 ', '11', '');
+  t('x := for $y in $a return $y+10 ', '11121352', '');
   t('join($x,",")', '11,12,13,52', '');
   t('join(m := (1,2,3),",")', '1,2,3', '');
   t('join($m,",")', '1,2,3', '');
@@ -2371,9 +2370,9 @@ begin
   t('join($optest)', '17 18 3 222');
   t('$optest[3] := ()', '');
   t('join($optest)', '17 18 222');
-  t('$optest[2] := (18, 16)', '18');
+  t('$optest[2] := (18, 16)', '1816');
   t('join($optest)', '17 18 16 222');
-  t('$optest[1] := (19, 17)', '19');
+  t('$optest[1] := (19, 17)', '1917');
   t('join($optest)', '19 17 18 16 222');
   t('$optest[1][] := 18.5', '18.5');
   t('join($optest)', '19 18.5 17 18 16 222');
@@ -2619,7 +2618,7 @@ begin
   t('json(''2000000000'')', '2000000000');
   t('json(''2000000000000000'')', '2000000000000000');
   t('json(''true'')', 'true');
-  t('jn:members(json(''[1, 2, 3]''))', '1');
+  t('jn:members(json(''[1, 2, 3]''))', '123');
   t('join(jn:members(json(''[1, 2, 3]'')), " ")', '1 2 3');
   t('join(jn:members(json(''[1, 2, 3, [4, 5, 6], [7] ]'')), " ")', '1 2 3 4 5 6 7'); //this should raise an error in JSONiq, but correct in 3.1
   t('join(jn:members(([1, 2, 3], {"a": 17}, [4,5,6], 7889, "hallo")))', '1 2 3 4 5 6');
@@ -2660,8 +2659,8 @@ begin
 
     t('[{"foobar": 123, "maus": 456}](1)("foobar")', '123');
 
-    t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(1), " ")', 'a o x');
-    t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(2), " ")', 'y');
+    //t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(1), " ")', 'a o x');
+    //t('string-join((["a"], {"1": "o"}, ["x", "y", "z"])(2), " ")', 'y');
 
     t('serialize-json(123)', '123');
     t('serialize-json(123.6)', '123.6');
@@ -2991,7 +2990,7 @@ begin
   t('fn:compare("abc", ())', '', '');
   t('/a/b/c/lang("de")', 'true', '!<a><b><c xml:lang="de"></c></b></a>');
   t('node-name(//c)', 'c', '!<a><b><c xml:lang="de"></c></b></a>');
-  t('for $var in (1,2,3,4,5) return $var', '1', '');
+  t('for $var in (1,2,3,4,5) return $var', '12345', '');
   t('fn:resolve-uri("abc", "http://www.example.com")' ,'http://www.example.com/abc', '');
   t('fn:resolve-uri("", "http://www.example.com")' ,'http://www.example.com', '');
   t('fn:resolve-uri("", "http://www.example.com/")' ,'http://www.example.com/', '');
@@ -3341,7 +3340,7 @@ begin
   f('count(form("Yxxxxxxxxxx=..."))', 'XPDY0002');
   t('form("foo2=hi").url', 'pseudo://test/abc22?foo2=hi&X=123&Y=456', '');
   t('form("T=hi").url', 'pseudo://test/next/haus/bimbam?k=y&T=hi&fy=ihl', '');
-  t('form().url', 'pseudo://test/abc', '');
+  t('join(form().url)', 'pseudo://test/abc pseudo://test/abc22?foo2=bar2&X=123&Y=456 pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl pseudo://test/multi', '');
   t('(//form[1]/form()).url', 'pseudo://test/abc', '');
   t('(//form[2]/form()).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
   t('(//form[3]/form()).url', 'pseudo://test/next/haus/bimbam?k=y&T=Z&fy=ihl', '');
@@ -3740,7 +3739,7 @@ begin
   t('xs:string("falsex") castable as xs:boolean', 'false');
   t('xs:string("false") cast as xs:boolean', 'false');
   t('xs:string("true") cast as xs:boolean', 'true');
-  t('data((1,2))', '1');
+  t('data((1,2))', '12');
   t('(1,2) castable as xs:integer?', 'false');
   //effective boolean value tests (most are duplicates to previous tests)
   t('xs:boolean("true")', 'true');
