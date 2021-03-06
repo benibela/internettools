@@ -6391,13 +6391,13 @@ var sortingContext: PSortingContext absolute self;
 
   begin
     if v1.kind = pvkNode then begin
-      if (v2.kind = pvkNode) or (TXQValueOwnershipTracker.isStringKeyLike(v2)) then
+      if (v2.kind = pvkNode) or (TXQValueOwnershipTracker.isKeyStringLike(v2)) then
         exit(compareStrings)
        else
         error;
     end;
     if v2.kind = pvkNode then begin
-      if TXQValueOwnershipTracker.isStringKeyLike(v1) then
+      if TXQValueOwnershipTracker.isKeyStringLike(v1) then
         exit(compareStrings)
        else
         error;
@@ -7158,7 +7158,7 @@ begin
             end;
           end;
           xqmpkkStringKeys: begin
-            isStringKey := TXQValueOwnershipTracker.isStringKeyLike(key.toValue);
+            isStringKey := TXQValueOwnershipTracker.isStringLikeAfterAtomize(key.toValue);
             if isStringKey then
               skey := key.toString;
             for smp in pv^.getEnumeratorStringPropertiesUnsafe do begin
@@ -7214,7 +7214,7 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
     SetLength(stringkeys, argv[1].getSequenceCount);
     i := 0;
     for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
-      if TXQValueOwnershipTracker.isStringKeyLike(v) then
+      if TXQValueOwnershipTracker.isStringLikeAfterAtomize(v) then
         stringkeys[i] := v.toString;
       inc(i);
     end;

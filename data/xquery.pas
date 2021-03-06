@@ -669,7 +669,9 @@ type
     class procedure release(v: TXQValue); static;
     class function hash(const v: IXQValue): uint32; static;
     class function equal(const v, w: IXQValue): boolean; static;
-    class function isStringKeyLike(const v: TXQValue): boolean; static;
+    //assuming v is an atomic value
+    class function isKeyStringLike(const v: TXQValue): boolean; static;
+    class function isStringLikeAfterAtomize(const v: TXQValue): boolean; static;
     class function isAtomicKeyValue(const v: IXQValue): boolean; static; inline;
   end;
 
@@ -5124,9 +5126,26 @@ begin
   result := GlobalInterpretedNativeFunctionStaticContext.equalDeepAtomic(v,w,nil);
 end;
 
-class function TXQValueOwnershipTracker.isStringKeyLike(const v: TXQValue): boolean;
+class function TXQValueOwnershipTracker.isKeyStringLike(const v: TXQValue): boolean;
 begin
   result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
+end;
+
+class function TXQValueOwnershipTracker.isStringLikeAfterAtomize(const v: TXQValue): boolean;
+var
+  w: TXQValue;
+begin
+  case v.kind of
+    pvkString: result := (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI));
+    pvkNode: result := true;
+    pvkSequence, pvkArray: begin
+      result := false;
+      for w in v.GetEnumeratorArrayTransparentUnsafe do
+        if result or not isStringLikeAfterAtomize(w) then exit(false)
+        else result := true;
+    end
+    else result := false;
+  end;
 end;
 
 class function TXQValueOwnershipTracker.isAtomicKeyValue(const v: IXQValue): boolean;
@@ -5155,7 +5174,7 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
     result := true;
     for pp2 in standardMap.getEnumeratorPropertiesUnsafe do begin
       k := pp2.key.toValue;
-      if not TXQValueOwnershipTracker.isStringKeyLike(k) then
+      if not TXQValueOwnershipTracker.isKeyStringLike(k) then
         exit(false);
       if not stringMap.hasProperty(k.toString, @tempv) then exit(false)
       else if not xqvalueDeep_equal(context, pp2.Value, tempv, collation) then exit(false);

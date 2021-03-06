@@ -507,14 +507,14 @@ var
     if characterMaps = nil then new(characterMaps,init);
     if pp.value.kind <> pvkObject then error;
     for characterp in pp.value.getEnumeratorPropertiesUnsafe do begin
-      if (not  TXQValueOwnershipTracker.isStringKeyLike(characterp.key.toValue)) or (characterp.Value.kind <> pvkString) then error;
+      if (not  TXQValueOwnershipTracker.isKeyStringLike(characterp.key.toValue)) or (characterp.Value.kind <> pvkString) then error;
       characterMaps.include(characterp.key.toString, characterp.Value.toString);
     end;
   end;
 
 begin
   for pp in v.getEnumeratorPropertiesUnsafe do begin
-    if not TXQValueOwnershipTracker.isStringKeyLike(pp.key.toValue) then continue;
+    if not TXQValueOwnershipTracker.isKeyStringLike(pp.key.toValue) then continue;
     case pp.Value.getSequenceCount of
       0: continue;
       1: ; //fine
