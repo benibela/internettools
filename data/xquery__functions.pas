@@ -7214,8 +7214,10 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
     SetLength(stringkeys, argv[1].getSequenceCount);
     i := 0;
     for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
-      if TXQValueOwnershipTracker.isStringLikeAfterAtomize(v) then
+      if TXQValueOwnershipTracker.isStringLikeAfterAtomize(v) then begin
+        if i >= high(stringkeys) then SetLength(stringkeys, 2*length(stringkeys));
         stringkeys[i] := v.toString;
+      end;
       inc(i);
     end;
     if i = 0 then
@@ -7246,9 +7248,12 @@ function xqFunctionMapRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
       exit(argv[0]);
     i := 0;
     for v in argv[1].GetEnumeratorArrayTransparentUnsafe do begin
+      if i >= high(keys) then SetLength(keys, 2*length(keys));
       keys[i] := v;
       inc(i);
     end;
+    if i < length(keys) then
+      SetLength(keys, i);
     map := TXQValueStandardMap.create();
     for mp in argv[0].getEnumeratorPropertiesUnsafe do begin
       keep := true;
