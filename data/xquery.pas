@@ -4414,7 +4414,9 @@ begin
        tneaFunctionSpecialCase: result := '(:special-case::)';
        else result := '???';
      end;
-   if matching = [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute,qmDocument] then result += 'node'
+   if (matching = [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute,qmDocument]) and (requiredType = nil)  then result += 'node()'
+   else if (matching = [qmElement,qmAttribute]) and (requiredType = nil) then result += '@*'
+   else if (matching = [qmValue, qmElement, qmCheckNamespaceURL]) and (requiredType = nil) then result := 'Q{}' + value
    else begin
      if qmElement in matching then result += 'element';
      if qmText in matching then result += 'text';
@@ -4422,17 +4424,17 @@ begin
      if qmProcessingInstruction in matching then result += 'processing-instruction';
      if qmAttribute in matching then result += 'attribute';
      if qmDocument in matching then result += 'document-node';
-   end;
-   result += '(';
-   if qmCheckNamespaceURL in matching then
-     if namespaceURLOrPrefix = 'http://www.w3.org/2010/xslt-xquery-serialization' then result += 'output:'
-     else result += 'Q{'+namespaceURLOrPrefix+'}';
-   if qmCheckNamespacePrefix in matching then result += namespaceURLOrPrefix + ':';
-   if qmValue in matching then result += value;
-   if qmCheckOnSingleChild in matching then result += 'element(*)';
+     result += '(';
+     if qmCheckNamespaceURL in matching then
+       if namespaceURLOrPrefix = 'http://www.w3.org/2010/xslt-xquery-serialization' then result += 'output:'
+       else result += 'Q{'+namespaceURLOrPrefix+'}';
+     if qmCheckNamespacePrefix in matching then result += namespaceURLOrPrefix + ':';
+     if qmValue in matching then result += value;
+     if qmCheckOnSingleChild in matching then result += 'element(*)';
 
-   if requiredType <> nil then result += ', '+requiredType.serialize;
-   result += ')';
+     if requiredType <> nil then result += ', '+requiredType.serialize;
+     result += ')';
+   end;
   end;
   for i := 0 to high(filters) do
     result += '[' + filters[i].filter.ToString + ']';
