@@ -287,7 +287,7 @@ end;
 
 function TXQValue.setImmutable(const name, value: IXQValue): TXQValueMapLike;
 begin
-  result := setImmutable(name.toString, value); //todo setting non-string key should work on string maps (e.g. map:put on empty map)
+  result := setImmutable(name.toString, value);
 end;
 
 function TXQValue.setImmutable(const name: string; const v: IXQValue): TXQValueMapLike;
@@ -2628,12 +2628,17 @@ end;
 
 function TXQValueStringMap.hasProperty(const name: ixqvalue; value: PXQValue): boolean;
 begin
-  Result:=hasProperty(name.toString, value);
+  if TXQValueOwnershipTracker.isStringLikeAfterAtomize(name.toValue) or globalCurrentQueryInfo.CastStringMapKeysToString then
+    Result := hasProperty(name.toString, value)
+   else
+    result := false;
 end;
 
 function TXQValueStringMap.getProperty(const name: IXQValue): IXQValue;
+var temp: TXQValue;
 begin
-  Result:=getProperty(name.toString);
+  if hasProperty(name, @temp) then result := temp
+  else result := xqvalue();
 end;
 
 function TXQValueStringMap.getProperty(const name: string): IXQValue;
@@ -2723,10 +2728,25 @@ begin
   end;
 end;
 
+function TXQValueStringMap.setImmutable(const name, value: IXQValue): TXQValueMapLike;
+var
+  sp: TXQStandardProperty;
+  res: TXQValueStandardMap;
+begin
+  if (name.typeAnnotation = baseSchema.string_) or globalCurrentQueryInfo.CastStringMapKeysToString then
+    exit(setImmutable(name.toString, value));
+  res := TXQValueStandardMap.create();
+  result := res;
+  for sp in getEnumeratorPropertiesUnsafe do
+    res.mapdata.include(sp.key, sp.value);
+  res.setMutable(name, value);
+end;
+
 procedure TXQValueStringMap.setMutable(const name: string; const s: string);
 begin
   setMutable(name, xqvalue(s));
 end;
+
 
 
 procedure TXQValueStringMap.enumeratePropertyKeys(var keyset: TXQHashsetStr);

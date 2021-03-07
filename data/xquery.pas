@@ -1094,6 +1094,7 @@ type
     procedure setMutable(const name: string; const v: IXQValue); reintroduce; //**< Changes a property
     procedure setMutable(const name: string; const s: string); reintroduce; //**< Changes a property (string wrapper)
 
+    function setImmutable(const name, value: IXQValue): TXQValueMapLike; overload; override;
     function setImmutable(const name: string; const v: IXQValue): TXQValueMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
 
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
@@ -3419,9 +3420,11 @@ var
   const ALL_CONTEXT_DEPENDENCIES = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast, xqcdContextCollation, xqcdContextTime, xqcdContextVariables, xqcdContextOther];
   const ALL_CONTEXT_DEPENDENCIES_FOCUS = [xqcdFocusItem, xqcdFocusPosition, xqcdFocusLast];
 
-threadvar globalCurrentQueryInfo: record
+type TGlobalCurrentQueryInfo = record
   AllowJSONiqOperations: boolean;
+  property CastStringMapKeysToString: boolean read AllowJSONiqOperations;
 end;
+threadvar globalCurrentQueryInfo: TGlobalCurrentQueryInfo;
 
 
 

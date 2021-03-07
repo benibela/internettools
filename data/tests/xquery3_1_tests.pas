@@ -94,7 +94,29 @@ begin
   t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
   t('serialize(<a>   <b xml:space="preserve">  <c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b xml:space="preserve">  <c>xx</c><c>yy</c></b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
 
+  t('$stringmap := parse-json("{""1"":13}")', '');
+  ps.StaticContext.AllowJSONiqOperations := false;
+  t('map:find($stringmap, 1)', '' );
+  t('map:find($stringmap, text{1})', '13' );
+  t('map:find($stringmap, ([],[[],[],text{1},[]]))', '13' );
+  t('map:get($stringmap, 1)', '' );
+  t('map:get($stringmap, text{1})', '13' );
+  t('map:get($stringmap, ([],[[],[],text{1},[]]))', '13' );
+  t('$stringmap(1)', '' );
+  t('$stringmap(text{1})', '13' );
+  t('$stringmap(([],[[],[],text{1},[]]))', '13' );
+  t('map:remove($stringmap, "1")("1")', '');
+  t('map:remove($stringmap, 1)("1")', '13');
+  t('map:remove($stringmap, text{1})("1")', '');
+  t('map:remove($stringmap, ([],[[],[],text{1},[]]))("1")', '');
+  t('map:remove($stringmap, ["1","2","3"])("1")', '');
+  t('map:remove(map{"1": 1, "2": 2}, ["1","2","3"])("1")', '');
 
+  ps.StaticContext.AllowJSONiqOperations := true;
+  t('map:find($stringmap, 1)', '' );
+  t('map:get($stringmap, 1)', '13' );
+  t('$stringmap(1)', '13' );
+  t('map:remove($stringmap, 1)("1")', '13');
 
   writeln('XQuery 3.1: ', count, ' completed');
   ps.free;
