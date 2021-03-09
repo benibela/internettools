@@ -303,7 +303,7 @@ begin
     end;
     if SNIHost<>'' then
       SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
-    if (internetAccess <> nil) or (FSocket.ConnectionTimeout <= 0) then //do blocking call of SSL_Connect
+    //if (internetAccess <> nil) or (FSocket.ConnectionTimeout <= 0) then //do blocking call of SSL_Connect
     begin
       //this is the branch used by internet tools
       x := sslconnect(FSsl);
@@ -314,7 +314,8 @@ begin
         Exit;
       end;
     end
-    else //do non-blocking call of SSL_Connect
+    //this must be commented out, because ConnectionTimeout is missing in Synapse SVN r40
+    {else //do non-blocking call of SSL_Connect
     begin
       b := Fsocket.NonBlockMode;
       Fsocket.NonBlockMode := true;
@@ -333,7 +334,7 @@ begin
       begin
         SSLcheck;
         Exit;
-      end;
+      end; }
     end;
 
     if FverifyCert then //seems like this is not needed, since sslconnect already fails on an invalid certificate
