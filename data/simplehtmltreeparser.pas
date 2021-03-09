@@ -421,7 +421,7 @@ const TreeNodesWithChildren = [tetOpen, tetDocument];
 
 
 
-type TInternetToolsFormat = (itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<- not used, might be used in future});
+type TInternetToolsFormat = (itfUnknown, itfXML, itfHTML, itfJSON, itfXMLPreparsedEntity {<- not used, might be used in future}, itfPlainText);
 function guessFormat(const data, uri, contenttype: string): TInternetToolsFormat;
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;
@@ -2913,6 +2913,9 @@ begin
   if contenttype.containsI('json') then
     exit(itfJSON);
 
+  if contenttype.containsI('text/plain') then
+    exit(itfPlainText);
+
   if uri.endsWithI('.html') or uri.endsWithI('.htm') then
     exit(itfHTML);
   if uri.endsWithI('.xml') then
@@ -2939,7 +2942,10 @@ begin
     if striBeginsWith(tdata, 'html') then exit(itfHTML);
   end;
 
-  result := itfXML;
+  if strBeginsWith(tdata, '<') then
+    exit(itfXML);
+
+  result := itfUnknown;
 end;
 
 function strEncodingFromContentType(const contenttype: string): TSystemCodePage;

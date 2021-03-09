@@ -829,18 +829,14 @@ var tempContext: TXQEvaluationContext;
     l: SizeInt;
   begin
     f := guessFormat(data, uri, contenttype);
-    if (f = itfJSON) then begin
-      exit(defaultQueryEngine.DefaultJSONParser.parse(data));
+    case f of
+      itfJSON:
+        exit(defaultQueryEngine.DefaultJSONParser.parse(data));
+      itfUnknown, itfPlainText:
+        exit(TXQValueString.create(baseSchema.untypedAtomic, data));
+      itfXML, itfHTML, itfXMLPreparsedEntity:
+        result := xqvalue(tempContext.parseDoc(data, uri, contenttype));
     end;
-    if f = itfXML then begin
-      if data = '' then exit(TXQValueString.create(baseSchema.untypedAtomic, ''));
-      //default
-      p := @data[1];
-      l := length(data);
-      strlTrimLeft(p, l);
-      if (l = 0) or (p^ <> '<') then exit(TXQValueString.create(baseSchema.untypedAtomic, data));
-    end;
-    result := xqvalue(tempContext.parseDoc(data, uri, contenttype));
   end;
 
   procedure handle(const v: IXQValue);
