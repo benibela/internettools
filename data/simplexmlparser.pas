@@ -1,5 +1,5 @@
 {**
-  @abstract This file contain something similar to an XML parser.@br
+  @abstract This file contains something similar to an XML parser.@br
   Use procedure parseXML to parse an XML file. It actually calls the HTML parser, not an XML parser, but it works reasonable well
 
   @author Benito van der Zander (http://www.benibela.de)

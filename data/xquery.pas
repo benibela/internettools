@@ -2652,7 +2652,7 @@ type
 
     @bold(Syntax of an XQuery / XPath / Pseudo-XPath-Expression)
 
-    This query engine currently supports XPath 3.1, XQuery 3.1, and JSONiq, with some extensions and minor deviations, as well as compatibility modes for older XPath and XQuery version.
+    This query engine currently supports XPath 3.1, XQuery 3.1, and JSONiq, with some extensions and minor deviations, as well as compatibility modes for older XPath and XQuery versions.
     @br@br
 
     A formal syntax definition of these languages is given at: http://www.w3.org/TR/xpath20/ , http://www.w3.org/TR/xquery/ , http://www.jsoniq.org/ ,
@@ -2751,7 +2751,7 @@ type
     The simplest way to use it with the function query and the defaultQueryEngine.
 
     You can evaluate XQuery/XPath-expressions by calling the class methods, e.g. @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
-    If you want to process a html/xml document, you have to pass the root TTreeNode (obtained by TTreeParser) instead of nil.@br@br@br
+    If you want to process an HTML/XML document, you have to pass the root TTreeNode (obtained by TTreeParser) instead of nil.@br@br@br
     If you call @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
     With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toFloat) an extended. @br@br
 
@@ -2766,6 +2766,7 @@ type
     @unorderedList(
     @item(Language changes:
       @unorderedList(
+        @item(The XPath 3.1 syntax for JSON objects or arrays is used; previously it used the JSONiq syntax. There are various compatibility options to choose a custom syntax.)
         @item(Function and type names are now case sensitive.)
         @item(The function pxp:filter has been removed to avoid confusion with the function fn:filter. (The replacement pxp:extract has existed for years))
         @item(Declarations in XQuery need to be separated by @code(;) and conflicting declarations or non-module queries containing only declarations are forbidden )
@@ -2779,6 +2780,8 @@ type
     )
     @item(API changes to previous versions:
       @unorderedList(
+      @item(IXQValue.toString on a sequence or array returns the concatenated strings of all contained values. Previously, it only returned the first.)
+      @item(It assumes the default codepage is UTF-8. (before FreePascal 3.0 there was no default codepage) )
       @item(IXQValue.getChild was renamed to get, TXQValueSequence.addChild to add and addChildMerging to addOrdered. "child" never made any sense here)
       @item(ParentElement/RootElement/TextElement have been moved from TXQueryEngine to TXQEvaluationContext. Avoid using them, just pass the element to @code(evaluate). )
       @item(Callbacks for external variables/functions have been changed to ask for a namespace URI instead a namespace object with URI/prefix (for 3's EQNames which do not have a prefix) )

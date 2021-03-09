@@ -2,8 +2,8 @@
  @abstract(This unit implements some functions of the binary module of http://expath.org/spec/binary )
 
  Call registerModuleBinary to register it.
- Afterwards you can use e.g. @code(query('Q{http://expath.org/ns/binary}exists("/tmp/")')) to test for the existence of a file.
- If you add the namespace to the namespaces in the static context, you can write it simpler as @code(query('f:exists("/tmp/")')).
+ Afterwards you can use e.g. @code(query('Q{http://expath.org/ns/binary}length(xs:base64Binary("abcd"))')) to get the length of a base64Binary after converting the base64 to binary.
+ If you add the namespace to the namespaces in the static context, you can write it simpler as @code(query('bin:length(xs:base64Binary("abcd"))')).
 
 *)
 

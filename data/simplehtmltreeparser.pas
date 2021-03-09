@@ -1,5 +1,5 @@
 {**
-  @abstract This unit contains a html/xml -> tree converter
+  @abstract This unit contains an HTML/XML -> tree converter
 
   @author Benito van der Zander (http://www.benibela.de)
 }
@@ -317,7 +317,7 @@ TBasicParsingState = (bpmBeforeHtml, bpmBeforeHead, bpmInHead, bpmAfterHead, bpm
 //**pmStrict: every tag must be closed explicitely (otherwise an exception is raised)
 //**pmHtml: accept everything, tries to create the best fitting tree using a heuristic to recover from faulty documents (no exceptions are raised), detect encoding
 TParsingModel = (pmStrict, pmHTML, pmUnstrictXML);
-//**@abstract This parses a html/sgml/xml file to a tree like structure.
+//**@abstract This parses an HTML/SGML/XML file to a tree like structure.
 //**To use it, you have to call @code(parseTree) with a string containing the document. Afterwards you can call @code(getLastTree) to get the document root node.@br
 //**
 //**The data structure is like a stream of annotated tokens with back links (so you can traverse it like a tree).@br
@@ -389,7 +389,7 @@ public
   constructor Create;
   destructor destroy;override;
   procedure clearTrees;
-  //** Creates a new tree from a html document contained in html. @br
+  //** Creates a new tree from an HTML document contained in html. @br
   //** contentType is used to detect the encoding
   function parseTree(html: string; uri: string = ''; contentType: string = ''): TTreeDocument; virtual;
   function parseTreeFromFile(filename: string): TTreeDocument; virtual;

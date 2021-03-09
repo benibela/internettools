@@ -139,7 +139,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   You can use it by calling the methods @code(parseTemplate) and @code(parseHTML). @code(parseTemplate) loads a certain pattern
   and @code(parseHTML) matches the pattern to an HTML/XML file.@br
-  A pattern file is just like a HTML file with special commands (it used to be called template file). The parser than matches every text and tag
+  A pattern file is just like an HTML file with special commands (it used to be called template file). The parser than matches every text and tag
   of the pattern to text/tag in the HTML file, while ignoring every additional data in latter file.
   If no match is possible an exception is raised.@br
   The pattern can extract certain values from the HTML file into variables, and you can access these variables with the property @link(variables) and variableChangeLog.
@@ -494,7 +494,7 @@ TXQTermVariableArray = array of TXQTermVariable;
 
   @bold(Template reference)
 
-  Basically the template file is a html file, and the parser tries to match the structure of the template html file to the html file. @br
+  Basically the template file is an HTML file, and the parser tries to match the structure of the template html file to the html file. @br
   A tag of the html file is considered as equal to a tag of the template file, if the tag names are equal, all attributes are the same (regardless of their order) and every child node of the tag in the template is also equal to a child node of the tag in the html file (in the same order and nesting).@br
   Text nodes are considered as equal, if the text in the html file starts with the whitespace trimmed text of the template file. All comparisons are performed case insensitive.@br
   The matching occurs with backtracking, so it will always find the first and longest match.
@@ -691,7 +691,7 @@ THtmlTemplateParser=class
 
     procedure initializeCaches;
   public
-    procedure parseHTMLSimple(html, uri, contenttype: string); //**< Parses a HTML file without performing matching. For internal use,
+    procedure parseHTMLSimple(html, uri, contenttype: string); //**< Parses an HTML file without performing matching. For internal use,
     function matchLastTrees: Boolean;
   public
     constructor create;
@@ -1667,7 +1667,7 @@ var xpathText: TTreeNode;
   var realHtmlStart: TTreeNode;
     procedure HandleCommandLoopClose;
     begin
-      //Jump to loop start if a html element was read in the loop
+      //Jump to loop start if an HTML element was read in the loop
       //The condition is necessary, because if the loop is executed without
       //reading a html element, it can be executed again, and again, and ... =>
       //endless loop

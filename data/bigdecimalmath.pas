@@ -23,7 +23,7 @@ exception statement from your version.
 
 (***
 
-  An unit for arbitrary precision arithmetic on bcd floats
+  A unit for arbitrary precision arithmetics on BCD floats
 
   See @link(BigDecimal)
 
