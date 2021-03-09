@@ -2367,23 +2367,28 @@ end;
 
 function strReverse(s: string): string;
 var
-  oldlen, charlen: SizeInt;
   len: sizeint;
-  p: PChar;
+  p, pe, oldp, tempp: PChar;
   q: Pchar;
 begin
   p := pointer(s);
   len := length(s);
+  pe := p + len;
   result := '';
+  if len = 0 then exit;
   SetLength(result, len);
   q := pointer(result) + len;
-  while len > 0 do begin
-    oldlen := len;
-    strDecodeUTF8Character(p, len);
-    charlen := oldlen - len;
-    q := q - charlen;
-    move((p-charlen)^, q^, charlen);
+  while p < pe do begin
+    oldp := p;
+    strDecodeUTF8Character(p, pe);
+    tempp := p - 1;
+    while tempp >= oldp do begin
+      dec(q);
+      q^ := tempp^;
+      dec(tempp);
+    end;
   end;
+  assert(q = pointer(result));
 end;
 
 //Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
@@ -2990,6 +2995,7 @@ var
 
 var
   i: SizeInt;
+  sourceend: pchar;
 begin
   dest := '';
   if len = 0 then exit;
@@ -3022,9 +3028,10 @@ begin
     end;
     CP_UTF8: begin
       SetLength(dest, len);
+      sourceend := source + len;
       outlen := 0;
-      while len > 0 do
-         writeCodepoint(strDecodeUTF8Character(source, len));
+      while source < sourceend do
+         writeCodepoint(strDecodeUTF8Character(source, sourceend));
       if outlen <> length(dest) then SetLength(dest, outlen);
     end;
     CP_WINDOWS1252: begin

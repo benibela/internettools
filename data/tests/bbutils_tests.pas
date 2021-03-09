@@ -565,6 +565,20 @@ begin
   test(strJoin(stableSort(strSplit('a|b|c|a20|aa|A20|A3','|')), '|'), 'a|A3|a20|A20|aa|b|c');
   test(strJoin(stableSort(strSplit('a|b|c|a20|aa|A20|A3','|'),@stringCompareReverseFunction), '|'), 'c|b|aa|A3|a20|A20|a');
 
+  test(strReverse(''), '');
+  test(strReverse('a'), 'a');
+  test(strReverse('ab'), 'ba');
+  test(strReverse('abc'), 'cba');
+  test(strReverse('Ä'), 'Ä');
+  test(strReverse('xÄ'), 'Äx');
+  test(strReverse('Äy'), 'yÄ');
+  test(strReverse('€'), '€');
+  test(strReverse('x€'), '€x');
+  test(strReverse('€y'), 'y€');
+  test(strReverse('𐍈'), '𐍈');
+  test(strReverse('x𐍈'), '𐍈x');
+  test(strReverse('𐍈y'), 'y𐍈');
+
 
  (* procedure roundtrip(cp: TSystemCodePage);
 var
