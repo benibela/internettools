@@ -313,7 +313,7 @@ begin
         setCustomError(rsSSLErrorConnectionFailed, -3);
         Exit;
       end;
-    end
+    end;
     //this must be commented out, because ConnectionTimeout is missing in Synapse SVN r40
     {else //do non-blocking call of SSL_Connect
     begin
@@ -334,8 +334,8 @@ begin
       begin
         SSLcheck;
         Exit;
-      end; }
-    end;
+      end;
+    end;}
 
     if FverifyCert then //seems like this is not needed, since sslconnect already fails on an invalid certificate
       if (GetVerifyCert <> 0) or (not DoVerifyCert) then begin
