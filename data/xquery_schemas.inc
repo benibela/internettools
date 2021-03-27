@@ -506,7 +506,7 @@ var
       if not result then exit;
       if length(constrainingFacets) > 0 then
         if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
-      if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v)
+      if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v, XQFormats)
       else if v[tempexp+1] = '-' then tempe := 0
       else if v[1]= '-' then tempe := getNegInf
       else tempe := getPosInf;}

@@ -103,6 +103,31 @@ procedure floatToDecimalFuzzing; forward;
 
 const powersOf10: array[0..16] of Int64 = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000,
                                            10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000, 1000000000000000, 10000000000000000);
+  Formats : TFormatSettings = (
+      CurrencyFormat: 1;
+      NegCurrFormat: 5;
+      ThousandSeparator: #0;
+      DecimalSeparator: '.';
+      CurrencyDecimals: 2;
+      DateSeparator: '-';
+      TimeSeparator: ':';
+      ListSeparator: ',';
+      CurrencyString: '$';
+      ShortDateFormat: 'y-m-d';
+      LongDateFormat: 'yyyy-mm-dd';
+      TimeAMString: 'AM';
+      TimePMString: 'PM';
+      ShortTimeFormat: 'hh:nn';
+      LongTimeFormat: 'hh:nn:ss';
+      ShortMonthNames: ('Jan','Feb','Mar','Apr','May','Jun',
+                        'Jul','Aug','Sep','Oct','Nov','Dec');
+      LongMonthNames: ('January','February','March','April','May','June',
+                       'July','August','September','October','November','December');
+      ShortDayNames: ('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
+      LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
+      TwoDigitYearCenturyWindow: 50;
+    );
+
 procedure unittests;
 var
   b1: BigDecimal;
@@ -332,17 +357,17 @@ begin
   test(TryStrToBigDecimal('.e2', nil) = false);
   test(TryStrToBigDecimal('18', nil) = TRUE);
   {$ifdef FPC_HAS_TYPE_SINGLE}
-  test(StrToBigDecimal('-3.40282346638528E38').toSingle = single(StrToFloat('-3.40282346638528E38')));
+  test(StrToBigDecimal('-3.40282346638528E38').toSingle = single(StrToFloat('-3.40282346638528E38', Formats)));
   {$endif}
   {$ifdef FPC_HAS_TYPE_DOUBLE}
-  test(StrToBigDecimal('-3.40282346638528').toDouble = double(StrToFloat('-3.40282346638528')));
-  test(StrToBigDecimal('-3.40282346638528E38').toDouble = double(StrToFloat('-3.40282346638528E38')));
-  test(single(StrToBigDecimal('-3.40282346638528E38').toDouble) = single(double(StrToFloat('-3.40282346638528E38'))));
+  test(StrToBigDecimal('-3.40282346638528').toDouble = double(StrToFloat('-3.40282346638528', Formats)));
+  test(StrToBigDecimal('-3.40282346638528E38').toDouble = double(StrToFloat('-3.40282346638528E38', Formats)));
+  test(single(StrToBigDecimal('-3.40282346638528E38').toDouble) = single(double(StrToFloat('-3.40282346638528E38', Formats))));
   {$endif}
   {$ifdef FPC_HAS_TYPE_EXTENDED}
-  test(double(StrToBigDecimal('-3.40282346638528').toExtended) = double(StrToFloat('-3.40282346638528')));
-  test(double(StrToBigDecimal('-3.40282346638528E38').toExtended) = double(StrToFloat('-3.40282346638528E38')));
-  test(single(double(StrToBigDecimal('-3.40282346638528E38').toExtended)) = single(double(StrToFloat('-3.40282346638528E38'))));
+  test(double(StrToBigDecimal('-3.40282346638528').toExtended) = double(StrToFloat('-3.40282346638528', Formats)));
+  test(double(StrToBigDecimal('-3.40282346638528E38').toExtended) = double(StrToFloat('-3.40282346638528E38', Formats)));
+  test(single(double(StrToBigDecimal('-3.40282346638528E38').toExtended)) = single(double(StrToFloat('-3.40282346638528E38', Formats))));
   {$endif}
 
 
@@ -816,13 +841,13 @@ begin
     e := Random(100000000) / powersOf10[random(6)];
     if random(2) = 0 then d := - e;
     if random(2) = 0 then d := - e;
-    test(BigDecimalToStr(StrToBigDecimal(FloatToStr(d)) + StrToBigDecimal(FloatToStr(e)) ), FloatToStr(d+e), FloatToStr(d)+ ' + ' + FloatToStr(e));
-    test(StrToBigDecimal(FloatToStr(d)) - StrToBigDecimal(FloatToStr(e)) , FloatToStr(d-e), FloatToStr(d)+ ' - ' + FloatToStr(e));
+    test(BigDecimalToStr(StrToBigDecimal(FloatToStr(d, Formats)) + StrToBigDecimal(FloatToStr(e, Formats)) ), FloatToStr(d+e, Formats), FloatToStr(d, Formats)+ ' + ' + FloatToStr(e, Formats));
+    test(StrToBigDecimal(FloatToStr(d, Formats)) - StrToBigDecimal(FloatToStr(e, Formats)) , FloatToStr(d-e, Formats), FloatToStr(d, Formats)+ ' - ' + FloatToStr(e, Formats));
     try
-    test(StrToBigDecimal(FloatToStr(d)) / StrToBigDecimal(FloatToStr(e)) , FloatToStr(d/e), FloatToStr(d)+ ' / ' + FloatToStr(e));
+    test(StrToBigDecimal(FloatToStr(d, Formats)) / StrToBigDecimal(FloatToStr(e, Formats)) , FloatToStr(d/e, Formats), FloatToStr(d, Formats)+ ' / ' + FloatToStr(e, Formats));
 
     except
-      writeln(FloatToStr(d)+ ' / ' + FloatToStr(e));
+      writeln(FloatToStr(d, Formats)+ ' / ' + FloatToStr(e, Formats));
     end;
 
     {$ifdef FPC_HAS_TYPE_EXTENDED}
@@ -830,7 +855,7 @@ begin
     e := Random(1000000) / powersOf10[random(7)];
     if random(2) = 0 then d := - d;
     if random(2) = 0 then e := - e;
-    test(BigDecimalToExtended(StrToBigDecimal(FloatToStrExact(d)) * StrToBigDecimal(FloatToStrExact(e)) ), FloatToStr(d*e), FloatToStrExact(d)+ ' * ' + FloatToStrExact(e));
+    test(BigDecimalToExtended(StrToBigDecimal(FloatToStrExact(d)) * StrToBigDecimal(FloatToStrExact(e)) ), FloatToStr(d*e, Formats), FloatToStrExact(d)+ ' * ' + FloatToStrExact(e));
     {$endif}
   end;
 

@@ -9,7 +9,7 @@ procedure unittests();
 
 implementation
 
-uses bbutils, commontestutils, xquery.internals.common, sysutils, bigdecimalmath, xquery;
+uses bbutils, commontestutils, xquery.internals.common, sysutils, bigdecimalmath, xquery, xquery.internals.floathelpers;
 
 procedure hashcodetests;
   procedure testnumcode(v: integer);
@@ -51,7 +51,7 @@ begin
   for i := 1 to 100 do begin
     s := inttostr(i);
     testnumcode(StrToFloat('10'+zeros+'E-'+s));
-    testnumcode(StrToFloat('0.'+zeros+'1E'+s));
+    testnumcode(StrToFloat('0.'+zeros+'1E'+s, XQFormats));
     zeros += '0';
   end;
 end;
