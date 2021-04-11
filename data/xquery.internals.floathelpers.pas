@@ -19,7 +19,7 @@ type TBBDoubleHelper = type helper (TDoubleHelper) for double
   Function Mantissa: QWord;
   function compare(other: double): TXQCompareResult;
   function round(prec: integer = 0): double;
-  function parse(const str: string): double;
+  class function parse(const str: string): double; static;
 end;
 
 var
@@ -152,7 +152,7 @@ begin
   end;
 end;
 
-function TBBDoubleHelper.parse(const str:string): double;
+class function TBBDoubleHelper.parse(const str:string): double; static;
 var
   s: String;
 begin
