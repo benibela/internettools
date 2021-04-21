@@ -96,6 +96,7 @@ type
     function getBaseValueOrDefault(const Key:TKey):TBaseValue;
     procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
     function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
+    procedure baseAssign(const other: TXQBaseHashmap);
   public
     constructor init;
     destructor done;
@@ -117,8 +118,11 @@ type
     end;
     procedure include(const Key:TKey; allowOverride: boolean=true);
     procedure includeAll(keys: array of TKey);
+    procedure assign(const other: specialize TXQBaseHashmap<TKey, TXQVoid,TInfo>); inline;
     function getEnumerator: TKeyOnlyEnumerator;
+    function isEqual(const other: TXQHashset): boolean;
   end;
+
   TXQHashsetStr = specialize TXQHashset<string,TXQDefaultTypeInfo>;
   PXQHashsetStr = ^TXQHashsetStr;
   TXQHashsetStrCaseInsensitiveASCII = specialize TXQHashset<string,TXQCaseInsensitiveTypeInfo>;
@@ -667,6 +671,19 @@ begin
  result^.Value:=Value;
 end;
 
+procedure TXQBaseHashmap.baseAssign(const other: TXQBaseHashmap);
+var
+  i: int32;
+begin
+  clear;
+  LogSize:=other.LogSize;
+  Size:=other.Size;
+  Entities:=other.Entities;
+  CellToEntityIndex:=other.CellToEntityIndex;
+  SetLength(entities, length(Entities));
+  SetLength(CellToEntityIndex, length(CellToEntityIndex));
+end;
+
 function TXQBaseHashmap.findEntity(const Key:TKey;CreateIfNotExist:boolean=false):PHashMapEntity;
 var Entity:int32;
     Cell:uint32;
@@ -916,9 +933,23 @@ begin
   for i := 0 to high(keys) do include(keys[i]);
 end;
 
+procedure TXQHashset.assign(const other: specialize TXQBaseHashmap<TKey, TXQVoid,TInfo>);
+begin
+  baseAssign(other);
+end;
+
 function TXQHashset.getEnumerator: TKeyOnlyEnumerator;
 begin
   result.init(@self);
+end;
+
+function TXQHashset.isEqual(const other: TXQHashset): boolean;
+var k: TKey;
+begin
+  result := false;
+  if Size <> other.Size then exit();
+  for k in other do if not contains(k) then exit();
+  result := true;
 end;
 
 
@@ -1092,13 +1123,7 @@ procedure TXQBaseHashmapValuePointerLikeOwning.assign(const other: TXQBaseHashma
 var
   i: int32;
 begin
-  clear;
-  LogSize:=other.LogSize;
-  Size:=other.Size;
-  Entities:=other.Entities;
-  CellToEntityIndex:=other.CellToEntityIndex;
-  SetLength(entities, length(Entities));
-  SetLength(CellToEntityIndex, length(CellToEntityIndex));
+  baseAssign(other);
   for i := 0 to size - 1 do //todo: skip this for non-owning map
     if Entities[i].Value <> nil then TValueOwnershipTracker.addRef(TValue(Entities[i].Value));
 end;
