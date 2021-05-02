@@ -835,6 +835,8 @@ const SystemCAFiles: array[1..2{$ifndef windows}+7{$endif}] of string = (
    programPath: String;
 {$endif}
 begin
+  temp := GetEnvironmentVariable('SSL_CERT_FILE');
+  if (temp <> '') and (FileExists(temp)) then CAFile := temp;
   {$ifdef windows}
   programPath:=IncludeTrailingBackslash(ExtractFilePath(ParamStr(0)));
   for i := low(SystemCAFiles) to high(SystemCAFiles) do begin
@@ -846,20 +848,16 @@ begin
     if CAFile <> '' then break;
     if FileExists(SystemCAFiles[i]) then CAFile := SystemCAFiles[i];
   end;
-  if (CAFile = '') then begin
-    temp := GetEnvironmentVariable('SSL_CERT_FILE');
-    if (temp <> '') and (FileExists(temp)) then CAFile := temp;
-  end;
+
+
+  temp := GetEnvironmentVariable('SSL_CERT_DIR');
+  if (temp <> '') and (DirectoryExists(temp)) then CAPath := temp;
   {$ifndef windows}
   for i := low(SystemCAPaths) to high(SystemCAPaths) do begin
     if CAPath <> '' then break;
     if DirectoryExists(SystemCAPaths[i]) then CAPath := SystemCAPaths[i];
   end;
   {$endif}
-  if (CAPath = '') then begin
-    temp := GetEnvironmentVariable('SSL_CERT_DIR');
-    if (temp <> '') and (DirectoryExists(temp)) then CAPath := temp;
-  end;
 end;
 
 
