@@ -1,6 +1,6 @@
 unit bigdecimal_tests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 {$WARN 5066 off : Symbol "$1" is deprecated: "$2"}
 {$WARN 6018 off : Unreachable code}
 interface

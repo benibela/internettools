@@ -1,7 +1,7 @@
 unit commontestutils;
 
 {$mode objfpc}{$H+}
-
+{$COperators on}
 interface
 
 uses

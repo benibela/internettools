@@ -40,4 +40,7 @@
 {$mode objfpc} {$H+}
 {$modeswitch advancedrecords}
 {$ModeSwitch typehelpers}
+{$modeswitch autoderef}
+{$goto on}
+{$COperators on}
 

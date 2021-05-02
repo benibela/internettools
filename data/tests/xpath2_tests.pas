@@ -1,6 +1,6 @@
 unit xpath2_tests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 
 {$ifndef cpuarm}{$define TEST_FLOAT}{$endif}
 {$WARN 6018 off : Unreachable code}

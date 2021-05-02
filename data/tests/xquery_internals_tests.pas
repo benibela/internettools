@@ -1,6 +1,6 @@
 unit xquery_internals_tests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 
 interface
 

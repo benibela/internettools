@@ -1,6 +1,6 @@
 unit xquery1_tests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 {$WARN 5024 off : Parameter "$1" not used}
 interface
 

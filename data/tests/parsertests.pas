@@ -1,6 +1,6 @@
 unit parsertests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 
 interface
 

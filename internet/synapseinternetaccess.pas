@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 unit synapseinternetaccess;
 
 
-{$mode objfpc}{$H+}
 
 
 
@@ -31,6 +30,7 @@ unit synapseinternetaccess;
  {$DEFINE COMPILE_SYNAPSE_INTERNETACCESS}
 {$ENDIF}
 
+{$I ../internettoolsconfig.inc}
 
 
 interface

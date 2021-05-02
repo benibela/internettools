@@ -10,7 +10,7 @@
 unit xquery_module_file;
 
 
-{$mode objfpc}{$H+}
+{$I ../internettoolsconfig.inc}
 
 interface
 

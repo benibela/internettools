@@ -5,7 +5,7 @@
 }
 unit simplehtmlparser;
 
-{$mode objfpc}{$H+}
+{$I ../internettoolsconfig.inc}
 
 {
 Copyright (C) 2008 Benito van der Zander (BeniBela)

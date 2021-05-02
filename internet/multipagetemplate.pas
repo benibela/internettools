@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 unit multipagetemplate;
 
 {$mode objfpc}{$H+}
+{$COperators on}{$goto on}{$inline on}
 
 interface
 

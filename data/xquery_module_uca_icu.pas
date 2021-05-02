@@ -12,8 +12,7 @@
 
 unit xquery_module_uca_icu;
 
-{$mode objfpc}{$H+}
-{$ModeSwitch advancedrecords}
+{$I ../internettoolsconfig.inc}
 
 interface
 

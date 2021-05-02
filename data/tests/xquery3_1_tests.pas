@@ -1,6 +1,6 @@
 unit xquery3_1_tests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 
 interface
 

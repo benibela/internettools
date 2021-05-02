@@ -63,6 +63,8 @@ unit bbutils;
 {$ModeSwitch advancedrecords}
 {$ModeSwitch typehelpers}
 {$COPERATORS OFF}
+{$Goto on}
+{$Inline on}
 {$DEFINE HASINLINE}
 {$DEFINE HASDefaultFormatSettings}
 {$DEFINE HASDeprecated}

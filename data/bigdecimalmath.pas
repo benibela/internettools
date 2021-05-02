@@ -35,6 +35,7 @@ unit bigdecimalmath;
 
 {$mode objfpc}{$H+}
 {$ModeSwitch advancedrecords}
+{$COperators on}
 interface
 
 uses

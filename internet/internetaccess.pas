@@ -19,8 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     Currently it only supports HTTP/S connections, but this might change in future (e.g. to also support ftp)}
 unit internetaccess;
 
-{$mode objfpc}{$H+}
-{$modeswitch advancedrecords}
+{$I ../internettoolsconfig.inc}
 {$WARN 5043 off : Symbol "$1" is deprecated}
 interface
 

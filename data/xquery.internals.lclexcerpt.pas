@@ -1,7 +1,7 @@
 //copied from Lazarus/the LCL to reduce dependancies
 unit xquery.internals.lclexcerpt;
 
-{$mode objfpc}{$H+}
+{$I ../internettoolsconfig.inc}
 
 interface
 

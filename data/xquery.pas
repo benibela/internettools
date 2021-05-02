@@ -42,11 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-{$mode objfpc}
-{$modeswitch advancedrecords}
-{$modeswitch autoderef}
-{$ModeSwitch typehelpers}
-{$H+}
+{$I ../internettoolsconfig.inc}
 {$DEFINE ALLOW_EXTERNAL_DOC_DOWNLOAD}
 
 

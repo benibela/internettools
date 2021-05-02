@@ -1,6 +1,6 @@
 unit xpath3_tests;
 
-{$mode objfpc}{$H+}
+{$I ../../internettoolsconfig.inc}
 
 interface
 

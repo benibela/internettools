@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-{$mode objfpc}{$H+}
-{$ModeSwitch advancedrecords}
+{$I ../internettoolsconfig.inc}
 {$PackSet 4}
 interface
 

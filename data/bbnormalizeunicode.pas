@@ -43,6 +43,7 @@ unit bbnormalizeunicode;
 
 {$IFDEF fpc}
 {$MODE objfpc}{$H+}
+{$COperators on}
 {$ENDIF}
 
 interface
