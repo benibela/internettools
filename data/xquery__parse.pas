@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }
 
 {$I ../internettoolsconfig.inc}
+{$ModeSwitch autoderef-}
 {$PackSet 4}
 interface
 
