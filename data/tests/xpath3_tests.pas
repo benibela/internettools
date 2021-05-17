@@ -244,7 +244,7 @@ begin
   t('(string-length(environment-variable("PATH")) > 0, empty(environment-variable("invalidvar=!!invalid")))', 'true true');
 
   t('parse-xml("<abc>hallo welt</abc>")/abc', 'hallo welt');
-  t('parse-xml-fragment("<abc xmlns=""foobar"" attrib=""value""/><abc attrib=""value2""/>")/Q{foobar}abc/@attrib', 'value value2');
+  t('parse-xml-fragment("<abc xmlns=""foobar"" attrib=""value""/><abc attrib=""value2""/><t:abc xmlns:t=""foobar"" attrib=""value3""/>")/Q{foobar}abc/@attrib', 'value value3');
   t('">"||string(parse-xml-fragment(" <w> </w>  <s> </s>"))||parse-xml-fragment("&lt;")', '>     <');
   t('parse-html("<html><a href=""foobar""/></html>")//a/@href', 'foobar');
 

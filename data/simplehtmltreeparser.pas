@@ -2537,8 +2537,10 @@ begin
     FCurrentNamespaceDefinitions.Delete(FCurrentNamespaceDefinitions.Count-1);
     FCurrentNamespaces.Delete(FCurrentNamespaces.Count-1);
   end;
-  if removedCurrentNamespace then
+  if removedCurrentNamespace then begin
+    FCurrentNamespace := nil;
     FCurrentNamespace := findNamespace('');
+  end;
 
 end;
 

@@ -131,6 +131,9 @@ begin
     t(#0'<'#0'h'#0't'#0'm'#0'l'#0'>'#0#$FC#$0'<'#0'/'#0'h'#0't'#0'm'#0'l'#0'>', '<html>'#$C3#$BC'</html>',  'text/html; charset=utf-16be');
   end;
 
+  t('<html><svg xmlns="http://www.w3.org/2000/svg"></svg><script>"a < b"</script></html>', '<html><svg xmlns="http://www.w3.org/2000/svg"/><script>&quot;a &lt; b&quot;</script></html>');
+
+
   tp.repairMissingStartTags := true;
   tp.repairMissingEndTags := true;
   t('<html><body></body></html>aaa', '<html><head/><body>aaa</body></html>');
