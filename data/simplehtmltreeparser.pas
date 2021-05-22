@@ -324,7 +324,6 @@ TParsingModel = (pmStrict, pmHTML, pmUnstrictXML);
 //**If TargetEncoding is not CP_NONE, the parsed data is automatically converted to that encoding. (the initial encoding is detected depending on the unicode BOM, the xml-declaration, the content-type header, the http-equiv meta tag and invalid characters.)
 //**You can change the class used for the elements in the tree with the field treeNodeClass.
 TTreeParser = class
-  function processingInstruction(text: pchar; textLen: SizeInt; {%H-}unusedParameter: TTextFlags): TParsingResult;
 protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
@@ -341,6 +340,7 @@ protected
   FNCNameCache: TXQHashmapStrStr;
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
+  FLineSpaceNormalizationIncludes85_2028: boolean;
   FEncodingInputCertain, FEncodingCurrent, FEncodingMeta: TSystemCodePage;
   FReparseWithChangedEncoding: boolean;
   function abortIfEncodingMismatch: TParsingResult;
@@ -365,6 +365,7 @@ protected
   procedure leaveTagNoOpenTagCheck(tagName: pchar; tagNameLen: SizeInt);
   function readText(text: pchar; textLen: SizeInt; tf: TTextFlags):TParsingResult;
   function readComment(text: pchar; textLen: SizeInt):TParsingResult;
+  function readProcessingInstruction(text: pchar; textLen: SizeInt; {%H-}unusedParameter: TTextFlags): TParsingResult;
 
 private
   //in-scope namespaces
@@ -1911,7 +1912,7 @@ end;
 
 { THTMLTreeParser }
 
-function TTreeParser.processingInstruction(text: pchar; textLen: SizeInt; unusedParameter: TTextFlags): TParsingResult;
+function TTreeParser.readProcessingInstruction(text: pchar; textLen: SizeInt; unusedParameter: TTextFlags): TParsingResult;
   function cutproperty(var remainingtext: string; out value: string): string;
   var
     eq, closing: SizeInt;
@@ -1935,7 +1936,7 @@ var content: string;
     ws: Integer;
     i: Integer;
     new: TTreeNode;
-
+    isXML1_1: boolean = false;
 
 begin
   result := prContinue;
@@ -1966,9 +1967,13 @@ begin
         'standalone':
           if allowTextAtRootLevel and (parsingModel = pmStrict) then
             raise ETreeParseException.Create('External-preparsed-entity cannot be standalone');
+        'version':
+          if value = '1.1' then
+            isXML1_1 := true;
         '': break;
       end;
     end;
+    FLineSpaceNormalizationIncludes85_2028 := isXML1_1 and (FEncodingCurrent = FEncodingTargetActual) and (FEncodingTargetActual = CP_UTF8);
     exit;
   end;
   if not FReadProcessingInstructions then exit;
@@ -2035,7 +2040,10 @@ end;
 function TTreeParser.parseCDATA(t: pchar; len: SizeInt): string;
 begin
   result := parseRawText(t, len);
-  result := strNormalizeLineEndings(result);
+  if FLineSpaceNormalizationIncludes85_2028 then
+    result := strNormalizeLineEndingsUTF8(result)
+   else
+    result := strNormalizeLineEndings(result);
 end;
 {$ImplicitExceptions on}
 
@@ -2043,6 +2051,7 @@ function TTreeParser.parseTextAttribute(t: pchar; len: SizeInt): string;
 var decodeFlags: TDecodeHTMLEntitiesFlags;
 begin
   if parsingModel = pmHTML then decodeFlags := [dhefNormalizeLineEndings, dhefWindows1252Extensions]
+  else if FLineSpaceNormalizationIncludes85_2028 then decodeFlags := [dhefNormalizeLineEndings, dhefNormalizeLineEndingsAlso85_2028]
   else decodeFlags := [dhefNormalizeLineEndings];
   if FEncodingCurrent = FEncodingTargetActual then
     result := strDecodeHTMLEntities(t, len, FEncodingTargetActual, decodeFlags)
@@ -2792,6 +2801,7 @@ begin
   FLastHead := nil;
   flastbody := nil;
   flasthtml := nil;
+  FLineSpaceNormalizationIncludes85_2028 := false;
 
   //see https://www.w3.org/International/articles/spec-summaries/encoding
   FEncodingTargetActual:=strActualEncoding(FEncodingTarget);
@@ -2820,7 +2830,7 @@ begin
     simplehtmlparser.parseHTML(FCurrentFile,@enterHTMLTag, @leaveHTMLTag, @readText, @readComment);
     leaveHTMLTag(nil,0); //close root element
   end else begin
-    simplehtmlparser.parseML(FCurrentFile,[poRespectXMLProcessingInstructions],@enterXMLTag, @leaveXMLTag, @readText, @readComment, @processingInstruction);
+    simplehtmlparser.parseML(FCurrentFile,[poRespectXMLProcessingInstructions],@enterXMLTag, @leaveXMLTag, @readText, @readComment, @readProcessingInstruction);
     leaveXMLTag(nil,0); //close root element
   end;
   if FReparseWithChangedEncoding then begin

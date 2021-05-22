@@ -169,6 +169,29 @@ begin
   t('<r> <?foobar?> </r>', '<r> <?foobar?> </r>');
   t('<r> <?php echo "<span class=''cap''>".$row[''ID''].". "; ?> </r>', '<r> <?php echo "<span class=''cap''>".$row[''ID''].". "; ?> </r>');
 
+{  XML1.0:
+  To simplify the tasks of applications, the XML processor must behave as if it normalized all line breaks in external parsed entities (including the document entity) on input, before parsing, by translating both the two-character sequence #xD #xA and any #xD that is not followed by #xA to a single #xA character.
+
+  XML1.1:
+
+  the two-character sequence #xD #xA
+
+  the two-character sequence #xD #x85
+
+  the single character #x85
+
+  the single character #x2028
+
+  any #xD character that is not immediately followed by #xA or #x85.
+
+
+  //utf 8 $2028 = e280a8, $85 = C285}
+
+  if DefaultSystemCodePage = CP_UTF8 then begin
+    t('<a>'#13#10'b'#13'c'#13#$C2#$85'd'#$C2#$85'e'#$e2#$80#$a8'</a>', '<a>'#10'b'#10'c'#10'&#x85;d&#x85;e&#x2028;</a>');
+    t('<?xml version="1.1"?><a>'#13#10'b'#13'c'#13#$C2#$85'd'#$C2#$85'e'#$e2#$80#$a8'</a>', '<a>'#10'b'#10'c'#10'd'#10'e'#10'</a>');
+  end;
+
   finally
       tp.free;
   end;

@@ -454,7 +454,7 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
 
-type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions, dhefNormalizeLineEndings);
+type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions, dhefNormalizeLineEndings, dhefNormalizeLineEndingsAlso85_2028);
      EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -5408,7 +5408,26 @@ begin
   result := CP_WINDOWS1252;
 end;
 
+{
+XML1.0:
+To simplify the tasks of applications, the XML processor must behave as if it normalized all line breaks in external parsed entities (including the document entity) on input, before parsing, by translating both the two-character sequence #xD #xA and any #xD that is not followed by #xA to a single #xA character.
 
+XML1.1:
+
+the two-character sequence #xD #xA
+
+the two-character sequence #xD #x85
+
+the single character #x85
+
+the single character #x2028
+
+any #xD character that is not immediately followed by #xA or #x85.
+
+
+//utf 8 $2028 = e280a8, $85 = C285
+
+}
 
 function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):RawByteString;
   procedure parseError;
@@ -5428,8 +5447,10 @@ var
     acceptPos: pchar;
     nextNode: pchar;
     noSpecialCharBlockStart: PAnsiChar;
+    flagNormalize85_2028: boolean;
 begin
   encoding := strActualEncoding(encoding);
+  flagNormalize85_2028 := (dhefNormalizeLineEndingsAlso85_2028 in flags) and (dhefNormalizeLineEndings in flags) and (encoding = CP_UTF8);
   builder.init(@result, l, encoding);
   noSpecialCharBlockStart := p;
   lastChar:=@p[l-1];
@@ -5443,7 +5464,11 @@ begin
           inc(p);
           if dhefNormalizeLineEndings in flags then begin
             append(#10);
-            if (p <= lastChar) and (p^ = #10) then inc(p);
+            if (p <= lastChar) then
+              case p^ of
+                #10: inc(p);
+                #$C2: if flagNormalize85_2028 and ((p + 1) <= lastChar) and ((p+1)^ = #$85) then inc(p, 2);
+              end;
           end else append(#13);
           noSpecialCharBlockStart := p;
         end;
@@ -5597,7 +5622,26 @@ begin
         end;
 
 
-        else inc(p);
+        else begin
+          if flagNormalize85_2028 then begin
+            case p^ of
+               #$C2: if ((p + 1) <= lastChar) and ((p + 1)^ = #$85) then begin
+                 if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
+                 append(#10);
+                 inc(p);
+                 noSpecialCharBlockStart := p + 1;
+               end;
+               #$E2: if ((p + 2) <= lastChar) and ((p + 1)^ = #$80) and ((p + 2)^ = #$A8) then begin
+                 if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
+                 append(#10);
+                 inc(p, 2);
+                 noSpecialCharBlockStart := p + 1;
+               end;
+              //utf 8 $2028 = e280a8, $85 = C285
+            end;
+          end;
+          inc(p);
+        end;
       end;
     end;
     if noSpecialCharBlockStart < p then append(noSpecialCharBlockStart, p - noSpecialCharBlockStart);
