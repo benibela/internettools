@@ -2587,7 +2587,10 @@ begin
   typ := tetText;
   if tfCDATA in tf then t := parseCDATA(text, textLen)
   else t := parseTextAttribute(text, textLen);
-  appendTreeNode(typ, t, longint(text - @FCurrentFile[1])).initialized;
+  if FCurrentElement.typ <> tetText then
+    appendTreeNode(typ, t, longint(text - @FCurrentFile[1])).initialized
+   else
+    FCurrentElement.value += t;
 end;
 
 function TTreeParser.readComment(text: pchar; textLen: SizeInt): TParsingResult;
