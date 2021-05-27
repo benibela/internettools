@@ -757,7 +757,7 @@ end;
 
 function TXQValue.map(const q: string): IXQValue;
 begin
-  result := defaultQueryEngine.evaluateXQuery3(q, self);
+  result := defaultQueryEngine.evaluateXQuery(q, self);
 end;
 
 function TXQValue.map(const q: string; const vs: array of ixqvalue): IXQValue;

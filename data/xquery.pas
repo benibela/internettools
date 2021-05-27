@@ -2848,33 +2848,45 @@ protected
 public
     function evaluate(expression: string; model: TXQParsingModel; tree:TTreeNode = nil): IXQValue;
     function evaluate(expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue;
+
+    //** Evaluates an XQuery 3.1 expression with a certain tree element as current node.
+    function evaluateXQuery(expression: string; tree:TTreeNode = nil): IXQValue;
+    //** Evaluates an XQuery 3.1 expression with a certain tree element as current node.
+    function evaluateXQuery(expression: string; const contextItem: IXQValue): IXQValue;
+    //** Evaluates an XPath 3.1 expression with a certain tree element as current node.
+    function evaluateXPath(expression: string; tree:TTreeNode = nil): IXQValue;
+    //** Evaluates an XPath 3.1 expression with a certain tree element as current node.
+    function evaluateXPath(expression: string; const contextItem: IXQValue): IXQValue;
+
     //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
-    function evaluateXPath2(expression: string; tree:TTreeNode = nil): IXQValue;
-    function evaluateXPath2(expression: string; const contextItem: IXQValue): IXQValue;
+    function evaluateXPath2(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use evaluateXPath for the newest XPath version, or evaluate for an older';
+    function evaluateXPath2(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use evaluateXPath for the newest XPath version, or evaluate for an older';
     //** Evaluates an XQuery 1.0 expression with a certain tree element as current node.
-    function evaluateXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
-    function evaluateXQuery1(expression: string; const contextItem: IXQValue): IXQValue;
-    //** Evaluates an XPath 3.0 expression with a certain tree element as current node. Work in progress, only a small set of 3.0 statements is supported
-    function evaluateXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
-    function evaluateXPath3(expression: string; const contextItem: IXQValue): IXQValue;
-    //** Evaluates an XQuery 3.0 expression with a certain tree element as current node. Work in progress, only a small set of 3.0 statements is supported
-    function evaluateXQuery3(expression: string; tree:TTreeNode = nil): IXQValue;
-    function evaluateXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
+    function evaluateXQuery1(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use evaluateXQuery for the newest XQuery version, or evaluate for an older';
+    function evaluateXQuery1(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use evaluateXQuery for the newest XQuery version, or evaluate for an older';
+    //** Evaluates an XPath 3.0 expression with a certain tree element as current node.
+    function evaluateXPath3(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use evaluateXPath for the newest XPath version, or evaluate for an older';
+    function evaluateXPath3(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use evaluateXPath for the newest XPath version, or evaluate for an older';
+    //** Evaluates an XQuery 3.0 expression with a certain tree element as current node.
+    function evaluateXQuery3(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use evaluateXQuery for the newest XQuery version, or evaluate for an older';
+    function evaluateXQuery3(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use evaluateXQuery for the newest XQuery version, or evaluate for an older';
     //** Evaluates an CSS 3 Selector expression with a certain tree element as current node.
     function evaluateCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
     function evaluateCSS3(expression: string; const contextItem: IXQValue): IXQValue;
 
+
+
     //** Evaluates an expression with a certain tree element as current node.
-    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue; overload;
-    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue; overload;
-    class function evaluateStaticXPath3(expression: string; tree:TTreeNode = nil): IXQValue;
-    class function evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue;
-    class function evaluateStaticXQuery1(expression: string; tree:TTreeNode = nil): IXQValue;
-    class function evaluateStaticXQuery1(expression: string; const contextItem: IXQValue): IXQValue;
-    class function evaluateStaticXQuery3(expression: string; tree:TTreeNode = nil): IXQValue;
-    class function evaluateStaticXQuery3(expression: string; const contextItem: IXQValue): IXQValue;
+    class function evaluateStaticXPath2(expression: string; tree:TTreeNode = nil): IXQValue; overload; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXPath2(expression: string; const contextItem: IXQValue): IXQValue; overload; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXPath3(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXPath3(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXQuery1(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXQuery1(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXQuery3(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
+    class function evaluateStaticXQuery3(expression: string; const contextItem: IXQValue): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
     //** Evaluates an expression with a certain tree element as current node.
-    class function evaluateStaticCSS3(expression: string; tree:TTreeNode = nil): IXQValue;
+    class function evaluateStaticCSS3(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
 
     procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. An XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
     function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
@@ -8175,6 +8187,26 @@ begin
   end;
 end;
 
+function TXQueryEngine.evaluateXQuery(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := evaluate(expression, xqpmXQuery3_1, tree);
+end;
+
+function TXQueryEngine.evaluateXQuery(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := evaluate(expression, xqpmXQuery3_1, contextItem);
+end;
+
+function TXQueryEngine.evaluateXPath(expression: string; tree: TTreeNode): IXQValue;
+begin
+  result := evaluate(expression, xqpmXPath3_1, tree);
+end;
+
+function TXQueryEngine.evaluateXPath(expression: string; const contextItem: IXQValue): IXQValue;
+begin
+  result := evaluate(expression, xqpmXPath2, contextItem);
+end;
+
 function TXQueryEngine.evaluateXPath2(expression: string; tree: TTreeNode): IXQValue;
 begin
   result := evaluate(expression, xqpmXPath2, tree);
@@ -9875,20 +9907,20 @@ threadvar theDefaultQueryEngine: TXQueryEngine;
 
 function query(q: string): IXQValue;
 begin
-  result := defaultQueryEngine.evaluateXQuery3(q);
+  result := defaultQueryEngine.evaluateXQuery(q);
 end;
 
 function query(q: string; const vs: array of ixqvalue): IXQValue;
 begin
   defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
-  result := defaultQueryEngine.evaluateXQuery3(q);
+  result := defaultQueryEngine.evaluateXQuery(q);
   defaultQueryEngine.VariableChangelog.popAll();
 end;
 
 function query(q: string; const vs: array of string): IXQValue;
 begin
   defaultQueryEngine.VariableChangelog.pushOpenArray(vs);
-  result := defaultQueryEngine.evaluateXQuery3(q);
+  result := defaultQueryEngine.evaluateXQuery(q);
   defaultQueryEngine.VariableChangelog.popAll();
 end;
 
