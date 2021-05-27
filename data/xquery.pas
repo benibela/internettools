@@ -7257,7 +7257,7 @@ function TXQEvaluationContext.contextNode(mustExists: boolean): TTreeNode;
 begin
   if SeqValue <> nil then begin //tests pass without this branch. Why???
     result := SeqValue.toNode;
-    if result = nil then raise EXQEvaluationException.create('XPTY0004', 'Context item is not a node', nil, SeqValue);
+    if mustExists and (result = nil) then raise EXQEvaluationException.create('XPTY0004', 'Context item is not a node', nil, SeqValue);
     exit;
   end;
   if ParentElement <> nil then exit(ParentElement);
