@@ -672,8 +672,6 @@ begin
 end;
 
 procedure TXQBaseHashmap.baseAssign(const other: TXQBaseHashmap);
-var
-  i: int32;
 begin
   clear;
   LogSize:=other.LogSize;

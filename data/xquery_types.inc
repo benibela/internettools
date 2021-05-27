@@ -825,8 +825,6 @@ var tempContext: TXQEvaluationContext;
   function dataToXQV(const data, uri, contenttype: string): ixqvalue;
   var
     f: TInternetToolsFormat;
-    p: PChar;
-    l: SizeInt;
   begin
     f := guessFormat(data, uri, contenttype);
     case f of
