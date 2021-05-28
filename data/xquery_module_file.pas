@@ -28,7 +28,7 @@ implementation
 uses Classes, SysUtils, xquery, bbutils, strutils, bigdecimalmath, base64, math, xquery__regex
   , internetaccess //it does not need internet access itself, just the URI encoding function there
   , xquery.internals.common, xquery.internals.lclexcerpt
-  , xquery__serialization
+  , xquery__serialization, xquery__serialization_nodes
   {$ifdef unix},BaseUnix{$endif}
   {$ifdef windows},windows{$endif}
     ;
