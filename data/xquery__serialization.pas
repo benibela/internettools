@@ -11,7 +11,7 @@ uses
 function hashsetQNameIncludeAll(var hs: TXQHashsetQName; const v: IXQValue): boolean;
 function hashsetQNameIncludeAll(var hs: TXQHashsetQName;const context: TXQEvaluationContext; node: TTreeNode; const s: string): boolean;
 
-type TXQSerializationParamsHelper = type helper for TXQSerializationParams
+type TXQSerializationParamsHelper = record helper for TXQSerializationParams
   procedure setFromNode(const context: TXQEvaluationContext;paramNode: TTreeNode; isStatic: boolean);
   procedure setFromMap(const context: TXQEvaluationContext; const v: IXQValue);
   procedure initFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
