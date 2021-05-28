@@ -54,7 +54,7 @@ uses
    Classes, SysUtils,
    simplehtmltreeparser, math, bigdecimalmath, bbutils,
    {$ifdef ALLOW_EXTERNAL_DOC_DOWNLOAD}internetaccess{$endif},
-   xquery.internals.common, xquery.internals.collations, xquery.namespaces,
+   xquery.internals.common, xquery.internals.collations, xquery.namespaces, xquery__serialization_nodes,
    xquery__functions, xquery__parse //if this is in interface uses rather than implementation uses, fpc compiles xquery.pas first and other units can inline the functions here
    ;
 
@@ -344,23 +344,11 @@ type
   end;
   PXQValueDateTimeData = ^TXQValueDateTimeData;
 
-  TXQSerializerInsertWhitespace = (xqsiwNever, xqsiwConservative, xqsiwIndent);
-  TXQSerializerOnString = procedure (const s: string) of object;
-  TXQSerializerOnNode = function (const n: TTreeNode; html: boolean): boolean of object;
-  TXQSerializerOnAttribute = procedure (const n: TTreeAttribute; html: boolean) of object;
-  TXQSerializer = object(TJSONXHTMLStrBuilder)
+  TXQSerializer = object(TIndentingJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     allowDuplicateNames: boolean;
-    insertWhitespace: TXQSerializerInsertWhitespace;
-
-    onInterceptAppendJSONString: TXQSerializerOnString;
-    onInterceptAppendXMLHTMLText: TXQSerializerOnNode;
-    onInterceptAppendXMLHTMLAttribute: TXQSerializerOnAttribute;
 
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
-    procedure indent;
-    procedure appendIndent;
-    procedure unindent;
 
     procedure appendJSONArrayStart;
     procedure appendJSONArrayComma;
@@ -378,8 +366,6 @@ type
     procedure error(const code: string; value: TXQValue);
     procedure error(const code: string; message: string; value: TXQValue);
   protected
-    indentCache: string;
-    indentLevel: SizeInt;
     sequenceTag: string;// = 'seq';
     elementTag: string;// = 'e';
     objectTag: string;// = 'object';
@@ -3503,36 +3489,12 @@ begin
   inherited init(abuffer, basecapacity, aencoding);
   nodeFormat := tnsText;
   allowDuplicateNames := true;
-  insertWhitespace := xqsiwConservative;
-  indentCache := '  ';
-  indentLevel := 0;
   standard := false;
   sequenceTag :=  'seq';
   elementTag := 'e';
   objectTag := 'object';
-
-  onInterceptAppendXMLHTMLAttribute := nil;
-  onInterceptAppendXMLHTMLText := nil;
-
-  //this is basically a custom VMT on the stack
-  onInterceptAppendJSONString := @appendJSONStringWithoutQuotes;
 end;
 
-procedure TXQSerializer.indent;
-begin
-  inc(indentLevel);
-  while 2 * indentLevel > length(indentCache) do indentCache := indentCache + indentCache;
-end;
-
-procedure TXQSerializer.appendIndent;
-begin
-  append(pchar(indentCache), 2 * indentLevel);
-end;
-
-procedure TXQSerializer.unindent;
-begin
-  dec(indentLevel);
-end;
 
 procedure TXQSerializer.appendJSONArrayStart;
 begin

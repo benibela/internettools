@@ -430,11 +430,9 @@ function isInvalidUTF8Guess(const s: string; cutoff: integer): boolean;
 
 
 
-type TSerializationCallback = function (node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
-var GlobalNodeSerializationCallback: TSerializationCallback;
 
 implementation
-uses htmlInformation;
+uses htmlInformation, xquery__serialization_nodes;
 
 type THTMLOmittedEndTagInfo = class
   siblings, parents, additionallyclosed: TStringArray;
@@ -1680,17 +1678,27 @@ begin
 end;
 
 
+function nodeSerializationCallbackImpl(node: TTreeNode; includeSelf, insertLineBreaks, html: boolean): string;
+var serializer: TIndentingJSONXHTMLStrBuilder;
+begin
+  serializer.init(@result);
+  if insertLineBreaks then serializer.insertWhitespace := xqsiwIndent
+  else serializer.insertWhitespace := xqsiwNever;
+  serializeNodes(node, serializer, includeSelf, html, nil);
+  serializer.final;
+end;
+
 function TTreeNode.serializeXML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 
 begin
   if self = nil then exit('');
-  result := GlobalNodeSerializationCallback(self, nodeSelf, insertLineBreaks, false);
+  result := nodeSerializationCallbackImpl(self, nodeSelf, insertLineBreaks, false);
 end;
 
 function TTreeNode.serializeHTML(nodeSelf: boolean; insertLineBreaks: boolean): string;
 begin
   if self = nil then exit('');
-  result := GlobalNodeSerializationCallback(self, nodeSelf, insertLineBreaks, true);
+  result := nodeSerializationCallbackImpl(self, nodeSelf, insertLineBreaks, true);
 end;
 
 
