@@ -2571,7 +2571,7 @@ type
 
     The return value can be created with one of the xqvalue(..) functions.
   *)
-  TXQDeclareExternalVariableEvent = procedure(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue) of object;
+  TXQDeclareExternalVariableEvent = procedure(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue) of object;
   (***
   @abstract(Event callback that is called to set a function @code(value) of an XQuery function declared as "declare function ... external").
 
@@ -9367,7 +9367,7 @@ begin
        end;
     if context.SeqValue = nil then begin
       if assigned(staticContext.sender.OnDeclareExternalVariable) then
-        staticContext.sender.OnDeclareExternalVariable(staticContext.sender, staticContext, '', '$', context.SeqValue);
+        staticContext.sender.OnDeclareExternalVariable(staticContext, self, '', '$', context.SeqValue);
       if context.SeqValue = nil then
          raise EXQEvaluationException.create('XPDY0002', 'context item missing');
        context.SeqLength := 1;

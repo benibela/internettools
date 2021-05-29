@@ -642,7 +642,7 @@ begin
      //raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
       name := (variable as TXQTermVariable).value;
       nsu := (variable as TXQTermVariable).namespace;
-      context.staticContext.sender.OnDeclareExternalVariable(context.staticContext.sender, context.staticContext, nsu, name, result);
+      context.staticContext.sender.OnDeclareExternalVariable(context.staticContext, self, nsu, name, result);
     end;
   end;
   if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + getVariable.ToString+ ' given.');

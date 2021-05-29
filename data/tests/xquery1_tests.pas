@@ -22,7 +22,7 @@ type
   ps: TXQueryEngine;
   constructor create;
   destructor Destroy; override;
-  procedure DeclareExternalVariableEvent({%H-}sender: TObject; const {%H-}context: TXQStaticContext; const namespace: string;  const variable: string; var value: IXQValue);
+  procedure DeclareExternalVariableEvent(const {%H-}context: TXQStaticContext; {%H-}sender: TObject; const namespace: string;  const variable: string; var value: IXQValue);
   procedure DeclareExternalFunctionEvent({%H-}sender: TObject; const {%H-}context: TXQStaticContext; const {%H-}namespace: string;  const functionName: string; var value: TXQValueFunction);
   procedure ImportModule({%H-}sender: TObject; {%H-}context: TXQStaticContext; const namespace: string; const {%H-}at: array of string);
 end;
@@ -1982,7 +1982,7 @@ begin
   inherited Destroy;
 end;
 
-procedure THelper.DeclareExternalVariableEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;
+procedure THelper.DeclareExternalVariableEvent(const context: TXQStaticContext; sender: TObject; const namespace: string;
   const variable: string; var value: IXQValue);
 begin
   case variable of

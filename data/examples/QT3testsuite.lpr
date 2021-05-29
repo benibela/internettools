@@ -62,7 +62,7 @@ type
   procedure init;
   class function load(e: TTreeNode): TEnvironment;
   function getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
-  procedure getExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+  procedure getExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
 end;
 
 { TDependency }
@@ -1626,7 +1626,7 @@ begin
     end;
 end;
 
-procedure TEnvironment.getExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string;
+procedure TEnvironment.getExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string;
   var value: IXQValue);
 var
   i: Integer;

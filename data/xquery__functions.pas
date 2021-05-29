@@ -7316,10 +7316,10 @@ end;
 type TLoadXQueryHelper = object
   oldDeclareExternalVariable: TXQDeclareExternalVariableEvent;
   externalVariables: IXQValue;
-  procedure OnDeclareExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+  procedure OnDeclareExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
 end;
 
-procedure TLoadXQueryHelper.OnDeclareExternalVariable(sender: TObject; const context: TXQStaticContext; const namespaceUrl, variable: string; var value: IXQValue);
+procedure TLoadXQueryHelper.OnDeclareExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
 var
   tempName: IXQValue;
   tempValue: TXQValue;
