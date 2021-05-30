@@ -6017,7 +6017,11 @@ var
   var token: string;
   begin
     Str(scanner.CurToken, token);
-    if code = '' then code := IfThen(jsoniqMode, 'jerr:JNDY0021', 'FOJS0001');
+    if code = '' then begin
+      if jsoniqMode then code := 'jerr:JNDY0021'
+      else if isInvalidUTF8Guess(scanner.CurLine, length(scanner.CurLine)) then code := 'FOUT1200'
+      else code := 'FOJS0001';
+    end;
     raise EXQEvaluationException.create(code, message+' at ' + scanner.CurTokenString +' (' + token +') in '+scanner.CurLine);
   end;
 
