@@ -1556,7 +1556,8 @@ begin
   FreeAndNil(theDefaultInternet);
 end;
 initialization
-  defaultInternetConfiguration.checkSSLCertificates := true;
+defaultInternetConfiguration.checkSSLCertificates := true;
+defaultInternetConfiguration.tryDefaultConfig := true;
 
 finalization
   freeThreadVars;
