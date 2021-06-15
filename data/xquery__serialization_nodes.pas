@@ -109,7 +109,7 @@ procedure serializeNodes(base: TTreeNode; var builder: TIndentingJSONXHTMLStrBui
 
 implementation
 uses
-  strutils, bbutils,
+  bbutils,
   htmlInformation,
   {$IFDEF USE_BBFLRE_UNICODE}PUCU,bbnormalizeunicode{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}

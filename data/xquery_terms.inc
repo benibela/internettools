@@ -1086,6 +1086,7 @@ begin
       exit(false);
     end;
     tikJSONiqTest: result := checkSequenceCount and checkJSONiqStructuredItem;
+    {$if FPC_FULLVERSION < 030300}else result := false;{$endif}
   end
 end;
 

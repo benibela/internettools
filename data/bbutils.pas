@@ -69,6 +69,7 @@ unit bbutils;
 {$DEFINE HASDefaultFormatSettings}
 {$DEFINE HASDeprecated}
 
+{$if FPC_FULLVERSION >= 030300}{$DEFINE HASPCHARINLINE}{$endif}
 
 {$ELSE} //DELPHI
 
@@ -272,11 +273,11 @@ function strIndexOf(const str: string; const searched: TCharSet):SizeInt; overlo
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
 function striIndexOf(const str,searched:string):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
-function strIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function strIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASPCHARINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
 function strIndexOf(const str: string; const searched: TCharSet; from: SizeInt):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 //**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
-function striIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+function striIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASPCHARINLINE} inline; {$ENDIF}
 
 //**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence  (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
 function strlsLastIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt; overload;

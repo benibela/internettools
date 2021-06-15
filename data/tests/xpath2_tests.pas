@@ -1,5 +1,6 @@
 unit xpath2_tests;
-
+{$WARN 5066 off : Symbol "$1" is deprecated: "$2"}
+{$WARN 6018 off : unreachable code}
 {$I ../../internettoolsconfig.inc}
 
 {$ifndef cpuarm}{$define TEST_FLOAT}{$endif}

@@ -44,7 +44,7 @@ uses
 
 procedure splitEQName(context: TXQEvaluationContext; node: TTreeNode; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown);
 var
-  namespacePrefix: String;
+  namespacePrefix: String {$if FPC_FULLVERSION < 030300}= ''{$endif};
 begin
   case parseEQName(eqname, namespacePrefix, localpart) of
     xqeqnPrefix, xqeqnPrefixAbsent: begin

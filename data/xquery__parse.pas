@@ -884,7 +884,7 @@ begin
 end;
 
 const SYMBOLS = ['''','"', '(','=','!','<','>',')',',','[',']','/','|','+','*','{','}', '?', '#', ';', ':', '@', '$', '%'];
-const START_SYMBOLS = ['-'];
+//const START_SYMBOLS = ['-'];
 
 procedure TXQParsingContext.expect(s: string);
   procedure error;
@@ -1124,7 +1124,7 @@ begin
     xqlenNone:  result := s;
     xqlenXML1:  result := strNormalizeLineEndings(s);
     xqlenXML11: result := strNormalizeLineEndingsUTF8(s);
-    //else result := s;
+    {$if FPC_FULLVERSION < 030300}else result := s; assert(false); {$endif}
   end;
 end;
 

@@ -1,5 +1,5 @@
 unit xquery3_1_tests;
-
+{$WARN 5024 off : Parameter "$1" not used}
 {$I ../../internettoolsconfig.inc}
 
 interface
@@ -12,7 +12,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, xquery_module_math, math, commontestutils;
+uses xquery, simplehtmltreeparser, xquery_module_math,  commontestutils;
 
 procedure unittests(testerrors: boolean);
 var

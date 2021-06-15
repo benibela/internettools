@@ -279,8 +279,8 @@ type
 const INVALID_SOCKET		= TSocket(NOT(0));
 var
   x: integer;
-  b: boolean;
-  err: integer;
+  //b: boolean;
+  //err: integer;
 begin
   Result := False;
   if FSocket.Socket = INVALID_SOCKET then

@@ -5236,7 +5236,7 @@ begin
   result := true;
 end;
 
-type TRangeSpecial = (rsNormal, rsInfinity, rsBigDecimal);
+
 procedure xpathRangeDefinition(argc: sizeint; args: PIXQValue; const maxLen: sizeint; out from, len: SizeInt);
 var
   from64, len64, until64: SizeInt64;
@@ -6826,7 +6826,7 @@ var ak, bk: TXQValueKind;
           else raiseFORG0001InvalidConversion(b, 'decimal');
       end;
     end;
-    result := TXQCompareResult.fromIntegerResult(compareBigDecimals(bda, bdb));
+    result := TXQCompareResult.fromIntegerResult(bigdecimal.compare(bda, bdb));
   end;
   function compareAsBigDecimals(const i: TXQValue; const s: string): TXQCompareResult;
   var
@@ -6835,7 +6835,7 @@ var ak, bk: TXQValueKind;
     if not tryStrToBigDecimal(s, @temp) then
       if strContains(s, 'N') then exit(compareCommonFloat())
       else raiseFORG0001InvalidConversion(xqvalue(s), 'decimal');
-    result := TXQCompareResult.fromIntegerResult(compareBigDecimals(i.toInt64, temp));
+    result := TXQCompareResult.fromIntegerResult(bigdecimal.compare(i.toInt64, temp));
   end;
 
   function compareAsPossibleInt64: TXQCompareResult; //assumption ak != bk; ak, bk != pvkBigDecimal

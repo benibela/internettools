@@ -1,5 +1,5 @@
 unit xquery1_tests;
-
+{$WARN 5066 off : Symbol "$1" is deprecated: "$2"}
 {$I ../../internettoolsconfig.inc}
 {$WARN 5024 off : Parameter "$1" not used}
 interface

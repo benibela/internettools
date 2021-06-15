@@ -163,6 +163,7 @@ end;
 function TXQValue.toBinaryBytes: TBytes;
 begin
   raiseXPTY0004TypeError(self, 'binary');
+  result := nil;
 end;
 
 {$ImplicitExceptions off}
@@ -834,6 +835,7 @@ var tempContext: TXQEvaluationContext;
         exit(TXQValueString.create(baseSchema.untypedAtomic, data));
       itfXML, itfHTML, itfXMLPreparsedEntity:
         result := xqvalue(tempContext.parseDoc(data, uri, contenttype));
+      {$if FPC_FULLVERSION < 030300}else result := nil;{$endif}
     end;
   end;
 
