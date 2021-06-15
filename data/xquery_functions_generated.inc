@@ -60,7 +60,7 @@ begin
   v := castSomethingToDatetime(args[0]);
   with v.getInternalDateTimeData^ do begin
     if microsecs = 0 then exit(xqvalue(seconds));
-    result := xqvalue(seconds + shifted10(microsecs, -6) );
+    result := xqvalue(seconds + bigdecimal(microsecs).shifted10(-6) );
   end;
 end;
 

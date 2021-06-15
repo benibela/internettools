@@ -315,7 +315,7 @@ end;
 function TXQValue.toDecimal: BigDecimal;
 begin
   if not tryStrToBigDecimal(toString, @result) then
-    setZero(result);
+    result.setZero();
 end;
 
 function TXQValue.isUndefined: boolean;
@@ -927,7 +927,7 @@ end;
 
 function TXQValueBoolean.toDecimal: bigdecimal;
 begin
-  if bool then setOne(result) else setZero(result);
+  if bool then result.setOne() else result.setZero();
 end;
 
 function TXQValueBoolean.toString: string;

@@ -2933,7 +2933,7 @@ begin
   tempValue := xqv.getInternalDateTimeData^;
   TXQValueDateTime.setDayTime(tempValue, tempValue.toDayTime());
   if (v <> 6) or (tempValue.microsecs = 0) then result := xqvalue(tempValue.values[v])
-  else  result := xqvalue( tempValue.seconds + shifted10(bigdecimal(tempValue.microsecs), -6) );
+  else  result := xqvalue( tempValue.seconds + bigdecimal(tempValue.microsecs).shifted10(-6) );
 end;
 
 function xqFunctionDay_From_Duration({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -5978,8 +5978,8 @@ begin
       else if currentPictureParser = 0 then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
       with pictureParser[currentPictureParser] do
         if foundChar[xqdfpPercent] then begin
-          if foundChar[xqdfpPerMille] then shift10(number, 3)
-          else shift10(number, 2)
+          if foundChar[xqdfpPerMille] then number.shift10(3)
+          else number.shift10(2)
         end;
     end;
   end;
@@ -5988,9 +5988,9 @@ begin
     number.signed := false;
 
     if foundChar[xqdfpExponentSeparator] then begin
-      exponent := mostSignificantExponent(number) - scalingFactor + 1;
+      exponent := number.mostSignificantExponent() - scalingFactor + 1;
       if (exponent <> 0) and (number.isZero()) then exponent := 0;
-      shift10(number, -exponent);
+      number.shift10(-exponent);
     end;
 
     number := round(number, -(fractionMandatory + fractionOptional) );

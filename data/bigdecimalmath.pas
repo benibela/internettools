@@ -84,6 +84,7 @@ Invalid digit count
 {$ENDIF}
 
 type TBigDecimalFormat = (bdfExact, bdfExponent);
+type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmRoundHalfUp, bfrmRoundHalfToEven);
 type
   //** @abstract(Big Decimal type). @br
   //** Consisting of an bcd integer times a decimal exponent ([integer digits] * 10 ^ (DIGITS_PER_ELEMENT * exponent)) @br
@@ -115,6 +116,19 @@ type
     function isEven(): boolean;
 
 
+    //** How many non-zero digits the number contains
+    function precision(): integer;
+    //** The index of the leading, most significant digit @br
+    //** That is, the exponent of number when it is written in scientific notation @br
+    //** That is, 10^result <= v < 10^(result+1)
+    function mostSignificantExponent(): integer;
+    //** Returns the digit-th digit of v. @br
+    //** Last integer digit is digit 0, digits at negative indices are behind the decimal point.
+    function getDigit(digit: integer): BigDecimalBin;
+
+    //** Compares the big decimals. Returns -1, 0 or 1 corresponding to a <, = or > b
+    class function compare(const a, b: BigDecimal): integer; static;
+
     function toLongint: longint;
     function toInt64: int64;
     function toSizeInt: sizeint;
@@ -133,6 +147,24 @@ type
     {$ifdef FPC_HAS_TYPE_EXTENDED}
     function toExtended: extended;
     {$endif}
+
+    //** Sets the bigdecimal to 0
+    procedure setZero();
+    //** Sets the bigdecimal to 1
+    procedure setOne();
+
+    //** Removes leading (pre .) and trailing (post .) zeros
+    procedure normalize();
+
+    //** Universal rounding function @br
+    //** Rounds to the precision of a certain digit, subject to a certain rounding mode. @br
+    //** Positive toDigit will round to an integer with toDigit trailing zeros, negative toDigit will round to a decimal with -toDigit numbers after the decimal point
+    function rounded(toDigit: integer = 0; roundingMode: TBigDecimalRoundingMode = bfrmRound): BigDecimal;
+
+    //** Calculates a decimal shift: @code(self := self * 10^shift)
+    procedure shift10(shift: integer);
+    //** Calculates a decimal shift: @code(result := self * 10^shift)
+    function shifted10(shift: integer): BigDecimal;
   end;
   PBigDecimal = ^BigDecimal;
 
@@ -233,13 +265,9 @@ procedure divideModNoAlias(out quotient, remainder: BigDecimal; const a, b: BigD
 //** Wrapper around divideModNoAlias, ignoring the calculated remainder
 function divide(const a, b: BigDecimal; maximalAdditionalFractionDigits: integer = 18; flags: TBigDecimalDivisionFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit]): BigDecimal;
 
-//** Calculates a decimal shift: @code(v := v * 10^shift)
-procedure shift10(var v: BigDecimal; shift: integer);
-//** Calculates a decimal shift: @code(result := v * 10^shift)
-function shifted10(const v: BigDecimal; shift: integer): BigDecimal;
-
-//** Compares the big decimals. Returns -1, 0 or 1 corresponding to a <, = or > b
-function compareBigDecimals(const a, b: BigDecimal): integer;
+procedure shift10(var v: BigDecimal; shift: integer); deprecated 'use advanced record method';
+function shifted10(const v: BigDecimal; shift: integer): BigDecimal; deprecated 'use advanced record method';
+function compareBigDecimals(const a, b: BigDecimal): integer; deprecated 'use advanced record method';
 
 operator <(const a: BigDecimal; const b: BigDecimal): boolean;
 operator <=(const a: BigDecimal; const b: BigDecimal): boolean;
@@ -247,16 +275,10 @@ operator =(const a: BigDecimal; const b: BigDecimal): boolean;
 operator >=(const a: BigDecimal; const b: BigDecimal): boolean;
 operator >(const a: BigDecimal; const b: BigDecimal): boolean;
 
-//** Removes leading (pre .) and trailing (post .) zeros
-procedure normalize(var x: BigDecimal);
-//** How many non-zero digits the number contains
-function precision(const v: BigDecimal): integer;
-//** The index of the leading, most significant digit @br
-//** That is, the exponent of number when it is written in scientific notation @br
-//** That is, 10^result <= v < 10^(result+1)
-function mostSignificantExponent(const v: BigDecimal): integer;
+procedure normalize(var x: BigDecimal); deprecated 'use advanced record method';
+function precision(const v: BigDecimal): integer; deprecated 'use advanced record method';
+function mostSignificantExponent(const v: BigDecimal): integer; deprecated 'use advanced record method';
 
-type TBigDecimalRoundingMode = (bfrmTrunc, bfrmCeil, bfrmFloor, bfrmRound, bfrmRoundHalfUp, bfrmRoundHalfToEven);
 //** Universal rounding function @br
 //** Rounds v to the precision of a certain digit, subject to a certain rounding mode. @br
 //** Positive toDigit will round to an integer with toDigit trailing zeros, negative toDigit will round to a decimal with -toDigit numbers after the decimal point
@@ -266,14 +288,12 @@ function round(const v: BigDecimal; toDigit: integer = 0; roundingMode: TBigDeci
 //**   result has the minimal number of non-zero digits                        @br
 //**   | result - exact | is minimized
 function roundInRange(mi, exact, ma: BigDecimal): BigDecimal;
-//** Returns the digit-th digit of v. @br
-//** Last integer digit is digit 0, digits at negative indices are behind the decimal point.
 function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
 
 //** Sets the bigdecimal to 0
-procedure setZero(out r: BigDecimal);
+procedure setZero(out r: BigDecimal); deprecated 'use advanced record method';
 //** Sets the bigdecimal to 1
-procedure setOne(out r: BigDecimal);
+procedure setOne(out r: BigDecimal); deprecated 'use advanced record method';
 function isZero(const v: BigDecimal): boolean; overload; deprecated 'use advanced record method';
 function isIntegral(const v: BigDecimal): boolean; deprecated 'use advanced record method';
 function isLongint(const v: BigDecimal): boolean; deprecated 'use advanced record method';
@@ -404,7 +424,7 @@ begin
           if assigned(errCode) then errCode^ := bdceParsingTooBig;
           exit(false);
         end;
-      if res <> nil then setZero(res^); //but if all digits are 0, the exponent can be ignored
+      if res <> nil then res^.setZero(); //but if all digits are 0, the exponent can be ignored
       exit;
     end;
   end;
@@ -441,7 +461,7 @@ begin
       digits[p] := digits[p] * 10;
       i += 1;
     end;
-    if signed and res^.isZero() then setZero(res^);
+    if signed and res^.isZero() then res^.setZero();
   end;
 end;
 
@@ -595,7 +615,7 @@ begin
     if (lastDigitHidden)   then begin
       additionalCarry := (lowBin mod 10 >= 5) ;
       if additionalCarry and (lowBin div 10 + 1 >= powersOf10[lowBinLength-1]) then begin
-        tempdecimal := round(v, (exponent + lowskip + 1) * DIGITS_PER_ELEMENT - (lowBinLength - 1));
+        tempdecimal := v.rounded((exponent + lowskip + 1) * DIGITS_PER_ELEMENT - (lowBinLength - 1));
         displayed := @tempdecimal;
         init;
         if length(displayed^.digits) = skip + lowskip then exit(BigDecimalZeroResult);
@@ -823,7 +843,7 @@ var
 begin
   if (mi.signed and not mi.isZero()) or ma.signed then begin //if mi is signed 0, treat it as unsigned 0
     //if ma is signed, mi must be signed and non zero
-    if not ma.signed and not ma.isZero() then setZero(result) //0 has the minimal number of non-zero digits, but can only be returned if 0 < ma. Then we know mi < 0 or we would not be here
+    if not ma.signed and not ma.isZero() then result.setZero() //0 has the minimal number of non-zero digits, but can only be returned if 0 < ma. Then we know mi < 0 or we would not be here
     else begin
       //possible cases mi signed and ma not signed => ma = 0
       //               mi signed and ma signed
@@ -917,6 +937,21 @@ begin
   assert(false);
 end;
 
+function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
+begin
+  result := v.getDigit(digit);
+end;
+
+procedure setZero(out r: BigDecimal);
+begin
+  r.setZero();
+end;
+
+procedure setOne(out r: BigDecimal);
+begin
+  r.setOne();
+end;
+
 {$ifdef FPC_HAS_TYPE_Single}
 procedure splitFloat(const v: single; out sign: boolean; out exponent: integer; out mantissa: QWord); overload;
 begin
@@ -969,7 +1004,7 @@ begin
   case exponent of
     0: begin
       if mantissa = 0 then begin
-        setZero(result);
+        result.setZero();
         exit;
       end else begin
         //subnormal
@@ -1040,7 +1075,7 @@ begin
   case exponent of
     0: begin
       if mantissa = 0 then begin
-        setZero(result);
+        result.setZero();
         exit;
       end else begin
         //subnormal
@@ -1111,7 +1146,7 @@ begin
   case exponent of
     0: begin
       if mantissa = 0 then begin
-        setZero(result);
+        result.setZero();
         exit;
       end else begin
         //subnormal
@@ -1458,21 +1493,21 @@ begin
 end;
 
 
-procedure setZero(out r: BigDecimal);
+procedure BigDecimal.setZero();
 begin
-  r.signed:=false;
-  setlength(r.digits, 0);
-  r.exponent:=0;
-  r.lastDigitHidden:=false;
+  signed:=false;
+  setlength(digits, 0);
+  exponent:=0;
+  lastDigitHidden:=false;
 end;
 
-procedure setOne(out r: BigDecimal);
+procedure BigDecimal.setOne();
 begin
-  r.signed:=false;
-  setlength(r.digits, 1);
-  r.digits[0] := 1;
-  r.exponent:=0;
-  r.lastDigitHidden:=false;
+  signed:=false;
+  setlength(digits, 1);
+  digits[0] := 1;
+  exponent:=0;
+  lastDigitHidden:=false;
 end;
 
 function isIntegral(const v: BigDecimal): boolean;
@@ -1576,55 +1611,53 @@ begin
   end;
 end;
 
-procedure shift10(var v: BigDecimal; shift: integer);
+procedure BigDecimal.shift10(shift: integer);
 var
   expshift, i: Integer;
   temp: BigDecimalBin;
 begin
-  if length(v.digits) = 0 then exit;
+  if length(digits) = 0 then exit;
 
-  with v do begin
-    expshift := shift div DIGITS_PER_ELEMENT;
-    exponent += expshift;
+  expshift := shift div DIGITS_PER_ELEMENT;
+  exponent += expshift;
 
-    shift := shift - expshift * DIGITS_PER_ELEMENT;
-    if shift = 0 then exit;
-    if shift < 0 then begin
-      if (digits[0] = 0 ) then begin
-        //high  | ...       |  0
-        //  xxx | yyy | zzz |
-        //=>  x | xxy | yyz | zz
-        shift := - shift;
-        for i := 0 to high(digits) - 1 do begin
-          temp := digits[i+1] div powersOf10[shift];
-          digits[i] += (digits[i+1] - temp * powersOf10[shift]) * powersOf10[DIGITS_PER_ELEMENT - shift];
-          digits[i+1] := temp;
-        end;
-        exit;
-      end else  begin
-        shift := DIGITS_PER_ELEMENT + shift; //resizing adds a bin in front so everything is shifted left, then right
-        v.exponent -= 1;
+  shift := shift - expshift * DIGITS_PER_ELEMENT;
+  if shift = 0 then exit;
+  if shift < 0 then begin
+    if (digits[0] = 0 ) then begin
+      //high  | ...       |  0
+      //  xxx | yyy | zzz |
+      //=>  x | xxy | yyz | zz
+      shift := - shift;
+      for i := 0 to high(digits) - 1 do begin
+        temp := digits[i+1] div powersOf10[shift];
+        digits[i] += (digits[i+1] - temp * powersOf10[shift]) * powersOf10[DIGITS_PER_ELEMENT - shift];
+        digits[i+1] := temp;
       end;
+      exit;
+    end else  begin
+      shift := DIGITS_PER_ELEMENT + shift; //resizing adds a bin in front so everything is shifted left, then right
+      exponent -= 1;
     end;
-    if digits[high(digits)] <> 0 then
-      SetLength(digits, length(digits) + 1);
-    for i := high(digits) - 1 downto 0 do begin
-      temp := digits[i] div powersOf10[DIGITS_PER_ELEMENT - shift];
-      digits[i+1] += temp;
-      digits[i] := (digits[i] - temp * powersOf10[DIGITS_PER_ELEMENT - shift]) * powersOf10[shift];
-    end;
+  end;
+  if digits[high(digits)] <> 0 then
+    SetLength(digits, length(digits) + 1);
+  for i := high(digits) - 1 downto 0 do begin
+    temp := digits[i] div powersOf10[DIGITS_PER_ELEMENT - shift];
+    digits[i+1] += temp;
+    digits[i] := (digits[i] - temp * powersOf10[DIGITS_PER_ELEMENT - shift]) * powersOf10[shift];
   end;
 end;
 
-function shifted10(const v: BigDecimal; shift: integer): BigDecimal;
+function BigDecimal.shifted10(shift: integer): BigDecimal;
 begin
-  result := v;
+  result := self;
   //if shift mod DIGITS_PER_ELEMENT <> 0 then
     SetLength(Result.digits, length(result.digits));
-  shift10(result, shift);
+  result.shift10(shift);
 end;
 
-function compareBigDecimals(const a, b: BigDecimal): integer;
+class function BigDecimal.compare(const a, b: BigDecimal): integer;
 begin
   if a.signed <> b.signed then begin
     if a.isZero() then begin
@@ -1641,12 +1674,26 @@ begin
   if a.signed then result := - Result;
 end;
 
+procedure shift10(var v: BigDecimal; shift: integer);
+begin
+  v.shift10(shift);
+end;
+
+function shifted10(const v: BigDecimal; shift: integer): BigDecimal;
+begin
+  result := v.shifted10(shift);
+end;
+
+function compareBigDecimals(const a, b: BigDecimal): integer;
+begin
+  result := BigDecimal.compare(a,b);
+end;
 
 operator <(const a: BigDecimal; const b: BigDecimal): boolean;
 var
   temp: Integer;
 begin
-  temp := compareBigDecimals(a, b);
+  temp := BigDecimal.compare(a, b);
   result := (temp = -1) 
 end;
 
@@ -1654,7 +1701,7 @@ operator <=(const a: BigDecimal; const b: BigDecimal): boolean;
 var
   temp: Integer;
 begin
-  temp := compareBigDecimals(a, b);
+  temp := BigDecimal.compare(a, b);
   result := (temp = -1) or (temp = 0);
 end;
 
@@ -1662,7 +1709,7 @@ operator =(const a: BigDecimal; const b: BigDecimal): boolean;
 var
   temp: Integer;
 begin
-  temp := compareBigDecimals(a, b);
+  temp := BigDecimal.compare(a, b);
   result := (temp = 0) 
 end;
 
@@ -1670,7 +1717,7 @@ operator >=(const a: BigDecimal; const b: BigDecimal): boolean;
 var
   temp: Integer;
 begin
-  temp := compareBigDecimals(a, b);
+  temp := BigDecimal.compare(a, b);
   result := (temp = 0) or (temp = 1);
 end;
 
@@ -1678,63 +1725,68 @@ operator >(const a: BigDecimal; const b: BigDecimal): boolean;
 var
   temp: Integer;
 begin
-  temp := compareBigDecimals(a, b);
+  temp := BigDecimal.compare(a, b);
   result := (temp = 1) 
 end;
 
 
-procedure normalize(var x: BigDecimal);
+procedure BigDecimal.normalize();
 var
   highskip: integer;
   lowskip: integer;
   i: Integer;
 begin
-  skipZeros(x, highskip, lowskip);
-  x.exponent += lowskip;
+  skipZeros(self, highskip, lowskip);
+  exponent += lowskip;
   if lowskip > 0 then
-    for i := lowskip to high(x.digits) - highskip do
-      x.digits[i - lowskip] := x.digits[i] ;
-  SetLength(x.digits, length(x.digits) - lowskip - highskip);
+    for i := lowskip to high(digits) - highskip do
+      digits[i - lowskip] := digits[i] ;
+  SetLength(digits, length(digits) - lowskip - highskip);
 end;
 
-function precision(const v: BigDecimal): integer;
+function BigDecimal.rounded(toDigit: integer; roundingMode: TBigDecimalRoundingMode): BigDecimal;
+begin
+  result := round(self, toDigit, roundingMode);
+end;
+
+function BigDecimal.precision(): integer;
 var
   realhigh: integer;
   reallow: Integer;
 begin
-  realhigh := high(v.digits);
-  while (realhigh >= 0) and (v.digits[realhigh] = 0) do dec(realhigh);
+  realhigh := high(digits);
+  while (realhigh >= 0) and (digits[realhigh] = 0) do dec(realhigh);
   if realhigh < 0 then exit(0);
 
   reallow := 0;
-  while (reallow <= realhigh) and (v.digits[reallow] = 0) do inc(reallow);
+  while (reallow <= realhigh) and (digits[reallow] = 0) do inc(reallow);
 
 
-  if realhigh = reallow then exit(digitsInBin(v.digits[realhigh]) - trailingZeros(v.digits[reallow]));
+  if realhigh = reallow then exit(digitsInBin(digits[realhigh]) - trailingZeros(digits[reallow]));
 
-  result := digitsInBin(v.digits[realhigh]) + (realhigh - reallow) * DIGITS_PER_ELEMENT - trailingZeros(v.digits[reallow])
+  result := digitsInBin(digits[realhigh]) + (realhigh - reallow) * DIGITS_PER_ELEMENT - trailingZeros(digits[reallow])
 end;
 
-function mostSignificantExponent(const v: BigDecimal): integer;
+function BigDecimal.mostSignificantExponent(): integer;
 var
   realhigh: Integer;
 begin
-  realhigh := high(v.digits);
-  while (realhigh >= 0) and (v.digits[realhigh] = 0) do dec(realhigh);
+  realhigh := high(digits);
+  while (realhigh >= 0) and (digits[realhigh] = 0) do dec(realhigh);
   if realhigh < 0 then exit(0);
 
-  result := digitsInBin(v.digits[realhigh]) + (realhigh  + v.exponent) * DIGITS_PER_ELEMENT - 1;
+  result := digitsInBin(digits[realhigh]) + (realhigh  + exponent) * DIGITS_PER_ELEMENT - 1;
 end;
 
-function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
+function BigDecimal.getDigit(digit: integer): BigDecimalBin;
 var
   binPos: Integer;
 begin
   if digit >= 0 then binPos := digit div DIGITS_PER_ELEMENT
   else binPos := (digit - (DIGITS_PER_ELEMENT - 1)) div DIGITS_PER_ELEMENT;
-  if binPos < v.exponent then exit(0);
-  if binPos > v.exponent + high(v.digits) then exit(0);
-  result := v.digits[binPos - v.exponent];
+  if binPos < exponent then exit(0);
+  if binPos > exponent + high(digits) then exit(0);
+  result := digits[binPos - exponent];
   result := (result div powersOf10[digit - binPos * DIGITS_PER_ELEMENT]) mod 10;
 end;
 
@@ -1778,7 +1830,7 @@ begin
   end else begin
     //2^-i = 5^i / 10^i
     result := fastpower5to(-exp);
-    shift10(result, exp);
+    result.shift10(exp);
   end;
 end;
 
@@ -1795,7 +1847,7 @@ begin
   end else begin
     //5^-i = 2^i / 10^i
     result := fastpower2to(-exp);
-    shift10(result, exp);
+    result.shift10(exp);
   end;
 end;
 
@@ -1808,8 +1860,8 @@ begin
   if v.isZero() then exit(0);
   if v.signed then raise EInvalidArgument.Create('Negative sqrt is not defined');;
 
-   skipZeros(v, highskip, lowskip);
-  setZero(result);
+  skipZeros(v, highskip, lowskip);
+  result.setZero();
   result.exponent := (v.exponent + length(v.digits) - highskip) div 2;
   setlength(result.digits, 1);
   result.digits[0] := powersOf10[digitsInBin(v.digits[high(v.digits) - highskip])];
@@ -1853,6 +1905,20 @@ begin
   result := a * b div gcd(a, b);
 end;
 
+procedure normalize(var x: BigDecimal);
+begin
+  x.normalize();
+end;
+
+function precision(const v: BigDecimal): integer;
+begin
+  result := v.precision();
+end;
+
+function mostSignificantExponent(const v: BigDecimal): integer;
+begin
+  result := v.mostSignificantExponent();
+end;
 
 function round(const v: BigDecimal; toDigit: integer; roundingMode: TBigDecimalRoundingMode): BigDecimal;
 const SAFETY_MARGIN = 1024; //do not attemp to round to maxint digit precision, but keep a safety margin to unrepresentable value
@@ -1941,13 +2007,13 @@ end;
 operator+(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 begin
   addSubNoAlias(result, a, b, false);
-  normalize(result);
+  result.normalize();
 end;
 
 operator-(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 begin
   addSubNoAlias(result, a, b, true);
-  normalize(result);
+  result.normalize();
 end;
 
 
@@ -1956,7 +2022,7 @@ var
   i: Integer;
 begin
   if a.isZero() or b.isZero() then begin
-    setZero(r);
+    r.setZero();
     exit;
   end;
   r.signed   := a.signed <> b.signed;
@@ -1974,7 +2040,7 @@ end;
 operator*(const a: BigDecimal; const b: BigDecimal): BigDecimal;
 begin
   multiplyNoAlias(result, a, b);
-  normalize(result);
+  result.normalize();
 end;
 
 
@@ -2073,14 +2139,14 @@ begin
   if bddfNoFractionalPart in flags then
     case compareAbsolute(a, b) of
       -1: begin
-        setZero(quotient);
+        quotient.setZero();
         remainder := a;
         exit;
       end;
     end;
   if a.isZero() then begin
-    setZero(quotient);
-    setZero(remainder);
+    quotient.setZero();
+    remainder.setZero();
     exit;
   end;
   quotient.signed := a.signed <> b.signed;
@@ -2091,8 +2157,8 @@ begin
   temp.exponent := b.exponent;
 
 
-  if bddfKeepDividentPrecision in flags then targetPrecision := max(targetPrecision, precision(a));
-  if bddfKeepDivisorPrecision in flags then  targetPrecision := max(targetPrecision, precision(b));
+  if bddfKeepDividentPrecision in flags then targetPrecision := max(targetPrecision, a.precision());
+  if bddfKeepDivisorPrecision in flags then  targetPrecision := max(targetPrecision, b.precision());
   //if bddfFillIntegerPart in flags then targetPrecision := max(targetPrecision, (length(a.digits) + a.exponent) * DIGITS_PER_ELEMENT ); //(a.exponent - b.exponent) * DIGITS_PER_ELEMENT);
   if bddfAddHiddenDigit in flags then targetPrecision += 1;
 
