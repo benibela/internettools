@@ -737,6 +737,7 @@ begin
         (p+1)^ := BigDecimalDecimalSeparator;
         dec(p);
       end;
+      {$if FPC_FULLVERSION < 030300} else result := ''; p := nil; {$endif}
     end;
     if signed then begin p^ := '-'; dec(p); end;
     //safety check
@@ -1977,7 +1978,8 @@ begin
       else if toDigitInBin = 0 then increment := v.digits[exponentDelta - 1] > ELEMENT_OVERFLOW div 2 //if the rounded-to digit is the last in its bin, it depends on the next block after removing its first digit (e.g. 50000 => no increment, 5000x000 => increment)
       else increment := v.digits[exponentDelta] mod powersOf10[toDigitInBin - 1] > 0; //otherwise it depends on the digits in the same after the removing the rounded-to digit and next digits
     end;
-    //else increment := false; //hides a warning
+    {$if FPC_FULLVERSION < 030300} else increment := false; //hides a warning
+    {$endif}
   end;
 
   if v.digits[high(v.digits) - highskip] = ELEMENT_OVERFLOW-1 then additionalBin := 1
