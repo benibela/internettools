@@ -101,12 +101,28 @@ type
     exponent: integer;
     signed, lastDigitHidden: ByteBool;
 
+    //** Returns true iff the bigdecimal is zero
+    function isZero(): boolean;
+    //** Returns true iff v has no fractional digits
+    function isIntegral(): boolean;
+    //** Returns true iff v has no fractional digits and can be stored within an longint (32 bit integer)
+    function isLongint(): boolean;
+    //** Returns true iff v has no fractional digits and can be stored within an int64
+    function isInt64(): boolean;
+    //** Checks if v is odd. A number with fractional digits is never odd (only weird)
+    function isOdd(): boolean;
+    //** Checks if v is even. A number with fractional digits is never even (and neither odd, which is odd)
+    function isEven(): boolean;
+
+
     function toLongint: longint;
     function toInt64: int64;
     function toSizeInt: sizeint;
+
     function tryToLongint(out v: longint): boolean;
     function tryToInt64(out v: int64): boolean;
     function tryToSizeInt(out v: sizeint): boolean;
+
     function toString(format: TBigDecimalFormat = bdfExact): string;
     {$ifdef FPC_HAS_TYPE_SINGLE}
     function toSingle: single;
@@ -258,18 +274,12 @@ function getDigit(const v: BigDecimal; digit: integer): BigDecimalBin;
 procedure setZero(out r: BigDecimal);
 //** Sets the bigdecimal to 1
 procedure setOne(out r: BigDecimal);
-//** Returns true iff the bigdecimal is zero
-function isZero(const v: BigDecimal): boolean; overload;
-//** Returns true iff v has no fractional digits
-function isIntegral(const v: BigDecimal): boolean;
-//** Returns true iff v has no fractional digits and can be stored within an longint (32 bit integer)
-function isLongint(const v: BigDecimal): boolean;
-//** Returns true iff v has no fractional digits and can be stored within an int64
-function isInt64(const v: BigDecimal): boolean;
-//** Checks if v is odd. A number with fractional digits is never odd (only weird)
-function odd(const v: BigDecimal): boolean; overload;
-//** Checks if v is even. A number with fractional digits is never even (and neither odd, which is odd)
-function even(const v: BigDecimal): boolean; overload;
+function isZero(const v: BigDecimal): boolean; overload; deprecated 'use advanced record method';
+function isIntegral(const v: BigDecimal): boolean; deprecated 'use advanced record method';
+function isLongint(const v: BigDecimal): boolean; deprecated 'use advanced record method';
+function isInt64(const v: BigDecimal): boolean; deprecated 'use advanced record method';
+function odd(const v: BigDecimal): boolean; overload; deprecated 'use advanced record method';
+function even(const v: BigDecimal): boolean; overload; deprecated 'use advanced record method';
 
 //** Returns the absolute value of v
 function abs(const v: BigDecimal): BigDecimal; overload;
@@ -431,7 +441,7 @@ begin
       digits[p] := digits[p] * 10;
       i += 1;
     end;
-    if signed and isZero(res^) then setZero(res^);
+    if signed and res^.isZero() then setZero(res^);
   end;
 end;
 
@@ -811,16 +821,16 @@ var
   mibin: BigDecimalBin;
   exbin: BigDecimalBin;
 begin
-  if (mi.signed and not isZero(mi)) or ma.signed then begin //if mi is signed 0, treat it as unsigned 0
+  if (mi.signed and not mi.isZero()) or ma.signed then begin //if mi is signed 0, treat it as unsigned 0
     //if ma is signed, mi must be signed and non zero
-    if not ma.signed and not isZero(ma) then setZero(result) //0 has the minimal number of non-zero digits, but can only be returned if 0 < ma. Then we know mi < 0 or we would not be here
+    if not ma.signed and not ma.isZero() then setZero(result) //0 has the minimal number of non-zero digits, but can only be returned if 0 < ma. Then we know mi < 0 or we would not be here
     else begin
       //possible cases mi signed and ma not signed => ma = 0
       //               mi signed and ma signed
       assert(exact.signed);
       mi.signed := false; exact.signed := false; ma.signed := false;
       result := roundInRange(ma, exact, mi);
-      result.signed := not isZero(result);
+      result.signed := not result.isZero();
     end;
     exit;
   end;
@@ -1434,11 +1444,16 @@ end;}
 
 
 function isZero(const v: BigDecimal): boolean;
+begin
+  result := v.isZero();
+end;
+
+function BigDecimal.isZero(): boolean;
 var
   i: Integer;
 begin
-  for i := 0 to high(v.digits) do
-    if v.digits[i] <> 0 then exit(false);
+  for i := 0 to high(digits) do
+    if digits[i] <> 0 then exit(false);
   exit(true);
 end;
 
@@ -1461,51 +1476,72 @@ begin
 end;
 
 function isIntegral(const v: BigDecimal): boolean;
+begin
+  result := v.isIntegral()
+end;
+function isLongint(const v: BigDecimal): boolean;
+begin
+  result := v.isLongint()
+end;
+function isInt64(const v: BigDecimal): boolean;
+begin
+  result := v.isInt64()
+end;
+function odd(const v: BigDecimal): boolean;
+begin
+  result := v.isOdd()
+end;
+function even(const v: BigDecimal): boolean;
+begin
+  result := v.isEven()
+end;
+
+function BigDecimal.isIntegral(): boolean;
 var
   i: Integer;
 begin
-  if v.exponent >= 0 then exit(true);
-  for i := 0 to min(-v.exponent - 1, high(v.digits)) do
-    if v.digits[i] <> 0 then exit(false);
+  if exponent >= 0 then exit(true);
+  for i := 0 to min(-exponent - 1, high(digits)) do
+    if digits[i] <> 0 then exit(false);
   result := true;
 end;
 
-function isLongint(const v: BigDecimal): boolean;
+function BigDecimal.isLongint(): boolean;
 begin
-  if not isIntegral(v) then exit(false);
-  if not v.signed and (v <= high(LongInt)) then exit(true);
-  if v.signed and (v >= low(LongInt)) then exit(true);
+  if not isIntegral() then exit(false);
+  if not signed and (self <= high(LongInt)) then exit(true);
+  if signed and (self >= low(LongInt)) then exit(true);
   exit(false);
 end;
 
-function isInt64(const v: BigDecimal): boolean;
+function BigDecimal.isInt64(): boolean;
 begin
-  if not isIntegral(v) then exit(false);
-  if not v.signed and (v <= high(Int64)) then exit(true);
-  if v.signed and (v >= low(Int64)) then exit(true);
+  if not isIntegral() then exit(false);
+  if not signed and (self <= high(Int64)) then exit(true);
+  if signed and (self >= low(Int64)) then exit(true);
   exit(false);
 end;
 
-function odd(const v: BigDecimal): boolean;
+function BigDecimal.isOdd(): boolean;
 var
   i: Integer;
 begin
-  if v.exponent > 0 then exit(false);
-  if v.exponent = 0 then exit(system.odd(v.digits[0]));
-  for i := 0 to min(-v.exponent - 1, high(v.digits)) do
-    if v.digits[i] <> 0 then exit(false);
-  result := (-v.exponent <= high(v.digits)) and system.odd(v.digits[-v.exponent]);
+  if exponent > 0 then exit(false);
+  if exponent = 0 then exit(system.odd(digits[0]));
+  for i := 0 to min(-exponent - 1, high(digits)) do
+    if digits[i] <> 0 then exit(false);
+  result := (-exponent <= high(digits)) and system.odd(digits[-exponent]);
 end;
 
-function even(const v: BigDecimal): boolean;
+function BigDecimal.isEven(): boolean;
 var
   i: Integer;
 begin
-  if v.exponent > 0 then exit(true);
-  if v.exponent = 0 then exit(not system.odd(v.digits[0]));
-  for i := 0 to min(-v.exponent - 1, high(v.digits)) do
-    if v.digits[i] <> 0 then exit(false);
-  result := (-v.exponent > high(v.digits)) or not system.odd(v.digits[-v.exponent]);
+  if exponent > 0 then exit(true);
+  if exponent = 0 then exit(not system.odd(digits[0]));
+  for i := 0 to min(-exponent - 1, high(digits)) do
+    if digits[i] <> 0 then exit(false);
+  result := (-exponent > high(digits)) or not system.odd(digits[-exponent]);
 end;
 
 function abs(const v: BigDecimal): BigDecimal;
@@ -1535,7 +1571,7 @@ begin
       r.signed  := not a.signed;
       //r.value := b - a.value;
     end;
-    if r.signed and isZero(r) then
+    if r.signed and r.isZero() then
       r.signed := false;
   end;
 end;
@@ -1591,11 +1627,11 @@ end;
 function compareBigDecimals(const a, b: BigDecimal): integer;
 begin
   if a.signed <> b.signed then begin
-    if isZero(a) then begin
-      if isZero(b) then exit(0);
+    if a.isZero() then begin
+      if b.isZero() then exit(0);
       if b.signed then exit(1)  // 0 > - 1
       else exit(-1);            // 0 < 1
-    end else if isZero(b) then begin
+    end else if b.isZero() then begin
       if a.signed then exit(-1) // -1 < 0
       else exit(1);             //  1 > 0
     end else if a.signed then exit(-1) // -1 < 1
@@ -1707,7 +1743,7 @@ var p: UInt64;
     c: BigDecimal;
     e: Int64;
 begin
-  if isZero(v) then exit(v);
+  if v.isZero() then exit(v);
   c := v;
   p := 1;
   result := 1;
@@ -1769,7 +1805,7 @@ var
   precisionBins: Integer;
   highskip, lowskip: integer;
 begin
-  if isZero(v) then exit(0);
+  if v.isZero() then exit(0);
   if v.signed then raise EInvalidArgument.Create('Negative sqrt is not defined');;
 
    skipZeros(v, highskip, lowskip);
@@ -1807,7 +1843,7 @@ end;
 function gcd(const a, b: BigDecimal): BigDecimal;
 begin
   if compareAbsolute(b, a) < 0 then exit(gcd(b,a));
-  if isZero(a) then exit(b);
+  if a.isZero() then exit(b);
   if a=b then exit(a);
   result:=gcd(b mod a, a);
 end;
@@ -1897,7 +1933,7 @@ begin
         end else break;
     end;
   end;
-  result.signed := v.signed and not isZero(v);
+  result.signed := v.signed and not v.isZero();
 end;
 
 
@@ -1919,7 +1955,7 @@ procedure multiplyNoAlias(out r: BigDecimal; const a,b: BigDecimal);
 var
   i: Integer;
 begin
-  if isZero(a) or isZero(b) then begin
+  if a.isZero() or b.isZero() then begin
     setZero(r);
     exit;
   end;
@@ -2042,7 +2078,7 @@ begin
         exit;
       end;
     end;
-  if isZero(a) then begin
+  if a.isZero() then begin
     setZero(quotient);
     setZero(remainder);
     exit;
@@ -2108,7 +2144,7 @@ begin
         if foundNonZeroBin then targetPrecision += DIGITS_PER_ELEMENT
         else targetPrecision += 1;
       end else if (bddfAddHiddenDigit in flags) and (rbin = rdotbin - 1) then
-        if isZero(remainder) then Exclude(flags, bddfAddHiddenDigit)
+        if remainder.isZero() then Exclude(flags, bddfAddHiddenDigit)
         else targetPrecision := 1;
   end;
 
@@ -2127,7 +2163,7 @@ begin
     remainder.exponent -= abin + 1;
   end;
 
-  if (a.signed <> b.signed) and not isZero(remainder) then
+  if (a.signed <> b.signed) and not remainder.isZero() then
     remainder.signed := a.signed <> b.signed;
 
 end;
@@ -2242,13 +2278,13 @@ end;
 
 function BigDecimal.tryToLongint(out v: longint): boolean;
 begin
-  result := isLongint(self);
+  result := isLongint();
   if result then v := BigDecimalToLongint(self);
 end;
 
 function BigDecimal.tryToInt64(out v: int64): boolean;
 begin
-  result := isInt64(self);
+  result := isInt64();
   if result then v := BigDecimalToInt64(self);
 end;
 

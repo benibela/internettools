@@ -265,10 +265,10 @@ begin
     //if args[1] is TXQValueInt64 then exit(mathIntPower(f, i));
     if args[1].instanceOf(baseSchema.integer) then begin
       bd := args[1].toDecimal;
-      if isZero(bd) then exit(xqv(1));
-      if isLongint(bd) then b := BigDecimalToLongint(bd)
+      if bd.isZero() then exit(xqv(1));
+      if bd.isLongint() then b := BigDecimalToLongint(bd)
       else begin
-        if odd(bd) then b := 2147483647
+        if bd.isOdd() then b := 2147483647
         else b := 2147483646;
         if bd.signed then b := -b;
       end;

@@ -136,7 +136,7 @@ begin
   case arg.kind of
     pvkBigDecimal: begin
       bd := -arg.toDecimal;
-      if isIntegral(bd) then result := TXQValueDecimal.create(baseSchema.integer, bd)
+      if bd.isIntegral() then result := TXQValueDecimal.create(baseSchema.integer, bd)
       else result := TXQValueDecimal.create(baseSchema.decimal, bd);
     end;
     pvkInt64: begin
@@ -326,15 +326,16 @@ begin
   resseqseq := resseq.seq;
   resseqseq.Count := BigDecimalToLongint(len);
   resbuffer := resseqseq.buffer;
-  if isLongint(f) and isLongint(t) then begin
+  if f.isLongint() and t.isLongint() then begin
     fsmall := BigDecimalToLongint(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
       resbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+fsmall);
-  end else if isInt64(f) and isInt64(t) then begin
+  end else if f.isInt64() and t.isInt64() then begin
     i64 := BigDecimalToInt64(f);
     for idx := 0 to BigDecimalToLongint(len) - 1 do
       resbuffer[idx] := TXQValueInt64.Create(baseSchema.integer, idx+i64);
   end else begin
+    if not len.isIntegral() then raiseXPTY0004TypeError(b, 'integer length for to operator');
     idx := 0;
     i := f;
     typ := baseSchema.integer;
@@ -343,8 +344,8 @@ begin
       i += 1;
       idx+=1;
     end;
-    resbuffer[idx] := typ.createValue(t);
     assert(idx + 1 = len);
+    resbuffer[idx] := typ.createValue(t);
   end;
   result := resseq;
 end;
@@ -451,7 +452,7 @@ begin
     if (b is TXQValueDateTime) and (a.typeAnnotation as TXSDateTimeType).isDuration then begin
       if a.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) and b.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)  then begin
         bd := b.getInternalDateTimeData^.toDayTime();
-        if isZero(bd) then raiseDivisionBy0NotAllowed;
+        if bd.isZero() then raiseDivisionBy0NotAllowed;
         exit(baseSchema.decimal.createValue(a.getInternalDateTimeData^.toDayTime() / bd));
       end;
       if a.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) and b.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration)  then begin
@@ -471,7 +472,7 @@ begin
   t := TXSType.commonDecimalType(a, b) as TXSNumericType;
   if t.derivedFrom(baseSchema.decimal) then begin
     bd := b.toDecimal;
-    if isZero(bd) then raiseDivisionBy0NotAllowed;
+    if bd.isZero() then raiseDivisionBy0NotAllowed;
     exit(t.createValue(a.toDecimal / bd));
   end;
 
@@ -493,7 +494,7 @@ end;
 function xqvalueFloatLikeToDecimal(const v: IXQValue): BigDecimal;
 begin
   result := v.toDecimal;
-  if isZero(result) then
+  if result.isZero() then
     if not (v.kind in [pvkInt64, pvkBigDecimal, pvkFloat]) then
       baseSchema.double.createValue(v).toDecimal;  //check special values
 end;
@@ -539,7 +540,7 @@ begin
   end;
 
   tempd :=  xqvalueFloatLikeToDecimal(b);
-  if isZero(tempd) then raiseDivisionBy0NotAllowed;
+  if tempd.isZero() then raiseDivisionBy0NotAllowed;
   result := baseSchema.integer.createValue(xqvalueFloatLikeToDecimal(a) div tempd);
 end;
 
@@ -591,12 +592,12 @@ begin
   end;
 
 
-  if isZero(bd) then  exit(XQValueF(xqfloat.NaN, a, b));
-  if isZero(ad) then exit(a);
+  if bd.isZero() then  exit(XQValueF(xqfloat.NaN, a, b));
+  if ad.isZero() then exit(a);
 
   t := TXSType.commonDecimalType(a, b);
   rd := ad mod bd;
-  if (ak = pvkFloat) and isZero(rd) and ((t = baseSchema.double) or (t = baseSchema.float)) then
+  if (ak = pvkFloat) and rd.isZero() and ((t = baseSchema.double) or (t = baseSchema.float)) then
     if a.toFloat.sign then exit(t.createValue(-0.0));
   result := t.createValue(rd);
 end;
@@ -972,7 +973,7 @@ begin
   //result := - prec.toInteger with overflow checking:
   if prec.kind = pvkBigDecimal then begin
     precbcd := prec.toDecimal;
-    if isLongint(precbcd) then begin
+    if precbcd.isLongint() then begin
       Result := BigDecimalToLongint(precbcd);
       if result <> low(Integer) then result := -result
       else result := -result;
@@ -2221,7 +2222,7 @@ var
   var bd: BigDecimal;
   begin
     bd := v.toDecimal;
-    result := isLongint(bd);
+    result := bd.isLongint();
     if result then outv := BigDecimalToLongint(bd)
   end;
 
@@ -5272,12 +5273,12 @@ begin
   formatted := '';
   case primaryFormat of
     '': raise EXQEvaluationException.create('FODF1310', 'Invalid picture string');
-    'A', 'a': if not isZero(number) then begin
+    'A', 'a': if not number.isZero() then begin
       formatted := alphabetify(number, primaryFormat[1]);
       if xqfimOrdinal in modifiers then formatted += '-';
     end;
     'i', 'I': begin
-      if isLongint(number) then formatted := IntToRoman(BigDecimalToLongint(number));
+      if number.isLongint() then formatted := IntToRoman(BigDecimalToLongint(number));
       if primaryFormat = 'i' then formatted := LowerCase(formatted);
     end;
     'w','W','Ww': begin
@@ -5317,7 +5318,7 @@ begin
   end;
   if formatted <> '' then formatted := ordinalize(formatted);
   if formatted = '' then formatted := ordinalize(BigDecimalToStr(number));
-  if Signed and not isZero(number) then formatted := '-' + formatted ;
+  if Signed and not number.isZero() then formatted := '-' + formatted ;
   result := xqvalue(formatted);
 end;
 
@@ -5988,7 +5989,7 @@ begin
 
     if foundChar[xqdfpExponentSeparator] then begin
       exponent := mostSignificantExponent(number) - scalingFactor + 1;
-      if (exponent <> 0) and (isZero(number)) then exponent := 0;
+      if (exponent <> 0) and (number.isZero()) then exponent := 0;
       shift10(number, -exponent);
     end;
 

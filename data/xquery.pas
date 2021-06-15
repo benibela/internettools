@@ -8834,7 +8834,7 @@ begin
     //optimization for a single number
     if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
       if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
-         ((value.kind = pvkBigDecimal) and (not isInt64(value.toDecimal) )) then exit;
+         ((value.kind = pvkBigDecimal) and (not value.toDecimal.isInt64() )) then exit;
       i64 := value.toInt64;
       if (i64 >= 1) and (i64 <= sequence.getSequenceCount) then outList.add(sequence.get(i64));
     end else if value.toBooleanEffective then outList.add(sequence);

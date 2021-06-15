@@ -359,7 +359,7 @@ begin
     pvkNull:       result := 'null';
     pvkInt64:      result := qualifiedTypeName(toString, 'integer');
     pvkFloat:      result := qualifiedTypeName(toString, '');
-    pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(IsIntegral(toDecimal), 'integer', 'decimal') );
+    pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(toDecimal.IsIntegral(), 'integer', 'decimal') );
     pvkString, pvkBinary: result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
     pvkQName, pvkDateTime:
       result := qualifiedTypeName(escapeToXQueryString(toString), '' );
@@ -1262,7 +1262,7 @@ end;
 {$ImplicitExceptions off}
 constructor TXQValueDecimal.create(const v: BigDecimal);
 begin
-  if isIntegral(v) then inherited create(baseSchema.integer)
+  if v.isIntegral() then inherited create(baseSchema.integer)
   else inherited create(baseSchema.decimal);
   value := v;
 end;

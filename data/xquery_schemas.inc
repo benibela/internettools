@@ -487,11 +487,11 @@ var
     if (outv <> nil) then
       case subType of
         xsstInteger, xsstDecimal:
-          if isInt64(temp) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
+          if temp.isInt64() then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
           else outv^ := TXQValueDecimal.create(self, temp);
         xsstFloat, xsstDouble: begin
           try
-            if isZero(temp) and strBeginsWith(v, '-') then tempd := -0.0
+            if temp.isZero() and strBeginsWith(v, '-') then tempd := -0.0
             else if subType = xsstDouble then tempd := temp.toDouble
             else tempd := temp.toSingle;
             {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
@@ -608,19 +608,19 @@ end;
 function TXSNumericType.tryCreateValue(const v: BigDecimal; outv: PXQValue): TXSCastingError;
 var i: BigDecimal;
 begin
-  if (subType = xsstInteger) and (not isIntegral(v)) then i := round(v, 0, bfrmTrunc) //i might satisfy the constraints, but integer(i) not
+  if (subType = xsstInteger) and (not v.isIntegral()) then i := round(v, 0, bfrmTrunc) //i might satisfy the constraints, but integer(i) not
   else i := v;
   if not constraintsSatisfied(i) then exit(xsceFORG0001);
   result := xsceNoError;
   if outv <> nil then
     case subType of
       xsstInteger: begin
-        if not isIntegral(i) then i := round(i, 0, bfrmTrunc);
-        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+        if not i.isIntegral() then i := round(i, 0, bfrmTrunc);
+        if i.isInt64() then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
         else outv^ := TXQValueDecimal.create(self, i);
       end;
       xsstDecimal:
-        if isInt64(i) then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
+        if i.isInt64() then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
         else outv^ := TXQValueDecimal.create(self, i);
       xsstFloat:   outv^ := TXQValueFloat.create(self, i.toSingle);
       xsstDouble:  outv^ := TXQValueFloat.create(self, i.toDouble);

@@ -132,7 +132,7 @@ begin
     end;
     {pvkBigDecimal:}else begin
       temp := round(v.toDecimal);
-      if not isInt64(temp) then exit(false);
+      if not temp.isInt64() then exit(false);
       res := BigDecimalToInt64(temp);
     end;
   end;
