@@ -1116,7 +1116,7 @@ begin
       end;
       $F0..$F4: begin
         FCurrentByteLength := 4;
-        if (p + 2 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) or ((pbyte(p + 3)^ and $C0) <> $80 ) then
+        if (p + 3 >= pend) or ((pbyte(p + 1)^ and $C0) <> $80 ) or ((pbyte(p + 2)^ and $C0) <> $80 ) or ((pbyte(p + 3)^ and $C0) <> $80 ) then
           FCurrentByteLength:= 1;
       end;
       else FCurrentByteLength := 1;
