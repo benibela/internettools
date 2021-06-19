@@ -150,6 +150,12 @@ type
   TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction) of object;
   TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
 
+  TTransferContentInflater = class
+    //constructor create(); virtual; abstract;
+    //procedure writeCompressedBlock(const Buffer; Count: Longint); virtual; abstract;
+    class procedure injectDecoder(sender: TInternetAccess; const encoding: string; var encoder: TTransferContentInflater; var blockWrite: TTransferBlockWriteEvent); virtual; abstract;
+  end;
+  TTransferInflaterClass = class of TTransferContentInflater;
 
   //**URL Encoding encodes every special character @code(#$AB) by @code(%AB). This model describes which characters are special:
   TUrlEncodingModel = (
@@ -177,6 +183,7 @@ type
     FOnProgress:TProgressEvent;
     //active transfer
     FOnWriteBlock: TTransferBlockWriteEvent;
+    FTransferInflater: TTransferContentInflater;
     FTransferCurrentSize, FTransferContentLength: integer; //only used for progress event
     procedure beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent);
     procedure endTransfer;
@@ -308,6 +315,7 @@ function guessType(const data: string): TRetrieveType;
 
 var defaultInternetConfiguration: TInternetConfig; //**< default configuration, used by all internet access classes
     defaultInternetAccessClass:TInternetAccessClass = nil; //**< default internet access. This controls which internet library the program will use.
+    defaultTransferInflater: TTransferInflaterClass;
 
 const ContentTypeUrlEncoded: string = 'application/x-www-form-urlencoded';
 const ContentTypeMultipart: string = 'multipart/form-data'; //; boundary=
@@ -923,11 +931,13 @@ begin
   FTransferContentLength := -1;
   lastHTTPResultCode := -1;
   lastErrorDetails := '';
+  FreeAndNil(FTransferInflater); //should be freed in endTransfer, but might have failed because of exceptions during transfer
   //do not call OnTransferStart, since that event is triggered once for each request, while this function is called for the each request and again for each redirection;
 end;
 
 procedure TInternetAccess.endTransfer;
 begin
+  FreeAndNil(FTransferInflater);
   if Assigned(FOnProgress) then begin
     if (FTransferCurrentSize < FTransferContentLength) then FOnProgress(self, FTransferContentLength, FTransferContentLength)
     else if FTransferContentLength = -1 then FOnProgress(self, 0, 0);
@@ -935,12 +945,21 @@ begin
 end;
 
 procedure TInternetAccess.writeBlock(const Buffer; Count: Longint);
+  procedure checkForContentEncoding;
+  var encoding: string;
+  begin
+    encoding := getLastHTTPHeaderValue('content-encoding');
+    if encoding = '' then exit;
+    defaultTransferInflater.injectDecoder(self, encoding, FTransferInflater, FOnWriteBlock);
+  end;
 begin
+  if (FTransferCurrentSize = 0) and (count > 0) and (defaultTransferInflater <> nil) then
+    checkForContentEncoding;
+  FTransferCurrentSize := FTransferCurrentSize + Count;
   FOnWriteBlock(buffer, count);
   if Assigned(FOnProgress) then begin
     if FTransferContentLength < 0 then
       FTransferContentLength := StrToIntDef(getLastHTTPHeaderValue('content-length') , -1);
-    FTransferCurrentSize := FTransferCurrentSize + Count;
     FOnProgress(self, FTransferCurrentSize, FTransferContentLength);
   end;
 end;
@@ -1391,6 +1410,7 @@ destructor TInternetAccess.Destroy;
 begin
   FLastHTTPHeaders.Free; //created by init
   additionalHeaders.Free;
+  FreeAndNil(FTransferInflater); //should be freed in endTransfer, but might have failed because of exceptions during transfer
   inherited Destroy;
 end;
 

@@ -136,10 +136,10 @@ uses bbutils, extendedhtmlparser
      ,xquery_json //enable json as default
      ,xquery.internals.protectionbreakers
 {$IFDEF USE_SYNAPSE_WRAPPER}
-, synapseinternetaccess
+, synapseinternetaccess, internetaccess_inflater_paszlib
 {$ENDIF}
 {$IFDEF USE_WININET_WRAPPER}
-, w32internetaccess
+, w32internetaccess, internetaccess_inflater_paszlib
 {$ENDIF}
 {$IFDEF USE_ANDROID_WRAPPER}
 , androidinternetaccess      //if the androidinternetaccess unit is not found, you need to add the directory containing this (simpleinternet) unit to the search paths
