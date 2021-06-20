@@ -242,13 +242,17 @@ begin
       pxpparser.StaticContext.baseURI:=dataFileName;
       pxpParser.addAWeirdGlobalVariableH('', 'json');
       case querykind of
-        ekXQuery1, ekXQuery3_0, ekXQuery3_1: begin
-          pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQuery;
-          pxpParser.parseQuery(query, xqpmXQuery3_1, pxpParser.StaticContext);
-        end;
-        ekXPath2, ekXPath3_0, ekXPath3_1: begin
-          pxpParser.ParsingOptions.StringEntities := xqseIgnoreLikeXPath;
-          pxpParser.parseQuery(query, xqpmXQuery3_1, pxpParser.StaticContext) //no point in using a less powerful language.
+        ekDefault, ekXPath2, ekXPath3_0, ekXPath3_1, ekXQuery1, ekXQuery3_0, ekXQuery3_1: begin
+          case querykind of
+            ekDefault:
+              pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQueryButIgnoreInvalid;
+            ekXPath2, ekXPath3_0, ekXPath3_1:
+              pxpParser.ParsingOptions.StringEntities := xqseIgnoreLikeXPath;
+            ekXQuery1, ekXQuery3_0, ekXQuery3_1:
+              pxpParser.ParsingOptions.StringEntities := xqseResolveLikeXQuery;
+            else raise Exception.Create('internal error 21412466');
+          end;
+          pxpParser.parseQuery(query, xqpmXQuery3_1, pxpParser.StaticContext);//always use xquery, no point in using a less powerful language.
         end;
         ekCSS: pxpParser.parseCSS3(query);
         else raise Exception.Create('internal error 21412466');

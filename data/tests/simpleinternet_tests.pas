@@ -32,7 +32,8 @@ begin
 
 
   //test query kind guessing
-  test(process('', '"&amp;"'), '&amp;');
+  test(process('', '"&amp"'), '&amp');
+  test(process('', '"&amp;"'), '&');
   test(process('', 'xquery version "1.0"; "&amp;"'), '&');
   test(process('<html>1<a id="foobar">2</a>3</html>', '#foobar'), '2');
   test(process('<html>1<div class="a">div</div> <div class="b">b</div> <div class="a">xyz</div></html>', '.a'), 'div xyz');
