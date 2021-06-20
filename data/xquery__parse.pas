@@ -125,7 +125,7 @@ protected
   function parseSequenceType(flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parseSequenceTypeUnion(const flags: TXQSequenceTypeFlags): TXQTermSequenceType;
   function parsePatternMatcher(): TXQTermPatternMatcher;
-  function replaceEntitiesAlways(s: string): string;
+  function replaceEntitiesAlways(s: string; allowInvalid: boolean = false): string;
   function replaceEntitiesIfNeeded(const s: string): string; inline;
   function parseString: string;
   function parseString(const w: string): string;
@@ -796,8 +796,9 @@ end;
 function TXQParsingContext.replaceEntitiesIfNeeded(const s: string): string;
 begin
   result := s;
-  if ((parsingModel in PARSING_MODEL_XQUERY) and (options.StringEntities = xqseDefault)) or (options.StringEntities = xqseResolveLikeXQuery) then
-    Result := replaceEntitiesAlways(Result);
+  if ((parsingModel in PARSING_MODEL_XQUERY) and (options.StringEntities = xqseDefault))
+     or (options.StringEntities in [xqseResolveLikeXQuery, xqseResolveLikeXQueryButIgnoreInvalid]) then
+    Result := replaceEntitiesAlways(Result, options.StringEntities = xqseResolveLikeXQueryButIgnoreInvalid );
 end;
 
 procedure TXQParsingContext.refuseReservedFunctionName(const name: string);
@@ -2367,7 +2368,7 @@ begin
 end;
 
 
-function TXQParsingContext.replaceEntitiesAlways(s: string): string;
+function TXQParsingContext.replaceEntitiesAlways(s: string; allowInvalid: boolean): string;
 var
   n, p: SizeInt;
   temp: string;
@@ -2390,8 +2391,14 @@ begin
       'quot': result += '"';
       'apos': result += '''';
       else begin
-        if (length(temp) <= 1) or (temp[1] <> '#') then raiseSyntaxError('Invalid entity')
-        else begin
+        if (length(temp) <= 1) or (temp[1] <> '#') then begin
+          if allowInvalid then begin
+            n := strIndexOf(s, '&', p);
+            dec(p);
+            continue;
+          end;
+          raiseSyntaxError('Invalid entity')
+        end else begin
           case temp[2] of
             'x': begin
               base := 16;

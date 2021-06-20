@@ -727,6 +727,12 @@ begin
   m('declare option pxp:string-entities "on"; ''&quot;''',                 '"',                        '');
   m('declare option pxp:string-entities "on";  "x&quot;y"',                   'x"y',                        '');
   m('declare option pxp:string-entities "on";  ''x&quot;y''',                 'x"y',                        '');
+  ps.ParsingOptions.StringEntities:=xqseResolveLikeXQueryButIgnoreInvalid;
+  t('"&quot;"',  '"');
+  t('"&"',  '&');
+  t('"&&amp;"',  '&&');
+  t('"&&amp;&"',  '&&&');
+  t('"u&x;&amp;&y;"',  'u&x;&&y;');
   ps.ParsingOptions.StringEntities:=xqseDefault;
 
 

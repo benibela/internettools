@@ -2596,7 +2596,7 @@ type
   TXQFormatIntegerEvent = procedure (sender: TObject; integerNumber: BigDecimal; primaryFormat, modifierVariant, language: string; modifiers: TXQFormatIntegerModifiers; var formatted: string) of object;
 
   //** Record grouping different parsing options
-  TXQParsingOptionsStringEntities = (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery);
+  TXQParsingOptionsStringEntities = (xqseDefault, xqseIgnoreLikeXPath, xqseResolveLikeXQuery, xqseResolveLikeXQueryButIgnoreInvalid);
   TXQJSONObjectMode = (xqjomForbidden, xqjomMapAlias, xqjomJSONiq );
   TXQJSONArrayMode = (xqjamStandard, xqjamArrayAlias, xqjamJSONiq );
   TXQParsingOptions = record
