@@ -750,7 +750,10 @@ THtmlTemplateParser=class
 //** xml compatible namespace url to define new template prefixes
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 
-type TExtractionKind = (ekAuto, ekXPath2, ekXPath3_0, ekXPath3_1, ekXQuery1, ekXQuery3_0, ekXQuery3_1, ekPatternHTML, ekPatternXML, ekCSS, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
+type TExtractionKind = (ekAuto, ekDefault,
+                        ekXPath2, ekXPath3_0, ekXPath3_1,
+                        ekXQuery1, ekXQuery3_0, ekXQuery3_1,
+                        ekPatternHTML, ekPatternXML, ekCSS, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
 function guessExtractionKind(e: string): TExtractionKind;
 
 const
@@ -2428,10 +2431,10 @@ var
   i: Integer;
 begin
   { try to detect the type of an extract expression:
-    Template:  if it is an xml file, i.e. starts with a <
-    CSS:       If it contains many # or .    i.e. if there is a [#.] before any other non letter/space character
-    XQuery:    If it starts with an XQuery only command (i.e. xquery version, declare function, ...)
-    XPath:     otherwise
+    Pattern matching:  if it is like an xml file, i.e. starts with a <
+    CSS:               If it contains many # or .    i.e. if there is a [#.] before any other non letter/space character
+    XQuery:            If it starts with an XQuery declaration (i.e. xquery version)
+    default:           otherwise
   }
 
 
@@ -2441,14 +2444,14 @@ begin
 
   if e[1] = '#' then exit(ekCSS);
 
-  if checkWords('xquery', ['version', 'encoding']) or checkWords('typeswitch', []) or checkWords('import', ['module', 'schema']) or
+  if checkWords('xquery', ['version', 'encoding']) {or checkWords('typeswitch', []) or checkWords('import', ['module', 'schema']) or
      checkWords('module', ['namespace']) or
      checkWords('declare', ['function', 'variable', 'namespace', 'default', 'boundary-space', 'base-uri', 'option', 'construction', 'copy-namespace']) or
-     checkWords('for', ['sliding', 'tumbling'])
+     checkWords('for', ['sliding', 'tumbling'])}
      then
     exit(ekXQuery3_1);
 
-  result := ekXPath3_1;
+  result := ekDefault;
 
   dots := 0;
   for i := 1 to length(e) do
@@ -2457,10 +2460,10 @@ begin
       '#': exit(ekCSS);
       '.': if ((i = 1) or (e[i-1] in ['a'..'z','A'..'Z'])) and ((i = length(e)) or (e[i+1] in ['a'..'z','A'..'Z'])) then
          dots+=1;
-      else exit(ekXPath3_1);
+      else exit(ekDefault);
     end;
   if dots > 0 then exit(ekCSS)
-  else exit(ekXPath3_1);
+  else exit(ekDefault);
 end;
 
 
