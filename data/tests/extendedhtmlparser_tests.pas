@@ -805,7 +805,12 @@ t('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b></t:switch-prio
 t('<xx><t:switch-prioritized><a>{a:=text()}</a></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b></xx>', 'a=1'#13'a=3'#13'a=4');
 t('<xx><t:switch-prioritized><b>{b:=text()}</b></t:switch-prioritized>*</xx>', '<xx><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b></xx>', 'b=2'#13'b=5');
 t('<xx><t:switch-prioritized><a>{a:=text()}</a><b>{b:=text()}</b><c>{c:=text()}</c></t:switch-prioritized>*</xx>', '<xx><c>0</c><a>1</a><b>2</b><a>3</a><a>4</a><b>5</b><c>6</c></xx>', 'a=1'#13'a=3'#13'a=4'#13'b=5'#13'c=6');
-
+//+ if
+t('<xx><t:switch-prioritized><a t:test="true()">{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><a>1</a><b>2</b></xx>', 'a=1');
+t('<xx><t:switch-prioritized><a t:test="false()">{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><a>1</a><b>2</b></xx>', 'b=2');
+t('<xx><t:switch-prioritized><a t:test="true()">{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><b>2</b><a>1</a></xx>', 'a=1');
+t('<xx><t:switch-prioritized><a t:test="false()">{a:=text()}</a><b>{b:=text()}</b></t:switch-prioritized></xx>', '<xx><b>2</b><a>1</a></xx>', 'b=2');
+t('<xx><t:switch-prioritized><a t:test="0 ge 7">{a:=text()}</a><b t:test="false()">{b:=text()}</b><b>{c:=text()}</b></t:switch-prioritized></xx>', '<xx><a>1</a><b>2</b></xx>', 'c=2');
 
 
         //whitespace

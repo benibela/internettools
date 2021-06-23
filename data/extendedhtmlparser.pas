@@ -1751,18 +1751,21 @@ var xpathText: TTreeNode;
         if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch-prioritized construct may not have the attribute template:optional (it is optional anyways)');
         if curChild.templateType >= firstRealNoHTMLMatchTemplateType then raise ETemplateParseException.Create('A switch-prioritized command must consist entirely of only html tags');
 
-        htmlStart := oldHtmlStart;
-        while (htmlStart <> nil) and ((htmlStart <> htmlEnd.next)) do begin
-          if templateElementFitHTMLOpen(htmlStart, curChild) and
-            matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
-            //found match
-            htmlStart := htmlStart.reverse.next;
-            templateStart := templateStart.templateReverse.templateNext;
-            exit;
-          end;
-          htmlStart := htmlStart.next;
-        end;
+        if (curChild.test = nil) or (performPXPEvaluation(curChild.test).toBoolean {like HandleCommandPseudoIf} ) then begin
 
+          htmlStart := oldHtmlStart;
+          while (htmlStart <> nil) and ((htmlStart <> htmlEnd.next)) do begin
+            if templateElementFitHTMLOpen(htmlStart, curChild) and
+              matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
+              //found match
+              htmlStart := htmlStart.reverse.next;
+              templateStart := templateStart.templateReverse.templateNext;
+              exit;
+            end;
+            htmlStart := htmlStart.next;
+          end;
+
+        end;
 
         //no match, try other matches
         curChild := TTemplateElement(curChild.getNextSibling());
