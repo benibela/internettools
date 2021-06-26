@@ -109,6 +109,8 @@ type
     procedure cutBefore(target: PElement);
     procedure cutAfter(target: PElement);
 
+    function count(const e: TElement): SizeInt;
+
     //** copy and cutAfter
     function viewTo(newLast: PElement): TArrayView;
     //** copy and cutBefore
@@ -127,11 +129,20 @@ type
     function ToString: string;
 
     function contains(const s: string): boolean; inline;
+    function beginsWith(const s: string): boolean; inline;
+    //function beginsWithI(const s: string): boolean; inline;
+    function endsWith(const expectedEnd: string): boolean; inline;
+
+
     function find(searched: pchar; searchedLength: SizeInt): pchar;
     function find(const s: string): pchar;
+    function findLast(searched: pchar; searchedLength: SizeInt): pchar;
+    function findLast(const s: string): pchar;
 
     function moveToFind(const s: string): boolean;
     function moveAfterFind(const s: string): boolean;
+    function moveToFindLast(const s: string): boolean;
+    function moveAfterFindLast(const s: string): boolean;
 
     //finds #13 or #10  (implicit #13#10)
     function findLineBreak: pchar;
@@ -140,6 +151,10 @@ type
 
     function cutBeforeFind(const s: string): boolean;
     function cutAfterFind(const s: string): boolean;
+    function cutBeforeFindLast(const s: string): boolean;
+    function cutAfterFindLast(const s: string): boolean;
+
+    procedure trim(const trimCharacters: TCharSet = [#0..' ']);
 
     function viewTo(newLast: pchar): TCharArrayView; reintroduce;
     function viewUntil(newEnd: pchar): TCharArrayView; reintroduce;
@@ -322,6 +337,20 @@ begin
   cutBefore(target + 1);
 end;
 
+function TArrayView.count(const e: TElement): SizeInt;
+var
+  p, &end: PElement;
+begin
+  p := data;
+  &end := dataend;
+  result := 0;
+  while p < &end do begin
+    if p^ = e then
+      inc(result);
+    inc(p);
+  end;
+end;
+
 function TArrayView.viewTo(newLast: PElement): TArrayView;
 begin
   result.initEndCapped(data, newLast + 1, dataend);
@@ -369,6 +398,26 @@ begin
   result := find(s) <> nil;
 end;
 
+function TCharArrayView.beginsWith(const s: string): boolean;
+var
+  expectedLength: SizeInt;
+begin
+  expectedLength := system.length(s);
+  result := (expectedLength <= length)
+            and ((s = '') or (CompareByte(PByte(data)^, pbyte(s)^, expectedLength ) = 0));
+end;
+
+function TCharArrayView.endsWith(const expectedEnd: string): boolean;
+var
+  strLength, expectedLength: SizeInt;
+begin
+  expectedLength := system.length(expectedEnd);
+  strLength := length;
+  result := ( length >= expectedLength ) and
+            ( (expectedEnd='') or
+              (CompareByte(data[strLength-expectedLength], PByte(expectedEnd)^, expectedLength) = 0) );
+end;
+
 function TCharArrayView.find(searched: pchar; searchedLength: SizeInt): pchar;
 var
   last: pchar;
@@ -391,6 +440,28 @@ begin
   result := find(pchar(s), system.length(s));
 end;
 
+function TCharArrayView.findLast(searched: pchar; searchedLength: SizeInt): pchar;
+var
+  first: pchar;
+begin
+  if searchedLength <= 0 then exit(dataend); //carefully it is not in bounds
+  if data + searchedLength > dataend then exit(nil);
+  result := dataend - searchedLength;
+  first := data;
+  while result >= first do begin
+    if result^ = searched^ then
+      if CompareByte(result^, searched^, searchedLength) = 0 then
+        exit;
+    dec(result);
+  end;
+  result := nil;
+end;
+
+function TCharArrayView.findLast(const s: string): pchar;
+begin
+  result := findLast(pchar(s), system.length(s));
+end;
+
 
 function TCharArrayView.moveToFind(const s: string): boolean;
 begin
@@ -402,6 +473,26 @@ var
   target: PChar;
 begin
   target := find(s);
+  result := target <> nil;
+  if result then
+    data := target + system.length(s);
+end;
+
+function TCharArrayView.moveToFindLast(const s: string): boolean;
+var
+  target: PChar;
+begin
+  target := findLast(s);
+  result := target <> nil;
+  if result then
+    data := target;
+end;
+
+function TCharArrayView.moveAfterFindLast(const s: string): boolean;
+var
+  target: PChar;
+begin
+  target := findLast(s);
   result := target <> nil;
   if result then
     data := target + system.length(s);
@@ -454,6 +545,35 @@ begin
   result := target <> nil;
   if result then
     dataend := target + system.length(s);
+end;
+
+function TCharArrayView.cutBeforeFindLast(const s: string): boolean;
+var
+  target: PChar;
+begin
+  target := findLast(s);
+  result := target <> nil;
+  if result then
+    dataend := target;
+end;
+
+function TCharArrayView.cutAfterFindLast(const s: string): boolean;
+var
+  target: PChar;
+begin
+  target := findLast(s);
+  result := target <> nil;
+  if result then
+    dataend := target + system.length(s);
+end;
+
+procedure TCharArrayView.trim(const trimCharacters: TCharSet = [#0..' ']);
+var
+  l: SizeInt;
+begin
+  l := length;
+  strlTrim(data, l, trimCharacters);
+  dataend := data + l;
 end;
 
 function TCharArrayView.viewTo(newLast: pchar): TCharArrayView;
