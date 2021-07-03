@@ -4395,6 +4395,7 @@ begin
    if (matching = [qmElement,qmText,qmComment,qmProcessingInstruction,qmAttribute,qmDocument]) and (requiredType = nil)  then result += 'node()'
    else if (matching = [qmElement,qmAttribute]) and (requiredType = nil) then result += '@*'
    else if (matching = [qmValue, qmElement, qmCheckNamespaceURL]) and (requiredType = nil) then result := 'Q{}' + value
+   else if (matching = [qmElement,qmDocument]) and (requiredType = nil) and (typ = tneaDirectParent) then result := '(..)'
    else begin
      if qmElement in matching then result += 'element';
      if qmText in matching then result += 'text';
@@ -9133,6 +9134,15 @@ begin
 end;
 
 class function TXQueryEngine.evaluateSingleStepQuery(const query: TXQPathMatchingStep;var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
+  procedure error(code, msg: string);
+  begin
+    msg += ' when evaluating ' + query.serialize;
+    if context.SeqValue <> nil then msg += LineEnding + 'Context item is: ' + context.SeqValue.toXQuery;
+    if query.typ = tneaDirectChildImplicit then
+     msg += LineEnding + '(Hint: This can happen if you forgot a $ before a variable name in a function.)';
+    raise EXQEvaluationException.create(code, msg );
+  end;
+
 var
   n: TTreeNode;
 begin
@@ -9150,8 +9160,8 @@ begin
     else begin
       if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
       else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
-      else if context.SeqValue = nil then raise EXQEvaluationException.create('XPDY0002', 'Context item is undefined')
-      else raise EXQEvaluationException.Create('XPTY0020', 'Expected node as context item, got: '+context.SeqValue.toXQuery());
+      else if context.SeqValue = nil then error('XPDY0002', 'Context item is undefined')
+      else error('XPTY0020', 'Expected node as context item');
       result := expandSequence(result,query, context, lastExpansion);
     end;
   end;
