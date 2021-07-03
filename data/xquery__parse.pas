@@ -80,6 +80,7 @@ protected
   tempcontext: TXQEvaluationContext;
   lastTokenStart: pchar;
   lastErrorPos: pchar;
+  insideUncertainNamespaceScope: integer;
   function errorTracking: TXQParsingErrorTracker; inline;
   procedure registerTermLocation(t: TObject);
   procedure raiseParsingError(errcode, s: string);
@@ -143,7 +144,8 @@ protected
   function parseDirectConstructor(): TXQTermConstructor;
   function parseComputedConstructor(name: string): TXQTermConstructor;
   function parseExtension: TXQTerm;
-  function parseVariable: TXQTermPendingEQNameToken;
+  function parseVariable: TXQTerm;
+  function getVariableLocalNamePtr(t: TXQTerm): PString;
   function splitVariableForDotNotation(t: TXQTerm): TXQTerm;
   function parseDefineVariable: TXQTermDefineVariable;
   function parseAnnotations: TXQAnnotations;
@@ -213,6 +215,8 @@ end;
  TFinalVariableResolving = class(TXQTerm_VisitorTrackKnownVariables)
    staticContext: TXQStaticContext;
    currentVariable: TXQTermVariable;
+   errorTracking: TXQParsingErrorTracker;
+   procedure raiseParsingError(a, b: string; location: TObject);
    function visit(t: PXQTerm): TXQTerm_VisitAction; override;
    function leave(t: PXQTerm): TXQTerm_VisitAction; override;
    procedure resolveVariables(t: PXQTerm);
@@ -271,6 +275,14 @@ begin
   result := TXQueryEngineBreaker(pointer(p));
 end;
 
+procedure TFinalVariableResolving.raiseParsingError(a, b: string; location: TObject);
+begin
+  if errorTracking <> nil then begin
+    errorTracking.raiseParsingError(location, a,b);
+    raise errorTracking.pendingException;
+  end else  raise EXQParsingException.create(a,b);
+end;
+
 function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   procedure visitVariable(pt: PXQTerm);
   var v: TXQTermVariable;
@@ -289,18 +301,18 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       exit;
     end;
     if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then
-      raise EXQParsingException.create('XPST0008', 'Self-Dependancy: '+v.ToString);
+      raiseParsingError('XPST0008', 'Self-Dependancy: '+v.ToString, v);
 
     q := staticContext.findModule(v.namespace);
     if q <> nil then begin
       declaration := q.getStaticContext.findVariableDeclaration(v);
       if declaration <> nil then begin
         if (q.getStaticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
-          raise EXQParsingException.create('XPST0008', 'Private variable '+v.ToString);
+          raiseParsingError('XPST0008', 'Private variable '+v.ToString, v);
         replacement := TXQTermVariableGlobalImported.Create;
         TXQTermVariableGlobalImported(replacement).staticContext := q.getStaticContext;
       end;
-    end else if staticContext.isLibraryModule then begin raise EXQParsingException.create('XPST0008', 'Cannot find module for variable '+v.ToString); exit; end
+    end else if staticContext.isLibraryModule then begin raiseParsingError('XPST0008', 'Cannot find module for variable '+v.ToString, v); exit; end
     else begin
       declaration := staticContext.findVariableDeclaration(v);
       if declaration <> nil then
@@ -321,7 +333,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         'line-ending': begin replace(pt, TXQTermConstant.create(xqvalue(LineEnding) )); exit; end;
         'amp': begin replace(pt, TXQTermConstant.create(xqvalue('&') )); exit; end;
       end;
-    raise EXQParsingException.create('XPST0008', 'Unknown variable: '+v.ToString);
+    raiseParsingError('XPST0008', 'Unknown variable: '+v.ToString, v);
   end;
 
   procedure visitPendingPatternMatcher(pt: PXQTerm);
@@ -2023,6 +2035,7 @@ begin
     #9,#10,#13,' ': raiseSyntaxError('Invalid whitespace in constructor');
   end;
   result := TXQTermConstructor.create(tetOpen, nextTokenQName(xqptElement));
+  inc(insideUncertainNamespaceScope);
   registerTermLocation(result);
   try
     hadWhitespace := true; //if there is no whitespace the qname would have eaten pos^
@@ -2053,6 +2066,7 @@ begin
       exit;
     end;
     expectWithoutComment('>');
+    dec(insideUncertainNamespaceScope);
 
     lastWasCData := false;
     while pos^ <> #0 do begin
@@ -2202,10 +2216,22 @@ begin
   result := parseOptionalExpr31;
 end;
 
-function TXQParsingContext.parseVariable: TXQTermPendingEQNameToken;
+function TXQParsingContext.parseVariable: TXQTerm;
+var
+  temp: TXQTermPendingEQNameToken;
 begin
   expect('$');
-  Result := parsePendingEQName(xqptVariable);
+  temp := parsePendingEQName(xqptVariable);
+  result := temp;
+  if (insideUncertainNamespaceScope = 0) then result := temp.resolveAndFree(staticContext);
+  registerTermLocation(result);
+end;
+
+function TXQParsingContext.getVariableLocalNamePtr(t: TXQTerm): PString;
+begin
+  if objInheritsFrom(t, TXQTermVariable) then result := @TXQTermVariable(t).value
+  else if objInheritsFrom(t, TXQTermPendingEQNameToken) then result := @TXQTermPendingEQNameToken(t).localpart
+  else begin raiseSyntaxErrorFatal('Internal error 201601102252'); exit(nil); end;
 end;
 
 function TXQParsingContext.splitVariableForDotNotation(t: TXQTerm): TXQTerm;
@@ -2214,9 +2240,7 @@ var
   prop: String;
   pname: PAnsiString;
 begin
-  if objInheritsFrom(t, TXQTermVariable) then pname := @TXQTermVariable(t).value
-  else if objInheritsFrom(t, TXQTermPendingEQNameToken) then pname := @TXQTermPendingEQNameToken(t).localpart
-  else begin raiseSyntaxErrorFatal('Internal error 201601102252'); exit(nil); end;
+  pname := getVariableLocalNamePtr(t);
   if not strContains(pname^, '.') then exit(t);
   name := pname^;
   pname^ := strSplitGet('.', name);
@@ -2770,25 +2794,27 @@ var
   var
     operatorMode: Boolean;
     propertyAccess: Boolean;
-    v: TXQTermPendingEQNameToken;
+    v: TXQTerm;
+    pname: PString;
   begin
     v := parseVariable;
+    pname := getVariableLocalNamePtr(v);
     result := v;
     operatorMode := false;
-    if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(v.localpart, '.') then begin
+    if (options.AllowPropertyDotNotation = xqpdnAllowFullDotNotation) and strContains(pname^, '.') then begin
       propertyAccess := true;
-      operatorMode := strEndsWith(v.localpart, '.');
+      operatorMode := strEndsWith(pname^, '.');
       if operatorMode then begin
-        delete(v.localpart, length(v.localpart), 1);
-        propertyAccess := strContains(v.localpart, '.');
+        delete(pname^, length(pname^), 1);
+        propertyAccess := strContains(pname^, '.');
       end;
       if propertyAccess then
         result := splitVariableForDotNotation(result);
-    end else if (options.AllowPropertyDotNotation = xqpdnAllowUnambiguousDotNotation) and strEndsWith(v.localpart, '.') then begin
+    end else if (options.AllowPropertyDotNotation = xqpdnAllowUnambiguousDotNotation) and strEndsWith(pname^, '.') then begin
       skipWhitespaceAndComment();
       operatorMode := pos^ in ['"', '''', '$'];
       if operatorMode then
-        delete(v.localpart, length(v.localpart), 1);
+        delete(pname^, length(pname^), 1);
     end;
     if operatorMode then begin
       result := TXQTermDynamicFunctionCall.create(result, parseValue());
@@ -3684,10 +3710,12 @@ begin
 
       //keep the known variables in the engine, so nested expression (patterns) can access each other variables
       if TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor = nil then
-        TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor := TFinalVariableResolving.create;
+        TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor := TFinalVariableResolving.create();
       varvisitor := TXQueryEngineBreaker.forceCast(sc.sender).FParserVariableVisitor as TFinalVariableResolving;
+      varvisitor.errorTracking := errortracker;
       varvisitor.staticContext := visitor.staticContext;
       varvisitor.resolveVariables(@result);
+      varvisitor.errorTracking := nil;
     except
       raise;
     end;
