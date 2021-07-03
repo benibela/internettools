@@ -3202,6 +3202,21 @@ var astroot: TXQTerm;
        raiseSyntaxError('Unexpected .');
      end;
   end;
+
+  procedure error;
+  var
+    msg: String;
+  begin
+    msg := 'Unknown or unexpected operator: "'+word+ '"';
+    msg += LineEnding + 'Hint: Perhaps a comma "," or closing parentheses ")}]" is missing.';
+    if (astroot is TXQTermNodeMatcher)
+        and (TXQTermNodeMatcher(astroot).queryCommand.typ = tneaDirectChildImplicit)
+        and (TXQTermNodeMatcher(astroot).queryCommand.value = 'declare')
+        then
+          msg += LineEnding + 'Hint: The order of declare statements is not arbitrary. E.g. "declare namespace" must come before "declare variable".';
+    raiseSyntaxError(msg);
+  end;
+
 var
   op: TXQOperatorInfo;
 begin
@@ -3262,7 +3277,7 @@ begin
             expect(word);
             parseDotOperator;
           end else
-            raiseSyntaxError('Unknown or unexpected operator: "'+word+ '" (possibly missing comma "," or closing parentheses ")}]" )' );
+            error;
         end;
       end;
     end;
