@@ -2223,7 +2223,13 @@ begin
   expect('$');
   temp := parsePendingEQName(xqptVariable);
   result := temp;
-  if (insideUncertainNamespaceScope = 0) then result := temp.resolveAndFree(staticContext);
+  if (insideUncertainNamespaceScope = 0) then
+    try
+      result := temp.resolveAndFree(staticContext);
+    except
+      temp.free;
+      raise;
+    end;
   registerTermLocation(result);
 end;
 
