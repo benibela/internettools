@@ -1608,7 +1608,7 @@ begin
       pvkNode: begin
         formData := nodeToFormData(v^.toNode, nodeCompare, true);
         if formData.hasData then addFormData(formData)
-       else addUrlEncodedList(v^.toString);
+        else addUrlEncodedList(v^.toString);
       end
      else addUrlEncodedList(v^.toString)
    end;
@@ -1834,7 +1834,6 @@ var requestOverride: THttpRequestParams;
       request.charset := getFormEncoding(form);
 
       lastFormHadOverriddenValue := request.addFormAndMerge(form, cmp, requestOverride);
-      request.done;
 
       actionURI := form.getAttribute('action', cmp);
 
@@ -1863,6 +1862,7 @@ var requestOverride: THttpRequestParams;
       resultobj.setMutable('url', actionURI);
       if request.charset <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(request.charset));
 
+      request.done;
     end;
 
 var v: PIXQValue;
