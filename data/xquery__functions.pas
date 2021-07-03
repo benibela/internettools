@@ -1221,47 +1221,79 @@ begin
 end;
 
 
+type TFormElementData = record
+  hasData, isSubmitButton: boolean;
+  names, values: array of string;
+end;
 
 
+function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllInputs: boolean): TFormElementData;
+//todo: handle formaction, formmethod, formenctype on submit buttons
+  procedure pushEntry(const n, v: string);
+  begin
+    SetLength(result.names, length(result.names) + 1);
+    SetLength(result.values, length(result.values) + 1);
+    result.names[high(result.names)] := n;
+    result.values[high(result.values)] := v;
+  end;
+  procedure checkForDirname();
+  begin
+    if node.hasAttribute('dirname', cmp) then
+      pushEntry(node.getAttribute('dirname', cmp), 'LTR');
+  end;
 
-function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllInputs: boolean; out name, value: string): boolean;
 //submittable elements:   button input object select textarea
 type TSubmittableElement = (seButton, seInput, seObject, seSelect, seTextarea);
-type TInputElementType = (ietOther, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
+type TInputElementType = (ieNotAnInputElement, ietOther, ietTextOrSearch, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
+const IMAGE_BUTTON_DEFAULT_COORD = '1';
 var
-  typ: String;
-  first: Boolean;
+  typ, name: String;
   kind: TSubmittableElement;
-  inputKind: TInputElementType;
-  ancestor, legend, descendant: TTreeNode;
+  inputKind: TInputElementType = ieNotAnInputElement;
+  ancestor, legend, descendant, firstOption: TTreeNode;
 begin
-  result := false;
+  result := default(TFormElementData);
+  result.hasData := false;
   if node.typ <> tetOpen then exit;
 
   if cmp(node.value, 'input') then begin
     kind := seInput;
     typ := node.getAttribute('type', cmp);
 
-    if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
-    else if cmp(typ, 'image') then inputKind := ietImageButton
-    else if cmp(typ, 'submit') or cmp(typ, 'reset') or cmp(typ, 'button')  then inputKind := ietButton
+    if cmp(typ, 'hidden') then inputKind := ietOther //common types first for faster comparison
+    else if (typ =  '') or cmp(typ, 'text') or cmp(typ, 'search') then inputKind := ietTextOrSearch
+    else if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
+    else if cmp(typ, 'image') then begin
+      inputKind := ietImageButton;
+      result.isSubmitButton := true;
+    end else if cmp(typ, 'submit') then begin
+      inputKind := ietButton;
+      result.isSubmitButton := true;
+    end else if cmp(typ, 'reset') or cmp(typ, 'button')  then inputKind := ietButton
     else if cmp(typ, 'file') then inputKind := ietFile
-    else inputKind := ietOther
-    ;
+    else case lowercase(typ) of {todo: handle cmp}
+      'tel', 'url', 'email', 'password',
+      'date', 'month', 'week',
+      'time', 'datetime-local',
+      'number', 'range', 'color': inputKind := ietOther;
+      else inputKind := ietTextOrSearch; //invalid value => text default
+    end;
   end else begin
-    inputKind := ietOther;  //not used, fixes a pointless warning
     if cmp(node.value, 'select') then kind := seSelect
     else if cmp(node.value, 'textarea') then kind := seTextarea
-    else if cmp(node.value, 'button') then kind := seButton
-    else if cmp(node.value, 'object') then kind := seObject
+    else if cmp(node.value, 'button') then begin
+      kind := seButton;
+      result.isSubmitButton := cmp(node.getAttribute('type', cmp), 'submit');
+    end else if cmp(node.value, 'object') then kind := seObject
     else exit;
   end;
 
   if not includeAllInputs then begin
-    if (kind = seButton) or ((kind = seInput) and (inputKind in [ietImageButton,ietButton])) then exit; //todo: only exit if not submitter
     if kind = seObject then exit; //we have no plugins?
-
+    if ((kind = seButton) or (inputKind in [ietImageButton,ietButton])) and not result.isSubmitButton then exit;
     if (kind <> seObject) and node.hasAttribute('disabled', cmp) then exit;
+    if (inputKind = ietCheckboxOrRadiobutton) and not node.hasAttribute('checked', cmp) then exit;
+
     legend := nil;
     for ancestor in node.getEnumeratorAncestors do begin
       if cmp(ancestor.value, 'fieldset') and ancestor.hasAttribute('disabled', cmp) then begin
@@ -1270,47 +1302,52 @@ begin
       end else if cmp(ancestor.value, 'legend') then legend := ancestor
       //else if cmp(ancestor.value, 'datalist') then exit; html5 says, ignore fields with a datalist ancestor, but FF/Chromium do not do that
     end;
-
-    if (inputKind = ietCheckboxOrRadiobutton) and (kind = seInput) and not node.hasAttribute('checked', cmp) then exit;
   end;
 
 
   name := node.getAttribute('name', cmp);
 
-  if name = '' then exit; //todo: do not exit on image buttons here
-
-  //todo: image button x,y
+  if (name = '') and (inputKind <> ietImageButton) then exit;
 
   case kind of
     seSelect: begin
-      value := '';
-      first := true;
+      firstOption := nil;
       for descendant in node.getEnumeratorDescendants do begin
-        if cmp(descendant.value, 'option') and (first or descendant.hasAttribute('selected', cmp)) then begin
-          value := descendant.getAttribute('value', cmp);
-          first := false;
-          //todo: multiple options can be selected
+        if cmp(descendant.value, 'option') and (not assigned(firstOption) or descendant.hasAttribute('selected', cmp)) then begin
+          if not assigned(firstOption) then firstOption := descendant;
           if descendant.hasAttribute('selected', cmp) then
-            break;
+            pushEntry(name, descendant.getAttribute('value', cmp));
         end;
       end;
-      exit(not first);
+      if (length(result.names) = 0) and (assigned(firstOption)) then
+        pushEntry(name, firstOption.getAttribute('value', cmp));
     end;
     seInput: begin
       case inputKind of
-        ietCheckboxOrRadiobutton: value := node.getAttribute('value', 'on', cmp);
+        ietCheckboxOrRadiobutton: pushEntry(name, node.getAttribute('value', 'on', cmp));
         ietFile: exit; //todo: file upload
+        ietImageButton: begin
+          if name <> '' then name += '.';
+          pushEntry(name + 'x', IMAGE_BUTTON_DEFAULT_COORD);
+          pushEntry(name + 'y', IMAGE_BUTTON_DEFAULT_COORD);
+        end;
         //todo: ietHidden: if name = '_charset_' then value := getFormCharset(form)
-        else value := node.getAttribute('value', cmp);
+        else begin
+          pushEntry(name, node.getAttribute('value', cmp));
+          if inputKind = ietTextOrSearch then
+            checkForDirname();
+        end;
       end;
     end;
     //seObject: ; aborted above
-    seTextarea: value := node.deepNodeText()
-    else value := node.getAttribute('value', cmp);
+    seTextarea: begin
+      pushEntry(name, node.deepNodeText());
+      checkForDirname();
+    end else pushEntry(name, node.getAttribute('value', cmp));
   end;
-  //todo: dirname attribute
+
   //todo: line normalization
-  result := true;
+  result.hasData := length(result.names) > 0;
 end;
 
 
@@ -1551,20 +1588,28 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     end;
   end;
 
+  procedure addFormData(const formData: TFormElementData);
+  var
+    i: Integer;
+  begin
+    for i := 0 to high(formData.names) do
+      addKeyValue(formData.names[i], formData.values[i]);
+  end;
+
 var
   v: PIXQValue;
-  sname: string;
-  svalue: string;
   nodeCompare: TStringComparisonFunc;
+  formData: TFormElementData;
 begin
   nodeCompare := @staticContext.NodeCollation.equal;
   for v in value.GetEnumeratorPtrUnsafe do
     case v^.kind of
       pvkObject: addObject(v^);
-      pvkNode:
-        if nodeToFormData(v^.toNode, nodeCompare, true, sname, svalue) then
-          addKeyValue(sname, svalue)
+      pvkNode: begin
+        formData := nodeToFormData(v^.toNode, nodeCompare, true);
+        if formData.hasData then addFormData(formData)
        else addUrlEncodedList(v^.toString);
+      end
      else addUrlEncodedList(v^.toString)
    end;
 end;
@@ -1671,18 +1716,22 @@ end;
 function THttpRequestParams.addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams
   ): boolean;
 var temp: TTreeNode;
-  name, value: string;
+  formData: TFormElementData;
+  i: Integer;
 begin
   for temp in form.getEnumeratorDescendants do begin
-    if nodeToFormData(temp, cmp, false, name, value) then begin
-      addKeyValue(name, value);
-    end else if (cmp(temp.value, 'input') or cmp(temp.value, 'button')) and cmp(temp.getAttribute('type'), 'submit') then begin
-      name := temp.getAttribute('name');
-      if (name <> '') and requestOverride.firstKeyIndex.contains(name) then
-        addKeyValue(name, temp.getAttribute('value'));
+    formData := nodeToFormData(temp, cmp, false);
+    if not formData.hasData then
+      continue;
+    if formData.isSubmitButton then begin
+      if ((high(formdata.names) < 0) or not requestOverride.firstKeyIndex.contains(formData.names[0]))
+         and ((high(formdata.names) < 1) or not requestOverride.firstKeyIndex.contains(formData.names[1])) //for image buttons
+        then
+        continue;
     end;
+    for i := 0 to high(formData.names) do
+      addKeyValue(formData.names[i], formData.values[i]);
   end;
-
   result := mergeOverride(requestOverride);
 end;
 

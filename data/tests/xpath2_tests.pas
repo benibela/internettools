@@ -3368,6 +3368,37 @@ begin
   t('form(//form).url', 'abs://hallo?abc=cba', '!<html><form action="abs://hallo"><input name="abc" value="cba"/></form></html>');
   t('form(//form).url', 'abs://foo/bar?abcdef=on', '!<html><form action="abs://foo/bar"><input name="abcdef" type="checkbox" checked/></form></html>');
 
+  t('form(//form).url', 'abs://hello?ab=&ab.dir=LTR&ab2=&ab2.dir=LTR&ab3=&ab3.dir=LTR&ab4=&ab5=&ab5.dir=LTR', '!<html><form action="abs://hello"><input name="ab" dirname="ab.dir"/><input name="ab2" dirname="ab2.dir" type="text"/><input name="ab3" dirname="ab3.dir" type="search"/><input name="ab4" dirname="ab4.dir" type="hidden"/><input name="ab5" dirname="ab5.dir" type="invalid"/></form></html>');
+
+  t('//form/form(.).url', 'abs://example', '<html><form action="abs://example"><input type="image"/><input type="image" name="foobar"/><input type="submit" name="xyz" value="abc"/><button type="submit" name="btn" value="def"/><button name="000"/></form></html>');
+  t('//form/form(., input[1]).url', 'abs://example?x=1&y=1');
+  t('//form/form(., input[2]).url', 'abs://example?foobar.x=1&foobar.y=1');
+  t('//form/form(., input[3]).url', 'abs://example?xyz=abc');
+  t('//form/form(., button[1]).url', 'abs://example?btn=def');
+  t('//form/form(., button[2]).url', 'abs://example?000=');
+  t('//form/form(., "x=99").url', 'abs://example?x=99&y=1');
+  t('//form/form(., "y=99").url', 'abs://example?x=1&y=99');
+  t('//form/form(., "x=99&y=99").url', 'abs://example?x=99&y=99');
+  t('//form/form(., "foobar.x=99").url', 'abs://example?foobar.x=99&foobar.y=1');
+  t('//form/form(., "foobar.y=99").url', 'abs://example?foobar.x=1&foobar.y=99');
+  t('//form/form(., "foobar.x=99&foobar.y=99").url', 'abs://example?foobar.x=99&foobar.y=99');
+  t('//form/form(., "xyz=---").url', 'abs://example?xyz=---');
+  t('//form/form(., "btn=___").url', 'abs://example?btn=___');
+
+  t('form(//form).url', 'abs://hello?one=o1&second=o2&three=o1&three=o2&three=o3&alternate=o2&alternate=o4',
+    '!<html><form action="abs://hello">' +
+      '<select name="zero"/>' +
+      '<select name="one"><option value="o1"/></select>' +
+      '<select name="second"><option value="o1"/><option value="o2" selected="selected"/></select>' +
+      '<select name="three"><option value="o1" selected="selected"/><option value="o2" selected="selected"/><option value="o3" selected="selected"/></select>' +
+      '<select name="alternate"><option value="o1"/><option value="o2" selected="selected"/><option value="o3"/><option value="o4" selected="selected"/></select>' +
+      '</form></html>');
+  t('form(//form, "one=ONE").url', 'abs://hello?one=ONE&second=o2&three=o1&three=o2&three=o3&alternate=o2&alternate=o4');
+  t('form(//form, "second=minute").url', 'abs://hello?one=o1&second=minute&three=o1&three=o2&three=o3&alternate=o2&alternate=o4');
+  t('form(//form, "three=thymes").url', 'abs://hello?one=o1&second=o2&three=thymes&alternate=o2&alternate=o4');
+  t('form(//form, "alternate=o1&alternate=o3").url', 'abs://hello?one=o1&second=o2&three=o1&three=o2&three=o3&alternate=o1&alternate=o3');
+
+
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%C3%A4=%C3%BC", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "latin1"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "cp1252"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "cp1252"}');
