@@ -1222,9 +1222,10 @@ end;
 
 
 type
+THttpRequestHTMLFormKind = (hrhfDefault, hrhfNoValue, hrhfSubmitButton, hrhfCharsetSpecial);
 TFormElementData = record
   hasData: boolean;
-  isSubmitButton, isCharsetSpecial: boolean;
+  kind: THttpRequestHTMLFormKind;
   names, values: array of string;
 end;
 
@@ -1274,10 +1275,10 @@ begin
     else if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
     else if cmp(typ, 'image') then begin
       inputKind := ietImageButton;
-      result.isSubmitButton := true;
+      result.kind := hrhfSubmitButton;
     end else if cmp(typ, 'submit') then begin
       inputKind := ietButton;
-      result.isSubmitButton := true;
+      result.kind := hrhfSubmitButton;
     end else if cmp(typ, 'reset') or cmp(typ, 'button')  then inputKind := ietButton
     else if cmp(typ, 'file') then inputKind := ietFile
     else case lowercase(typ) of {todo: handle cmp}
@@ -1292,14 +1293,14 @@ begin
     else if cmp(node.value, 'textarea') then kind := seTextarea
     else if cmp(node.value, 'button') then begin
       kind := seButton;
-      result.isSubmitButton := cmp(node.getAttribute('type', cmp), 'submit');
+      if cmp(node.getAttribute('type', cmp), 'submit') then result.kind := hrhfSubmitButton;
     end else if cmp(node.value, 'object') then kind := seObject
     else exit;
   end;
 
   if not includeAllInputs then begin
     if kind = seObject then exit; //we have no plugins?
-    if ((kind = seButton) or (inputKind in [ietImageButton,ietButton])) and not (result.isSubmitButton) then exit;
+    if ((kind = seButton) or (inputKind in [ietImageButton,ietButton])) and (result.kind <> hrhfSubmitButton) then exit;
     if (kind <> seObject) and node.hasAttribute('disabled', cmp) then exit;
     if (inputKind = ietCheckboxOrRadiobutton) and not node.hasAttribute('checked', cmp) then exit;
 
@@ -1343,7 +1344,7 @@ begin
         else begin
           pushEntryNameValue();
           case inputKind of
-            ietHidden: result.isCharsetSpecial := striEqual(name, '_charset_') and not node.hasAttribute('value', cmp);
+            ietHidden: if striEqual(name, '_charset_') and not node.hasAttribute('value', cmp) then result.kind := hrhfCharsetSpecial;
             ietTextOrSearch: checkForDirname();
           end;
         end;
@@ -1395,7 +1396,7 @@ end;
 type
 THttpRequestParam = record
   key, value: string;
-  hasValue: boolean;
+  kind: THttpRequestHTMLFormKind;
   mimeHeaders: TStringArray;
 end;
 PHttpRequestParam = ^THttpRequestParam;
@@ -1441,7 +1442,7 @@ begin
     else SetLength(data, 16);
   result := @data[size];
   result.key := k;
-  result.hasValue := true;
+  result.kind := hrhfDefault;
   keysToRemove.exclude(k);
   firstKeyIndex.include(k, size, false);
   inc(size);
@@ -1451,7 +1452,7 @@ function THttpRequestParams.addRawParam(const p: THttpRequestParam): PHttpReques
 begin
   result := addRawKey(p.key);
   result.value := p.value;
-  result.hasValue := p.hasValue;
+  result.kind := p.kind;
   result.mimeHeaders := p.mimeHeaders;
 end;
 
@@ -1538,19 +1539,19 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
 
     headers := '';
     value := '';
-    param.hasValue := false;
+    param.kind := hrhfNoValue;
     filename := '';
     contenttype := '';
     if v.hasProperty('file', @temp) then begin
       filename := temp.toString;
       value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
-      param.hasValue := true;
+      param.kind := hrhfDefault;
     end;
     if v.hasProperty('filename', @temp) then filename := temp.toString;
     if v.hasProperty('type', @temp) then contenttype := temp.toString;
     if v.hasProperty('value', @temp) then begin
       value := temp.toString;
-      param.hasValue := true;
+      param.kind := hrhfDefault;
     end;
 
     if v.hasProperty('headers', @temp) then begin
@@ -1607,7 +1608,7 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     i: Integer;
   begin
     for i := 0 to high(formData.names) do
-      addKeyValue(formData.names[i], formData.values[i]);
+      addKeyValue(formData.names[i], formData.values[i]).kind := formData.kind;
   end;
 
 var
@@ -1695,7 +1696,6 @@ var
 
 var oldData: array of THttpRequestParam;
   oldSize, i, replaced: SizeInt;
-  oldHasCharsetSpecial: Boolean;
 begin
   result := false;
   if (requestOverride.urlencoded <> urlencoded) or
@@ -1716,9 +1716,12 @@ begin
         result := true;
         requestOverrideKeyIndex.include(oldData[i].key, requestOverrideNextKeyOccurrence[replaced]);
         requestOverrideUsed[replaced] := true;
-        if requestOverride.data[replaced].hasValue then begin
-          data[size-1].value := requestOverride.data[replaced].value;
-          data[size-1].hasValue := true;
+        if requestOverride.data[replaced].kind <> hrhfNoValue then begin
+          data[size-1].kind := requestOverride.data[replaced].kind;
+          if requestOverride.data[replaced].kind = hrhfCharsetSpecial then
+            data[size-1].value := strEncodingName(charset)
+          else
+            data[size-1].value := requestOverride.data[replaced].value;
         end;
         if requestOverride.data[replaced].mimeHeaders <> nil then mergeHeaders(data[size-1], requestOverride.data[replaced]);
       end;
@@ -1741,15 +1744,17 @@ begin
     formData := nodeToFormData(temp, cmp, false);
     if not formData.hasData then
       continue;
-    if formData.isSubmitButton then begin
-      if ((high(formdata.names) < 0) or not requestOverride.firstKeyIndex.contains(formData.names[0]))
-         and ((high(formdata.names) < 1) or not requestOverride.firstKeyIndex.contains(formData.names[1])) //for image buttons
-        then
-        continue;
-    end else if formData.isCharsetSpecial and (length(formData.values) > 0) then
-      formData.values[0] := strEncodingName(charset);
+    case formData.kind of
+      hrhfSubmitButton: begin
+        if ((high(formdata.names) < 0) or not requestOverride.firstKeyIndex.contains(formData.names[0]))
+           and ((high(formdata.names) < 1) or not requestOverride.firstKeyIndex.contains(formData.names[1])) //for image buttons
+          then
+          continue;
+      end;
+      hrhfCharsetSpecial: if length(formData.values) > 0 then formData.values[0] := strEncodingName(charset);
+    end;
     for i := 0 to high(formData.names) do
-      addKeyValue(formData.names[i], formData.values[i]);
+      addKeyValue(formData.names[i], formData.values[i]).kind := formData.kind;
   end;
   result := mergeOverride(requestOverride);
 end;

@@ -3401,9 +3401,9 @@ begin
   t('//form/form(.).url', 'abs://example?_charset_=UTF-8', '<html><form action="abs://example"><input type="hidden" name="_charset_"/></form></html>');
   t('//form/form(., "_charset_=foo").url', 'abs://example?_charset_=foo');
   t('//form/form(., .//input).url', 'abs://example?_charset_=UTF-8');
-  t('//form/form(.).url', 'abs://example?_charset_=cp-1252', '<html><form action="abs://example" encoding="latin1"><input type="hidden" name="_charset_"/></form></html>');
+  t('//form/form(.).url', 'abs://example?_charset_=iso-8859-1', '<html><form action="abs://example" accept-charset="latin1"><input type="hidden" name="_charset_"/></form></html>');
   t('//form/form(., "_charset_=foo").url', 'abs://example?_charset_=foo');
-  t('//form/form(., .//input).url', 'abs://example?_charset_=cp-1252');
+  t('//form/form(., .//input).url', 'abs://example?_charset_=iso-8859-1');
 
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%C3%A4=%C3%BC", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "latin1"}');
