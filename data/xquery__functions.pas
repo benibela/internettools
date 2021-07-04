@@ -1246,8 +1246,15 @@ function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllI
 type TSubmittableElement = (seButton, seInput, seObject, seSelect, seTextarea);
 type TInputElementType = (ieNotAnInputElement, ietOther, ietTextOrSearch, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
 const IMAGE_BUTTON_DEFAULT_COORD = '1';
+var name: string;
+  procedure pushEntryNameValue(n: TTreeNode = nil);
+  begin
+    if n = nil then n := node;
+    pushEntry(name, n.getAttribute('value', cmp));
+  end;
+
 var
-  typ, name: String;
+  typ: String;
   kind: TSubmittableElement;
   inputKind: TInputElementType = ieNotAnInputElement;
   ancestor, legend, descendant, firstOption: TTreeNode;
@@ -1316,11 +1323,11 @@ begin
         if cmp(descendant.value, 'option') and (not assigned(firstOption) or descendant.hasAttribute('selected', cmp)) then begin
           if not assigned(firstOption) then firstOption := descendant;
           if descendant.hasAttribute('selected', cmp) then
-            pushEntry(name, descendant.getAttribute('value', cmp));
+            pushEntryNameValue(descendant);
         end;
       end;
       if (length(result.names) = 0) and (assigned(firstOption)) then
-        pushEntry(name, firstOption.getAttribute('value', cmp));
+        pushEntryNameValue(firstOption);
     end;
     seInput: begin
       case inputKind of
@@ -1333,7 +1340,7 @@ begin
         end;
         //todo: ietHidden: if name = '_charset_' then value := getFormCharset(form)
         else begin
-          pushEntry(name, node.getAttribute('value', cmp));
+          pushEntryNameValue();
           if inputKind = ietTextOrSearch then
             checkForDirname();
         end;
@@ -1343,7 +1350,7 @@ begin
     seTextarea: begin
       pushEntry(name, node.deepNodeText());
       checkForDirname();
-    end else pushEntry(name, node.getAttribute('value', cmp));
+    end else pushEntryNameValue();
   end;
 
   //todo: line normalization
