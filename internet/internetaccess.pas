@@ -638,7 +638,7 @@ begin
     result += encodedData[i];
   end;
 
-  result += #13#10'--' + boundary + '--';
+  result += #13#10'--' + boundary + '--'#13#10;
 end;
 
 procedure TMIMEMultipartData.parse(sdata, boundary: string);
