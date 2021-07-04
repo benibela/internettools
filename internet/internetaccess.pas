@@ -160,6 +160,7 @@ type
   //**URL Encoding encodes every special character @code(#$AB) by @code(%AB). This model describes which characters are special:
   TUrlEncodingModel = (
     ueHTMLForm,     //**< Encode for application/x-www-form-urlencoded as defined in HTML 5 standard
+    ueHTMLMultipartFieldName,  //**< Encode for  multipart/form-data field names as defined in HTML 5 standard
     ueURLPath,      //**< Encode for the path part of an URL
     ueURLQuery,     //**< Encode for the query part of an URL
     ueXPathURI,     //**< Encode for the XPath/XQuery function fn:encode-for-uri as defined in the XPath standard
@@ -1475,6 +1476,10 @@ const allowedUnreserved =  ['0'..'9', 'A'..'Z', 'a'..'z',    '-', '_', '.', '!',
       allChars = [#0..#255];
 const ENCODE_TABLE: array[TUrlEncodingModel] of TCharSet = (
   allChars - [#$20, #$2A, #$2D, #$2E, #$30..#$39, #$41..#$5A, #$5F, #$61..#$7A],
+  //Multipart name encoding:
+  //this is written in the HTML5 standard.
+  //this is nothing like the browser behaviour. Firefox converts " to \" and line break to space
+  [#$A, #$D, #$22],
   allChars - allowedPath,
   allChars - allowedURI,
   allChars - ['a'..'z', 'A'..'Z', '0'..'9', '-', '_', '.', '~'],

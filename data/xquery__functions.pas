@@ -1391,7 +1391,10 @@ begin
     s := strConvertFromUtf8(s, encoding);
   result := TInternetAccess.urlEncodeData(s, ueHTMLForm);
 end;
-
+function formMultipartFieldEncode(s: string): string;
+begin
+  result := TInternetAccess.urlEncodeData(s, ueHTMLMultipartFieldName);
+end;
 
 type
 THttpRequestParam = record
@@ -1562,7 +1565,13 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
       end;
     end;
 
-    if urlEncoded then value := formEncode(value, charset);
+    if urlEncoded then value := formEncode(value, charset)
+    else begin
+      n := formMultipartFieldEncode(n);
+      filename := formMultipartFieldEncode(filename);
+      contenttype := formMultipartFieldEncode(contenttype);
+    end;
+
 
     param.value := value;
     param.mimeHeaders := TMIMEMultipartData.buildHeaders(n, filename, contenttype, headers);
@@ -1799,7 +1808,7 @@ begin
   SetLength(result.data, size);
   for i := 0 to size - 1 do begin
     result.data[i].data := data[i].value;
-    result.data[i].headers := TMIMEMultipartData.insertMissingNameToHeaders(data[i].key, data[i].mimeHeaders);
+    result.data[i].headers := TMIMEMultipartData.insertMissingNameToHeaders(formMultipartFieldEncode(data[i].key), data[i].mimeHeaders);
   end;
 end;
 
