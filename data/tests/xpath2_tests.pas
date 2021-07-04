@@ -3398,6 +3398,12 @@ begin
   t('form(//form, "three=thymes").url', 'abs://hello?one=o1&second=o2&three=thymes&alternate=o2&alternate=o4');
   t('form(//form, "alternate=o1&alternate=o3").url', 'abs://hello?one=o1&second=o2&three=o1&three=o2&three=o3&alternate=o1&alternate=o3');
 
+  t('//form/form(.).url', 'abs://example?_charset_=UTF-8', '<html><form action="abs://example"><input type="hidden" name="_charset_"/></form></html>');
+  t('//form/form(., "_charset_=foo").url', 'abs://example?_charset_=foo');
+  t('//form/form(., .//input).url', 'abs://example?_charset_=UTF-8');
+  t('//form/form(.).url', 'abs://example?_charset_=cp-1252', '<html><form action="abs://example" encoding="latin1"><input type="hidden" name="_charset_"/></form></html>');
+  t('//form/form(., "_charset_=foo").url', 'abs://example?_charset_=foo');
+  t('//form/form(., .//input).url', 'abs://example?_charset_=cp-1252');
 
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%C3%A4=%C3%BC", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "latin1"}');

@@ -1221,8 +1221,10 @@ begin
 end;
 
 
-type TFormElementData = record
-  hasData, isSubmitButton: boolean;
+type
+TFormElementData = record
+  hasData: boolean;
+  isSubmitButton, isCharsetSpecial: boolean;
   names, values: array of string;
 end;
 
@@ -1244,7 +1246,7 @@ function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllI
 
 //submittable elements:   button input object select textarea
 type TSubmittableElement = (seButton, seInput, seObject, seSelect, seTextarea);
-type TInputElementType = (ieNotAnInputElement, ietOther, ietTextOrSearch, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
+type TInputElementType = (ieNotAnInputElement, ietOther, ietHidden, ietTextOrSearch, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
 const IMAGE_BUTTON_DEFAULT_COORD = '1';
 var name: string;
   procedure pushEntryNameValue(n: TTreeNode = nil);
@@ -1267,7 +1269,7 @@ begin
     kind := seInput;
     typ := node.getAttribute('type', cmp);
 
-    if cmp(typ, 'hidden') then inputKind := ietOther //common types first for faster comparison
+    if cmp(typ, 'hidden') then inputKind := ietHidden //common types first for faster comparison
     else if (typ =  '') or cmp(typ, 'text') or cmp(typ, 'search') then inputKind := ietTextOrSearch
     else if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
     else if cmp(typ, 'image') then begin
@@ -1297,7 +1299,7 @@ begin
 
   if not includeAllInputs then begin
     if kind = seObject then exit; //we have no plugins?
-    if ((kind = seButton) or (inputKind in [ietImageButton,ietButton])) and not result.isSubmitButton then exit;
+    if ((kind = seButton) or (inputKind in [ietImageButton,ietButton])) and not (result.isSubmitButton) then exit;
     if (kind <> seObject) and node.hasAttribute('disabled', cmp) then exit;
     if (inputKind = ietCheckboxOrRadiobutton) and not node.hasAttribute('checked', cmp) then exit;
 
@@ -1338,11 +1340,12 @@ begin
           pushEntry(name + 'x', IMAGE_BUTTON_DEFAULT_COORD);
           pushEntry(name + 'y', IMAGE_BUTTON_DEFAULT_COORD);
         end;
-        //todo: ietHidden: if name = '_charset_' then value := getFormCharset(form)
         else begin
           pushEntryNameValue();
-          if inputKind = ietTextOrSearch then
-            checkForDirname();
+          case inputKind of
+            ietHidden: result.isCharsetSpecial := striEqual(name, '_charset_') and not node.hasAttribute('value', cmp);
+            ietTextOrSearch: checkForDirname();
+          end;
         end;
       end;
     end;
@@ -1405,6 +1408,7 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   data: array of THttpRequestParam;
   firstKeyIndex: TXQHashmapStrSizeInt;
   keysToRemove: TXQHashsetStr;
+  hasCharsetSpecial: boolean;
   function addRawKey(const k: string): PHttpRequestParam;
   function addRawParam(const p: THttpRequestParam): PHttpRequestParam;
   function addRawKeyValue(const k, v: string): PHttpRequestParam;
@@ -1419,12 +1423,13 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   //returns true if a value has been overridden
   function addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams): boolean;
 
+
   function toUrlEncodedRequest: string;
   function toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
   function toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
 
   procedure compress;
-  procedure clear;
+  procedure clearData; //does not clear meta properties like charset
   constructor init;
   destructor done;
 end;
@@ -1446,6 +1451,7 @@ function THttpRequestParams.addRawParam(const p: THttpRequestParam): PHttpReques
 begin
   result := addRawKey(p.key);
   result.value := p.value;
+  result.hasValue := p.hasValue;
   result.mimeHeaders := p.mimeHeaders;
 end;
 
@@ -1461,7 +1467,7 @@ begin
     SetLength(data, size);
 end;
 
-procedure THttpRequestParams.clear;
+procedure THttpRequestParams.clearData;
 begin
   size := 0;
   data := nil;
@@ -1477,6 +1483,7 @@ begin
   urlencoded := false;
   size := 0;
   data := nil;
+  hasCharsetSpecial := false;
 end;
 
 destructor THttpRequestParams.done;
@@ -1688,6 +1695,7 @@ var
 
 var oldData: array of THttpRequestParam;
   oldSize, i, replaced: SizeInt;
+  oldHasCharsetSpecial: Boolean;
 begin
   result := false;
   if (requestOverride.urlencoded <> urlencoded) or
@@ -1697,7 +1705,7 @@ begin
 
   oldData := data;
   oldSize := size;
-  clear;
+  clearData;
   SetLength(data, oldSize + requestOverride.size);
   for i := 0 to oldSize - 1 do begin
     replaced := requestOverrideKeyIndex.get(oldData[i].key, -2);
@@ -1708,7 +1716,10 @@ begin
         result := true;
         requestOverrideKeyIndex.include(oldData[i].key, requestOverrideNextKeyOccurrence[replaced]);
         requestOverrideUsed[replaced] := true;
-        if requestOverride.data[replaced].hasValue then data[size-1].value := requestOverride.data[replaced].value;
+        if requestOverride.data[replaced].hasValue then begin
+          data[size-1].value := requestOverride.data[replaced].value;
+          data[size-1].hasValue := true;
+        end;
         if requestOverride.data[replaced].mimeHeaders <> nil then mergeHeaders(data[size-1], requestOverride.data[replaced]);
       end;
     end;
@@ -1735,12 +1746,14 @@ begin
          and ((high(formdata.names) < 1) or not requestOverride.firstKeyIndex.contains(formData.names[1])) //for image buttons
         then
         continue;
-    end;
+    end else if formData.isCharsetSpecial and (length(formData.values) > 0) then
+      formData.values[0] := strEncodingName(charset);
     for i := 0 to high(formData.names) do
       addKeyValue(formData.names[i], formData.values[i]);
   end;
   result := mergeOverride(requestOverride);
 end;
+
 
 function THttpRequestParams.toUrlEncodedRequest: string;
 var sb: TStrBuilder;
