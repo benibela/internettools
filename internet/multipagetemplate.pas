@@ -891,6 +891,10 @@ begin
     SetLength(children, length(children)+1);
     children[high(children)] := TTemplateActionPattern.createFromFile(context, t.getAttribute('templateFile'));
   end;
+  if t.hasAttribute('pattern-href') then begin //alternative to templateFile, not recommended to use
+    SetLength(children, length(children)+1);
+    children[high(children)] := TTemplateActionPattern.createFromFile(context, t.getAttribute('pattern-href'));
+  end;
   case LowerCase(t.value) of
     'json': inputFormat := itfJSON;
     else inputFormat := itfHTML;
