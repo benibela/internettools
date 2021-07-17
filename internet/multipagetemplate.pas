@@ -44,6 +44,7 @@ type
   TTemplateLoadingContext = class
     path: string;
     loadFileCallback: TLoadTemplateFile;
+    function createParser: TTreeParser;
   end;
 
   //**@abstract(Internal used base class for an action within the multi page template)
@@ -445,6 +446,14 @@ type
 
 resourcestring
   rsActionNotFound = 'Action %s not found.';
+
+function TTemplateLoadingContext.createParser: TTreeParser;
+begin
+  result := TTreeParser.Create;
+  result.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
+  result.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
+  result.TargetEncoding:=CP_UTF8;
+end;
 
 
 
@@ -1135,6 +1144,19 @@ procedure TTemplateAction.addChildFromTree(context: TTemplateLoadingContext; t: 
     children[high(children)] := c.create();
     children[high(children)].initFromTree(context, t);
   end;
+  procedure addChildrenFromInclude();
+  var
+    href: String;
+    tree: TTreeParser;
+  begin
+    href := t['href'];
+    tree := context.createParser;
+    try
+      addChildrenFromTree(context, tree.parseTree(context.loadFileCallback(context.path+href)));
+    finally
+      tree.free;
+    end;
+  end;
 
 begin
   if t.typ <> tetOpen then exit;
@@ -1160,6 +1182,7 @@ begin
     's': addChild(TTemplateActionShort);
     'try': addChild(TTemplateActionTry);
     'catch': addChild(TTemplateActionCatch);
+    'include': addChildrenFromInclude();
     else raise ETemplateReader.Create('Unknown template node: '+t.outerXML);
   end;
 end;
@@ -1253,11 +1276,8 @@ begin
   if path <> '' then path := IncludeTrailingPathDelimiter(path);
   context.path := path;
   context.loadFileCallback := loadFileCallback;
-  tree := TTreeParser.Create;
+  tree := context.createParser;
   try
-    tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
-    tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
-    tree.TargetEncoding:=CP_UTF8;
     readTree(context, tree.parseTree(template));
     setPatternNames(baseActions);
   finally
