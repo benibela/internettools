@@ -40,18 +40,24 @@ type
   { TTemplateAction }
 
   TMultipageTemplateReader = class;
+  TLoadTemplateFile = function(name: RawByteString): string;
+  TTemplateLoadingContext = class
+    path: string;
+    loadFileCallback: TLoadTemplateFile;
+  end;
+
   //**@abstract(Internal used base class for an action within the multi page template)
   TTemplateAction = class
   protected
-    procedure addChildFromTree(t: TTreeNode);
+    procedure addChildFromTree(context: TTemplateLoadingContext; t: TTreeNode);
     procedure performChildren(reader: TMultipageTemplateReader);
     function cloneChildren(theResult: TTemplateAction): TTemplateAction;
     function parseQuery(reader: TMultipageTemplateReader; const query: string): IXQuery;
     function evaluateQuery(reader: TMultipageTemplateReader; const query: string): IXQValue;
   public
     children: array of TTemplateAction;
-    procedure initFromTree(t: TTreeNode); virtual;
-    procedure addChildrenFromTree(t: TTreeNode);
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); virtual;
+    procedure addChildrenFromTree(context: TTemplateLoadingContext; t: TTreeNode);
     procedure perform(reader: TMultipageTemplateReader); virtual;
     function clone: TTemplateAction; virtual;
     procedure clear;
@@ -69,14 +75,13 @@ type
       def: string;
       description: string;
     end;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
 
   { TMultiPageTemplate }
 
-  type TLoadTemplateFile = function(name: RawByteString): string;
 
   (***@abstract(A multi page template, which defines which and how pages are processed. @br )
 
@@ -218,12 +223,13 @@ type
   *)
   TMultiPageTemplate=class
   protected
-    procedure readTree(t: TTreeNode);
+    procedure readTemplateFromString(template: string; loadFileCallback: TLoadTemplateFile; path: string);
+    procedure readTree(context: TTemplateLoadingContext; t: TTreeNode);
   public
     //**The primary <actions> element (or the first <action> element, if only one exists)
     baseActions: TTemplateAction;
     //**The path of the xml file containing this template
-    path,name:string;
+    name:string;
 
     //variables: TStringList;
 
@@ -231,7 +237,8 @@ type
     //**Loads this template from a directory. @br The multipage template is read from the file template, and
     //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
     procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
-    //**Loads the template directly from a string. @br Loading pattern-matching templates with the templateFile attribute is not supported
+    //**Loads the template directly from a string.
+    //**@br Loading pattern-matching templates with the templateFile attribute is not supported
     procedure loadTemplateFromString(template: string; aname: string = 'unknown'; apath: string = '');
     //**Loads this template from a directory. @br The multipage template is read from the file template, and
     //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
@@ -317,7 +324,7 @@ type
 
   TTemplateActionMain = class(TTemplateAction)
     name: string;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -327,7 +334,7 @@ type
   TTemplateActionVariable = class(TTemplateAction)
     name, value, valuex: string;
     hasValueStr: boolean;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -339,7 +346,7 @@ type
     inputFormat: TInternetToolsFormat;
 
     errorHandling: string;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   private
@@ -348,18 +355,21 @@ type
 
   TTemplateActionPattern = class(TTemplateAction)
     pattern:string;
-    procedure initFromTree(t: TTreeNode); override;
+    constructor create;
+    constructor createFromFile(context: TTemplateLoadingContext; href: string);
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   private
-    name, href: string;
+    name: string;
+    procedure loadFile(context: TTemplateLoadingContext;href: string);
   end;
 
   { TTemplateActionCallAction }
 
   TTemplateActionCallAction = class(TTemplateAction)
     action, test: string;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -369,7 +379,7 @@ type
   TTemplateActionIf = class(TTemplateAction)
     test: string;
     &else: TTemplateAction;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
     destructor Destroy; override;
@@ -378,7 +388,7 @@ type
   { TTemplateActionChoose }
 
   TTemplateActionChoose = class(TTemplateAction)
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -387,7 +397,7 @@ type
 
   TTemplateActionChooseWhen = class(TTemplateAction)
     test: string;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -395,7 +405,7 @@ type
   { TTemplateActionChooseOtherwise }
 
   TTemplateActionChooseOtherwise = class(TTemplateAction)
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -403,7 +413,7 @@ type
 
   TTemplateActionLoop = class(TTemplateAction)
     varname, list, test: string;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -412,7 +422,7 @@ type
 
   TTemplateActionShort = class(TTemplateAction)
     test, query: string;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
@@ -420,14 +430,14 @@ type
   { TTemplateActionShort }
 
   TTemplateActionTry = class(TTemplateAction)
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform(reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
   end;
 
   TTemplateActionCatch = class(TTemplateAction)
     errNamespaces, errCodes: TStringArray;
-    procedure initFromTree(t: TTreeNode); override;
+    procedure initFromTree(context: TTemplateLoadingContext; t: TTreeNode); override;
     procedure perform({%H-}reader: TMultipageTemplateReader); override;
     function clone: TTemplateAction; override;
     function checkError(reader: TMultipageTemplateReader; const namespace, prefix, code: string): boolean;
@@ -438,12 +448,12 @@ resourcestring
 
 
 
-procedure TTemplateActionTry.initFromTree(t: TTreeNode);
+procedure TTemplateActionTry.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 var
   hadCatch: Boolean;
   i: Integer;
 begin
-  addChildrenFromTree(t);
+  addChildrenFromTree(context, t);
   hadCatch := false;
   for i := 0 to high(children) do
     if objInheritsFrom(children[i], TTemplateActionCatch) then hadCatch := true
@@ -493,7 +503,7 @@ begin
   result := cloneChildren(result);
 end;
 
-procedure TTemplateActionCatch.initFromTree(t: TTreeNode);
+procedure TTemplateActionCatch.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 var
   errors: TStringArray;
   i: Integer;
@@ -542,7 +552,7 @@ begin
         baseSchema.NCName.createValue(errCodes[i]); //ensure err code is valid
     end;
   end;
-  addChildrenFromTree(t);
+  addChildrenFromTree(context, t);
 end;
 
 procedure TTemplateActionCatch.perform(reader: TMultipageTemplateReader);
@@ -591,12 +601,29 @@ begin
   end;
 end;
 
-procedure TTemplateActionPattern.initFromTree(t: TTreeNode);
+constructor TTemplateActionPattern.create;
 begin
+
+end;
+
+constructor TTemplateActionPattern.createFromFile(context: TTemplateLoadingContext;href: string);
+begin
+  name := href;
+  loadFile(context, href);
+end;
+
+procedure TTemplateActionPattern.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
+var
+  href: String;
+begin
+  ignore(context);
   href := t.getAttribute('href'); //Is loaded later
   name := t.getAttribute('name');
   pattern := t.innerXML();
-  if (href <> '') and (pattern <> '') then raise ETemplateReader.create('Cannot mix href attribute with direct pattern text');
+  if (href <> '') then begin
+    if pattern <> '' then raise ETemplateReader.create('Cannot mix href attribute with direct pattern text');
+    loadFile(context, href);
+  end;
 end;
 
 procedure TTemplateActionPattern.perform(reader: TMultipageTemplateReader);
@@ -610,13 +637,20 @@ begin
   Result:=TTemplateActionPattern.Create;
   TTemplateActionPattern(result).pattern := pattern;
   TTemplateActionPattern(result).name := name;
-  TTemplateActionPattern(result).href := href;
+end;
+
+procedure TTemplateActionPattern.loadFile(context: TTemplateLoadingContext; href: string);
+begin
+  pattern:=context.loadFileCallback(context.path+href);
+  if pattern='' then
+    raise ETemplateReader.create('Failed to load "'+context.path+href+'".');
 end;
 
 { TTemplateActionShort }
 
-procedure TTemplateActionShort.initFromTree(t: TTreeNode);
+procedure TTemplateActionShort.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
+  ignore(context);
   query := t.deepNodeText();
   test := t['test'];
 end;
@@ -635,11 +669,11 @@ begin
   TTemplateActionShort(result).query:=query;
 end;
 
-procedure TTemplateActionIf.initFromTree(t: TTreeNode);
+procedure TTemplateActionIf.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
-  inherited initFromTree(t);
+  inherited initFromTree(context, t);
   test := t['test'];
-  addChildrenFromTree(t);
+  addChildrenFromTree(context, t);
   //else is handled separately
 end;
 
@@ -665,10 +699,11 @@ end;
 
 { TTemplateActionMeta }
 
-procedure TTemplateActionMeta.initFromTree(t: TTreeNode);
+procedure TTemplateActionMeta.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 var
   e: TTreeNode;
 begin
+  ignore(context);
   e := t.next;
   while e <> nil do begin
     if (e.typ = tetOpen) then
@@ -702,10 +737,10 @@ end;
 
 { TTemplateActionChooseOtherwise }
 
-procedure TTemplateActionChooseOtherwise.initFromTree(t: TTreeNode);
+procedure TTemplateActionChooseOtherwise.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
-  inherited initFromTree(t);
-  addChildrenFromTree(t);
+  inherited initFromTree(context, t);
+  addChildrenFromTree(context, t);
 end;
 
 procedure TTemplateActionChooseOtherwise.perform(reader: TMultipageTemplateReader);
@@ -720,10 +755,10 @@ end;
 
 { TTemplateActionChooseWhen }
 
-procedure TTemplateActionChooseWhen.initFromTree(t: TTreeNode);
+procedure TTemplateActionChooseWhen.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
-  inherited initFromTree(t);
-  addChildrenFromTree(t);
+  inherited initFromTree(context, t);
+  addChildrenFromTree(context, t);
   test := t['test'];
 end;
 
@@ -740,10 +775,10 @@ end;
 
 { TTemplateActionChoose }
 
-procedure TTemplateActionChoose.initFromTree(t: TTreeNode);
+procedure TTemplateActionChoose.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
-  inherited initFromTree(t);
-  addChildrenFromTree(t);
+  inherited initFromTree(context, t);
+  addChildrenFromTree(context, t);
 end;
 
 procedure TTemplateActionChoose.perform(reader: TMultipageTemplateReader);
@@ -771,12 +806,12 @@ begin
   result := cloneChildren(TTemplateActionChoose.Create);
 end;
 
-procedure TTemplateActionLoop.initFromTree(t: TTreeNode);
+procedure TTemplateActionLoop.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
   varname:=t['var'];
   list:=t['list'];
   test:=t['test'];
-  addChildrenFromTree(t);
+  addChildrenFromTree(context, t);
 end;
 
 procedure TTemplateActionLoop.perform(reader: TMultipageTemplateReader);
@@ -817,8 +852,9 @@ end;
 
 { TTemplateActionCallAction }
 
-procedure TTemplateActionCallAction.initFromTree(t: TTreeNode);
+procedure TTemplateActionCallAction.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
+  ignore(context);
   action := t['action'];
   test := t['test']
 end;
@@ -844,7 +880,7 @@ end;
 
 { TTemplateActionLoadPage }
 
-procedure TTemplateActionPage.initFromTree(t: TTreeNode);
+procedure TTemplateActionPage.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
   SetLength(postparams, 0);
   url := t.getAttribute('url', url);
@@ -853,9 +889,7 @@ begin
 
   if t.hasAttribute('templateFile') then begin //DEPRECATED pattern import syntax
     SetLength(children, length(children)+1);
-    children[high(children)] := TTemplateActionPattern.create();
-    TTemplateActionPattern(children[high(children)]).href := t.getAttribute('templateFile');
-    TTemplateActionPattern(children[high(children)]).name := TTemplateActionPattern(children[high(children)]).href;
+    children[high(children)] := TTemplateActionPattern.createFromFile(context, t.getAttribute('templateFile'));
   end;
   case LowerCase(t.value) of
     'json': inputFormat := itfJSON;
@@ -1032,8 +1066,9 @@ end;
 
 
 
-procedure TTemplateActionVariable.initFromTree(t: TTreeNode);
+procedure TTemplateActionVariable.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
+  ignore(context);
   name := t['name'];
   hasValueStr :=  t.getAttributeTry('value', value);
   valuex := t.deepNodeText();
@@ -1063,10 +1098,10 @@ end;
 
 { TTemplateActionMain }
 
-procedure TTemplateActionMain.initFromTree(t: TTreeNode);
+procedure TTemplateActionMain.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
   name := t['id'];
-  addChildrenFromTree(t);
+  addChildrenFromTree(context, t);
 end;
 
 procedure TTemplateActionMain.perform(reader: TMultipageTemplateReader);
@@ -1083,17 +1118,18 @@ end;
 { TTemplateAction }
 
 
-procedure TTemplateAction.initFromTree(t: TTreeNode);
+procedure TTemplateAction.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
+  ignore(context);
   ignore(t);
 end;
 
-procedure TTemplateAction.addChildFromTree(t: TTreeNode);
+procedure TTemplateAction.addChildFromTree(context: TTemplateLoadingContext; t: TTreeNode);
   procedure addChild(c: TTemplateActionClass);
   begin
     SetLength(children, length(children)+1);
     children[high(children)] := c.create();
-    children[high(children)].initFromTree(t);
+    children[high(children)].initFromTree(context, t);
   end;
 
 begin
@@ -1101,7 +1137,7 @@ begin
   case LowerCase(t.value) of
     'variable': addChild(TTemplateActionVariable);
     'action': addChild(TTemplateActionMain);
-    'actions': addChildrenFromTree(t);
+    'actions': addChildrenFromTree(context, t);
     'page', 'json': addChild(TTemplateActionPage);
     'pattern': addChild(TTemplateActionPattern);
     'call': addChild(TTemplateActionCallAction);
@@ -1115,7 +1151,7 @@ begin
       if (length(children) = 0 ) or not objInheritsFrom(children[high(children)], TTemplateActionIf) then raise ETemplateReader.create('<else> must follow <if>')
       else begin
         TTemplateActionIf(children[high(children)]).&else := TTemplateAction.Create;
-        TTemplateActionIf(children[high(children)]).&else.addChildrenFromTree(t);
+        TTemplateActionIf(children[high(children)]).&else.addChildrenFromTree(context, t);
       end;
     's': addChild(TTemplateActionShort);
     'try': addChild(TTemplateActionTry);
@@ -1153,11 +1189,11 @@ begin
   result := reader.evaluateQuery(parseQuery(reader, query));
 end;
 
-procedure TTemplateAction.addChildrenFromTree(t: TTreeNode);
+procedure TTemplateAction.addChildrenFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
   t := t.getFirstChild();
   while t <> nil do begin
-    addChildFromTree(t);
+    addChildFromTree(context, t);
     t := t.getNextSibling();
   end;
 end;
@@ -1190,24 +1226,6 @@ end;
 
 { TMultiPageTemplate }
 
-
-procedure TMultiPageTemplate.readTree(t: TTreeNode);
-var  u: TTreeNode;
-begin
-  baseActions.clear;
-
-  if not (t.typ in [tetOpen, tetDocument]) then raise ETemplateReader.Create('Empty template');
-  u := t.findChild(tetOpen,'action',[tefoIgnoreText]);
-  if u = nil then raise ETemplateReader.Create('Empty template');
-  baseActions.addChildrenFromTree(u.getParent());
-end;
-
-
-constructor TMultiPageTemplate.create();
-begin
-  baseActions:=TTemplateAction.Create;
-end;
-
 procedure setPatternNames(a: TTemplateAction; baseName: string='');
 var
   i: Integer;
@@ -1222,70 +1240,65 @@ begin
     setPatternNames(a.children[i], baseName);
 end;
 
-procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
-begin
-  if not FileExists(_dataPath+'template') then
-    raise ETemplateReader.Create('Template '+_dataPath+' nicht gefunden');
-  IncludeTrailingPathDelimiter(_dataPath);
-  self.path:=_dataPath;
-  loadTemplateWithCallback(@strLoadFromFileUTF8, aname);
-end;
-
-procedure loadPatterns(a: TTemplateAction; loadSomething: TLoadTemplateFile; dataPath: string = '');
-var i:longint;
- b: TTemplateActionPattern;
-begin
- for i:=0 to high(a.children) do
-   loadPatterns(a.children[i],loadSomething, dataPath);
- if a.InheritsFrom(TTemplateActionPattern) then begin
-   b := TTemplateActionPattern(a);
-   if b.href = '' then exit;
-   b.pattern:=loadSomething(dataPath+b.href);
-   if b.pattern='' then
-     raise ETemplateReader.create('Template-Datei "'+dataPath+b.href+'" konnte nicht geladen werden');
- end else if a.InheritsFrom(TTemplateActionIf) and assigned(TTemplateActionIf(a).&else) then begin
-   loadPatterns(TTemplateActionIf(a).&else, loadSomething, dataPath);
- end;
-end;
-
-procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string; apath: string = '');
-
+procedure TMultiPageTemplate.readTemplateFromString(template: string; loadFileCallback: TLoadTemplateFile; path: string);
 var
+  context: TTemplateLoadingContext;
   tree: TTreeParser;
 begin
-  self.path:=apath;
+  context := TTemplateLoadingContext.Create;
   if path <> '' then path := IncludeTrailingPathDelimiter(path);
-  self.name:=aname;
-  tree := TTreeParser.Create;
-  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
-  tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
-  tree.TargetEncoding:=CP_UTF8;
-  readTree(tree.parseTree(template));
-  loadPatterns(baseActions, @strLoadFromFileUTF8, path);
-  setPatternNames(baseActions);
-  tree.Free;
-end;
-
-procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
-
-var
-  tree: TTreeParser;
-begin
-  self.path:=_dataPath;
-  self.name:=aname;
-
-
+  context.path := path;
+  context.loadFileCallback := loadFileCallback;
   tree := TTreeParser.Create;
   try
     tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 't'));
     tree.globalNamespaces.add(TNamespace.create(HTMLPARSER_NAMESPACE_URL, 'template'));
     tree.TargetEncoding:=CP_UTF8;
-    readTree(tree.parseTree(loadSomething(_dataPath+'template'), 'template'));
-    loadPatterns(baseActions,loadSomething,path);
+    readTree(context, tree.parseTree(template));
     setPatternNames(baseActions);
   finally
     tree.free;
+    context.free;
   end;
+end;
+
+procedure TMultiPageTemplate.readTree(context: TTemplateLoadingContext; t: TTreeNode);
+var  u: TTreeNode;
+begin
+  baseActions.clear;
+
+  if not (t.typ in [tetOpen, tetDocument]) then raise ETemplateReader.Create('Empty template');
+  u := t.findChild(tetOpen,'action',[tefoIgnoreText]);
+  if u = nil then raise ETemplateReader.Create('Empty template');
+  baseActions.addChildrenFromTree(context, u.getParent());
+end;
+
+
+constructor TMultiPageTemplate.create();
+begin
+  baseActions:=TTemplateAction.Create;
+end;
+
+
+procedure TMultiPageTemplate.loadTemplateFromDirectory(_dataPath: string; aname: string);
+begin
+  IncludeTrailingPathDelimiter(_dataPath);
+  if not FileExists(_dataPath+'template') then
+    raise ETemplateReader.Create('Template '+_dataPath+' nicht gefunden');
+  loadTemplateWithCallback(@strLoadFromFileUTF8, _dataPath, aname);
+end;
+
+
+procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string; apath: string = '');
+begin
+  self.name:=aname;
+  readTemplateFromString(template, @strLoadFromFileUTF8, apath );
+end;
+
+procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
+begin
+  self.name:=aname;
+  readTemplateFromString(loadSomething(_dataPath+'template'), loadSomething, _dataPath);
 end;
 
 
@@ -1336,7 +1349,6 @@ function TMultiPageTemplate.clone: TMultiPageTemplate;
 begin
   result := TMultiPageTemplate.create();
   result.baseActions.free;
-  result.path:=path;
   result.name:=name;
   result.baseActions:=baseActions.clone;
 end;
