@@ -1,4 +1,4 @@
-{Copyright (C) 2008-2012  Benito van der Zander
+{Copyright (C) 2008-2021  Benito van der Zander
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -16,9 +16,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 }
 
 (***
-  @abstract(This unit contains classes to handle multi-page template scripts. A collection of single-page patterns (previously also called templates) that can be applied to different pages.)@br@br
+  @abstract(This unit contains classes to handle multi-page template scripts. A collection of single-page patterns that are applied to multiple webpages.)@br@br
 
-  The class TMultiPageTemplate can be used to load a template script (and there is also the documentation of the template syntax/semantic).
+  The class TMultiPageTemplate can be used to load a multi-page template script (and there is also the documentation of the template syntax/semantic).
 
   The class TMultipageTemplateReader can be used to run the template.
 
@@ -47,7 +47,7 @@ type
     function createParser: TTreeParser;
   end;
 
-  //**@abstract(Internal used base class for an action within the multi page template)
+  //**@abstract(Internal used base class for an action within the multi-page template)
   TTemplateAction = class
   protected
     procedure addChildFromTree(context: TTemplateLoadingContext; t: TTreeNode);
@@ -84,18 +84,17 @@ type
   { TMultiPageTemplate }
 
 
-  (***@abstract(A multi page template, which defines which and how pages are processed. @br )
+  (***@abstract(A multi-page template, which defines which and how web pages are processed. @br )
 
-    A multi page template defines a list of actions, each listing variables to set as well as pages to download and
-    process with single-page patterns (previously also called templates). @br
-    You can then call an action, let it process the elements defined in the template and then read the resulting variables.
+    A multi-page template defines a list of actions, each action listing webpages to download and queries to run on those webpages. @br
+    You can then call an action, let it run its queries, and read the result as variables.
 
-   (In the past patterns were called templates, too, but they are very different from the multi-page template of this unit. @br
-       A multi-page template is a list of explicit actions that are performed in order, like an algorithm; @br
+   (In the past patterns, were called templates, too, but they are very different from the multi-page template of this unit. @br
+       A multi-page template is a list of explicit actions that are performed in order, like an algorithm or script; @br
        A pattern (single-page template) is an implicit pattern that is matched against the page, like a regular expression)
 
-    The syntax of a multi-page template is inspired by the XSLT syntax and looks like this:
-   @longCode(
+    The syntax of a multi-page template is inspired by the XSLT/XProc syntax and looks like this:
+   @preformatted(
    <actions>
    <action id="action-1">
      <variable name="foobar" value="xyz"/>
@@ -120,16 +119,17 @@ type
     <actions> contains a list/map of named actions, each <action> can contain:
 
     @unorderedList(
-      @item(@code(<page>)        Downloads a page )
-      @item(@code(<json>)        Same as <page> but to download JSON data )
-      @item(@code(<pattern>)     Processes the last page with pattern matching )
-      @item(@code(<variable>)    Sets an variable, either to a string value or to an evaluated XPath expression )
-      @item(@code(<loop>)        Repeats the children of the loop element )
-      @item(@code(<call>)        Calls another action )
-      @item(@code(<if>)          Tests, if a condition is satisfied )
-      @item(@code(<choose><when><otherwise>)      Switches depending on a value  )
-      @item(@code(<s>)           Evaluates an XPath/XQuery expression )
-      @item(@code(<try><catch>)  Catch errors )
+      @item(@code(<page>)        Downloads a webpage. )
+      @item(@code(<json>)        Same as <page> but to download JSON data. )
+      @item(@code(<pattern>)     Processes the last page with pattern matching. )
+      @item(@code(<variable>)    Sets an variable, either to a string value or to an evaluated XPath expression. )
+      @item(@code(<loop>)        Repeats the children of the loop element. )
+      @item(@code(<call>)        Calls another action. )
+      @item(@code(<if>)          Tests, if a condition is satisfied. )
+      @item(@code(<choose><when><otherwise>)      Switches depending on a value.  )
+      @item(@code(<s>)           Evaluates an XPath/XQuery expression. )
+      @item(@code(<try><catch>)  Catch errors. )
+      @item(@code(<include>)     Includes template elements from another file. )
     )
 
     Details for each element:
@@ -138,40 +138,38 @@ type
 
     @itemLabel(@code(<page url="request url">))
     @item(
-      A page to download and process. @br
-      You can use @code(<post name="..name.." value="..value..">..value..</post>) elements in the <page> to add
+      Specifies a page to download and process. @br
+      You can use @code(<post name="..name.." value="..value..">..value..</post>) child elements under <page> to add
       variables for a post request to send to the url. @br
-      If the name attribute exists, the content is url encoded, otherwise not. @br
-      (currently the value attribute and the contained text are treated as string to send.
+      If the name attribute exists, the content is url-encoded, otherwise not. @br
+      (currently, the value attribute and the contained text are treated as a string to send.
        In future versions, the contained text will be evaluated as XPath expression.)  @br
-      If no <post> children exist, a GET request is send.
+      If no <post> children exist, a GET request is sent.
 
-      The template that should be applied to the downloaded page, can be given directly in a <template> element, or
-      in a separate file linked by the templateFile attribute.
+      The patterns that should be applied to the downloaded page, can be given directly in a <pattern> element, or
+      in a separate file linked by the pattern-href attribute.
       (see THtmlTemplateParser for a description of the pattern-matching single-page template.)
 
-      There is also a @code(test="xpath") attribute that can define a condition, which will skip a page,
-      if the condition evaluates to false().
+      The attribute @code(test="xpath") can be used to skip a page if the condition in the attribute evaluates to false().
 
     )
     @itemLabel(@code(<pattern href="file" name="..">  inline pattern  </variable>))
     @item(
       This applies a pattern to the last page.
 
-      The pattern can be given inline or loaded from a file in the src attribute.
+      The pattern can be given inline or loaded from a file in the href attribute.
 
-      The name attribute is basically ignored, but useful for debugging.
+      The name attribute is only used for debugging.
 
     )
     @itemLabel(@code(<variable name="name" value="str value">xpath expression</variable>))
     @item(
-
       This sets the value of the variable with name $name.
-      If the value attribute is given, it is set to the string value of the attribute, otherwise the xpath expression
-      is evaluated its result is used.
-      (there is no document loaded for node reading, but the xpath expression is still useful for computations on the other
-       variables.)
 
+      If the value attribute is given, it is set to the string value of the attribute, otherwise, the xpath expression
+      is evaluated and its result is used.
+
+      The last downloaded webpage is available as the root element in the XPath expression.
     )
     @itemLabel(@code(<loop var="variable name" list="list (xpath)" test="condition (xpath)">))
     @item(
@@ -179,8 +177,8 @@ type
       Repeats the children of this element.@br
       It can be used like a foreach loop by giving the var/list attributes, like a while loop by using test,
       or like a combination of both.@br
-      In the first case the expression in list is evaluated, each element of the resulting sequence is assigned
-      once to the variable with the name var, and the loop body is evaluated each time.@br
+      In the first case, the expression in list is evaluated, each element of the resulting sequence is assigned
+      once to the variable with the name $var, and the loop body is evaluated each time.@br
       In the second case, the loop is simply repeated forever, until the expression in the test attributes evaluates to false.
 
     )
@@ -213,14 +211,18 @@ type
       Iff an error occurs during the evaluation of the non-<catch> children of the <try>-element, the children of matching <catch>-element are evaluated.
       This behaves similar to the try-except statement in Pascal and <try><catch> in XSLT. @br@br
 
-      The errors attribute is a whitespace separated list of error codes caught by that <catch> element. XPath/XQuery errors have the form @code( err:* ) with the value of * given in the XQuery standard.@br
-      HTTP errors have the internal form @code( pxp:http123 ) where pxp: is the default prefix. Nevertheless they can be matched using the namespace prefix http as @code(http:123). Partial wildcards are accepted like @code(http:4* ) to match the range 400 to 499. @br
+      The errors attribute is a whitespace-separated list of error codes caught by that <catch> element. XPath/XQuery errors have the form @code( err:* ) with the value of * given in the XQuery standard.@br
+      HTTP errors have the internal form @code( pxp:http123 ) where pxp: is the default prefix. Nevertheless, they can be matched using the namespace prefix http as @code(http:123). Partial wildcards are accepted like @code(http:4* ) to match the range 400 to 499. @br
       @code(pxp:pattern) is used for pattern matching failures.
+    )
+    @itemLabel(@code(<include href="filename">))
+    @item(
+      Includes another XML file. It behaves as if the elements of the other file were copy-pasted here.
     )
    )
 
-   Within all string attributes you can access the previously defined variables by writing @code({$variable}) .@br
-   Within an XPath expression you can access the variables as usually with @code($variable).
+   Within all string attributes, you can access the previously defined variables by writing @code({$variable}) .@br
+   Within an XPath expression, you can access the variable with @code($variable).
   *)
   TMultiPageTemplate=class
   protected
@@ -229,36 +231,30 @@ type
   public
     //**The primary <actions> element (or the first <action> element, if only one exists)
     baseActions: TTemplateAction;
-    //**The path of the xml file containing this template
+    //**A name for the template, for debugging
     name:string;
 
-    //variables: TStringList;
-
     constructor create();
-    //**Loads this template from a directory. @br The multipage template is read from the file template, and
-    //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
+    //**Loads a template from a directory. @br
+    //**The multipage template is read from the file @code(template).
     procedure loadTemplateFromDirectory(_dataPath: string; aname: string = 'unknown');
-    //**Loads the template directly from a string.
-    //**@br Loading pattern-matching templates with the templateFile attribute is not supported
-    procedure loadTemplateFromString(template: string; aname: string = 'unknown'; apath: string = '');
-    //**Loads this template from a directory. @br The multipage template is read from the file template, and
-    //**additional single page, pattern-matching templates given by templateFile attributes are read from their relative file
+    //**Loads a template directly from a string. @br
+    //**If the template loads additional files like include files, you need to give a path.
+    procedure loadTemplateFromString(template: string; aname: string = 'unknown'; path: string = '');
+    //**Loads a template using a callback function. The callback function is called with different files names to load the corresponding file.
     procedure loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string = 'unknown');
     destructor destroy;override;
 
-    //**Returns a <action> element with the given id
+    //**Returns the <action> element with the given id.
     function findAction(_name:string): TTemplateAction;
     //**Find the first <variable> element definining a variable with the given name. @br
     //**Only returns the value of the value attribute, ignoring any contained xpath expression
     function findVariableValue(aname: string): string;
 
     function clone: TMultiPageTemplate;
-    //function getAccountObject():TCustomAccountAccess;override;
   end;
 
   { TMultipageTemplateReader }
-
-  { ETemplateReader }
 
   ETemplateReader=class(Exception)
     details:string;
@@ -271,8 +267,8 @@ type
   //**Event that is called after every <page> element is processed. @br
   //**You can use parser to read the variables changed by the template applied to the page
   TPageProcessed = procedure (sender: TMultipageTemplateReader; parser: THtmlTemplateParser) of object;
-  //**@abstract(Class to process a multi page template)
-  //**see TMultiPageTemplate for a documentation of the allowed xml elements
+  //**@abstract(Class to process a multi-page template)
+  //**see TMultiPageTemplate for a documentation of the allowed XML elements.
   TMultipageTemplateReader = class
   protected
     template:TMultiPageTemplate;
@@ -1313,10 +1309,10 @@ begin
 end;
 
 
-procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string; apath: string = '');
+procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string; path: string = '');
 begin
   self.name:=aname;
-  readTemplateFromString(template, @strLoadFromFileUTF8, apath );
+  readTemplateFromString(template, @strLoadFromFileUTF8, path );
 end;
 
 procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
