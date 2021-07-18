@@ -77,7 +77,7 @@ var
   procedure tdouble(a,b:string; c: string = '');
   begin
     {$ifdef FPC_HAS_TYPE_EXTENDED}
-    t(a,b,c);
+    {$ifdef TEST_FLOAT} t(a,b,c);{$endif}
     {$else}
     //these tests need decimal->double casting, which is implemented naively in TXSNumericType.tryCreateValue
     //to get rid of rounding errors we cast decimal->extended->double. without extended type the rounding fails the tests
@@ -3008,8 +3008,8 @@ begin
   t('number("")', 'NaN', '');
   t('number()', '123', '<x>123</x>');
   t('number()', 'NaN', '<x>foo</x>');
-  t('fn:number(xs:float("-3.4028235E38")) eq xs:float("-3.4028235E38")', 'true');
-  t('fn:number(xs:float("-3.4028235E38")) eq -3.4028234663852885E38', 'true');
+  {$ifdef TEST_FLOAT}t('fn:number(xs:float("-3.4028235E38")) eq xs:float("-3.4028235E38")', 'true');
+  t('fn:number(xs:float("-3.4028235E38")) eq -3.4028234663852885E38', 'true');{$endif}
   tdouble('xs:double("-1.7976931348623157E308") eq xs:double("1.7976931348623157E308")', 'false');
   t('xs:double("-1.7976931348623157E308") eq xs:double("-1.7976931348623157E308")', 'true');
   t('not(double("NaN"))', 'true', '');
