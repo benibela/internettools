@@ -1532,7 +1532,7 @@ var token: String;
         vars.when := parse;
       end;
 
-    var flags: TXQTermFlowerWindowFlags;
+    var flags: TXQTermFlowerWindowFlags = [];
       window: TXQTermFlowerWindow;
     begin
       if nextTokenIs('tumbling') then flags := []
@@ -4777,7 +4777,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         case tdf.kind of
           xqtdfStaticPartialApplication: insertAt := 0;
           xqtdfDynamicPartialApplication: insertAt := 1;
-          else raiseSyntaxError('=>', b);
+          else begin insertAt := 0; raiseSyntaxError('=>', b); end;
         end;
         tcall := tdf.children[0] as TXQTermWithChildren;
       end else begin
