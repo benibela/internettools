@@ -320,6 +320,7 @@ var defaultInternetConfiguration: TInternetConfig; //**< default configuration, 
 
 const ContentTypeUrlEncoded: string = 'application/x-www-form-urlencoded';
 const ContentTypeMultipart: string = 'multipart/form-data'; //; boundary=
+const ContentTypeTextPlain: string = 'text/plain'; //; boundary=
 
 
 //**Make a HTTP GET request to a certain url.

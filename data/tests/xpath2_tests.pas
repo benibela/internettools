@@ -3467,6 +3467,12 @@ begin
   t('serialize-json(request-decode({"url": "http://x/y", "post": "f=g", "method": "POST"}))', '{"url": "http://x/y", "post": "f=g", "method": "POST", "protocol": "http", "host": "x", "params": {"f": "g"}}');
 
 
+  t('($f := form(//form)).post', 'a=b c d'#13#10'x=y'#13#10,
+    '!<html><form action="abs://hello" method="post" enctype="text/plain"><input name="a" value="b c d"/><input name="x" value="y"/></form></html>');
+  t('concat($f.method, "*", $f.headers)', 'POST*Content-Type: text/plain');
+  t('request-combine($f, {"x": 17, "z": 23}).post', 'a=b c d'#13#10'x=17'#13#10'z=23'#13#10);
+  t('serialize-json(request-decode($f).params)', '{"a": "b c d", "x": "y"}');
+
 
 
   t('join(for $r in (random(), random(), random()) return if ($r >= 0 and $r < 1) then "O" else "F")', 'O O O');

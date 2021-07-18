@@ -1385,6 +1385,18 @@ begin
   end;
 end;
 
+type THtmlFormEnctype = (hfetUrlEncoded, hfetMultipart, hfetTextPlain);
+function getFormEnctypeActual(isPost: boolean; n: TTreeNode; cmp: TStringComparisonFunc): THtmlFormEnctype;
+var
+  enctype: String;
+begin
+  result := hfetUrlEncoded;
+  if not isPost then exit();
+  enctype := n.getAttribute('enctype', cmp);
+  if striEqual(enctype, ContentTypeMultipart) then result := hfetMultipart
+  else if striEqual(enctype, ContentTypeTextPlain) then result := hfetTextPlain
+end;
+
 function formEncode(s: string; encoding: TSystemCodePage): string;
 begin
   if (encoding <> CP_UTF8) and (encoding <> CP_NONE) and (encoding <> StringCodePage(s)) {todo: does that make sense?} then
@@ -1421,6 +1433,7 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   procedure addUrlEncodedList(s: string); //encoded
   procedure addXQValue(const value: IXQValue; const staticContext: TXQStaticContext);
   procedure addMime(const mime: TMIMEMultipartData);
+  procedure addTextPlainRequest(const textPlain: string);
 
   //returns true if a value has been overridden
   function mergeOverride(const requestOverride: THttpRequestParams): boolean;
@@ -1428,9 +1441,11 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   function addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams): boolean;
 
 
+  function toEncodedRequest(enctype: THtmlFormEnctype; out header: string): string;
   function toUrlEncodedRequest: string;
-  function toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
-  function toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
+  function toMimeRequest(out boundary: string): string;
+  function toMimeRequest(): TMIMEMultipartData;
+  function toTextPlainRequest(): string;
 
   procedure compress;
   procedure clearData; //does not clear meta properties like charset
@@ -1650,6 +1665,19 @@ begin
   end;
 end;
 
+procedure THttpRequestParams.addTextPlainRequest(const textPlain: string);
+var
+  temp: sysutils.TStringArray;
+  i: Integer;
+  key: String;
+begin
+  temp := strSplit(textPlain, #13#10, false);
+  for i := 0 to high(temp) do begin
+    key := strSplitGet('=', temp[i]);
+    addKeyValue(key, temp[i]);
+  end;
+end;
+
 function THttpRequestParams.mergeOverride(const requestOverride: THttpRequestParams): boolean;
 var
   requestOverrideUsed: array of boolean = nil;
@@ -1768,6 +1796,25 @@ begin
   result := mergeOverride(requestOverride);
 end;
 
+function THttpRequestParams.toEncodedRequest(enctype: THtmlFormEnctype; out header: string): string;
+begin
+  case enctype of
+    hfetUrlEncoded: begin
+      header := '';
+      result := toUrlEncodedRequest;
+    end;
+    hfetMultipart: begin
+      result := toMimeRequest(header);
+      header := TMIMEMultipartData.HeaderForBoundary(header);
+    end;
+    hfetTextPlain: begin
+      header := 'Content-Type: ' + ContentTypeTextPlain;
+      result := toTextPlainRequest();
+    end;
+    {$if FPC_FULLVERSION <= 30202}else begin result := ''; header := ''; end; {$endif}
+  end;
+end;
+
 
 function THttpRequestParams.toUrlEncodedRequest: string;
 var sb: TStrBuilder;
@@ -1792,15 +1839,15 @@ end;
 
 
 
-function THttpRequestParams.toMimeRequest(const staticContext: TXQStaticContext; out header: string): string;
+function THttpRequestParams.toMimeRequest(out boundary: string): string;
 var mime: TMIMEMultipartData;
 begin
   if urlencoded then raise EHttpRequestParamsException.Create('MIME Request needs unencoded params');
-  mime := toMimeRequest(staticContext);
-  result := mime.compose(header);
+  mime := toMimeRequest();
+  result := mime.compose(boundary);
 end;
 
-function THttpRequestParams.toMimeRequest(const staticContext: TXQStaticContext): TMIMEMultipartData;
+function THttpRequestParams.toMimeRequest(): TMIMEMultipartData;
 var
   i: SizeInt;
 begin
@@ -1812,12 +1859,21 @@ begin
   end;
 end;
 
+function THttpRequestParams.toTextPlainRequest(): string;
+var
+  i: Integer;
+begin
+  result := '';
+  for i := 0 to size - 1 do begin
+    result += data[i].key + '=' + data[i].value + #13#10;
+  end;
+end;
+
 //see https://html.spec.whatwg.org/multipage/forms.html and https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-2
 {todo:
 form owner attribute can add submittable elements to the form that are not descendants of the form (e.g. form=xyz adds it to <form id=xyz)
 need to handle submitter element (e.g. button)
 check for <form method=dialog>
-enctype=text/plain
 }
 function xqFunctionForm(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var onlyFormsWithOverriddenValue: boolean = false;
@@ -1849,22 +1905,21 @@ var requestOverride: THttpRequestParams;
 
     function encodeForm(const form: TTreeNode): IXQValue;
     var
-      multipart: boolean;
-    var
-      header: string;
+      contenttypeheader: string;
       post: Boolean;
       method: string;
       actionURI: String;
       resultobj: TXQValueStringMap;
       request: THttpRequestParams;
       encodedRequest: string;
+      enctype: THtmlFormEnctype;
     begin
       if form = nil then exit(xqvalue());
       request.init;
 
       method := UpperCase(form.getAttribute('method', 'GET', cmp));
       post := striEqual(method, 'POST');
-      multipart := post and striEqual( form.getAttribute('enctype', cmp), ContentTypeMultipart);
+      enctype := getFormEnctypeActual(post, form, cmp);
       request.charset := getFormEncoding(form);
 
       lastFormHadOverriddenValue := request.addFormAndMerge(form, cmp, requestOverride);
@@ -1876,11 +1931,9 @@ var requestOverride: THttpRequestParams;
 
       resultobj.setMutable('method', method);
 
-      if not multipart then encodedRequest := request.toUrlEncodedRequest
-      else begin
-        encodedRequest := request.toMimeRequest(context.staticContext, header);
-        resultobj.setMutable('headers', TMIMEMultipartData.HeaderForBoundary(header))
-      end;
+      encodedRequest := request.toEncodedRequest(enctype, contenttypeheader);
+      if contenttypeheader <> '' then
+        resultobj.setMutable('headers', contenttypeheader);
 
       if post then begin
         resultobj.setMutable('post', encodedRequest)
@@ -1977,22 +2030,24 @@ begin
   requests[1].done;
 end;
 
-function getMultipartHeader(const v: IXQValue): string;
+function getRequestContentTypeAndMIMEBoundary(const v: IXQValue; out mimeBoundary: string): THtmlFormEnctype;
 var
   headers: IXQValue;
   h: TXQValue;
   tempstr: String;
 begin
-  result := '';
+  result := hfetUrlEncoded;
+  mimeBoundary := '';
+  if v.kind <> pvkObject then exit;
   headers := v.getProperty('headers');
   for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
     tempstr := h.toString;
-    if striBeginsWith(tempstr, 'Content-Type') and striContains(tempstr, ContentTypeMultipart) then begin
-      result := tempstr;
-      result := trim(strCopyFrom(result, pos('=', result) + 1));
-      if strBeginsWith(result, '"') then result := copy(result, 2, length(result) - 2);
-      exit;
-    end;
+    if not striBeginsWith(tempstr, 'Content-Type') then continue;
+    if striContains(tempstr, ContentTypeMultipart) then begin
+      mimeBoundary := trim(strCopyFrom(tempstr, pos('=', tempstr) + 1));
+      if strBeginsWith(tempstr, '"') then mimeBoundary := copy(mimeBoundary, 2, length(mimeBoundary) - 2);
+      exit(hfetMultipart);
+    end else if striContains(tempstr, ContentTypeTextPlain) then exit(hfetTextPlain);
   end;
 end;
 
@@ -2039,11 +2094,33 @@ function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeI
     if prefix = '' then result := obj.setImmutable(propName, newEncoded)
     else result := obj.setImmutable(propName, prefix + newEncoded.toString);
   end;
+  function combineTextPlain(obj: TXQValue): IXQValue;
+  var i: SizeInt;
+      encoding: TSystemCodePage;
+      requests: array[0..1] of THttpRequestParams;
+  begin
+    encoding := strEncodingFromName(obj.getProperty('charset').toString);
+    for i := 0 to 1 do begin
+      requests[i] := default(THttpRequestParams);
+      requests[i].init;
+      requests[i].charset:=encoding;
+    end;
+    requests[0].addTextPlainRequest(obj.getProperty('post').toString);
+    requests[1].addXQValue(args[1], context.staticContext);
+
+    requests[0].mergeOverride(requests[1]);
+
+    result := obj.setImmutable('post', requests[0].toTextPlainRequest());
+
+    requests[0].done;
+    requests[1].done;
+  end;
 
 var
   headers: IXQValue;
   h: TXQValue;
-  multipart, tempstr: String;
+  enctype: THtmlFormEnctype;
+  mimeBoundary, tempstr: String;
   mime: TMIMEMultipartData;
   obj: TXQValueMapLike;
   tempSeq: TXQValueSequence;
@@ -2059,7 +2136,7 @@ var
 
     baseRequest.mergeOverride(requestOverride);
 
-    mime := baseRequest.toMimeRequest(context.staticContext);
+    mime := baseRequest.toMimeRequest();
 
     baseRequest.done;
     requestOverride.done;
@@ -2067,36 +2144,37 @@ var
 
 begin
   requiredArgCount(argc, 2);
+  enctype := getRequestContentTypeAndMIMEBoundary(args[0], mimeBoundary);
   if args[0].kind  = pvkObject then begin
-    multipart := getMultipartHeader(args[0]);
     obj := args[0].toValue as TXQValueMapLike;
     result := obj
   end else begin
-    multipart:='';
     obj := TXQValueStringMap.create();
     TXQValueStringMap(obj).setMutable('url', args[0].toString);
     result := obj;
   end;
 
 
-  if multipart = '' then begin
-    result := combineHttpEncoded(obj);
-  end else begin
-    mime.parse(args[0].getProperty('post').toString, multipart);
-    mimeCombine();
-    result := result.setImmutable('post', mime.compose(tempstr, multipart));
+  case enctype of
+    hfetUrlEncoded: result := combineHttpEncoded(obj);
+    hfetMultipart: begin
+      mime.parse(args[0].getProperty('post').toString, mimeBoundary);
+      mimeCombine();
+      result := result.setImmutable('post', mime.compose(tempstr, mimeBoundary));
 
-    if tempstr <> multipart then begin
-      headers := obj.getProperty('headers');
-      tempSeq := TXQValueSequence.create(headers.getSequenceCount);
-      tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
-      for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
-        tempstr := h.toString;
-        if not striBeginsWith(tempstr, 'Content-Type') then
-          tempSeq.add(h);
+      if tempstr <> mimeBoundary then begin
+        headers := obj.getProperty('headers');
+        tempSeq := TXQValueSequence.create(headers.getSequenceCount);
+        tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
+        for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+          tempstr := h.toString;
+          if not striBeginsWith(tempstr, 'Content-Type') then
+            tempSeq.add(h);
+        end;
+        result := result.setImmutable('headers', tempSeq);
       end;
-      result := result.setImmutable('headers', tempSeq);
     end;
+    hfetTextPlain: result := combineTextPlain(obj);
   end;
 end;
 
@@ -2114,14 +2192,15 @@ var paramobj: TXQValueStringMap;
     end else paramobj.setMutable(name, value);
   end;
 
-  procedure parseParamsUriEncoded(const q: ixqvalue);
+  procedure parseParams(enctype: THtmlFormEnctype; const q: ixqvalue);
   var
     request: THttpRequestParams;
     i: SizeInt;
   begin
     if paramobj = nil then paramobj := TXQValueStringMap.create();
     request.init;
-    request.addXQValue(q, context.staticContext);
+    if enctype <> hfetTextPlain then request.addXQValue(q, context.staticContext)
+    else request.addTextPlainRequest(q.toString);
     for i := 0 to request.size - 1 do
       addParam(request.data[i].key, request.data[i].value);
     request.done;
@@ -2137,9 +2216,10 @@ var paramobj: TXQValueStringMap;
   end;
 
 var
-  url, multipart: String;
+  url, boundary: String;
   decoded: TDecodedUrl;
   resobj: TXQValueStringMapPendingUpdate;
+  enctype: THtmlFormEnctype;
 begin
   requiredArgCount(argc, 1);
   resobj := TXQValueStringMapPendingUpdate.create();
@@ -2149,9 +2229,9 @@ begin
     resobj.prototype := args[0];
     url := args[0].getProperty('url').toString;
     if striEqual(args[0].getProperty('method').toString, 'POST') then begin
-      multipart := getMultipartHeader(args[0]);
-      if multipart = '' then parseParamsUriEncoded(args[0].getProperty('post'))
-      else parseParamsMime(args[0].getProperty('post').toString, multipart);
+      enctype := getRequestContentTypeAndMIMEBoundary(args[0], boundary);
+      if enctype = hfetMultipart then parseParamsMime(args[0].getProperty('post').toString, boundary)
+      else parseParams(enctype, args[0].getProperty('post'));
     end;
   end else begin
     url := args[0].toString;
@@ -2175,7 +2255,7 @@ begin
     if decoded.params <> '' then begin
       if strBeginsWith(decoded.params, '?') then delete(decoded.params, 1, 1);
       resobj.setMutable('query', decoded.params);
-      parseParamsUriEncoded(xqvalue(decoded.params));
+      parseParams(hfetUrlEncoded, xqvalue(decoded.params));
     end;
     if decoded.linktarget <> '' then begin
       if strBeginsWith(decoded.linktarget, '#') then delete(decoded.linktarget, 1, 1);
