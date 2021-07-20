@@ -147,7 +147,7 @@ type
   //** xqpdnDisallowDotNotation: do not allow the dot operator anywhere @br
   //** xqpdnAllowUnambiguousDotNotation: allow the dot operator when disabling it would be a syntax error. E.g. cases like @code(($obj).property), @code(func(..).property), @code({"a": ..}.property), ...  @br
   //** xqpdnAllowFullDotNotation: allow the dot operator everywhere. Even in $obj.property  @br
-  TXQPropertyDotNotation = (xqpdnDisallowDotNotation, xqpdnAllowUnambiguousDotNotation, xqpdnAllowFullDotNotation);
+  TXQPropertyDotNotation = (xqpdnUndefined, xqpdnDisallowDotNotation, xqpdnAllowUnambiguousDotNotation, xqpdnAllowFullDotNotation);
 
   TTreeNodeSerialization = (tnsText, tnsXML, tnsHTML);
 
