@@ -7471,7 +7471,7 @@ begin
   result := parser.parse(data);
 end;
 
-function xqFunctionTransformPlaceholder(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionTransformPlaceholder(const {%H-}context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   raise EXQEvaluationException.create('FOXT0004', 'XSLT is not supported');
   result := xqvalue();

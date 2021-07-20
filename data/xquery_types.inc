@@ -1486,6 +1486,7 @@ end;
 
 function TXQValueBinary.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
+  ignore(scontext);
   raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to float.');
   result := 0;
 end;

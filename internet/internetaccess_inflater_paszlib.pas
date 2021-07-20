@@ -74,7 +74,6 @@ end;
 
 procedure TTransferContentInflaterZlib.writeCompressedBlock(const abuffer; Count: Longint);
 var err:smallint;
-  skip: Integer;
 begin
   stream.next_in:=@abuffer;
   stream.avail_in:=count;
