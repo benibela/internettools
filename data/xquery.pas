@@ -8341,7 +8341,7 @@ function TXQueryEngine.findModule(context: TXQStaticContext; const namespace: st
 begin
   result := findModule(namespace);
   if result <> nil then exit;
-  if assigned(OnImportModule) then onImportModule(self, staticContext, namespace, at);
+  if assigned(OnImportModule) then onImportModule(self, context, namespace, at);
   result := findModule(namespace);
 end;
 
