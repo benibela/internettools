@@ -898,8 +898,10 @@ initialization
   InitCriticalSection(flreCacheLock);
 
 finalization
-  freeCache;
-  DoneCriticalsection(flreCacheLock);
+  if not createMemoryLeakOnExit then begin
+    freeCache;
+    DoneCriticalsection(flreCacheLock);
+  end;
 {$ENDIF}
 
 end.

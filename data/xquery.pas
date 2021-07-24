@@ -9998,37 +9998,39 @@ baseSchema.hide('function(*)');
 
 InitCriticalSection(interpretedFunctionSynchronization);
 finalization
-freeThreadVars;
-DoneCriticalsection(interpretedFunctionSynchronization);
+  if not createMemoryLeakOnExit then begin
+    freeThreadVars;
+    DoneCriticalsection(interpretedFunctionSynchronization);
 
-xquery__functions.finalizeFunctions;
-xs.free;
+    xquery__functions.finalizeFunctions;
+    xs.free;
 
-globalTypes.free;
+    globalTypes.free;
 
-nativeModules.free;
-globalUnnamedVariable.free;
-globalTypeParsingContext.staticContext.Free;
-globalTypeParsingContext.free;
-baseSchema.free;
-baseJSONiqSchema.free;
-GlobalInterpretedNativeFunctionStaticContext.Free;
-GlobalStaticNamespaces.Free;
-TXQueryInternals.commonValuesUndefined := nil;
-TXQueryInternals.commonValuesTrue := nil;
-TXQueryInternals.commonValuesFalse := nil;
-TXQueryEngine.freeCommonCaches;
+    nativeModules.free;
+    globalUnnamedVariable.free;
+    globalTypeParsingContext.staticContext.Free;
+    globalTypeParsingContext.free;
+    baseSchema.free;
+    baseJSONiqSchema.free;
+    GlobalInterpretedNativeFunctionStaticContext.Free;
+    GlobalStaticNamespaces.Free;
+    TXQueryInternals.commonValuesUndefined := nil;
+    TXQueryInternals.commonValuesTrue := nil;
+    TXQueryInternals.commonValuesFalse := nil;
+    TXQueryEngine.freeCommonCaches;
 
-XMLNamespace_XPathFunctions._Release;
-XMLnamespace_XPathFunctionsArray._Release;
-XMLnamespace_XPathFunctionsMap._Release;
-XMLNamespace_XMLSchema._Release;
-XMLNamespace_XMLSchemaInstance._Release;
-XMLNamespace_XQueryLocalFunctions._Release;
-XMLNamespace_MyExtensionsMerged._Release;
-XMLNamespace_MyExtensionsNew._Release;
-XMLNamespace_MyExtensionOperators._Release;
-XMLNamespace_XQuery._Release;
+    XMLNamespace_XPathFunctions._Release;
+    XMLnamespace_XPathFunctionsArray._Release;
+    XMLnamespace_XPathFunctionsMap._Release;
+    XMLNamespace_XMLSchema._Release;
+    XMLNamespace_XMLSchemaInstance._Release;
+    XMLNamespace_XQueryLocalFunctions._Release;
+    XMLNamespace_MyExtensionsMerged._Release;
+    XMLNamespace_MyExtensionsNew._Release;
+    XMLNamespace_MyExtensionOperators._Release;
+    XMLNamespace_XQuery._Release;
+  end;
 
 end.
 

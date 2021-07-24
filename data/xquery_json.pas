@@ -336,9 +336,11 @@ values
     TXQueryEngine.registerNativeModule(libjn);
   end;
 finalization
-  libjn.free;
-  jn.free;
-  XMLNamespace_JSONiqFunctions._Release;
-  XMLNamespace_JSONiqLibraryFunctions._Release;
+  if not createMemoryLeakOnExit then begin
+    libjn.free;
+    jn.free;
+    XMLNamespace_JSONiqFunctions._Release;
+    XMLNamespace_JSONiqLibraryFunctions._Release;
+  end;
 end.
 

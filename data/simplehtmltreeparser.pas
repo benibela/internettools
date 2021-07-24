@@ -3021,10 +3021,12 @@ initialization
   attributeDataTypeHackList1 := TTreeAttribute(AllocMem(TTreeAttribute.InstanceSize));
   attributeDataTypeHackList2 := TTreeAttribute(AllocMem(TTreeAttribute.InstanceSize));
 finalization
-  FreeMem(attributeDataTypeHackList1);
-  FreeMem(attributeDataTypeHackList2);
-  omittedEndTags.free;
-  omittedStartTags.free;
-  TNamespace.freeCache;
+  if not createMemoryLeakOnExit then begin
+    FreeMem(attributeDataTypeHackList1);
+    FreeMem(attributeDataTypeHackList2);
+    omittedEndTags.free;
+    omittedStartTags.free;
+    TNamespace.freeCache;
+  end;
 end.
 

@@ -46,7 +46,7 @@ var XMLNamespace_Math : TNamespace;
 
 implementation
 
-uses xquery, math;
+uses xquery, math, xquery.internals.common;
 //file:///home/benito/information/xml/XPath%20and%20XQuery%20Functions%20and%20Operators%203.0.html#func-math-pi
 
 {
@@ -342,7 +342,8 @@ initialization
   XMLNamespace_Math := TNamespace.makeWithRC1(XMLNamespaceURL_Math, 'math');
 
 finalization
-  XMLNamespace_Math._Release;
-  module.free;
-
+  if not createMemoryLeakOnExit then begin
+    XMLNamespace_Math._Release;
+    module.free;
+  end;
 end.

@@ -373,6 +373,8 @@ const
   Procedure fpc_ansistr_decr_ref (Var S : Pointer); [external name 'FPC_ANSISTR_DECR_REF'];
 {$endif}
 
+var createMemoryLeakOnExit: boolean;
+
 implementation
 uses math;
 

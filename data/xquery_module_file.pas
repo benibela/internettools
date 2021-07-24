@@ -811,8 +811,9 @@ initialization
   XMLNamespace_Expath_File := TNamespace.makeWithRC1(XMLNamespaceURL_Expath_File, 'file');
 
 finalization
-  XMLNamespace_Expath_File._Release;
-  module.free;
-
+  if not createMemoryLeakOnExit then begin
+    XMLNamespace_Expath_File._Release;
+    module.free;
+  end;
 end.
 
