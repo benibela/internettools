@@ -640,7 +640,6 @@ TXQTermVariableArray = array of TXQTermVariable;
 THtmlTemplateParser=class
   protected
     //FObjects: boolean;
-    FRepetitionRegEx: TWrappedRegExpr;
     FTrimTextNodes, lastTrimTextNodes: TTrimTextNodes;
     FVeryShortNotation: boolean;
     FUnnamedVariableName: string;
@@ -2136,7 +2135,6 @@ begin
   outputEncoding:=CP_UTF8;
   FParsingExceptions := true;
   FKeepOldVariables:=kpvForget;
-  FRepetitionRegEx:=wregexprParse('^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *', [wrfSingleLine]);
   FUnnamedVariableName:='_result';
   FVeryShortNotation:=true;
   FTrimTextNodes:=ttnForMatching;
@@ -2163,7 +2161,6 @@ begin
   FHTML.Free;
   FQueryEngine.Free;
   FAttributeMatching.Free;
-  wregexprFree(FRepetitionRegEx);
   FreeAndNil(FVariables);
   FVariableLogCondensed.free;
   FOldVariableLog.Free;
@@ -2191,13 +2188,59 @@ begin
   result.root := templateDocument;
 end;
 
+function takeLoopCounter(var s: string; out minCount, maxCount: string): boolean;
+var
+  view, maxView: TStringView;
+  comma: pchar;
+  temp: Longint;
+  closingParen: pChar;
+begin
+  result := false;
+  case s[1] of
+    '+', '*': begin
+      if s[1] = '+' then minCount := '1'
+      else minCount := '';
+      maxCount := '';
+      delete(s, 1, 1);
+      result := true;
+    end;
+    '{': begin
+      //original regex:
+      //^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *
+      view := s.unsafeView;
+      view.moveBy(1); //strip {
+      closingParen := view.find('}');
+      if closingParen = nil then exit;
+      view.cutBefore(closingParen);
+      comma := view.find(',');
+      if comma = nil then maxView := view
+      else begin
+        maxView := view.viewBehind(comma);
+        view.cutBefore(comma);
+      end;
+      view.trim();
+      maxView.trim();
+      if view.isEmpty or maxView.isEmpty then exit;
+      //prevent TryStrToInt from parsing non-decimal bases:    (especially $abc as hex is bad)
+      //(it will still parse 0x.. but that is killed when the number is parsed as XPath (any XPath is allowed in the min/max attributes of <t:loop>))
+      if not (view.data^ in ['0'..'9']) or not (maxView.data^ in ['0'..'9']) then exit;
+      minCount := view.ToString;
+      maxCount := maxView.ToString;
+      result := TryStrToInt(minCount, temp) and TryStrToInt(maxCount, temp);
+      if result then
+        delete(s, 1, s.unsafeViewTo(closingParen).length);
+    end;
+  end;
+end;
+
+
 var el: TTemplateElement;
     defaultTextMatching: String;
     defaultCaseSensitive: string;
     i: Integer;
     looper: TTemplateElement;
     temp: TTemplateElement;
-    matches: TWrappedMatchArray;
+    implicitLoopMin, implicitLoopMax: string;
 begin
    //read template
   FTemplate.parseTree(template, templateName);
@@ -2238,18 +2281,11 @@ begin
           if temp.typ = tetClose then temp := temp.templateReverse;
           temp.flags += [tefOptional];
         end;
-        if (el.value <> '') and ((el.value[1] in ['*', '+']) or ((el.value[1] = '{') and wregexprExtract(FRepetitionRegEx, el.value, matches))) then begin
+        if (el.value <> '') and (el.value[1] in ['*', '+', '{']) and takeLoopCounter(el.value, implicitLoopMin, implicitLoopMax) then begin
           looper := createTemplateElement(tetCommandLoopOpen);
           TTemplateElement(el.getPrevious()).insertSurrounding(looper, createTemplateElement(tetCommandLoopClose));
-          if el.value[1] <> '{' then begin
-            if el.value[1] = '+' then looper.setTemplateAttribute('min', '1');
-            delete(el.value,1,1);
-          end else begin
-            looper.setTemplateAttribute('min', matches[1]);
-            if (length(matches) < 4) or (length(matches[3]) <= 0) then looper.setTemplateAttribute('max', matches[1])
-            else looper.setTemplateAttribute('max', matches[3]);
-            delete(el.value,1,length(matches[0]));
-          end;
+          if implicitLoopMin <> '' then looper.setTemplateAttribute('min', implicitLoopMin);
+          if implicitLoopMax <> '' then looper.setTemplateAttribute('max', implicitLoopMax);
         end;
         if el.value = '' then el.templateType := tetIgnore
         else if el.value[1] = '{' then begin
