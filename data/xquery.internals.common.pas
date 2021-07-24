@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
-
+{$WARN 4055 off : Conversion between ordinals and pointers is not portable}
 {$I ../internettoolsconfig.inc}
 {$undef HASHMAP_SUPPORTS_MARKING_DELETIONS}
 
