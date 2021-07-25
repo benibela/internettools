@@ -87,7 +87,7 @@ end;
 
 function THTMLEventHandler.enterTagEvent(tagName: pchar; tagNameLen: SizeInt;
   properties: THTMLProperties): TParsingResult;
-var xmlProperties: TProperties;
+var xmlProperties: TProperties = nil;
     i:longint;
     tn:string;
 begin
