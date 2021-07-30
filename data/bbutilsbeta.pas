@@ -128,6 +128,8 @@ type
     procedure init(const buffer: string);
     function ToString: string;
 
+    function length: SizeInt; reintroduce;
+
     function contains(const s: string): boolean; inline;
     function beginsWith(const s: string): boolean; inline;
     //function beginsWithI(const s: string): boolean; inline;
@@ -265,7 +267,7 @@ end;
 {$R-}
 function TArrayView.length: SizeInt;
 begin
-  result := SizeUInt(pchar(dataend) - pchar(data)) div sizeof(TElement);
+  result := SizeUInt(pchar(dataend) - pchar(data)) div SizeUInt(sizeof(TElement));
 end;
 {$POP}
 
@@ -390,6 +392,11 @@ end;
 function TCharArrayView.ToString: string;
 begin
   result := strFromPchar(data, length);
+end;
+
+function TCharArrayView.length: SizeInt;
+begin
+  result := dataend - data;
 end;
 
 
