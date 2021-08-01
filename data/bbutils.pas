@@ -3949,6 +3949,11 @@ begin
   if isWindowsFileUrl() then begin basesplit[0] := basesplit[0] + '/' + basesplit[1]; arrayDelete(basesplit, 1); end;
   for i:=high(relsplit) downto 0 do if relsplit[i] = '.' then arrayDelete(relsplit, i);
 
+  for i:=high(basesplit) - 1 downto 0 do
+    if (basesplit[i] = '.') or (basesplit[i] = '') then
+      arrayDelete(basesplit, i);
+
+
   if (length(basesplit) > 1) then SetLength(basesplit, high(basesplit));
 
   if (length(relsplit) > 0) and (relsplit[high(relsplit)] <> '')  and (relsplit[high(relsplit)] <> '.') and (relsplit[high(relsplit)] <> '..') then begin

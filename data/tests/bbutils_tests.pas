@@ -1800,6 +1800,34 @@ begin
   test(strResolveURI('../foobar/', '/tmp\xyz\'), '/tmp/foobar/');
  {$endif}
 
+   test(strResolveURI('/foobar', '/tmp/xyz//'), '/foobar');
+   test(strResolveURI('foobar', '/tmp/xyz//'), '/tmp/xyz/foobar');
+   test(strResolveURI('../foobar', '/tmp/xyz//'), '/tmp/foobar');
+   test(strResolveURI('/foobar/', '/tmp/xyz//'), '/foobar/');
+   test(strResolveURI('foobar/', '/tmp/xyz//'), '/tmp/xyz/foobar/');
+   test(strResolveURI('../foobar/', '/tmp/xyz//'), '/tmp/foobar/');
+
+   test(strResolveURI('/foobar', '/tmp//./././////////xyz//./././'), '/foobar');
+   test(strResolveURI('foobar', '/tmp//./././////////xyz//./././'), '/tmp/xyz/foobar');
+   test(strResolveURI('../foobar', '/tmp//./././////////xyz//./././'), '/tmp/foobar');
+   test(strResolveURI('/foobar/', '/tmp//./././////////xyz//./././'), '/foobar/');
+   test(strResolveURI('foobar/', '/tmp//./././////////xyz//./././'), '/tmp/xyz/foobar/');
+   test(strResolveURI('../foobar/', '/tmp//./././////////xyz//./././'), '/tmp/foobar/');
+
+   test(strResolveURI('/foobar', './././////////tmp/./././////////xyz/'), '/foobar');
+   test(strResolveURI('foobar', './././////////tmp/./././////////xyz/'), 'tmp/xyz/foobar');
+   test(strResolveURI('../foobar', './././////////tmp/./././////////xyz/'), 'tmp/foobar');
+   test(strResolveURI('/foobar/', './././////////tmp/./././////////xyz/'), '/foobar/');
+   test(strResolveURI('foobar/', './././////////tmp/./././////////xyz/'), 'tmp/xyz/foobar/');
+   test(strResolveURI('../foobar/', './././////////tmp/./././////////xyz/'), 'tmp/foobar/');
+
+   test(strResolveURI('/foobar', '/./././///////tmp/./././///////xyz'), '/foobar');
+   test(strResolveURI('foobar', '/./././///////tmp/./././///////xyz'), '/tmp/foobar');
+   test(strResolveURI('../foobar', '/./././///////tmp/./././///////xyz'), '/foobar');
+   test(strResolveURI('/foobar/', '/./././///////tmp/./././///////xyz'), '/foobar/');
+   test(strResolveURI('foobar/', '/./././///////tmp/./././///////xyz'), '/tmp/foobar/');
+   test(strResolveURI('../foobar/', '/./././///////tmp/./././///////xyz'), '/foobar/');
+
   //Windows local path resolving
 
   for filePrefixMode := 1 to 3 do begin
