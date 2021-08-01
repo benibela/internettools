@@ -50,8 +50,8 @@ type
     hSession,hLastConnection: hInternet;
     newConnectionOpened:boolean;
     lastServer: TDecodedUrl;
-    procedure doTransferUnchecked(method:string; const decoded: TDecodedUrl; const data: TInternetAccessDataBlock); override;
-    function getLastErrorDetails: string; override;
+    procedure doTransferUnchecked(var transfer: TTransfer); override;
+    function windowsLastErrorToString: string;
   public
     constructor create();override;
     destructor destroy;override;
@@ -71,10 +71,11 @@ uses bbutils//, bbdebugtools
 
 resourcestring
   rsNoInternetSessionCre = 'No internet session created';
-  rsConnectingTo0SFailed = 'Connecting to %0:s failed';
-  rsReceivingFrom0SFaile = 'Receiving from %0:s failed.';
-  rsInternetRequestFaile = 'Internet request failed';
-  rsHTTPErrorCode0SNWhen = 'HTTP Error code: %0:s\nWhen connecting to %1:s';
+  rsConnectingTo0SFailed = 'Connecting failed';
+  rsReceivingFrom0SFaile = 'Receiving failed.';
+  //rsInternetRequestFaile = 'Internet request failed';
+  //rsHTTPErrorCode0SNWhen = 'HTTP Error code: %0:s\nWhen connecting to %1:s';
+  rsHTTPSConnectionFailed = 'HTTPS connection failed';
   rsFailedToConnectToThe = 'Failed to connect to the internet.';
   rsNoInternetHandlesAva = 'No internet handles available. Restart your computer.';
   rsConnectionTimedOut = 'Connection timed out';
@@ -128,7 +129,7 @@ type TAddHeaderData = record
 end;
   PAddHeaderData = ^TAddHeaderData;
 
-procedure addHeader(data: pointer; headerKind: TW32InternetAccess.THeaderKind; const name, value: string);
+procedure addHeader(data: pointer; headerKind: THeaderKind; const name, value: string);
 var
   headerLine: string;
 begin
@@ -145,7 +146,7 @@ begin
 end;
 
 
-procedure TW32InternetAccess.doTransferUnchecked(method: string; const decoded: TDecodedUrl; const data: TInternetAccessDataBlock);
+procedure TW32InternetAccess.doTransferUnchecked(var transfer: TTransfer);
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', ''); //just as default. it will be overriden
 
     procedure newConnection;
@@ -154,31 +155,35 @@ const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtm
     begin
       if hLastConnection<>nil then
         InternetCloseHandle(hLastConnection);
-      if striequal(decoded.protocol, 'https') then begin
-        tempPort:=443;
-        service:=INTERNET_SERVICE_HTTP;
-      end else {if striequal(decoded.protocol, 'http') then} begin //if there is no else branch fpc gives pointless warnings
-        tempPort:=80;
-        service :=INTERNET_SERVICE_HTTP;
+      with transfer.decodedUrl do begin
+        if striequal(protocol, 'https') then begin
+          tempPort:=443;
+          service:=INTERNET_SERVICE_HTTP;
+        end else {if striequal(decoded.protocol, 'http') then} begin //if there is no else branch fpc gives pointless warnings
+          tempPort:=80;
+          service :=INTERNET_SERVICE_HTTP;
+        end;
+        if port <> '' then
+          tempPort := StrToIntDef(port, 80);
+        //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
+        if (username = '') and (password = '') then hLastConnection:= InternetConnectA(hSession,pchar(host),tempPort,nil,            nil,service,0,0)
+        else if password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(host),tempPort,pchar(strUnescapeHex(username, '%')),nil,service,0,0)
+        else                                        hLastConnection:= InternetConnectA(hSession,pchar(host),tempPort,pchar(strUnescapeHex(username, '%')),pchar(strUnescapeHex(password, '%')),service,0,0);
       end;
-      if decoded.port <> '' then
-        tempPort := StrToIntDef(decoded.port, 80);
-      //huh? wininet seems to remember the password, if it is set once and continues sending it with new requests, even if is unset. (tested with WINE and Windows 7)
-      if (decoded.username = '') and (decoded.password = '') then hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,nil,            nil,service,0,0)
-      else if decoded.password = '' then                  hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),nil,service,0,0)
-      else                                        hLastConnection:= InternetConnectA(hSession,pchar(decoded.host),tempPort,pchar(strUnescapeHex(decoded.username, '%')),pchar(strUnescapeHex(decoded.password, '%')),service,0,0);
     end;
 
     function newOpenRequest: HINTERNET;
     var flags: DWORD;
     begin
       flags := INTERNET_FLAG_NO_COOKIES or INTERNET_FLAG_RELOAD or INTERNET_FLAG_NO_CACHE_WRITE or INTERNET_FLAG_KEEP_CONNECTION or INTERNET_FLAG_NO_AUTO_REDIRECT;
-      if striequal(decoded.protocol, 'https') then begin
-        flags := flags or INTERNET_FLAG_SECURE;
-        if not internetConfig^.checkSSLCertificates then
-          flags := flags or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID
+      with transfer.decodedUrl do begin
+        if striequal(protocol, 'https') then begin
+          flags := flags or INTERNET_FLAG_SECURE;
+          if not internetConfig^.checkSSLCertificates then
+            flags := flags or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID
+        end;
+        result := HttpOpenRequestA(hLastConnection, pchar(transfer.method), pchar(path+params), nil, pchar(lastTransfer.url), ppchar(@defaultAccept[low(defaultAccept)]), flags, 0);
       end;
-      result := HttpOpenRequestA(hLastConnection, pchar(method), pchar(decoded.path+decoded.params), nil, pchar(lastURLDecoded.combined), ppchar(@defaultAccept[low(defaultAccept)]), flags, 0);
     end;
 
 var
@@ -194,35 +199,35 @@ var
 begin
   if not assigned(hSession) Then exit;
 
-  if (lastServer.Protocol<>decoded.protocol) or (lastServer.Host<>decoded.host) or (lastServer.Port <> decoded.port)
-     or (lastServer.username <> decoded.username) or (lastServer.password <> decoded.password) then begin
+  if (lastServer.Protocol<>transfer.decodedUrl.protocol) or (lastServer.Host<>transfer.decodedUrl.host) or (lastServer.Port <> transfer.decodedUrl.port)
+     or (lastServer.username <> transfer.decodedUrl.username) or (lastServer.password <> transfer.decodedUrl.password) then begin
     newConnection;
     if hLastConnection=nil then begin
-      lastHTTPResultCode := -2;
-      lastErrorDetails:=rsConnectingTo0SFailed;
+      transfer.HTTPResultCode := -2;
+      transfer.HTTPErrorDetails:= rsConnectingTo0SFailed + windowsLastErrorToString;
       exit;
     end;
     if internetConfig^.proxyUsername <> '' then
       InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_USERNAME, pchar(internetConfig^.proxyUsername), length(internetConfig^.proxyUsername));
     if internetConfig^.ProxyPassword <> '' then
       InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_PASSWORD, pchar(internetConfig^.ProxyPassword), length(internetConfig^.ProxyPassword));
-    lastServer := decoded; //remember to which server the connection points. We cannot use lastURLDecoded, since the connection has already changed, but lastURLDecoded is only set after redirects
+    lastServer := transfer.decodedUrl; //remember to which server the connection points. We cannot use lastURLDecoded, since the connection has already changed, but lastURLDecoded is only set after redirects
   end;
 
   hfile := newOpenRequest;
   if not assigned(hfile) then begin
-    lastErrorDetails := rsReceivingFrom0SFaile;
+    transfer.HTTPErrorDetails := rsReceivingFrom0SFaile + windowsLastErrorToString;
     exit;
   end;
 
   headerAdd.hfile := hfile;
-  enumerateAdditionalHeaders(decoded, @addHeader, data.count > 0, @headerAdd);
+  enumerateAdditionalHeaders(transfer, @addHeader, @headerAdd);
 
   for i := 1 to 2 do begin //repeat if ssl certificate is wrong
-    if data.count = 0 then
+    if transfer.data.isEmpty then
       callResult:= httpSendRequestA(hfile, nil,0,nil,0)
      else
-      callResult:= httpSendRequestA(hfile, pchar(headerAdd.overridenPostHeader), Length(headerAdd.overridenPostHeader), data.data, data.count);
+      callResult:= httpSendRequestA(hfile, pchar(headerAdd.overridenPostHeader), Length(headerAdd.overridenPostHeader), transfer.data.data, transfer.data.length);
 
     if callResult then break;
 
@@ -238,7 +243,8 @@ begin
       end;
     end;
 
-    lastHTTPResultCode := -3;
+    transfer.HTTPResultCode := -3;
+    transfer.HTTPErrorDetails := rsHTTPSConnectionFailed + ': ' +windowsLastErrorToString;
     exit;
   end;
 
@@ -248,8 +254,8 @@ begin
     exit;
   res := pchar(@dwcode);
 
-  lastHTTPResultCode := StrToIntDef(res, -4);
-  lastHTTPHeaders.Clear;
+  transfer.HTTPResultCode := StrToIntDef(res, -4);
+  transfer.receivedHTTPHeaders.Clear;
   dwNumber := 0;
   if not HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
     if (GetLastError = ERROR_INSUFFICIENT_BUFFER) and (i > 0) then begin
@@ -258,14 +264,14 @@ begin
       lastHTTPHeaders.Text:=headerOut;
     end;
 
-  if method <> 'HEAD' then begin
+  if transfer.method <> 'HEAD' then begin
     dwRead:=0;
     SetLastError(0);
     while true do begin
       if InternetReadfile(hfile,@databuffer,sizeof(databuffer)-1,@DwRead) then begin
         if dwRead = 0 then
           break; //this is end-of-file condition according to MSDN (InternetReadFile must return true)
-        writeBlock(databuffer[0], dwRead);
+        transfer.writeBlock(databuffer[0], dwRead);
       end else if InternetQueryDataAvailable(hfile, @dwRead, 0, 0) then begin
         if dwRead = 0 then //the above condition never occurs (at least on WINE). So explicitly check for more data. (this is supposed to prevent problems with chunked transfers)
           break;
@@ -276,11 +282,11 @@ begin
   InternetCloseHandle(hfile);
 end;
 
-function TW32InternetAccess.getLastErrorDetails: string;
+function TW32InternetAccess.windowsLastErrorToString: string;
 var
   temp1,templen: dword;
 begin
-  result:=lastErrorDetails;
+  result:='';
   case GetLastError of
     ERROR_INTERNET_OUT_OF_HANDLES:
       result:=rsNoInternetHandlesAva;
@@ -369,8 +375,8 @@ begin
       result:= rsInvalidSSLCertificat2;
     ERROR_INTERNET_SEC_CERT_REV_FAILED:
       result:= rsFailedToValidateSSLC;
-    else if GetLastError <> 0 then
-      result:='('+ rsWindowsCode + IntToStr(GetLastError)+')';
+    0: ;
+    else result:='('+ rsWindowsCode + IntToStr(GetLastError)+')';
   end;
 end;
 

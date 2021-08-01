@@ -46,6 +46,7 @@ uses
 
 type
 TSynapseInternetAccess=class;
+PTransfer = ^TTransfer;
 TSynapseSplitStream = class(TMemoryStream)
   internetAccess: TSynapseInternetAccess;
   function Write(const Buffer; Count: LongInt): LongInt; override;
@@ -84,10 +85,11 @@ protected
   lastHTTPSFallbackHost: string;
   lastHTTPSFallbackType: TSSLType;
   headersSet: boolean;
+  currentTransfer: PTransfer;
   procedure checkHeaders;
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
-  procedure doTransferUnchecked(method: string; const url: TDecodedUrl; const data:TInternetAccessDataBlock);override;
+  procedure doTransferUnchecked(var transfer: TTransfer);override;
 public
   constructor create();override;
   destructor destroy;override;
@@ -172,7 +174,7 @@ end;
 function TSynapseSplitStream.Write(const Buffer; Count: LongInt): LongInt;
 begin
   internetAccess.checkHeaders;
-  internetAccess.writeBlock(buffer, count);
+  internetAccess.currentTransfer.writeBlock(buffer, count);
   result := count;
 end;
 
@@ -249,19 +251,21 @@ end;
 procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
 var
   err: String;
+  transfer: PTransfer;
 begin
   if internetAccess = nil then
     exit;
-  internetAccess.lastHTTPResultCode := id;
+  transfer := internetAccess.currentTransfer;
+  transfer.HTTPResultCode := id;
   err := msg;
   if LastErrorDesc <> '' then begin
     err := LineEnding + err;
     err += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
     err += LineEnding+'OpenSSL information: CA file: '+internetAccess.internetConfig^.CAFile+' , CA dir: '+internetAccess.internetConfig^.CAPath+' , '+GetSSLVersion+', '+LibVersion;
   end;
-  if internetAccess.lastErrorDetails.contains(err) then exit;
-  if internetAccess.lastErrorDetails <> '' then internetAccess.lastErrorDetails += LineEnding;
-  internetAccess.lastErrorDetails += err;
+  if transfer.HTTPErrorDetails.contains(err) then exit;
+  if transfer.HTTPErrorDetails <> '' then transfer.HTTPErrorDetails += LineEnding;
+  transfer.HTTPErrorDetails += err;
 
 end;
 
@@ -348,7 +352,7 @@ begin
 end;
 
 
-procedure addHeader(data: pointer; headerKind: TSynapseInternetAccess.THeaderKind; const name, header: string);
+procedure addHeader(data: pointer; headerKind: THeaderKind; const name, header: string);
 var
   connection: THTTPSend;
 begin
@@ -362,33 +366,35 @@ end;
 procedure TSynapseInternetAccess.checkHeaders;
 begin
   if headersSet then exit;
-  LastHTTPHeaders.assign(connection.Headers);
-  lastHTTPResultCode := connection.ResultCode;
+  currentTransfer.receivedHTTPHeaders.assign(connection.Headers);
+  currentTransfer.HTTPResultCode := connection.ResultCode;
   headersSet := true;
 end;
 
-procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
+procedure TSynapseInternetAccess.doTransferUnchecked(var transfer: TTransfer);
   procedure initConnection;
   begin
    connection.Clear;
    connection.Cookies.Clear;
-   //Some servers fail without port in host, some with. This behaviour mirrors Firefox:
-   connection.AddPortNumberToHost:=(url.port <> '')
-                                    and ( (striEqual(url.protocol, 'http') and (url.port <> '80'))
-                                          or (striEqual(url.protocol, 'https') and (url.port <> '443'))
-                                         );
-   if data.count > 0 then begin
-     connection.Document.Size := data.count;
-     move(data.data^, connection.Document.Memory^, data.count);
-     connection.MimeType := ContentTypeForData; //this pointless as addHeader overrides it. But it does not hurt either
-   end;
-   connection.Protocol:='1.1';
-   //fallback to TLS for servers where auto detection fails
-   if striequal(url.protocol, 'https') then
-     if lastHTTPsFallbackHost = url.host then connection.Sock.SSL.SSLType := lastHTTPSFallbackType
-     else connection.Sock.SSL.SSLType := LT_all;
+   with transfer do begin
+     //Some servers fail without port in host, some with. This behaviour mirrors Firefox:
+     connection.AddPortNumberToHost:=(decodedUrl.port <> '')
+                                      and ( (striEqual(decodedUrl.protocol, 'http') and (decodedUrl.port <> '80'))
+                                            or (striEqual(decodedUrl.protocol, 'https') and (decodedUrl.port <> '443'))
+                                           );
+     if not data.isEmpty then begin
+       connection.Document.Size := data.length;
+       move(data.data^, connection.Document.Memory^, data.length);
+       connection.MimeType := ContentTypeForData; //this pointless as addHeader overrides it. But it does not hurt either
+     end;
+     connection.Protocol:='1.1';
+     //fallback to TLS for servers where auto detection fails
+     if striequal(decodedUrl.protocol, 'https') then
+       if lastHTTPsFallbackHost = decodedUrl.host then connection.Sock.SSL.SSLType := lastHTTPSFallbackType
+       else connection.Sock.SSL.SSLType := LT_all;
 
-   enumerateAdditionalHeaders(url, @addHeader, data.count > 0, connection);
+   end;
+   enumerateAdditionalHeaders(transfer, @addHeader, connection);
    headersSet := false;
   end;
 
@@ -397,49 +403,50 @@ procedure TSynapseInternetAccess.doTransferUnchecked(method: string; const url: 
     tempsep: String;
   begin
    tempsep := LineEnding + ' ' + #9 ;
-   lastHTTPResultCode := -2;
-   lastErrorDetails := Format(rsSSLErrorNoOpenSSL, [tempsep,tempsep,tempsep,tempsep]);
+   transfer.HTTPResultCode := -2;
+   transfer.HTTPErrorDetails := Format(rsSSLErrorNoOpenSSL, [tempsep,tempsep,tempsep,tempsep]);
   end;
 var ok: Boolean;
   tempSSLType: TSSLType;
 begin
-  if striequal(url.protocol, 'https') then
+  if striequal(transfer.decodedUrl.protocol, 'https') then
     if (not IsSSLloaded) then begin//check if ssl is actually loaded
       errorFailedToLoadSSL;
       exit;
     end;
+  currentTransfer := @transfer;
 
-  lastHTTPResultCode := -4;
+  transfer.HTTPResultCode := -4;
 
   connection.Sock.SSL.VerifyCert := internetConfig^.checkSSLCertificates;
   initConnection;
-  if (url.username <> '') then begin
-    connection.UserName := strUnescapeHex(url.username, '%');
-    connection.Password := strUnescapeHex(url.password, '%');
+  if (transfer.decodedUrl.username <> '') then begin
+    connection.UserName := strUnescapeHex(transfer.decodedUrl.username, '%');
+    connection.Password := strUnescapeHex(transfer.decodedUrl.password, '%');
   end;
 
-  ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+  ok := connection.HTTPMethod(transfer.method, transfer.url);
 
   if (not ok) and (checkEtcResolv) then begin
     initConnection;
-    ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+    ok := connection.HTTPMethod(transfer.method, transfer.url);
   end;
 
 
-  if (not ok) and (lastHTTPSFallbackHost <> url.host) then begin
-    lastHTTPSFallbackHost := url.host;
+  if (not ok) and (lastHTTPSFallbackHost <> transfer.decodedUrl.host) then begin
+    lastHTTPSFallbackHost := transfer.decodedUrl.host;
     for tempSSLType := SSLFallbackMaxVersion downto SSLFallbackMinVersion do begin
       lastHTTPSFallbackType := tempSSLType;
       initConnection;
-      ok := connection.HTTPMethod(method,url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+      ok := connection.HTTPMethod(transfer.method, transfer.url);
       if ok then break;
     end;
   end;
 
   if ok then begin
     checkHeaders;
-  end else if lastHTTPResultCode = -4 then
-    lastErrorDetails := rsConnectionFailed;
+  end else if transfer.HTTPResultCode = -4 then
+    transfer.HTTPErrorDetails := rsConnectionFailed;
 end;
 
 constructor TSynapseInternetAccess.create();

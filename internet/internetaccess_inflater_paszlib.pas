@@ -19,7 +19,7 @@ TTransferContentInflaterZlib = class(TTransferContentInflater)
   procedure writeCompressedBlock(const abuffer; Count: Longint);
   constructor Create;
   destructor Destroy; override;
-  class procedure injectDecoder({%H-}sender: TInternetAccess; const encoding: string; var encoder: TTransferContentInflater; var blockWrite: TTransferBlockWriteEvent); override;
+  class procedure injectDecoder(var transfer: TTransfer; const encoding: string); override;
 end;
 
 implementation
@@ -114,8 +114,7 @@ begin
   inherited Destroy;
 end;
 
-class procedure TTransferContentInflaterZlib.injectDecoder(sender: TInternetAccess; const encoding: string;
-  var encoder: TTransferContentInflater; var blockWrite: TTransferBlockWriteEvent);
+class procedure TTransferContentInflaterZlib.injectDecoder(var transfer: TTransfer; const encoding: string);
 var
   zlibencoder: TTransferContentInflaterZlib;
   encodingIsGZIP: boolean;
@@ -126,8 +125,8 @@ begin
   else exit;
   end;
   zlibencoder := TTransferContentInflaterZlib.Create;
-  zlibencoder.writeUncompressedBlock := blockWrite;
-  zlibencoder.pointerToBlockWrite:=@blockWrite;
+  zlibencoder.writeUncompressedBlock := transfer.writeBlockCallback;
+  zlibencoder.pointerToBlockWrite:=@transfer.writeBlockCallback;
   zlibencoder.expectGZIP:=encodingIsGZIP;
 
   {if Askipheader then
@@ -137,8 +136,8 @@ begin
    }
    //inflateInit(zlibencoder.stream);
    inflateInit2(zlibencoder.stream, -MAX_WBITS);
-   blockWrite := @zlibencoder.writeCompressedBlock;
-   encoder := zlibencoder;
+   transfer.writeBlockCallback := @zlibencoder.writeCompressedBlock;
+   transfer.inflater := zlibencoder;
 end;
 
 initialization

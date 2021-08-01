@@ -24,7 +24,7 @@ unit internetaccess;
 interface
 
 uses
-  Classes, SysUtils, bbutils;
+  Classes, SysUtils, bbutils, bbutilsbeta;
 type
   PInternetConfig=^TInternetConfig;
   {** @abstract(Internet configuration)
@@ -83,12 +83,7 @@ type
     procedure prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
   end;
 
-  TInternetAccessDataBlock = record
-    data: pointer;
-    count: SizeInt;
-    class function create(const s: string): TInternetAccessDataBlock; static;
-    function isEmpty: boolean; inline;
-  end;
+  TInternetAccessDataBlock = TCharArrayView;
 
   TMIMEMultipartSubData = record
     data: string;
@@ -119,7 +114,14 @@ type
     class function randomLetter: Char; static;
   end;
 
-  THTTPHeaderList = TStringList;
+  THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie, iahUserAgent);
+  THTTPHeaderList = class(TStringList)
+  public
+    constructor Create;
+    function getHeaderValue(kind: THeaderKind): string;
+    function getHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
+    property headerValues[header: string]: string read GetheaderValue; default;
+  end;
 
   TCookieFlags = set of (cfHostOnly, cfSecure {, cfHttpOnly});
   TCookieManager = record
@@ -138,22 +140,48 @@ type
   end;
 
   TInternetAccess = class;
+  TTransferContentInflater = class;
 
   TInternetAccessReaction = (iarAccept, iarFollowRedirectGET, iarFollowRedirectKeepMethod, iarRetry, iarReject);
-
+     //if headerKind is iahUnknown header contains the entire header line name: value, otherwise only the value
+  THeaderEnumCallback = procedure (data: pointer; headerKindHint: THeaderKind; const name, value: string);
   //**Event to monitor the progress of a download (measured in bytes)
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
-  TTransferStartEvent=procedure (sender: TObject; var method: string; var url: TDecodedUrl; var data:string) of object;
   TTransferClearEvent = procedure() of object;
   TTransferBlockWriteEvent = TStreamLikeWrite;
-  TTransferReactEvent=procedure (sender: TInternetAccess; var method: string; var url: TDecodedUrl; var data: TInternetAccessDataBlock; var reaction: TInternetAccessReaction) of object;
-  TTransferEndEvent=procedure (sender: TObject; method: string; var url: TDecodedUrl; data:string; var result: string) of object;
+
+  TTransfer = record
+    //in
+    method: string;
+    url: string;
+    decodedUrl: TDecodedUrl;
+    data: TCharArrayView;
+    ownerAccess: TInternetAccess;
+
+    //during transfer
+    writeBlockCallback: TTransferBlockWriteEvent;
+    inflater: TTransferContentInflater;
+    currentSize, contentLength: sizeint;
+
+    //out
+    HTTPResultCode: longint;
+    HTTPErrorDetails: string;
+    receivedHTTPHeaders: THTTPHeaderList;
+
+    procedure beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; const amethod: string; const aurl: TDecodedUrl; const adata: TInternetAccessDataBlock);
+    procedure writeBlock(const Buffer; Count: Longint);
+    procedure endTransfer;
+  end;
+
+  TTransferStartEvent=procedure (sender: TObject; const method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock) of object;
+  TTransferReactEvent=procedure (sender: TInternetAccess; var transfer: TTransfer; var reaction: TInternetAccessReaction) of object;
+  TTransferEndEvent=procedure (sender: TObject; var transfer: TTransfer) of object;
 
   TTransferContentInflater = class
     //constructor create(); virtual; abstract;
     //procedure writeCompressedBlock(const Buffer; Count: Longint); virtual; abstract;
-    class procedure injectDecoder(sender: TInternetAccess; const encoding: string; var encoder: TTransferContentInflater; var blockWrite: TTransferBlockWriteEvent); virtual; abstract;
+    class procedure injectDecoder(var transfer: TTransfer; const encoding: string); virtual; abstract;
   end;
   TTransferInflaterClass = class of TTransferContentInflater;
 
@@ -182,52 +210,41 @@ type
     FOnTransferReact: TTransferReactEvent;
     FOnTransferStart: TTransferStartEvent;
     FOnProgress:TProgressEvent;
+    procedure setLastUrl(AValue: string);
+  protected
     //active transfer
-    FOnWriteBlock: TTransferBlockWriteEvent;
-    FTransferInflater: TTransferContentInflater;
-    FTransferCurrentSize, FTransferContentLength: integer; //only used for progress event
-    procedure beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent);
-    procedure endTransfer;
-  protected
-    procedure writeBlock(const Buffer; Count: Longint);
-  protected
-    lastErrorDetails: string;
-    lastURLDecoded: TDecodedUrl;
-    FLastHTTPHeaders: THTTPHeaderList;
+    lastTransfer: TTransfer;
     //**Override this if you want to sub class it
-    procedure doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);virtual;abstract;
-    procedure doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string; url: TDecodedUrl;  data: TInternetAccessDataBlock; remainingRedirects: integer);
-    function getLastErrorDetails(): string; virtual;
+    procedure doTransferUnchecked(var transfer: TTransfer);virtual;abstract;
+    procedure doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string; url: TDecodedUrl; data: TInternetAccessDataBlock; remainingRedirects: integer);
+    function getLastErrorDetails(): string;
+    function getLastHTTPHeaders: THTTPHeaderList;
+    function getLastHTTPResultCode: longint;
+    function getLastUrl: string;
     //utility functions to minimize platform dependent code
+    procedure enumerateAdditionalHeaders(const atransfer: TTransfer; callback: THeaderEnumCallback; callbackData: pointer);
   public
-    type THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie, iahUserAgent);
-         //if headerKind is iahUnknown header contains the entire header line name: value, otherwise only the value
-       THeaderEnumCallback = procedure (data: pointer; headerKindHint: THeaderKind; const name, value: string);
-      class function parseHeaderLineKind(const line: string): THeaderKind; static;
+    class function parseHeaderLineKind(const line: string): THeaderKind; static;
   protected
     class function parseHeaderLineValue(const line: string): string; static;
     class function parseHeaderLineName(const line: string): string; static;
     class function makeHeaderLine(const name, value: string): string; static;
     class function makeHeaderLine(const kind: THeaderKind; const value: string): string; static;
     class function makeHeaderName(const kind: THeaderKind): string; static;
-    procedure enumerateAdditionalHeaders(const target: TDecodedUrl; callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
-    function getLastHTTPHeaderValue(kind: THeaderKind): string;
-    function getLastHTTPHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
     //constructor, since .create is "abstract" and can not be called
     procedure init;
   public
-
     //in
     internetConfig: PInternetConfig; //**< Configuration to use. Defaults to defaultInternetConfig
-    additionalHeaders: TStringList; //**< Defines additional headers that should be send to the server
+    additionalHeaders: THTTPHeaderList; //**< Defines additional headers that should be send to the server
     ContentTypeForData: string; //**< Defines the Content-Type that is used to transmit data. Usually @code(application/x-www-form-urlencoded) or @code(multipart/form-data; boundary=...). @br This is overriden by a Content-Type set in additionalHeaders.
     multipartFormData: TMIMEMultipartData;
     function getFinalMultipartFormData: string;
   public
     //out
-    lastHTTPResultCode: longint;    //**< HTTP Status code of the last @noAutoLink(request)
-    lastUrl: String; //**< Last retrieved URL
-    property lastHTTPHeaders: TStringList read FLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
+    property lastHTTPResultCode: longint read getlastHTTPResultCode;    //**< HTTP Status code of the last @noAutoLink(request)
+    property lastUrl: string read getLastUrl write setLastUrl; //**< Last retrieved URL
+    property lastHTTPHeaders: THTTPHeaderList read getLastHTTPHeaders; //**< HTTP headers received by the last @noAutoLink(request)
     function getLastContentType: string; //**< Same as getLastHTTPHeader('Content-Type') but easier to remember and without magic string
   public
     //** Cookies receive from/to-send the server
@@ -483,7 +500,7 @@ begin
 end;
 
 
-procedure saveAbleURL(var url:string);
+procedure saveableURL(var url:string);
 var temp:integer;
 begin
   for temp:=1 to length(url) do
@@ -511,6 +528,7 @@ begin
   end;
 end;
 
+
 function TMIMEMultipartSubData.getFormDataName: string;
 var
   j: Integer;
@@ -521,17 +539,6 @@ begin
   result := '';
 end;
 
-class function TInternetAccessDataBlock.create(const s: string): TInternetAccessDataBlock;
-begin
-  result.count := length(s);
-  if result.count = 0 then result.data := nil
-  else result.data := pointer(s);
-end;
-
-function TInternetAccessDataBlock.isEmpty: boolean;
-begin
-  result := count = 0;
-end;
 
 { TMIMEMultipartData }
 
@@ -877,6 +884,58 @@ begin
   {$endif}
 end;
 
+procedure TTransfer.beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent;
+     const amethod: string; const aurl: TDecodedUrl; const adata: TInternetAccessDataBlock);
+begin
+  onClear();
+
+  method := amethod;
+  decodedUrl := aurl;
+  url := aurl.combinedExclude([dupUsername, dupPassword, dupLinkTarget]);
+  data := adata;
+
+  //during transfer
+  writeBlockCallback := onReceivedBlock;
+  FreeAndNil(inflater); //should be freed in endTransfer, but might have failed because of exceptions during transfer
+  currentSize := 0;
+  contentLength := -1; //only used for progress event
+
+  //out
+  HTTPResultCode := -1;
+  HTTPErrorDetails := '';
+  receivedHTTPHeaders.Clear;
+
+  //do not call OnTransferStart, since that event is triggered once for each request, while this function is called for the each request and again for each redirection;
+end;
+
+procedure TTransfer.writeBlock(const Buffer; Count: Longint);
+  procedure checkForContentEncoding;
+  var encoding: string;
+  begin
+    encoding := receivedHTTPHeaders['content-encoding'];
+    if encoding = '' then exit;
+    defaultTransferInflater.injectDecoder(self, encoding);
+  end;
+begin
+  if (currentSize = 0) and (count > 0) and (defaultTransferInflater <> nil) then
+    checkForContentEncoding;
+  currentSize := currentSize + Count;
+  writeBlockCallback(buffer, count);
+  if Assigned(ownerAccess.FOnProgress) then begin
+    if contentLength < 0 then
+      contentLength := StrToIntDef(receivedHTTPHeaders['content-length'], 0);
+    ownerAccess.FOnProgress(ownerAccess, currentSize, contentLength);
+  end;
+end;
+
+procedure TTransfer.endTransfer;
+begin
+  FreeAndNil(inflater);
+  if Assigned(ownerAccess.FOnProgress) then begin
+    if (currentSize < contentLength) then ownerAccess.FOnProgress(ownerAccess, currentSize, contentLength)
+    else if contentLength = -1 then ownerAccess.FOnProgress(ownerAccess, 0, 0);
+  end;
+end;
 
 
 function TInternetAccess.request(method, protocol, host, url, data: string): string;
@@ -894,17 +953,13 @@ function TInternetAccess.request(method: string; url: TDecodedUrl; data: string)
 var builder: TStrBuilder;
 begin
   if internetConfig=nil then raise Exception.create('No internet configuration set');
-  if assigned(FOnTransferStart) then
-    FOnTransferStart(self, method, url, data);
 
   builder.init(@result);
-  request(method, url, TInternetAccessDataBlock.create(data), TTransferClearEvent(@builder.clear), TTransferBlockWriteEvent(@builder.appendBuffer));
+  request(method, url, data.unsafeView, TTransferClearEvent(@builder.clear), TTransferBlockWriteEvent(@builder.appendBuffer));
   builder.final;
 
   if internetConfig^.logToPath<>'' then
     writeString(internetConfig^.logToPath, url.combined+'<-DATA:'+data,result);
-  if assigned(FOnTransferEnd) then
-    FOnTransferEnd(self, method, url, data, Result);
 end;
 
 procedure clearStream(self: TStream);
@@ -915,65 +970,50 @@ end;
 
 procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: string; outStream: TStream);
 begin
-  request(method, url, TInternetAccessDataBlock.create(uploadData), TTransferClearEvent(makeMethod(@clearStream, outStream)), @outStream.WriteBuffer);
+  request(method, url, uploadData.unsafeView, TTransferClearEvent(makeMethod(@clearStream, outStream)), @outStream.WriteBuffer);
 end;
 
 procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: TInternetAccessDataBlock;
   const onClear: TTransferClearEvent; const onReceivedBlock: TTransferBlockWriteEvent);
 begin
-  //todo: this does not call ontransferstart/end
   doTransferChecked(onClear, onReceivedBlock, method, url, uploadData, 10);
 end;
 
-procedure TInternetAccess.beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent);
+
+function TInternetAccess.getLastHTTPHeaders: THTTPHeaderList;
 begin
-  onClear();
-  FOnWriteBlock := onReceivedBlock;
-  FTransferCurrentSize := 0;
-  FTransferContentLength := -1;
-  lastHTTPResultCode := -1;
-  lastErrorDetails := '';
-  FreeAndNil(FTransferInflater); //should be freed in endTransfer, but might have failed because of exceptions during transfer
-  //do not call OnTransferStart, since that event is triggered once for each request, while this function is called for the each request and again for each redirection;
+  result := lastTransfer.receivedHTTPHeaders;
 end;
 
-procedure TInternetAccess.endTransfer;
+function TInternetAccess.getLastHTTPResultCode: longint;
 begin
-  FreeAndNil(FTransferInflater);
-  if Assigned(FOnProgress) then begin
-    if (FTransferCurrentSize < FTransferContentLength) then FOnProgress(self, FTransferContentLength, FTransferContentLength)
-    else if FTransferContentLength = -1 then FOnProgress(self, 0, 0);
-  end;
+  result := lastTransfer.HTTPResultCode;
 end;
 
-procedure TInternetAccess.writeBlock(const Buffer; Count: Longint);
-  procedure checkForContentEncoding;
-  var encoding: string;
-  begin
-    encoding := getLastHTTPHeaderValue('content-encoding');
-    if encoding = '' then exit;
-    defaultTransferInflater.injectDecoder(self, encoding, FTransferInflater, FOnWriteBlock);
-  end;
+function TInternetAccess.getLastUrl: string;
 begin
-  if (FTransferCurrentSize = 0) and (count > 0) and (defaultTransferInflater <> nil) then
-    checkForContentEncoding;
-  FTransferCurrentSize := FTransferCurrentSize + Count;
-  FOnWriteBlock(buffer, count);
-  if Assigned(FOnProgress) then begin
-    if FTransferContentLength < 0 then
-      FTransferContentLength := StrToIntDef(getLastHTTPHeaderValue('content-length') , -1);
-    FOnProgress(self, FTransferCurrentSize, FTransferContentLength);
-  end;
+  result := lastTransfer.url;
 end;
 
-procedure TInternetAccess.doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent; method: string;
-  url: TDecodedUrl; data: TInternetAccessDataBlock; remainingRedirects: integer);
+procedure TInternetAccess.setLastUrl(AValue: string);
+begin
+  lastTransfer.url := AValue;
+  lastTransfer.decodedUrl := decodeURL(avalue);
+end;
+
+procedure TInternetAccess.doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent;
+   method: string; url: TDecodedUrl; data: TInternetAccessDataBlock; remainingRedirects: integer);
 
 var
   reaction: TInternetAccessReaction;
   message: String;
+  transfer: TTransfer;
 begin
-  url.prepareSelfForRequest(lastURLDecoded);
+  if assigned(FOnTransferStart) then
+     FOnTransferStart(self, method, url, data);
+
+  url.prepareSelfForRequest(lastTransfer.decodedUrl);
+  transfer := lastTransfer;
 
   method := UpperCase(method);
   reaction := iarReject;
@@ -981,12 +1021,12 @@ begin
     url.path := urlEncodeData(url.path, ueURLPath); //remove forbidden characters from url. mostly for Apache HTTPClient, it throws an exception if it they remain
     url.params := urlEncodeData(url.params, ueURLQuery);
 
-    beginTransfer(onClear, onReceivedBlock);
-    doTransferUnchecked(method, url, data);
-    endTransfer;
+    transfer.beginTransfer(onClear, onReceivedBlock, method, url, data );
+    doTransferUnchecked(transfer);
+    transfer.endTransfer;
 
     reaction := iarReject;
-    case lastHTTPResultCode of
+    case transfer.HTTPResultCode of
       200..299: reaction := iarAccept;
       301,302,303: if remainingRedirects > 0 then
         if striEqual(method, 'POST') then reaction := iarFollowRedirectGET
@@ -995,40 +1035,43 @@ begin
       else reaction := iarReject;
     end;
 
-    if Assigned(OnTransferReact) then OnTransferReact(self, method, url, data, reaction);
+    if Assigned(OnTransferReact) then OnTransferReact(self, transfer, reaction);
 
     case reaction of
       iarAccept: ; //see above
       iarFollowRedirectGET, iarFollowRedirectKeepMethod: begin
         if reaction = iarFollowRedirectGET then begin
           method := 'GET';
-          data := TInternetAccessDataBlock.create('');
+          data := default(TInternetAccessDataBlock);
         end;
-        cookies.parseHeadersForCookies(url, lastHTTPHeaders); //parse for old url
-        url := url.resolved(getLastHTTPHeaderValue(iahLocation));
+        cookies.parseHeadersForCookies(url, transfer.receivedHTTPHeaders); //parse for old url
+        url := url.resolved(transfer.receivedHTTPHeaders.getHeaderValue(iahLocation));
         dec(remainingRedirects);
         continue;
       end;
       iarRetry: ; //do nothing
       else begin
-        message := getLastErrorDetails();
-        if lastHTTPResultCode <= 0 then message := 'Internet Error: ' + IntToStr(lastHTTPResultCode) + ' ' + message
-        else message := 'Internet/HTTP Error: ' + IntToStr(lastHTTPResultCode) + ' ' + message;
-        raise EInternetException.Create(message + LineEnding + 'when talking to: '+url.combined, lastHTTPResultCode);
+        message := IntToStr(transfer.HTTPResultCode) + ' ' + transfer.HTTPErrorDetails;
+        if transfer.HTTPResultCode <= 0 then message := 'Internet Error: ' + message
+        else message := 'Internet/HTTP Error: ' + message;
+        raise EInternetException.Create(message + LineEnding + 'when talking to: '+url.combined, transfer.HTTPResultCode);
       end;
     end;
 
-    cookies.parseHeadersForCookies(url, lastHTTPHeaders);
+    cookies.parseHeadersForCookies(url, transfer.receivedHTTPHeaders);
   end;
 
-  lastURLDecoded := url;
-  lastURLDecoded.username:=''; lastURLDecoded.password:=''; lastURLDecoded.linktarget:=''; //keep this secret
-  lastUrl := lastURLDecoded.combined;
+  lastTransfer := transfer;
+  //url.username:=''; url.password:=''; url.linktarget:=''; //keep this secret
+  //lastTransfer.decodedUrl := url;
+
+  if assigned(FOnTransferEnd) then
+    FOnTransferEnd(self, lastTransfer);
 end;
 
 function TInternetAccess.getLastErrorDetails(): string;
 begin
-  result := lastErrorDetails;
+  result := lastTransfer.HTTPErrorDetails;
 end;
 
 procedure TCookieManager.clear;
@@ -1132,9 +1175,9 @@ var name, value, domain, path, tName, tValue: string;
     lastSlash: LongInt;
 begin
   for ci := 0 to headers.Count - 1 do
-    case TInternetAccess.parseHeaderLineKind(headers[ci]) of
+    case TInternetAccess.parseHeaderLineKind(headers.Strings[ci]) of
       iahSetCookie: begin
-        header := TInternetAccess.parseHeaderLineValue(headers[ci]);
+        header := TInternetAccess.parseHeaderLineValue(headers.Strings[ci]);
         headerlen := length(header);
         i := 1;
         if not parseNameValuePair(name, value, true) then continue;
@@ -1243,7 +1286,6 @@ var temp: THTTPHeaderList;
 begin
   temp := THTTPHeaderList.Create;
   try
-    temp.NameValueSeparator := ':';
     temp.LoadFromFile(fn);
     tempurl := decodeURL('file:///'); //this is not actually used in parseHeadersForCookies
     parseHeadersForCookies(tempurl, temp, true);
@@ -1321,10 +1363,10 @@ begin
   end;
 end;
 
-procedure TInternetAccess.enumerateAdditionalHeaders(const target: TDecodedUrl;  callback: THeaderEnumCallback; hasPostData: boolean; data: pointer);
+procedure TInternetAccess.enumerateAdditionalHeaders(const atransfer: TTransfer; callback: THeaderEnumCallback; callbackData: pointer);
   procedure callKnownKind(kind: THeaderKind; value: string);
   begin
-    callback(data, kind, makeHeaderName(kind), value);
+    callback(callbackData, kind, makeHeaderName(kind), value);
   end;
 
 var
@@ -1334,18 +1376,18 @@ var
   temp: String;
 begin
   for i := 0 to additionalHeaders.Count - 1 do begin
-     kind := parseHeaderLineKind(additionalHeaders[i]);
+     kind := parseHeaderLineKind(additionalHeaders.Strings[i]);
      hadHeader[kind] := true;
-     callback(data, kind, parseHeaderLineName(additionalHeaders[i]), parseHeaderLineValue(additionalHeaders[i]));
+     callback(callbackData, kind, parseHeaderLineName(additionalHeaders.Strings[i]), parseHeaderLineValue(additionalHeaders.Strings[i]));
    end;
 
   if (not hadHeader[iahReferer]) and (lastUrl <> '') then callKnownKind( iahReferer, lastUrl );
    if (not hadHeader[iahAccept]) then callKnownKind( iahAccept, 'text/html,application/xhtml+xml,application/xml,text/*,*/*' );
    if (not hadHeader[iahCookie]) and (length(cookies.cookies) > 0) then begin
-     temp := cookies.makeCookieHeaderValueOnly(target);
+     temp := cookies.makeCookieHeaderValueOnly(atransfer.decodedUrl);
      if temp <> '' then callKnownKind( iahCookie, temp);
    end;
-   if (not hadHeader[iahContentType]) and hasPostData then callKnownKind(iahContentType, ContentTypeForData);
+   if (not hadHeader[iahContentType]) and (not atransfer.data.isEmpty) then callKnownKind(iahContentType, ContentTypeForData);
    //if (not hadHeader[iahUserAgent]) then callKnownKind( iahUserAgent, internetConfig^.userAgent ); no central handling of agent, it is too different between the APIs
 end;
 
@@ -1355,10 +1397,9 @@ begin
   if defaultInternetConfiguration.userAgent='' then
     defaultInternetConfiguration.userAgent:='Mozilla/5.0 (compatible)';
 
-  additionalHeaders := TStringList.Create;
-  additionalHeaders.nameValueSeparator := ':';
-  FLastHTTPHeaders := TStringList.Create;
-  FLastHTTPHeaders.nameValueSeparator := ':';
+  additionalHeaders := THTTPHeaderList.Create;
+  lastTransfer.receivedHTTPHeaders := THTTPHeaderList.Create;
+  lastTransfer.ownerAccess := self;
 
   ContentTypeForData := ContentTypeUrlEncoded;
 end;
@@ -1373,34 +1414,35 @@ begin
   multipartFormData.clear;
 end;
 
-function TInternetAccess.getLastHTTPHeaderValue(kind: THeaderKind): string;
+constructor THTTPHeaderList.Create;
+begin
+  NameValueSeparator := ':';
+end;
+
+function THTTPHeaderList.getHeaderValue(kind: THeaderKind): string;
 var
-  headers: TStringList;
   i: Integer;
 begin
-  headers := LastHTTPHeaders;
-  for i:= 0 to headers.count - 1 do
-    if parseHeaderLineKind(headers[i]) = kind then
-      exit(parseHeaderLineValue(headers[i]));
+  for i:= 0 to count - 1 do
+    if TInternetAccess.parseHeaderLineKind(Strings[i]) = kind then
+      exit(TInternetAccess.parseHeaderLineValue(Strings[i]));
   exit('');
 end;
 
-function TInternetAccess.getLastHTTPHeaderValue(header: string): string;
+function THTTPHeaderList.getHeaderValue(header: string): string;
 var
-  headers: TStringList;
   i: Integer;
 begin
   header := header + ':';
-  headers := LastHTTPHeaders;
-  for i:= 0 to headers.count - 1 do
-    if striBeginsWith(headers[i], header) then
-      exit(trim(strCopyFrom(headers[i], length(header) + 1)));
+  for i:= 0 to count - 1 do
+    if striBeginsWith(Strings[i], header) then
+      exit(trim(strCopyFrom(Strings[i], length(header) + 1)));
   exit('');
 end;
 
 function TInternetAccess.getLastContentType: string;
 begin
-  result := getLastHTTPHeaderValue(iahContentType);
+  result := lastHTTPHeaders.getHeaderValue(iahContentType);
 end;
 
 constructor TInternetAccess.create();
@@ -1410,9 +1452,9 @@ end;
 
 destructor TInternetAccess.Destroy;
 begin
-  FLastHTTPHeaders.Free; //created by init
+  FreeAndNil(lastTransfer.receivedHTTPHeaders); //created by init
   additionalHeaders.Free;
-  FreeAndNil(FTransferInflater); //should be freed in endTransfer, but might have failed because of exceptions during transfer
+  FreeAndNil(lastTransfer.inflater); //should be freed in endTransfer, but might have failed because of exceptions during transfer
   inherited Destroy;
 end;
 

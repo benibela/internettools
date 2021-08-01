@@ -41,7 +41,7 @@ uses
 
 type
 { TAndroidInternetAccess }
-
+PTransfer = ^TTransfer;
 //**@abstract(Internet access class using the Apache HttpComponents on Android.)
 //**Set defaultInternetAccessClass to TAndroidInternetAccess if you want to use this class on Android.@br
 //**Additionally bbjniutils.jvmref must be set to the Java VM reference.@br
@@ -49,7 +49,8 @@ type
 TAndroidInternetAccess=class(TInternetAccess)
 protected
   jhttpclient: jobject;
-  procedure doTransferUnchecked(method:string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);override;
+  currentTransfer: PTransfer;
+  procedure doTransferUnchecked(var transfer: TTransfer);override;
   function ExceptionCheckAndClear: boolean;
 public
   constructor create;override;
@@ -262,7 +263,7 @@ type TLocalStackRecord = record
 end;
      PLocalStackRecord = ^TLocalStackRecord;
 
-procedure addHeader(data: pointer; headerKind: TAndroidInternetAccess.THeaderKind; const name, value: string);
+procedure addHeader(data: pointer; headerKind: THeaderKind; const name, value: string);
 var args: array[0..1] of jvalue;
 begin
   //jRequest.addHeader(n, v)
@@ -276,7 +277,7 @@ begin
     end;
 end;
 
-procedure TAndroidInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
+procedure TAndroidInternetAccess.doTransferUnchecked(var transfer: TTransfer);
 var stack: TLocalStackRecord;
 
 
@@ -287,13 +288,13 @@ var stack: TLocalStackRecord;
   begin
     with stack do
       with classInfos do begin
-        if data.isEmpty then exit;
-        wrappedData := j.env^^.NewByteArray(j.env, data.count);
+        if transfer.data.isEmpty then exit;
+        wrappedData := j.env^^.NewByteArray(j.env, transfer.data.length);
         if wrappedData = nil then begin
-          lastErrorDetails := 'Failed to allocate JNI array';
+          transfer.HTTPErrorDetails := 'Failed to allocate JNI array';
           exit(false);
         end;
-        j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, data.count, data.data); //todo: is there a faster way than copying?
+        j.env^^.SetByteArrayRegion(j.env, wrappedData, 0, transfer.data.length, pointer(transfer.data.data)); //todo: is there a faster way than copying?
 
         //entity = new ByteArrayEntity(data)
         jentity.l := j.env^^.NewObjectA(j.env, jcByteArrayEntity, jmByteArrayEntityConstructor, @wrappedData);
@@ -318,13 +319,14 @@ var
   connectionResetRepeat: integer;
   connectionReset, needRequestData: Boolean;
 begin
+  currentTransfer := @transfer;
   needJ;
   if j.env^^.ExceptionCheck(j.env) <> JNI_FALSE then begin
     ExceptionCheckAndClear
     //log('Warning: Ignoring exception');
   end;
 
-  m := methodStringToMethod(method);
+  m := methodStringToMethod(transfer.method);
   needRequestData := m in [hmPut, hmPost];
   with stack do begin
     classInfos := initializeClasses(); //todo: cache?
@@ -337,25 +339,25 @@ begin
         try
           with classInfos do begin;
             //HttpGet httpget = new HttpGet(url);
-            jUrl := j.stringToJString(pchar(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget])));
+            jUrl := j.stringToJString(pchar(transfer.url));
             jRequest := j.env^^.NewObjectA(j.env, jcMethods[m], jmMethodConstructors[m], @jUrl);
             if ExceptionCheckAndClear then exit;
             j.DeleteLocalRef(jUrl);
 
-            enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, @stack);
-            if (not data.isEmpty) and needRequestData then
+            enumerateAdditionalHeaders(transfer, @addHeader, @stack);
+            if (not transfer.data.isEmpty) and needRequestData then
               if not setRequestData() then begin
-                lastErrorDetails:= 'Failed to set request data';
+                transfer.HTTPErrorDetails:= 'Failed to set request data';
                 exit;
               end;
 
             jContext := j.newObject(jcBasicHttpContext, jmBasicHttpContextInit);
             if ExceptionCheckAndClear then exit;
 
-            if url.username <> '' then
+            if transfer.decodedUrl.username <> '' then
               //problem: this is host specific, so it does not work for redirections
-              if not setCredentials(strUnescapeHex(url.username, '%'), strUnescapeHex(url.password, '%'), url.host ) then begin
-                lastErrorDetails:= 'Failed to set credentials';
+              if not setCredentials(strUnescapeHex(transfer.decodedUrl.username, '%'), strUnescapeHex(transfer.decodedUrl.password, '%'), transfer.decodedUrl.host ) then begin
+                transfer.HTTPErrorDetails:= 'Failed to set credentials';
                 exit;
               end;
 
@@ -373,8 +375,8 @@ begin
               if ExceptionCheckAndClear then exit;
 
               jStatusLine := j.callObjectMethodChecked(jResponse, jmHttpResponseGetStatusLine);
-              lastHTTPResultCode := j.callIntMethodChecked(jStatusLine, jmStatusLineGetStatusCode);
-              lastErrorDetails := j.jStringToStringAndDelete(j.callObjectMethodChecked(jStatusLine, jmStatusLineGetReasonPhrase));
+              transfer.HTTPResultCode := j.callIntMethodChecked(jStatusLine, jmStatusLineGetStatusCode);
+              transfer.HTTPErrorDetails := j.jStringToStringAndDelete(j.callObjectMethodChecked(jStatusLine, jmStatusLineGetReasonPhrase));
               j.DeleteLocalRef(jStatusLine);
 
               try
@@ -388,7 +390,7 @@ begin
                 end;
                 j.DeleteLocalRef(jHeaderIterator);
 
-                j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @writeBlock);
+                j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @transfer.writeBlock);
               finally
                 j.DeleteLocalRef(jResult);
               end;
@@ -435,7 +437,7 @@ end;
 function TAndroidInternetAccess.ExceptionCheckAndClear: boolean;
 begin
   result := j.ExceptionCheck;
-  if result then lastErrorDetails := j.ExceptionDescribeAndClear
+  if result then currentTransfer^.HTTPErrorDetails := j.ExceptionDescribeAndClear
 end;
 
 
@@ -517,7 +519,7 @@ var jcCredentialsProvider, jcAbstractHttpClient, jcAuthScope, jcUsernamePassword
     tempargs: array[0..1] of jvalue;
 begin
   if jhttpclient = nil then begin
-    lastErrorDetails := 'HttpClient not created';
+    currentTransfer^.HTTPErrorDetails := 'HttpClient not created';
     exit(false);
   end;
   //jhttpclient.getCredentialsProvider().setCredentials(new AuthScope(host, AuthScope.ANY_PORT), new UsernamePasswordCredentials(username, password));
