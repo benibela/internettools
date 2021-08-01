@@ -1756,6 +1756,49 @@ begin
   test(strResolveURI('../foobar/', '/tmp/xyz/'), '/tmp/foobar/');
 
 
+  {$ifdef windows}
+  test(strResolveURI('/foobar', 'tmp/xyz\'), '/foobar');
+  test(strResolveURI('foobar', 'tmp/xyz\'), 'tmp/xyz/foobar');
+  test(strResolveURI('../foobar', 'tmp/xyz\'), 'tmp/foobar');
+  test(strResolveURI('/foobar/', 'tmp/xyz\'), '/foobar/');
+  test(strResolveURI('foobar/', 'tmp/xyz\'), 'tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', 'tmp/xyz\'), 'tmp/foobar/');
+
+  test(strResolveURI('/foobar', 'tmp\xyz/'), '/foobar');
+  test(strResolveURI('foobar', 'tmp\xyz/'), 'tmp/xyz/foobar');
+  test(strResolveURI('../foobar', 'tmp\xyz/'), 'tmp/foobar');
+  test(strResolveURI('/foobar/', 'tmp\xyz/'), '/foobar/');
+  test(strResolveURI('foobar/', 'tmp\xyz/'), 'tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', 'tmp\xyz/'), 'tmp/foobar/');
+
+  test(strResolveURI('/foobar', 'tmp\xyz\'), '/foobar');
+  test(strResolveURI('foobar', 'tmp\xyz\'), 'tmp/xyz/foobar');
+  test(strResolveURI('../foobar', 'tmp\xyz\'), 'tmp/foobar');
+  test(strResolveURI('/foobar/', 'tmp\xyz\'), '/foobar/');
+  test(strResolveURI('foobar/', 'tmp\xyz\'), 'tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', 'tmp\xyz\'), 'tmp/foobar/');
+
+  test(strResolveURI('/foobar', '/tmp/xyz\'), '/foobar');
+  test(strResolveURI('foobar', '/tmp/xyz\'), '/tmp/xyz/foobar');
+  test(strResolveURI('../foobar', '/tmp/xyz\'), '/tmp/foobar');
+  test(strResolveURI('/foobar/', '/tmp/xyz\'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp/xyz\'), '/tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', '/tmp/xyz\'), '/tmp/foobar/');
+
+  test(strResolveURI('/foobar', '/tmp\xyz/'), '/foobar');
+  test(strResolveURI('foobar', '/tmp\xyz/'), '/tmp/xyz/foobar');
+  test(strResolveURI('../foobar', '/tmp\xyz/'), '/tmp/foobar');
+  test(strResolveURI('/foobar/', '/tmp\xyz/'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp\xyz/'), '/tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', '/tmp\xyz/'), '/tmp/foobar/');
+
+  test(strResolveURI('/foobar', '/tmp\xyz\'), '/foobar');
+  test(strResolveURI('foobar', '/tmp\xyz\'), '/tmp/xyz/foobar');
+  test(strResolveURI('../foobar', '/tmp\xyz\'), '/tmp/foobar');
+  test(strResolveURI('/foobar/', '/tmp\xyz\'), '/foobar/');
+  test(strResolveURI('foobar/', '/tmp\xyz\'), '/tmp/xyz/foobar/');
+  test(strResolveURI('../foobar/', '/tmp\xyz\'), '/tmp/foobar/');
+ {$endif}
 
   //Windows local path resolving
 

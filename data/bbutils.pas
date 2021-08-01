@@ -3925,6 +3925,9 @@ begin
     p := pos('?', base);
     if p > 0 then delete(base, p, length(base) - p + 1);
   end;
+  {$ifdef windows}
+  if stribeginswith(base, 'file://') and base.Contains('\') then base := base.Replace('\', '/', [rfReplaceAll]);
+  {$endif}
   schemeLength := pos(':', base); inc(schemeLength);
   if (schemeLength <= length(base)) and (base[schemeLength] = '/') then inc(schemeLength);
   if (schemeLength <= length(base)) and (base[schemeLength] = '/') then inc(schemeLength);
