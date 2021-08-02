@@ -1426,7 +1426,6 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   data: array of THttpRequestParam;
   firstKeyIndex: TXQHashmapStrSizeInt;
   keysToRemove: TXQHashsetStr;
-  hasCharsetSpecial: boolean;
   function addRawKey(const k: string): PHttpRequestParam;
   function addRawParam(const p: THttpRequestParam): PHttpRequestParam;
   function addRawKeyValue(const k, v: string): PHttpRequestParam;
@@ -1504,7 +1503,6 @@ begin
   urlencoded := false;
   size := 0;
   data := nil;
-  hasCharsetSpecial := false;
 end;
 
 destructor THttpRequestParams.done;
