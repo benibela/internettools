@@ -1775,17 +1775,36 @@ end;
 
 function THttpRequestParams.addFormAndMerge(form: TTreeNode; cmp: TStringComparisonFunc; const requestOverride: THttpRequestParams
   ): boolean;
-var temp: TTreeNode;
+var temp, tempIterator, iterationEnd: TTreeNode;
   formData: TFormElementData;
   i: Integer;
+  inForm: Boolean = false;
+  formId: String;
 begin
-  for temp in form.getEnumeratorDescendants do begin
+  formId := form.getAttribute('id', cmp);
+  if formId = '' then   tempIterator := form
+  else tempIterator := form.getRootHighest();
+  iterationEnd := tempIterator.reverse;
+  while (tempIterator <> nil) and (tempIterator <> iterationEnd) do begin
+    temp := tempIterator;
+    tempIterator := tempIterator.next;
+    case inForm of
+      true: if temp = form.reverse then inForm := false;
+      false: begin
+        if temp = form then begin
+          inform := true;
+          continue;
+        end;
+        if temp.getAttribute('form', cmp) <> formId then continue;
+      end;
+    end;
     case temp.hash of
       HTMLNodeNameHashs.input,
       HTMLNodeNameHashs.select,
       HTMLNodeNameHashs.textarea,
       HTMLNodeNameHashs.button,
-      HTMLNodeNameHashs.&object: {ok};
+      HTMLNodeNameHashs.&object
+      : {ok};
       else continue;
     end;
     formData := nodeToFormData(temp, cmp, false);
