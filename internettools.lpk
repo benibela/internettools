@@ -80,8 +80,8 @@
         <UnitName Value="xquery.internals.protectionbreakers"/>
       </Item16>
       <Item17>
-        <Filename Value="data/xquery.internals.rng.pas"/>
-        <UnitName Value="xquery.internals.rng"/>
+        <Filename Value="data/bbrandomnumbergenerator.pas"/>
+        <UnitName Value="bbrandomnumbergenerator"/>
       </Item17>
       <Item18>
         <Filename Value="data/xquery.namespaces.pas"/>

@@ -41,7 +41,7 @@ implementation
 
 uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
   simplehtmltreeparser, htmlInformation,
-  bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, xquery.internals.rng, xquery__serialization_nodes, xquery__serialization,
+  bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, bbrandomnumbergenerator, xquery__serialization_nodes, xquery__serialization,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
   {$IFDEF USE_BBFULL_UNICODE}bbunicodeinfo{$ENDIF}

@@ -1,4 +1,4 @@
-unit xquery.internals.rng;
+unit bbrandomnumbergenerator;
 
 {$mode objfpc}{$H+}
 {$ModeSwitch advancedrecords}
