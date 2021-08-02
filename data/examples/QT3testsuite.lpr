@@ -1762,21 +1762,21 @@ end;
 
 type
 TQT3FakeInternetAccess = class(TMockInternetAccess)
-  procedure doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock); override;
+  procedure doTransferUnChecked(var transfer: TTransfer); override;
 end;
 
 var testSetIndex: integer;
   clr: TCommandLineReader;
 
-procedure TQT3FakeInternetAccess.doTransferUnChecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
+procedure TQT3FakeInternetAccess.doTransferUnChecked(var transfer: TTransfer);
   procedure loadFile(const fn: string);
   var
     temp: String;
   begin
-    lastHTTPHeaders.Clear;
+    transfer.receivedHTTPHeaders.Clear;
     temp := strLoadFromFile(fn);
-    writeBlock(pchar(temp)^, length(temp));
-    lastHTTPResultCode := 200;
+    transfer.writeBlock(pchar(temp)^, length(temp));
+    transfer.HTTPResultCode := 200;
   end;
 var ur: string;
   procedure searchURL(e: TEnvironment);
@@ -1791,11 +1791,11 @@ var ur: string;
     if TEnvironment(e).resources <> nil then
       for r in TEnvironment(e).resources do
         if TResource(r).uri = ur then begin
-          lastHTTPHeaders.Clear;
-          lastHTTPHeaders.Add('Content-Type: ' + TResource(r).typ + '; charset=' + TResource(r).encoding);
+          transfer.receivedHTTPHeaders.Clear;
+          transfer.receivedHTTPHeaders.Add('Content-Type: ' + TResource(r).typ + '; charset=' + TResource(r).encoding);
           if TResource(r).data = '' then TResource(r).data := strLoadFromFile(TResource(r).filename);
-          writeBlock(pchar(TResource(r).data)^, length(TResource(r).data));
-          lastHTTPResultCode := 200;
+          transfer.writeBlock(pchar(TResource(r).data)^, length(TResource(r).data));
+          transfer.HTTPResultCode := 200;
           exit;
         end;// else writeln(TResource(r).uri + ' <> ' + url.combined() );
     if e.refed <> nil then begin
@@ -1822,20 +1822,20 @@ var
   e: Pointer;
   temp: String;
 begin
-  ur := url.combined();
+  ur := transfer.url;
   if strBeginsWith(ur, QT3BASEURI) then delete(ur, 1, length(QT3BASEURI));
-  lastHTTPResultCode := 400;
+  transfer.HTTPResultCode := 400;
 
   for e in currentTest.environments do begin
     searchURL(TEnvironment(e));
-    if lastHTTPResultCode <> 400 then exit;
+    if transfer.HTTPResultCode <> 400 then exit;
   end;
   if strBeginsWith(ur, 'http://www.w3.org/fots/') then begin
     delete(ur, 1, length('http://www.w3.org/fots/'));
     if FileExists(ur) then begin
-      lastHTTPResultCode := 200;
+      transfer.HTTPResultCode := 200;
       temp := strLoadFromFile(ur);
-      writeBlock(pchar(temp)^, length(temp));
+      transfer.writeBlock(pchar(temp)^, length(temp));
       exit;
     end;
   end;
