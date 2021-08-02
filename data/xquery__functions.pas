@@ -1266,35 +1266,37 @@ begin
   result.hasData := false;
   if node.typ <> tetOpen then exit;
 
-  if cmp(node.value, 'input') then begin
-    kind := seInput;
-    typ := node.getAttribute('type', cmp);
+  case node.hash of
+    HTMLNodeNameHashs.input: if cmp(node.value, 'input') then begin
+      kind := seInput;
+      typ := node.getAttribute('type', cmp);
 
-    if cmp(typ, 'hidden') then inputKind := ietHidden //common types first for faster comparison
-    else if (typ =  '') or cmp(typ, 'text') or cmp(typ, 'search') then inputKind := ietTextOrSearch
-    else if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
-    else if cmp(typ, 'image') then begin
-      inputKind := ietImageButton;
-      result.kind := hrhfSubmitButton;
-    end else if cmp(typ, 'submit') then begin
-      inputKind := ietButton;
-      result.kind := hrhfSubmitButton;
-    end else if cmp(typ, 'reset') or cmp(typ, 'button')  then inputKind := ietButton
-    else if cmp(typ, 'file') then inputKind := ietFile
-    else case lowercase(typ) of {todo: handle cmp}
-      'tel', 'url', 'email', 'password',
-      'date', 'month', 'week',
-      'time', 'datetime-local',
-      'number', 'range', 'color': inputKind := ietOther;
-      else inputKind := ietTextOrSearch; //invalid value => text default
-    end;
-  end else begin
-    if cmp(node.value, 'select') then kind := seSelect
-    else if cmp(node.value, 'textarea') then kind := seTextarea
-    else if cmp(node.value, 'button') then begin
+      if cmp(typ, 'hidden') then inputKind := ietHidden //common types first for faster comparison
+      else if (typ =  '') or cmp(typ, 'text') or cmp(typ, 'search') then inputKind := ietTextOrSearch
+      else if cmp(typ, 'checkbox') or cmp(typ, 'radio') then inputKind := ietCheckboxOrRadiobutton
+      else if cmp(typ, 'image') then begin
+        inputKind := ietImageButton;
+        result.kind := hrhfSubmitButton;
+      end else if cmp(typ, 'submit') then begin
+        inputKind := ietButton;
+        result.kind := hrhfSubmitButton;
+      end else if cmp(typ, 'reset') or cmp(typ, 'button')  then inputKind := ietButton
+      else if cmp(typ, 'file') then inputKind := ietFile
+      else case lowercase(typ) of {todo: handle cmp}
+        'tel', 'url', 'email', 'password',
+        'date', 'month', 'week',
+        'time', 'datetime-local',
+        'number', 'range', 'color': inputKind := ietOther;
+        else inputKind := ietTextOrSearch; //invalid value => text default
+      end;
+    end else exit;
+    HTMLNodeNameHashs.select: if  cmp(node.value, 'select') then kind := seSelect else exit;
+    HTMLNodeNameHashs.textarea: if cmp(node.value, 'textarea') then kind := seTextarea else exit;
+    HTMLNodeNameHashs.button: if cmp(node.value, 'button') then begin
       kind := seButton;
       if cmp(node.getAttribute('type', cmp), 'submit') then result.kind := hrhfSubmitButton;
-    end else if cmp(node.value, 'object') then kind := seObject
+    end else exit;
+    HTMLNodeNameHashs.&object:  if cmp(node.value, 'object') then kind := seObject else exit;
     else exit;
   end;
 
@@ -1778,6 +1780,14 @@ var temp: TTreeNode;
   i: Integer;
 begin
   for temp in form.getEnumeratorDescendants do begin
+    case temp.hash of
+      HTMLNodeNameHashs.input,
+      HTMLNodeNameHashs.select,
+      HTMLNodeNameHashs.textarea,
+      HTMLNodeNameHashs.button,
+      HTMLNodeNameHashs.&object: {ok};
+      else continue;
+    end;
     formData := nodeToFormData(temp, cmp, false);
     if not formData.hasData then
       continue;
