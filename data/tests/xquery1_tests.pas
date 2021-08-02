@@ -822,7 +822,11 @@ begin
   t('form(<form><select name="s"><option value="1">a</option><option selected="selected" value="2">b</option></select><option name="wr" value="ong"/></form>).url', 'pseudo://test?s=2');
   t('form(<form><select name="s"></select><option name="wr" value="ong"/></form>).url', 'pseudo://test');
 
-  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>).url', 'pseudo://test?a=AV&xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, <button/>).url', 'pseudo://test?xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": ()}).url', 'pseudo://test?xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"": {"kind": "submit"}}).url', 'pseudo://test?xxx=yyy');
+  t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": ""}).url', 'pseudo://test?a=&xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "AV"}).url', 'pseudo://test?a=AV&xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "XYZ"}).url', 'pseudo://test?a=XYZ&xxx=yyy');
   t('form(<form><button name="a" value="AV" type="submit"/><input name="xxx" value="yyy"/><button name="b" value="BV" type="submit"/></form>, {"a": "BV"}).url', 'pseudo://test?a=BV&xxx=yyy');
@@ -834,8 +838,12 @@ begin
 
   t('uri-combine(<input name="c" value="foo" type="submit"/>, ())', 'c=foo');
   t('uri-combine((), <input name="c" value="foo" type="submit"/>)', 'c=foo');
-  t('form(<form><input name="c" value="foo" type="submit"/></form>).url', 'pseudo://test');
-  t('form(<form><input name="c" value="foo" type="submit"/></form>, <input name="c" value="foo" type="submit"/>).url', 'pseudo://test?c=foo');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>).url', 'pseudo://test?c=foo');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>, <input name="c" value="foo2" type="submit"/>).url', 'pseudo://test?c=foo2');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>, <button/>).url', 'pseudo://test');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>, {"": {"kind": "submit"}}).url', 'pseudo://test');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>, {"c": ()}).url', 'pseudo://test');
+  t('form(<form><input name="c" value="foo" type="submit"/></form>, <input type="image"/>).url', 'pseudo://test?x=1&y=1');
 
   t('form(<form accept-charset="xyyx'#9'rte'#$C'r latin1"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%E4%F6%FC');
   t('form(<form accept-charset="asd'#$9'ter utf8"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%C3%A4%C3%B6%C3%BC');

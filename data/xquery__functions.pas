@@ -1294,7 +1294,10 @@ begin
     HTMLNodeNameHashs.textarea: if cmp(node.value, 'textarea') then kind := seTextarea else exit;
     HTMLNodeNameHashs.button: if cmp(node.value, 'button') then begin
       kind := seButton;
-      if cmp(node.getAttribute('type', cmp), 'submit') then result.kind := hrhfSubmitButton;
+      case node.getAttribute('type', cmp) of
+        'reset', 'button': ; //no submit
+        {'submit'} else result.kind := hrhfSubmitButton;
+      end;
     end else exit;
     HTMLNodeNameHashs.&object:  if cmp(node.value, 'object') then kind := seObject else exit;
     else exit;
@@ -1419,6 +1422,11 @@ end;
 PHttpRequestParam = ^THttpRequestParam;
 EHttpRequestParamsException = Exception;
 THttpRequestParams = object //This could completely replace TMIMEMultipartData
+protected
+//  procedure addSubmitButtonName(const key: string);
+//  procedure removeImplicitSubmitButtonNames();
+  procedure removeParamHard(keyIdx: integer);
+public
   urlencoded: boolean;
   charset: TSystemCodePage;
 
@@ -1426,6 +1434,9 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   data: array of THttpRequestParam;
   firstKeyIndex: TXQHashmapStrSizeInt;
   keysToRemove: TXQHashsetStr;
+
+  hasSubmitParams: boolean;
+  implicitSubmitElement: TTreeNode;
   function addRawKey(const k: string): PHttpRequestParam;
   function addRawParam(const p: THttpRequestParam): PHttpRequestParam;
   function addRawKeyValue(const k, v: string): PHttpRequestParam;
@@ -1452,6 +1463,28 @@ THttpRequestParams = object //This could completely replace TMIMEMultipartData
   procedure clearData; //does not clear meta properties like charset
   constructor init;
   destructor done;
+end;
+
+{procedure THttpRequestParams.addSubmitButtonName(const key: string);
+begin
+  SetLength(submitKeys, length(submitKeys) + 1);
+  submitKeys[high(submitKeys)] := key;
+end;}
+
+procedure THttpRequestParams.removeParamHard(keyIdx: integer);
+var
+  i: SizeInt;
+  key: String;
+  pair: TXQHashmapStrSizeInt.TKeyValuePairOption;
+begin
+  key := data[keyIdx].key;
+  for i := keyIdx + 1 to size - 1 do
+    data[i - 1] := data[i];
+  dec(size);
+  if firstKeyIndex[key] = keyIdx then firstKeyIndex.exclude(key);
+  for pair in firstKeyIndex do
+    if pair.value >= keyIdx then
+      firstKeyIndex.include(pair.key, pair.value - 1)
 end;
 
 function THttpRequestParams.addRawKey(const k: string): PHttpRequestParam;
@@ -1503,6 +1536,8 @@ begin
   urlencoded := false;
   size := 0;
   data := nil;
+  hasSubmitParams := false;
+  implicitSubmitElement:= nil;
 end;
 
 destructor THttpRequestParams.done;
@@ -1544,8 +1579,20 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     value, filename, contenttype, headers, h: String;
     temp: TXQValue;
     i: SizeInt;
+    kind: THttpRequestHTMLFormKind = hrhfNoValue;
   begin
     if urlEncoded then n := formEncode(n, charset);
+
+    if v.hasProperty('kind', @temp) then begin
+      case temp.toString of
+        'submit': kind := hrhfSubmitButton;
+        'charset': kind := hrhfCharsetSpecial;
+      end;
+      if kind = hrhfSubmitButton then begin
+        hasSubmitParams := true;
+        if (n = '') and not v.hasProperty('value', nil) then exit;
+      end;
+    end;
 
     if v.hasProperty('x', @temp) and v.hasProperty('y', nil) then begin
       addRawKey(n + '.x').value:=temp.toString;
@@ -1553,11 +1600,12 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
       exit;
     end;
 
+
     param := addRawKey(n);
+    param.kind := kind;
 
     headers := '';
     value := '';
-    param.kind := hrhfNoValue;
     filename := '';
     contenttype := '';
     if v.hasProperty('file', @temp) then begin
@@ -1627,12 +1675,16 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     end;
   end;
 
-  procedure addFormData(const formData: TFormElementData);
+  procedure addFormData(v: TTreeNode; const formData: TFormElementData);
   var
     i: Integer;
   begin
     for i := 0 to high(formData.names) do
       addKeyValue(formData.names[i], formData.values[i]).kind := formData.kind;
+    if formData.kind = hrhfSubmitButton then begin
+      hasSubmitParams := true;
+      if implicitSubmitElement = nil then implicitSubmitElement := v;
+    end;
   end;
 
 var
@@ -1646,7 +1698,8 @@ begin
       pvkObject: addObject(v^);
       pvkNode: begin
         formData := nodeToFormData(v^.toNode, nodeCompare, true);
-        if formData.hasData then addFormData(formData)
+        if formData.hasData then addFormData(v^.toNode, formData)
+        else if formData.kind = hrhfSubmitButton then hasSubmitParams := true
         else addUrlEncodedList(v^.toString);
       end
      else addUrlEncodedList(v^.toString)
@@ -1778,7 +1831,11 @@ var temp, tempIterator, iterationEnd: TTreeNode;
   i: Integer;
   inForm: Boolean = false;
   formId: String;
+  implicitSubmitIdx: integer = -1;
+  implicitSubmitCount: integer = 0;
 begin
+  if requestOverride.hasSubmitParams then
+    hasSubmitParams := true;
   formId := form.getAttribute('id', cmp);
   if formId = '' then   tempIterator := form
   else tempIterator := form.getRootHighest();
@@ -1806,17 +1863,33 @@ begin
       else continue;
     end;
     formData := nodeToFormData(temp, cmp, false);
-    if not formData.hasData then
-      continue;
     case formData.kind of
-      hrhfSubmitButton: begin
+      hrhfSubmitButton:
         if ((high(formdata.names) < 0) or not requestOverride.firstKeyIndex.contains(formData.names[0]))
            and ((high(formdata.names) < 1) or not requestOverride.firstKeyIndex.contains(formData.names[1])) //for image buttons
-          then
-          continue;
-      end;
+          then begin
+          //name is not used in requestOverride
+          if not hasSubmitParams then begin //use it as implicit submit element if there was none before
+            hasSubmitParams := true;
+            implicitSubmitElement := temp;
+            implicitSubmitIdx := size;
+            implicitSubmitCount := length(formdata.names);
+          end else
+            continue //skip otherwise
+        end else begin
+          hasSubmitParams := true;
+          if implicitSubmitIdx >= 0 then begin
+            //remove previous implicit submit element because requestOverride named this as explicit one (even if it is not marked as submit element in requestOverride)
+            for i := 1 to implicitSubmitCount do
+              removeParamHard(implicitSubmitIdx);
+            implicitSubmitIdx := -1;
+            implicitSubmitElement := nil;
+          end;
+        end;
       hrhfCharsetSpecial: if length(formData.values) > 0 then formData.values[0] := strEncodingName(charset);
     end;
+    if not formData.hasData then
+      continue;
     for i := 0 to high(formData.names) do
       addKeyValue(formData.names[i], formData.values[i]).kind := formData.kind;
   end;

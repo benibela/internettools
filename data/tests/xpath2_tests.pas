@@ -3302,25 +3302,27 @@ begin
   t('form(//form[1]).url', 'pseudo://test/abc', '');
   t('form(//form[1]).headers', '', '');
   t('form(//form[1]).method', 'POST', '');
-  t('form(//form[1]).post', 'foo=bar&X=123&Y=456', '');
-  t('($f := form(//form[1], "foo=override")).post', 'foo=override&X=123&Y=456', '');
-  t('form-combine($f, "foo=cat").post', 'foo=cat&X=123&Y=456', '');
-  t('form(//form[1], "Y=override2&Z=override3&Z=override4").post', 'foo=bar&X=123&Y=override2&Z=override3&Z=override4', '');
-  t('form(//form[1], "foo=override&Y=override2&Z=override3&Z=override4").post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1]).post', 'foo=bar&X=123&Y=456&btn=fu', '');
+  t('form(//form[1], {"": {"kind": "submit"}}).post', 'foo=bar&X=123&Y=456', '');
+  t('($f := form(//form[1], "foo=override")).post', 'foo=override&X=123&Y=456&btn=fu', '');
+  t('form-combine($f, "foo=cat").post', 'foo=cat&X=123&Y=456&btn=fu', '');
+  t('form(//form[1], "btn=xyz").post', 'foo=bar&X=123&Y=456&btn=xyz', '');
+  t('form(//form[1], "Y=override2&Z=override3&Z=override4").post', 'foo=bar&X=123&Y=override2&btn=fu&Z=override3&Z=override4', '');
+  t('form(//form[1], "foo=override&Y=override2&Z=override3&Z=override4").post', 'foo=override&X=123&Y=override2&btn=fu&Z=override3&Z=override4', '');
 
-  t('form(//form[1], {"foo": "override", "Y": "override2", "Z": ("override3", "override4")}).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
-  t('form(//form[1], ({"foo": "override", "Y": "override2", "Z": "override3"}, "Z=override4")).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
-  t('form(//form[1], ({"Z": ()}, {"foo": "override", "Y": "override2", "Z": "override3"}, "Z=override4", {"Z": ("override5", "override6")})).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4&Z=override5&Z=override6', '');
-  t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&X=123&Y=override2&ride=&Z=override3&Z=override4', '');
-  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": ("override3", "override4")}).post', 'foo=over%25%26ride&X=123&Y=override+2&Z=override3&Z=override4', '');
+  t('form(//form[1], {"foo": "override", "Y": "override2", "Z": ("override3", "override4"), "": {"kind": "submit"}}).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], ({"foo": "override", "Y": "override2", "Z": "override3"}, "Z=override4", {"": {"kind": "submit"}})).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4', '');
+  t('form(//form[1], ({"Z": ()}, {"foo": "override", "Y": "override2", "Z": "override3"}, "Z=override4", {"Z": ("override5", "override6"), "": {"kind": "submit"}})).post', 'foo=override&X=123&Y=override2&Z=override3&Z=override4&Z=override5&Z=override6', '');
+  t('form(//form[1], "foo=over%12&ride&Y=override2&Z=override3&Z=override4").post', 'foo=over%12&X=123&Y=override2&btn=fu&ride=&Z=override3&Z=override4', '');
+  t('form(//form[1], {"foo": "over%&ride", "Y": "override 2", "Z": ("override3", "override4"), "": {"kind": "submit"}}).post', 'foo=over%25%26ride&X=123&Y=override+2&Z=override3&Z=override4', '');
   t('form(//form[1], //form[1]//button).post', 'foo=bar&X=123&Y=456&btn=fu', '');
-  t('form(//form[1], {"foo": (), "X": (), "Y": ()}).post', '');
-  t('form(//form[1], ({"foo": (), "X": (), "Y": ()}, "Y=1b&X=1a&Y=2b&X=2a")).post', 'X=1a&Y=1b&Y=2b&X=2a');
-  t('form(//form[1], ({"foo": (), "X": (7,8), "Y": (9,10,11)}, "Y=1b&X=1a&Y=2b&X=2a")).post', 'X=7&Y=9&X=8&Y=10&Y=11&Y=1b&X=1a&Y=2b&X=2a');
-  t('form(//form[1], ({"foo": {}, "X": (7,8), "Y": (9,10,11)})).post', 'foo=bar&X=7&Y=9&X=8&Y=10&Y=11');
-  t('form(//form[1], ({"foo": {"value": "def"}, "X": (7,8), "Y": (9,10,11)})).post', 'foo=def&X=7&Y=9&X=8&Y=10&Y=11');
+  t('form(//form[1], {"foo": (), "X": (), "Y": (), "btn": ()}).post', '');
+  t('form(//form[1], ({"foo": (), "X": (), "Y": (), "btn": ()}, "Y=1b&X=1a&Y=2b&X=2a")).post', 'X=1a&Y=1b&Y=2b&X=2a');
+  t('form(//form[1], ({"foo": (), "X": (7,8), "Y": (9,10,11), "btn": ()}, "Y=1b&X=1a&Y=2b&X=2a")).post', 'X=7&Y=9&X=8&Y=10&Y=11&Y=1b&X=1a&Y=2b&X=2a');
+  t('form(//form[1], ({"foo": {}, "X": (7,8), "Y": (9,10,11), "btn": ()})).post', 'foo=bar&X=7&Y=9&X=8&Y=10&Y=11');
+  t('form(//form[1], ({"foo": {"value": "def"}, "X": (7,8), "Y": (9,10,11), "btn": ()})).post', 'foo=def&X=7&Y=9&X=8&Y=10&Y=11');
 
-  t('form(//form[1], {"foo": {"x": 1, "y": 2}, "X": (), "Y": ()}).post', 'foo=bar&foo.x=1&foo.y=2'); //or should it override foo?
+  t('form(//form[1], {"foo": {"x": 1, "y": 2}, "X": (), "Y": (), "btn": ()}).post', 'foo=bar&foo.x=1&foo.y=2'); //or should it override foo?
 
 
   t('form(//form[2]).url', 'pseudo://test/abc22?foo2=bar2&X=123&Y=456', '');
@@ -3369,7 +3371,7 @@ begin
 
   t('form(//form).url', 'abs://hello?ab=&ab.dir=LTR&ab2=&ab2.dir=LTR&ab3=&ab3.dir=LTR&ab4=&ab5=&ab5.dir=LTR', '!<html><form action="abs://hello"><input name="ab" dirname="ab.dir"/><input name="ab2" dirname="ab2.dir" type="text"/><input name="ab3" dirname="ab3.dir" type="search"/><input name="ab4" dirname="ab4.dir" type="hidden"/><input name="ab5" dirname="ab5.dir" type="invalid"/></form></html>');
 
-  t('//form/form(.).url', 'abs://example', '<html><form action="abs://example"><input type="image"/><input type="image" name="foobar"/><input type="submit" name="xyz" value="abc"/><button type="submit" name="btn" value="def"/><button name="000"/></form></html>');
+  t('//form/form(.).url', 'abs://example?x=1&y=1', '<html><form action="abs://example"><input type="image"/><input type="image" name="foobar"/><input type="submit" name="xyz" value="abc"/><button type="submit" name="btn" value="def"/><button name="000"/></form></html>');
   t('//form/form(., input[1]).url', 'abs://example?x=1&y=1');
   t('//form/form(., input[2]).url', 'abs://example?foobar.x=1&foobar.y=1');
   t('//form/form(., input[3]).url', 'abs://example?xyz=abc');
