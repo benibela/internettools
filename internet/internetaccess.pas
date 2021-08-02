@@ -106,12 +106,13 @@ type
     procedure clear;
 
     const HeaderSeparator = #13#10;
+    //const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?'; //all allowed
+    const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-'; //might be preferable to use those only
     class function buildHeaders(const name, filename, contenttype, headers: string): TStringArray; static;
     class function insertMissingNameToHeaders(const name: string; headers: TStringArray): TStringArray; static;
     class function nameFromHeader(const header: string): string; static;
     class function indexOfHeader(const sl: TStringArray; name: string): sizeint; static;
     class function HeaderForBoundary(const boundary: string): string; static;
-    class function randomLetter: Char; static;
   end;
 
   THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie, iahUserAgent);
@@ -356,7 +357,7 @@ function defaultInternet: TInternetAccess;
 //**before the thread terminates to prevent memory leaks @br
 procedure freeThreadVars;
 implementation
-
+uses bbrandomnumbergenerator;
 //==============================================================================
 //                            TInternetAccess
 //==============================================================================
@@ -604,6 +605,21 @@ var joinedHeaders: TStringArray = nil;
     encodedData: TStringArray = nil;
     i: Integer;
     ok: Boolean;
+    rng: TRandomNumberGenerator;
+    rnginitialized: boolean = false;
+  function randomLetter: char;
+  var seed: qword = qword($3456789012345678);
+      temp: qword = 0;
+  begin
+    if not rnginitialized then begin
+      if length(boundaryHint) >= sizeof(temp) then move(boundaryHint[length(boundaryHint) - sizeof(temp) + 1], temp, sizeof(temp));
+      seed := seed xor temp;
+      rng.randomize(seed);
+      rnginitialized := true;
+    end;
+    result := ALLOWED_BOUNDARY_CHARS[ rng.next(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
+  end;
+
 begin
   SetLength(joinedHeaders, length(data));
   SetLength(encodedData, length(data));
@@ -622,6 +638,7 @@ begin
     encodedData[i] := data[i].data;
   end;
 
+  rng := default(TRandomNumberGenerator);
 
   boundary := boundaryHint;
   repeat
@@ -721,12 +738,6 @@ begin
   result := 'Content-Type: ' + ContentTypeMultipart + '; boundary=' + boundary;
 end;
 
-class function TMIMEMultipartData.randomLetter: Char;
-//const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''''()+,-./:=?'; //all allowed
-const ALLOWED_BOUNDARY_CHARS: string = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-'; //might be preferable to use those only
-begin
-  result := ALLOWED_BOUNDARY_CHARS[ Random(length(ALLOWED_BOUNDARY_CHARS)) + 1 ];
-end;
 
 { EInternetException }
 
