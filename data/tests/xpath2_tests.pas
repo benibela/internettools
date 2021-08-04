@@ -3462,6 +3462,13 @@ begin
   t('request-combine("/y/?x=y", "a=b").url', '/y/?x=y&a=b');
   t('request-combine("/y/?x=y", "x=z").url', '/y/?x=z');
 
+  t('($f := //form/form(.))[0]', '', '<html><form action="abs://example"><input name="xyz" value="A"/><input type="submit" name="xyz" value="abc"/><input name="xyz" value="B"/><input type="submit" name="v" value="w"/></form></html>');
+  t('request-combine($f, "v=w")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=abc&xyz=B&v=w; 2');
+  //t('request-combine($f, .//input[@name="v"])/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
+  //t('request-combine($f, {"": {"kind": "submit"}})/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B');
+  //t('request-combine($f, {"v": {"value": "w", "kind": "submit}})/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
+
+
   t('serialize-json(request-decode("http://a/b/c"))', '{"url": "http://a/b/c", "protocol": "http", "host": "a"}');
   t('serialize-json(request-decode("http://a/b/c?x=y"))', '{"url": "http://a/b/c?x=y", "protocol": "http", "host": "a", "path": "b/c", "query": "x=y", "params": {"x": "y"}}');
   t('serialize-json(request-decode("http://a/b/c?x=y&d=e"))', '{"url": "http://a/b/c?x=y&d=e", "protocol": "http", "host": "a", "path": "b/c", "query": "x=y&d=e", "params": {"x": "y", "d": "e"}}');

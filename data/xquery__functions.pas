@@ -2135,6 +2135,7 @@ begin
   if onlyFormsWithOverriddenValue and (result.Count = 0) then failedToFindForm();
 end;
 
+//todo: could this be merged with request combine
 function xqFunctionUri_combine(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var i: SizeInt;
     encoding: TSystemCodePage;
@@ -2184,96 +2185,103 @@ begin
 end;
 
 
-function xqFunctionForm_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-  function combineHttpEncoded(obj: TXQValue): IXQValue;
-  var temp: TXQVArray = nil;
-      propName, oldUrl, prefix: String;
-      newEncoded: IXQValue;
+function xqFunctionRequest_combine(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  obj: TXQValueMapLike;
+  enctype: THtmlFormEnctype;
+  requests: array[0..1] of THttpRequestParams;
+
+  urlencodedIsPOST: boolean;
+  urlencodedGETurlPrefix: string;
+
+  mimeBoundary: string;
+
+  procedure addBaseRequestUrlEncoded;
+  var oldUrl: String;
       oldUrlView: TStringView;
       queryStart: PChar;
       hadLinkTarget: Boolean;
-
+      query: string;
   begin
-    SetLength(temp, 3);
-    temp[1] := args[1];
-    temp[2] := obj.getProperty('charset');
-
-    if striEqual(obj.getProperty('method').toString, 'POST') then begin
-      propName := 'post';
-      prefix := '';
-      temp[0] := obj.getProperty(propName);
+    urlencodedIsPOST := striEqual(obj.getProperty('method').toString, 'POST');
+    if urlencodedIsPOST then begin
+      urlencodedGETurlPrefix := '';
+      query := obj.getProperty('post').toString;
     end else begin
-      propName := 'url';
-      temp[0] := obj.getProperty(propName);
-      oldUrl := temp[0].toString;
+      oldUrl := obj.getProperty('url').toString;
       oldUrlView.init(oldUrl);
       hadLinkTarget := oldUrlView.cutBeforeFind('#');
       queryStart := oldUrlView.find('?');
       if queryStart = nil then begin
-        if hadLinkTarget then prefix := oldUrlView.toString
-        else prefix := oldUrl;
+        if hadLinkTarget then urlencodedGETurlPrefix := oldUrlView.toString
+        else urlencodedGETurlPrefix := oldUrl;
         oldUrlView.moveBy(length('https://'));
-        if strIsAbsoluteURI(oldUrl) and not oldUrlView.contains('/') then prefix += '/?'
-        else prefix += '?';
-        temp[0] := xqvalue('');
+        if strIsAbsoluteURI(oldUrl) and not oldUrlView.contains('/') then urlencodedGETurlPrefix += '/?'
+        else urlencodedGETurlPrefix += '?';
+        query := '';
       end else begin
-        prefix := oldUrlView.viewTo(queryStart).toString;
-        temp[0] := xqvalue(oldUrlView.viewBehind(queryStart).toString);
+        urlencodedGETurlPrefix := oldUrlView.viewTo(queryStart).toString;
+        query := oldUrlView.viewBehind(queryStart).toString;
       end;
     end;
 
-    newEncoded := xqFunctionUri_combine(context, 3, @temp[0]);
-    if prefix = '' then result := obj.setImmutable(propName, newEncoded)
-    else result := obj.setImmutable(propName, prefix + newEncoded.toString);
+    requests[0].urlencoded := true;
+    requests[1].urlencoded := true;
+
+    requests[0].addUrlEncodedList(query);
   end;
-  function combineTextPlain(obj: TXQValue): IXQValue;
-  var i: SizeInt;
-      encoding: TSystemCodePage;
-      requests: array[0..1] of THttpRequestParams;
+  procedure addBaseRequestMultipart;
+  var mime: TMIMEMultipartData;
   begin
-    encoding := strEncodingFromName(obj.getProperty('charset').toString);
-    for i := 0 to 1 do begin
-      requests[i] := default(THttpRequestParams);
-      requests[i].init;
-      requests[i].charset:=encoding;
-    end;
+    mime.parse(obj.getProperty('post').toString, mimeBoundary);
+    requests[0].addMime(mime);
+  end;
+  procedure addBaseRequestTextPlain;
+  begin
     requests[0].addTextPlainRequest(obj.getProperty('post').toString);
-    requests[1].addXQValue(args[1], context.staticContext);
+  end;
 
-    requests[0].mergeOverride(requests[1]);
 
+  procedure serializeRequestUrlEncoded;
+  var
+    newQuery: String;
+  begin
+    newQuery := requests[0].toUrlEncodedRequest;
+    if urlencodedGETurlPrefix <> '' then newQuery := urlencodedGETurlPrefix + newQuery;
+    if urlencodedIsPOST then result := obj.setImmutable('post', newQuery)
+    else result := obj.setImmutable('url', newQuery)
+  end;
+  procedure serializeRequestMultipart;
+  var
+    headers: IXQValue;
+    h: TXQValue;
+    mime: TMIMEMultipartData;
+    tempstr: String;
+    tempSeq: TXQValueSequence;
+  begin
+    mime := requests[0].toMimeRequest();
+    result := result.setImmutable('post', mime.compose(tempstr, mimeBoundary));
+
+    if tempstr <> mimeBoundary then begin
+      headers := obj.getProperty('headers');
+      tempSeq := TXQValueSequence.create(headers.getSequenceCount);
+      tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
+      for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+        tempstr := h.toString;
+        if not striBeginsWith(tempstr, 'Content-Type') then
+          tempSeq.add(h);
+      end;
+      result := result.setImmutable('headers', tempSeq);
+    end;
+  end;
+  procedure serializeRequestTextPlain;
+  begin
     result := obj.setImmutable('post', requests[0].toTextPlainRequest());
-
-    requests[0].done;
-    requests[1].done;
   end;
 
 var
-  headers: IXQValue;
-  h: TXQValue;
-  enctype: THtmlFormEnctype;
-  mimeBoundary, tempstr: String;
-  mime: TMIMEMultipartData;
-  obj: TXQValueMapLike;
-  tempSeq: TXQValueSequence;
-  procedure mimeCombine;
-  var
-    baseRequest, requestOverride: THttpRequestParams;
-  begin
-    baseRequest.init;
-    baseRequest.addMime(mime);
-
-    requestOverride.init;
-    requestOverride.addXQValue(args[1], context.staticContext);
-
-    baseRequest.mergeOverride(requestOverride);
-
-    mime := baseRequest.toMimeRequest();
-
-    baseRequest.done;
-    requestOverride.done;
-  end;
-
+  i: SizeInt;
+  encoding: TSystemCodePage;
 begin
   requiredArgCount(argc, 2);
   enctype := getRequestContentTypeAndMIMEBoundary(args[0], mimeBoundary);
@@ -2287,27 +2295,32 @@ begin
   end;
 
 
-  case enctype of
-    hfetUrlEncoded: result := combineHttpEncoded(obj);
-    hfetMultipart: begin
-      mime.parse(args[0].getProperty('post').toString, mimeBoundary);
-      mimeCombine();
-      result := result.setImmutable('post', mime.compose(tempstr, mimeBoundary));
-
-      if tempstr <> mimeBoundary then begin
-        headers := obj.getProperty('headers');
-        tempSeq := TXQValueSequence.create(headers.getSequenceCount);
-        tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
-        for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
-          tempstr := h.toString;
-          if not striBeginsWith(tempstr, 'Content-Type') then
-            tempSeq.add(h);
-        end;
-        result := result.setImmutable('headers', tempSeq);
-      end;
-    end;
-    hfetTextPlain: result := combineTextPlain(obj);
+  encoding := strEncodingFromName(obj.getProperty('charset').toString);
+  if encoding = CP_NONE then encoding := CP_UTF8;
+  for i := 0 to 1 do begin
+    requests[i] := default(THttpRequestParams);
+    requests[i].init;
+    requests[i].charset:=encoding;
   end;
+
+  case enctype of
+    hfetUrlEncoded: addBaseRequestUrlEncoded;
+    hfetMultipart: addBaseRequestMultipart;
+    hfetTextPlain: addBaseRequestTextPlain;
+  end;
+
+  requests[1].addXQValue(args[1], context.staticContext);
+
+  requests[0].mergeOverride(requests[1]);
+
+  case enctype of
+    hfetUrlEncoded: serializeRequestUrlEncoded;
+    hfetMultipart: serializeRequestMultipart;
+    hfetTextPlain: serializeRequestTextPlain;
+  end;
+
+  requests[0].done;
+  requests[1].done;
 end;
 
 function xqFunctionRequest_decode(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
@@ -7821,8 +7834,8 @@ begin
   pxpold.registerFunction('uri-encode', @xqFunctionEncode_For_Uri).setVersionsShared([stringOrEmpty, stringt]); //same as fn:encode-for-uri, but with an easier name
   pxpold.registerFunction('uri-decode', @xqFunctionDecode_Uri).setVersionsShared([stringOrEmpty, stringt]);
   pxpold.registerFunction('uri-combine', @xqFunctionUri_combine, dependencyNodeCollation).setVersionsShared([itemStar, itemStar, stringt]); //will probably be removed in future version
-  pxpold.registerFunction('form-combine', @xqFunctionForm_combine, dependencyNodeCollation).setVersionsShared([map, itemStar, map]); //will probably be removed in future version
-  pxpold.registerFunction('request-combine', @xqFunctionForm_combine, dependencyNodeCollation).setVersionsShared([item, itemStar, map]); //planed replacement for form-combine and uri-combine (but name is not final yet)
+  pxpold.registerFunction('form-combine', @xqFunctionRequest_combine, dependencyNodeCollation).setVersionsShared([map, itemStar, map]); //will probably be removed in future version
+  pxpold.registerFunction('request-combine', @xqFunctionRequest_combine, dependencyNodeCollation).setVersionsShared([item, itemStar, map]); //planed replacement for form-combine and uri-combine (but name is not final yet)
   pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, dependencyNodeCollation).setVersionsShared([item, map]);
 
   {transform
