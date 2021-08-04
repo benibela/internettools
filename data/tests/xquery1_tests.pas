@@ -844,6 +844,8 @@ begin
   t('form(<form><input name="c" value="foo" type="submit"/></form>, {"": {"kind": "submit"}}).url', 'pseudo://test');
   t('form(<form><input name="c" value="foo" type="submit"/></form>, {"c": ()}).url', 'pseudo://test');
   t('form(<form><input name="c" value="foo" type="submit"/></form>, <input type="image"/>).url', 'pseudo://test?x=0&y=0');
+  t('request-combine(form(<form><input name="c" value="foo" type="submit"/></form>, <input type="image"/>), <button/>).url', 'pseudo://test?');
+  t('request-combine(form(<form><input name="c" value="foo" type="submit"/></form>, <input type="image"/>), <button name="x" value="y"/>).url', 'pseudo://test?x=y');
 
   t('form(<form accept-charset="xyyx'#9'rte'#$C'r latin1"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%E4%F6%FC');
   t('form(<form accept-charset="asd'#$9'ter utf8"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%C3%A4%C3%B6%C3%BC');

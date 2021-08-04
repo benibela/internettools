@@ -3464,9 +3464,19 @@ begin
 
   t('($f := //form/form(.))[0]', '', '<html><form action="abs://example"><input name="xyz" value="A"/><input type="submit" name="xyz" value="abc"/><input name="xyz" value="B"/><input type="submit" name="v" value="w"/></form></html>');
   t('request-combine($f, "v=w")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=abc&xyz=B&v=w; 2');
-  //t('request-combine($f, .//input[@name="v"])/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
-  //t('request-combine($f, {"": {"kind": "submit"}})/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B');
-  //t('request-combine($f, {"v": {"value": "w", "kind": "submit}})/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
+  t('request-combine($f, .//input[@name="v"])/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
+  t('request-combine($f, {"": {"kind": "submit"}})/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B');
+  t('request-combine($f, {"v": {"value": "w", "kind": "submit"}})/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
+
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": 1}, {"a": 100} ).url', '?a=100');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": 1}, {"b": 100} ).url', '?a=u&a=v&a=w&a=x&a=y&b=100');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": 1}, {"": {"kind": "submit"}} ).url', '?a=v&a=w&a=x&a=y');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": 1}, {"": {"value": 100, "kind": "submit"}} ).url', '?a=v&a=w&a=x&a=y&=100');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": (1,2,4,5)}, {"": {"value": 100, "kind": "submit"}} ).url', '?a=w&=100');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": (1,2,3,4,5)}, {"": {"value": 100, "kind": "submit"}} ).url', '?=100');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": (3,4,5)}, {"": {"value": 100, "kind": "submit"}} ).url', '?a=u&a=v&=100');
+  t('request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": (3,4,5)}, {"new": {"value": 100, "kind": "submit"}} ).url', '?a=u&a=v&new=100');
+  t('request-combine(request-combine({"url": "?a=u&a=v&a=w&a=x&a=y", "submit-indices": (3,4,5)}, {"new": {"value": 100, "kind": "submit"}} ), {"more": {"value": 999, "kind": "submit"}}).url', '?a=u&a=v&more=999');
 
 
   t('serialize-json(request-decode("http://a/b/c"))', '{"url": "http://a/b/c", "protocol": "http", "host": "a"}');

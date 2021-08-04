@@ -1479,6 +1479,7 @@ var
   key: String;
   pair: TXQHashmapStrSizeInt.TKeyValuePairOption;
 begin
+  if (keyIdx < 0) or (keyIdx > size) then exit;
   key := data[keyIdx].key;
   for i := keyIdx + 1 to size - 1 do
     data[i - 1] := data[i];
@@ -1613,13 +1614,15 @@ procedure THttpRequestParams.addXQValue(const value: IXQValue; const staticConte
     if v.hasProperty('file', @temp) then begin
       filename := temp.toString;
       value := staticContext.retrieveFromFile(filename, contenttype, 'FOUT1170');
-      param.kind := hrhfDefault;
+      if kind = hrhfNoValue then
+        param.kind := hrhfDefault;
     end;
     if v.hasProperty('filename', @temp) then filename := temp.toString;
     if v.hasProperty('type', @temp) then contenttype := temp.toString;
     if v.hasProperty('value', @temp) then begin
       value := temp.toString;
-      param.kind := hrhfDefault;
+      if kind = hrhfNoValue then
+        param.kind := hrhfDefault;
     end;
 
     if v.hasProperty('headers', @temp) then begin
@@ -2241,7 +2244,6 @@ var
     requests[0].addTextPlainRequest(obj.getProperty('post').toString);
   end;
 
-
   procedure serializeRequestUrlEncoded;
   var
     newQuery: String;
@@ -2279,6 +2281,35 @@ var
     result := obj.setImmutable('post', requests[0].toTextPlainRequest());
   end;
 
+var submitIndices: array of integer = nil;
+  procedure markSubmitIndices;
+  var temp: TXQValue;
+      i: Integer;
+  begin
+    if not obj.hasProperty('submit-indices', @temp) then exit;
+    if temp.isUndefined then exit;
+    setlength(submitIndices, temp.getSequenceCount);
+    for i := 0 to high(submitIndices) do
+      submitIndices[i] := temp.get(i + 1).toInt64;
+    for i := 0 to high(submitIndices) do
+      if (submitIndices[i] >= 1) and (submitIndices[i] <= requests[0].size) then begin
+        requests[0].data[submitIndices[i] - 1].kind := hrhfSubmitButton;
+        requests[0].hasSubmitParams := true;
+      end;
+  end;
+
+  procedure removeOldSubmitParams;
+  var
+    i: Integer;
+  begin
+    for i := high(submitIndices) downto 0 do //assume sequence is sorted in reverse
+      requests[0].removeParamHard(submitIndices[i] - 1);
+  end;
+  procedure serializeSubmitIndices;
+  begin
+    result := result.setImmutable('submit-indices', requests[0].getSubmitIndices());
+  end;
+
 var
   i: SizeInt;
   encoding: TSystemCodePage;
@@ -2297,6 +2328,7 @@ begin
 
   encoding := strEncodingFromName(obj.getProperty('charset').toString);
   if encoding = CP_NONE then encoding := CP_UTF8;
+
   for i := 0 to 1 do begin
     requests[i] := default(THttpRequestParams);
     requests[i].init;
@@ -2308,8 +2340,11 @@ begin
     hfetMultipart: addBaseRequestMultipart;
     hfetTextPlain: addBaseRequestTextPlain;
   end;
+  markSubmitIndices();
 
   requests[1].addXQValue(args[1], context.staticContext);
+  if requests[1].hasSubmitParams then removeOldSubmitParams;
+
 
   requests[0].mergeOverride(requests[1]);
 
@@ -2318,6 +2353,9 @@ begin
     hfetMultipart: serializeRequestMultipart;
     hfetTextPlain: serializeRequestTextPlain;
   end;
+
+  if requests[0].hasSubmitParams or requests[1].hasSubmitParams then
+    serializeSubmitIndices;
 
   requests[0].done;
   requests[1].done;
