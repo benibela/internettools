@@ -1150,11 +1150,12 @@ procedure TTemplateAction.addChildFromTree(context: TTemplateLoadingContext; t: 
     if href.contains('/') or href.contains('\') then begin
       href := href.Replace('\', '/', [rfReplaceAll]);
       dir := href.unsafeViewTo(href.unsafeView.findLast('/')).ToString;
-      context.path := strResolveURI(dir, context.path);
+      if context.path = '' then context.path := dir
+      else context.path := IncludeTrailingPathDelimiter(context.path) + dir;
     end;
     tree := context.createParser;
     try
-      addChildrenFromTree(context, tree.parseTree(context.loadFileCallback(context.path+href)));
+      addChildrenFromTree(context, tree.parseTree(context.loadFileCallback(oldpath+href)));
     finally
       tree.free;
       context.path := oldpath
