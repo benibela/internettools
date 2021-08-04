@@ -4071,7 +4071,10 @@ begin
           else if strBeginsWith(temp, '3.1') and isModel3 then parsingModel := xqpmXQuery3_1
           else temp := 'fail';
           if not setXQueryVersion(temp) then
-            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 ' + ifthen(not isModel3, ' (3.0 is disabled)', 'or 3.0'));
+            raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 '
+                                           + ifthen(not isModel3, ' (3.0 is disabled) ', 'or 3.0 ')
+                                           + ifthen(not (parsingModel in [xqpmXPath3_1, xqpmXQuery3_1]), ' (3.1 is disabled)', 'or 3.1')
+                                           );
           token := nextToken(true);
           if token = 'encoding' then begin
             expect(token);
