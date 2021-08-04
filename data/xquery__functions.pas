@@ -1248,7 +1248,7 @@ function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllI
 //submittable elements:   button input object select textarea
 type TSubmittableElement = (seButton, seInput, seObject, seSelect, seTextarea);
 type TInputElementType = (ieNotAnInputElement, ietOther, ietHidden, ietTextOrSearch, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
-const IMAGE_BUTTON_DEFAULT_COORD = '1';
+const IMAGE_BUTTON_DEFAULT_COORD = '0';
 var name: string;
   procedure pushEntryNameValue(n: TTreeNode = nil);
   begin
