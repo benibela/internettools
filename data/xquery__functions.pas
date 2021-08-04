@@ -1459,6 +1459,8 @@ public
   function toMimeRequest(): TMIMEMultipartData;
   function toTextPlainRequest(): string;
 
+  function getSubmitIndices(): IXQValue;
+
   procedure compress;
   procedure clearData; //does not clear meta properties like charset
   constructor init;
@@ -1806,12 +1808,17 @@ begin
         result := true;
         requestOverrideKeyIndex.include(oldData[i].key, requestOverrideNextKeyOccurrence[replaced]);
         requestOverrideUsed[replaced] := true;
-        if requestOverride.data[replaced].kind <> hrhfNoValue then begin
-          data[size-1].kind := requestOverride.data[replaced].kind;
-          if requestOverride.data[replaced].kind = hrhfCharsetSpecial then
-            data[size-1].value := strEncodingName(charset)
-          else
+        case requestOverride.data[replaced].kind of
+          hrhfDefault: data[size-1].value := requestOverride.data[replaced].value;
+          hrhfNoValue: ;
+          hrhfSubmitButton: begin
+            data[size-1].kind := hrhfSubmitButton;
             data[size-1].value := requestOverride.data[replaced].value;
+          end;
+          hrhfCharsetSpecial: begin
+            data[size-1].kind := hrhfCharsetSpecial;
+            data[size-1].value := strEncodingName(charset)
+          end;
         end;
         if requestOverride.data[replaced].mimeHeaders <> nil then mergeHeaders(data[size-1], requestOverride.data[replaced]);
       end;
@@ -1969,6 +1976,24 @@ begin
   end;
 end;
 
+function THttpRequestParams.getSubmitIndices(): IXQValue;
+var indices: array of integer = nil;
+  i: Integer;
+  resseq: TXQValueSequence;
+begin
+  for i := 0 to size - 1 do
+    if data[i].kind = hrhfSubmitButton then begin
+      setlength(indices, length(indices) + 1);
+      indices[high(indices)] := i + 1;
+    end;
+  if length(indices) = 0 then result := xqvalue
+  else begin
+    resseq := TXQValueSequence.create(length(indices));
+    for i := 0 to high(indices) do resseq.add(xqvalue(indices[i]));
+    result := resseq;
+  end;
+end;
+
 //see https://html.spec.whatwg.org/multipage/forms.html and https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-2
 {todo:
 form owner attribute can add submittable elements to the form that are not descendants of the form (e.g. form=xyz adds it to <form id=xyz)
@@ -2013,6 +2038,7 @@ var requestOverride: THttpRequestParams;
       request: THttpRequestParams;
       encodedRequest: string;
       enctype: THtmlFormEnctype;
+      temp: IXQValue;
     begin
       if form = nil then exit(xqvalue());
       request.init;
@@ -2048,6 +2074,12 @@ var requestOverride: THttpRequestParams;
       {$ENDIF}
       resultobj.setMutable('url', actionURI);
       if request.charset <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(request.charset));
+
+      if request.hasSubmitParams then begin
+        temp := request.getSubmitIndices();
+        if not temp.isUndefined then
+          resultobj.setMutable('submit-indices', temp);
+      end;
 
       request.done;
     end;

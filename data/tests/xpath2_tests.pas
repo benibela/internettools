@@ -3372,18 +3372,18 @@ begin
   t('form(//form).url', 'abs://hello?ab=&ab.dir=LTR&ab2=&ab2.dir=LTR&ab3=&ab3.dir=LTR&ab4=&ab5=&ab5.dir=LTR', '!<html><form action="abs://hello"><input name="ab" dirname="ab.dir"/><input name="ab2" dirname="ab2.dir" type="text"/><input name="ab3" dirname="ab3.dir" type="search"/><input name="ab4" dirname="ab4.dir" type="hidden"/><input name="ab5" dirname="ab5.dir" type="invalid"/></form></html>');
 
   t('//form/form(.).url', 'abs://example?x=0&y=0', '<html><form action="abs://example"><input type="image"/><input type="image" name="foobar"/><input type="submit" name="xyz" value="abc"/><button type="submit" name="btn" value="def"/><button name="000"/></form></html>');
-  t('//form/form(., input[1]).url', 'abs://example?x=0&y=0');
-  t('//form/form(., input[2]).url', 'abs://example?foobar.x=0&foobar.y=0');
-  t('//form/form(., input[3]).url', 'abs://example?xyz=abc');
+  t('//form/form(., input[1])/join(((.).url, (.).submit-indices), "; ") ', 'abs://example?x=0&y=0; 1; 2');
+  t('//form/form(., input[2])/join(((.).url, (.).submit-indices), "; ")', 'abs://example?foobar.x=0&foobar.y=0; 1; 2');
+  t('//form/form(., input[3])/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=abc; 1');
   t('//form/form(., button[1]).url', 'abs://example?btn=def');
   t('//form/form(., button[2]).url', 'abs://example?000=');
-  t('//form/form(., "x=99").url', 'abs://example?x=99&y=0');
+  t('//form/form(., "x=99")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?x=99&y=0; 1; 2');
   t('//form/form(., "y=99").url', 'abs://example?x=0&y=99');
   t('//form/form(., "x=99&y=99").url', 'abs://example?x=99&y=99');
-  t('//form/form(., "foobar.x=99").url', 'abs://example?foobar.x=99&foobar.y=0');
+  t('//form/form(., "foobar.x=99")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?foobar.x=99&foobar.y=0; 1; 2');
   t('//form/form(., "foobar.y=99").url', 'abs://example?foobar.x=0&foobar.y=99');
   t('//form/form(., "foobar.x=99&foobar.y=99").url', 'abs://example?foobar.x=99&foobar.y=99');
-  t('//form/form(., "xyz=---").url', 'abs://example?xyz=---');
+  t('//form/form(., "xyz=---")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=---; 1');
   t('//form/form(., "btn=___").url', 'abs://example?btn=___');
 
   t('form(//form).url', 'abs://hello?one=o1&second=o2&three=o1&three=o2&three=o3&alternate=o2&alternate=o4',
@@ -3406,13 +3406,18 @@ begin
   t('//form/form(., "_charset_=foo").url', 'abs://example?_charset_=foo');
   t('//form/form(., .//input).url', 'abs://example?_charset_=iso-8859-1');
 
+  t('//form/form(.)/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=abc&xyz=B; 2', '<html><form action="abs://example"><input name="xyz" value="A"/><input type="submit" name="xyz" value="abc"/><input name="xyz" value="B"/><input type="submit" name="v" value="w"/></form></html>');
+  t('//form/form(., "v=w")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=A&xyz=B&v=w; 3');
+  t('//form/form(., "xyz=k")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=k');
+  t('//form/form(., "xyz=k&xyz=l")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=k&xyz=l; 2'); //???? does this make sense?
+
+  //(request-combine supersedes form-combine)
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%C3%A4=%C3%BC", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "latin1"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "cp1252"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "cp1252"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "method": "POST", "post": "a=b", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y", "method": "POST", "post": "a=b&%C3%A4=%C3%BC", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "method": "POST", "post": "a=b", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y", "method": "POST", "post": "a=b&%E4=%FC", "charset": "latin1"}');
 
-  //(request-combine supersedes form-combine)
   t('serialize-json(request-combine({"url": "http://foo/?x=y"}, {"a[]": "b"}))', '{"url": "http://foo/?x=y&a%5B%5D=b"}');
   t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b"},"c=d")))', '{"url": "http://foo/?x=y&a%5B%5D=b&c=d"}');
   t('serialize-json(request-combine({"url": "http://foo/?x=y"}, ({"a[]": "b"},{"a2[]": "b2"})))', '{"url": "http://foo/?x=y&a%5B%5D=b&a2%5B%5D=b2"}');
