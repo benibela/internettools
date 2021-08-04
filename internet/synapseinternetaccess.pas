@@ -507,10 +507,12 @@ end;
 
 {$IFDEF USE_SYNAPSE_WRAPPER}
 defaultInternetAccessClass := TSynapseInternetAccess;
-SSLImplementation := TSSLOpenSSLOverride;
-defaultInternetConfiguration.searchCertificates;
 {$ENDIF}
 
+{$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
+defaultInternetConfiguration.searchCertificates;
+SSLImplementation := TSSLOpenSSLOverride;
+{$endif}
 
 {$if not (defined(WINDOWS) or defined(android))}
 InitCriticalSection(resolvConfCS{%H-});
