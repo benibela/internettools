@@ -476,6 +476,8 @@ constructor TXQTermDefineVariable.create(vari: TXQTerm; value: TXQTerm);
         exit(true)
       else if objInheritsFrom(t, TXQTermReadObjectProperty) or objInheritsFrom(t, TXQTermDynamicFunctionCall) then
         t := TXQTermWithChildren(t).children[0]
+      else if objInheritsFrom(t, TXQTermJSONLookup) and not TXQTermJSONLookup(t).unary and (TXQTermJSONLookup(t).mode <> xqtjlmWild) then
+        t := TXQTermJSONLookup(t).children[0]
       else
         exit(false);
     end;
@@ -559,6 +561,13 @@ begin
         else assignmentMode := amArrayInsert; //due to automatical flattening, appending to element i, is equal to insertion after element i
       end else assignmentMode := amArrayAppend;
       v := TXQTermFilterSequence(v).children[0];
+    end else if objInheritsFrom(v, TXQTermJSONLookup) then begin
+      case TXQTermJSONLookup(v).mode of
+        xqtjlmInteger: arrayPrepend(properties, TXQTermJSONLookup(v).integerKey.ToString);
+        xqtjlmName: arrayPrepend(properties, TXQTermJSONLookup(v).propname);
+        xqtjlmParenthesized: arrayPrepend(properties, TXQTermJSONLookup(v).children[1].evaluate(context).toString);
+      end;
+      v := TXQTermJSONLookup(v).children[0];
     end else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v.debugTermToString);
   end;
 
@@ -681,14 +690,15 @@ begin
       visitor.simpleTermVisitNoRecurse(v, self);
       if objInheritsFrom(v^, TXQTermReadObjectProperty) then begin
         v := @TXQTermReadObjectProperty(v^).children[0];
-      end else if objInheritsFrom(v^, TXQTermDynamicFunctionCall) or objInheritsFrom(v^, TXQTermFilterSequence) then begin
+      end else if objInheritsFrom(v^, TXQTermDynamicFunctionCall) or objInheritsFrom(v^, TXQTermFilterSequence) or objInheritsFrom(v^, TXQTermJSONLookup) then begin
         case length(TXQTermWithChildren(v^).children) of
           0, 1: ;
-          2: visitor.simpleTermVisit(@TXQTermWithChildren(v^).children[1], v^);
+          2: result := visitor.simpleTermVisit(@TXQTermWithChildren(v^).children[1], v^);
           else raiseEvaluationError('pxp:VAR', 'invalid argument count for object property assignment');
         end;
         v := @TXQTermWithChildren(v^).children[0];
-      end else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v^.debugTermToString);
+      end else
+        raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v^.debugTermToString);
     end;
   end;
 end;
@@ -716,6 +726,7 @@ begin
     else if v.InheritsFrom(TXQTermReadObjectProperty) then v := TXQTermReadObjectProperty(v).children[0]
     else if v.InheritsFrom(TXQTermDynamicFunctionCall) then  v := TXQTermDynamicFunctionCall(v).children[0]
     else if v.InheritsFrom(TXQTermFilterSequence) then v := TXQTermFilterSequence(v).children[0]
+    else if v.InheritsFrom(TXQTermJSONLookup) then v := TXQTermFilterSequence(v).children[0]
     else raiseInternalError(1651217);
   end;
   raiseInternalError(1651218);

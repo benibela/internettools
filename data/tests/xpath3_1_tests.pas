@@ -222,6 +222,13 @@ begin
   t('(123, 10, 9, 1, 0.9, 0.1, 0.09, 0.01, 0) ! format-number(., "0.##e0")', '1.23e2 1e1 9e0 1e0 9e-1 1e-1 9e-2 1e-2 0e0');
   t('(123, 10, 9, 1, 0.9, 0.1, 0.09, 0.01, 0) ! format-number(., "00.##e000")', '12.3e001 10e000 90e-001 10e-001 90e-002 10e-002 90e-003 10e-003 00e000');
 
+
+  t('(a := map {}, $a?("b") := "12", serialize-json($a))', ' 12 {"b": "12"}');
+  t('(a := map {}, $a?b := "12", serialize-json($a))', ' 12 {"b": "12"}');
+  t('(a := map {}, $a?2 := "12", serialize-json($a))', ' 12 {"2": "12"}'); //preliminary
+  t('(a := [1,2,3], $a?2 := "12", serialize-json($a))', '1 2 3 12 [1, "12", 3]');
+
+
   writeln('XPath 3.1: ', count, ' completed');
   ps.free;
   xml.Free;
