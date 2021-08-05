@@ -3411,6 +3411,9 @@ begin
   t('//form/form(., "xyz=k")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=k');
   t('//form/form(., "xyz=k&xyz=l")/join(((.).url, (.).submit-indices), "; ")', 'abs://example?xyz=k&xyz=l; 2'); //???? does this make sense?
 
+  t('//form/form(.)/url', 'abs://example?a=123&a=0&b=456', '<html><input name="a" value="123" form="FF"/><form id="FF" action="abs://example"><input name="a" value="0"/></form><button name="b" value="456" form="FF"/></html>');
+
+
   //(request-combine supersedes form-combine)
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "utf-8"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%C3%A4=%C3%BC", "charset": "utf-8"}');
   t('serialize-json(form-combine({"url": "http://foo/?x=y", "charset": "latin1"}, {"ä": "ü"}))', '{"url": "http://foo/?x=y&%E4=%FC", "charset": "latin1"}');

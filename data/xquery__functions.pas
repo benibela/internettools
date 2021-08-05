@@ -1465,6 +1465,7 @@ public
   procedure clearData; //does not clear meta properties like charset
   constructor init;
   destructor done;
+
 end;
 
 {procedure THttpRequestParams.addSubmitButtonName(const key: string);
@@ -1547,6 +1548,22 @@ destructor THttpRequestParams.done;
 begin
   keysToRemove.done;
   firstKeyIndex.done;
+end;
+
+procedure formToRequest(request: TXQValueStringMap;
+  form, submitElement: TTreeNode; cmp: TStringComparisonFunc;
+  out actionURI: string; out encType: THtmlFormEnctype; out methodIsPost: boolean);
+var
+  method: String;
+begin
+  method := UpperCase(form.getAttribute('method', 'GET', cmp));
+  methodIsPost := striEqual(method, 'POST');
+
+  enctype := getFormEnctypeActual(methodIsPost, form, cmp);
+
+  actionURI := form.getAttribute('action', cmp);
+
+  request.setMutable('method', method);
 end;
 
 function THttpRequestParams.addKeyValue(const n, v: string): PHttpRequestParam; //not encoded
@@ -2035,7 +2052,6 @@ var requestOverride: THttpRequestParams;
     var
       contenttypeheader: string;
       post: Boolean;
-      method: string;
       actionURI: String;
       resultobj: TXQValueStringMap;
       request: THttpRequestParams;
@@ -2046,19 +2062,14 @@ var requestOverride: THttpRequestParams;
       if form = nil then exit(xqvalue());
       request.init;
 
-      method := UpperCase(form.getAttribute('method', 'GET', cmp));
-      post := striEqual(method, 'POST');
-      enctype := getFormEnctypeActual(post, form, cmp);
       request.charset := getFormEncoding(form);
 
       lastFormHadOverriddenValue := request.addFormAndMerge(form, cmp, requestOverride);
 
-      actionURI := form.getAttribute('action', cmp);
-
       resultobj := TXQValueStringMap.create();
       result := resultobj;
 
-      resultobj.setMutable('method', method);
+      formToRequest(resultobj, form, request.implicitSubmitElement, cmp, actionURI, enctype, post);
 
       encodedRequest := request.toEncodedRequest(enctype, contenttypeheader);
       if contenttypeheader <> '' then
