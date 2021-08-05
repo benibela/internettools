@@ -847,6 +847,33 @@ begin
   t('request-combine(form(<form><input name="c" value="foo" type="submit"/></form>, <input type="image"/>), <button/>).url', 'pseudo://test?');
   t('request-combine(form(<form><input name="c" value="foo" type="submit"/></form>, <input type="image"/>), <button name="x" value="y"/>).url', 'pseudo://test?x=y');
 
+  //multipart/form-data
+  t('($f := form(<form action="a"><input name="i" value="7"/><button formaction="b" formmethod="POST" name="x" value="y" formenctype="uri"/></form>))/(url, "!", post)', 'pseudo://test/b ! i=7&x=y');
+  t('request-combine($f, "i=0")/(url, "!", post)', 'pseudo://test/b ! i=0&x=y');
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a?i=0 !  !');
+  t('($f := form(<form action="a"><input name="i" value="7"/><button formaction="b" formmethod="POST" name="x" value="y" formenctype="text/plain"/></form>))/(url, "!", post)', 'pseudo://test/b ! i=7'#13#10'x=y'#13#10);
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a?i=0 !  !');
+  t('($f := form(<form action="a"><input name="i" value="7"/><button formaction="b" formmethod="POST" name="x" value="y" formenctype="multipart/formdata"/></form>))/(url)', 'pseudo://test/b');
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a?i=0 !  !');
+
+  t('($f := form(<form action="a" method="POST"><input name="i" value="7"/><button formaction="b" name="x" formmethod="GET" value="y" /></form>))/(url, "!", post)', 'pseudo://test/b?i=7&x=y !');
+  t('request-combine($f, "i=0")/(url, "!", post)', 'pseudo://test/b?i=0&x=y !');
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0 !');
+  t('($f := form(<form action="a" method="POST"><input name="i" value="7"/><button formaction="b" name="x" value="y" formmethod="POST" formenctype="text/plain"/></form>))/(url, "!", post)', 'pseudo://test/b ! i=7'#13#10'x=y'#13#10);
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0 !');
+  t('($f := form(<form action="a" method="POST"><input name="i" value="7"/><button formaction="b" name="x" value="y" formmethod="POST" formenctype="multipart/formdata"/></form>))/(url)', 'pseudo://test/b');
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0 !');
+
+  t('($f := form(<form action="a" method="POST" enctype="text/plain"><input name="i" value="7"/><button formaction="b" name="x" formmethod="GET" value="y" /></form>))/(url, "!", post)', 'pseudo://test/b?i=7&x=y !');
+  t('request-combine($f, "i=0")/(url, "!", post)', 'pseudo://test/b?i=0&x=y !');
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0'#13#10' ! Content-Type: text/plain');
+  t('($f := form(<form action="a" method="POST" enctype="text/plain"><input name="i" value="7"/><button formaction="b" name="x" value="y" formmethod="POST" formenctype="text/plain"/></form>))/(url, "!", post)', 'pseudo://test/b ! i=7'#13#10'x=y'#13#10);
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0'#13#10' ! Content-Type: text/plain');
+  t('($f := form(<form action="a" method="POST" enctype="text/plain"><input name="i" value="7"/><button formaction="b" name="x" value="y" formmethod="POST" formenctype="multipart/formdata"/></form>))/(url)', 'pseudo://test/b');
+  t('request-combine($f, {"i": {"value": "0", "kind": "submit"}})/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0'#13#10' ! Content-Type: text/plain');
+  t('request-combine(request-combine(request-combine($f,()), {"i": {"value": "0", "kind": "submit"}}), ())/(url, "!", post,"!", headers)', 'pseudo://test/a ! i=0'#13#10' ! Content-Type: text/plain');
+
+
   t('form(<form accept-charset="xyyx'#9'rte'#$C'r latin1"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%E4%F6%FC');
   t('form(<form accept-charset="asd'#$9'ter utf8"><input name="a" value="äöü"/></form>).url', 'pseudo://test?a=%C3%A4%C3%B6%C3%BC');
   t('form(<form><input name="a" value="b" disabled="false"/><datalist><input name="a2" value="b" /></datalist><fieldset disabled="x"><div><legend><input name="a3indiv" value="b"/></legend></div><legend><input name="a3" value="b"/></legend><input name="a4" value="b"/></fieldset></form>).url', 'pseudo://test?a2=b&a3=b');

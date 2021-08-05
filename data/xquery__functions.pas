@@ -1391,16 +1391,6 @@ begin
 end;
 
 type THtmlFormEnctype = (hfetUrlEncoded, hfetMultipart, hfetTextPlain);
-function getFormEnctypeActual(isPost: boolean; n: TTreeNode; cmp: TStringComparisonFunc): THtmlFormEnctype;
-var
-  enctype: String;
-begin
-  result := hfetUrlEncoded;
-  if not isPost then exit();
-  enctype := n.getAttribute('enctype', cmp);
-  if striEqual(enctype, ContentTypeMultipart) then result := hfetMultipart
-  else if striEqual(enctype, ContentTypeTextPlain) then result := hfetTextPlain
-end;
 
 function formEncode(s: string; encoding: TSystemCodePage): string;
 begin
@@ -1550,19 +1540,54 @@ begin
   firstKeyIndex.done;
 end;
 
-procedure formToRequest(request: TXQValueStringMap;
-  form, submitElement: TTreeNode; cmp: TStringComparisonFunc;
-  out actionURI: string; out encType: THtmlFormEnctype; out methodIsPost: boolean);
-var
-  method: String;
+function getFormEnctypeActual(isPost: boolean; enctype: string): THtmlFormEnctype;
 begin
-  method := UpperCase(form.getAttribute('method', 'GET', cmp));
+ result := hfetUrlEncoded;
+ if not isPost then exit();
+ if striEqual(enctype, ContentTypeMultipart) then result := hfetMultipart
+ else if striEqual(enctype, ContentTypeTextPlain) then result := hfetTextPlain
+end;
+
+procedure formToRequest(request: TXQValueStringMap;
+  form, submitElement: TTreeNode; cmp: TStringComparisonFunc; contextBaseURI: string;
+  out action: string; out encTypeEnum: THtmlFormEnctype; out methodIsPost: boolean);
+  procedure nodeToRequest(n: TTreeNode; prefix: string; var actionURI, enctype, method: string);
+  begin
+    method := uppercase(n.getAttribute(prefix + 'method', cmp));
+    if not ((method = 'POST') or (method = 'DIALOG')) then
+      method := 'GET';
+    actionURI := strTrim(n.getAttribute(prefix + 'action', cmp), [#$9, #$A, #$C, #$D, ' ']);
+    {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
+    if (form.getDocument() <> nil) then actionURI := strResolveURI(actionURI, form.getDocument().baseURI);
+    actionURI := strResolveURI(actionURI, contextBaseURI);
+    {$ENDIF}
+    enctype := n.getAttribute(prefix + 'enctype', cmp);
+    if not (striEqual(enctype, ContentTypeMultipart) or striEqual(enctype, ContentTypeTextPlain)) then
+      enctype := ContentTypeUrlEncoded;
+  end;
+
+var
+  enctype, method: string;
+  originAction, originEnctype, originMethod: string;
+  temp: TXQValueStringMap;
+begin
+  action := ''; enctype := ''; method := '';
+  nodeToRequest(form, '', action, enctype, method);
+  if assigned(submitElement) and (submitElement.hasAttribute('formmethod', cmp) or submitElement.hasAttribute('formaction', cmp) or submitElement.hasAttribute('formenctype', cmp)) then begin
+    originAction := action;
+    originEnctype := enctype;
+    originMethod := method;
+    nodeToRequest(submitElement, 'form', action, enctype, method);
+    if (originAction <> action) or (originEnctype <> enctype) or (originMethod <> method) then begin
+      temp := TXQValueStringMap.create();
+      temp.setMutable('method', originMethod);
+      temp.setMutable('enctype', originEnctype);
+      temp.setMutable('action', originAction);
+      request.setMutable('form-request', temp);
+    end;
+  end;
   methodIsPost := striEqual(method, 'POST');
-
-  enctype := getFormEnctypeActual(methodIsPost, form, cmp);
-
-  actionURI := form.getAttribute('action', cmp);
-
+  encTypeEnum := getFormEnctypeActual(methodIsPost, enctype);
   request.setMutable('method', method);
 end;
 
@@ -2069,7 +2094,7 @@ var requestOverride: THttpRequestParams;
       resultobj := TXQValueStringMap.create();
       result := resultobj;
 
-      formToRequest(resultobj, form, request.implicitSubmitElement, cmp, actionURI, enctype, post);
+      formToRequest(resultobj, form, request.implicitSubmitElement, cmp, context.staticContext.baseURI, actionURI, enctype, post);
 
       encodedRequest := request.toEncodedRequest(enctype, contenttypeheader);
       if contenttypeheader <> '' then
@@ -2082,10 +2107,6 @@ var requestOverride: THttpRequestParams;
         else actionURI += '?' + encodedRequest;
 
 
-      {$IFDEF ALLOW_EXTERNAL_DOC_DOWNLOAD}
-      if (form.getDocument() <> nil) then actionURI := strResolveURI(actionURI, form.getDocument().baseURI);
-      actionURI := strResolveURI(actionURI, context.staticContext.baseURI);
-      {$ENDIF}
       resultobj.setMutable('url', actionURI);
       if request.charset <> CP_UTF8 then resultobj.setMutable('charset', 'CP' + IntToStr(request.charset));
 
@@ -2255,41 +2276,47 @@ var
     requests[0].addTextPlainRequest(obj.getProperty('post').toString);
   end;
 
+  procedure updateContentType(const header: string);
+  var
+    headers: IXQValue;
+    tempSeq: TXQValueSequence;
+    h: TXQValue;
+    tempstr: String;
+  begin
+    headers := obj.getProperty('headers');
+    tempSeq := TXQValueSequence.create(headers.getSequenceCount);
+    if header <> '' then
+      tempSeq.add(xqvalue(header));
+    for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
+      tempstr := h.toString;
+      if not striBeginsWith(tempstr, 'Content-Type') then
+        tempSeq.add(h);
+    end;
+    result := result.setImmutable('headers', tempSeq);
+  end;
+
   procedure serializeRequestUrlEncoded;
   var
     newQuery: String;
   begin
     newQuery := requests[0].toUrlEncodedRequest;
-    if urlencodedGETurlPrefix <> '' then newQuery := urlencodedGETurlPrefix + newQuery;
-    if urlencodedIsPOST then result := obj.setImmutable('post', newQuery)
-    else result := obj.setImmutable('url', newQuery)
+    if urlencodedIsPOST then result := result.setImmutable('post', newQuery)
+    else result := result.setImmutable('url', urlencodedGETurlPrefix + newQuery)
   end;
   procedure serializeRequestMultipart;
   var
-    headers: IXQValue;
-    h: TXQValue;
     mime: TMIMEMultipartData;
     tempstr: String;
-    tempSeq: TXQValueSequence;
   begin
     mime := requests[0].toMimeRequest();
     result := result.setImmutable('post', mime.compose(tempstr, mimeBoundary));
 
-    if tempstr <> mimeBoundary then begin
-      headers := obj.getProperty('headers');
-      tempSeq := TXQValueSequence.create(headers.getSequenceCount);
-      tempSeq.add(xqvalue(TMIMEMultipartData.HeaderForBoundary(tempstr)));
-      for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
-        tempstr := h.toString;
-        if not striBeginsWith(tempstr, 'Content-Type') then
-          tempSeq.add(h);
-      end;
-      result := result.setImmutable('headers', tempSeq);
-    end;
+    if tempstr <> mimeBoundary then
+      updateContentType(TMIMEMultipartData.HeaderForBoundary(tempstr));
   end;
   procedure serializeRequestTextPlain;
   begin
-    result := obj.setImmutable('post', requests[0].toTextPlainRequest());
+    result := result.setImmutable('post', requests[0].toTextPlainRequest());
   end;
 
 var submitIndices: array of integer = nil;
@@ -2319,6 +2346,37 @@ var submitIndices: array of integer = nil;
   procedure serializeSubmitIndices;
   begin
     result := result.setImmutable('submit-indices', requests[0].getSubmitIndices());
+  end;
+  procedure updateFormRequestForSubmit;
+  var
+    originalFormRequest: IXQValue;
+    action, method: String;
+    methodIsPost: Boolean;
+    oldEncType: THtmlFormEnctype;
+  begin
+    originalFormRequest := obj.getProperty('form-request');
+    action := originalFormRequest.getProperty('action').toString;
+    method := originalFormRequest.getProperty('method').toString;
+    methodIsPost := method = 'POST';
+    oldEncType := enctype;
+    encType := getFormEnctypeActual(methodIsPost, originalFormRequest.getProperty('enctype').toString);
+    if methodIsPost <> (obj.getProperty('method').toString = 'POST') then begin
+      urlencodedIsPOST := methodIsPost;
+      if (not methodIsPost) then begin
+        if (enctype = hfetUrlEncoded) then
+          if action.contains('?') then urlencodedGETurlPrefix:=action + '&'
+          else urlencodedGETurlPrefix:=action + '?';
+        result := result.setImmutable('post', '');
+      end;
+    end;
+    if (oldEncType <> enctype) then
+      case enctype of
+        hfetUrlEncoded: updateContentType('');
+        hfetMultipart: mimeBoundary := ''; //update later
+        hfetTextPlain: updateContentType('Content-Type: ' + ContentTypeTextPlain);
+      end;
+    result := result.setImmutable('url', action);
+    result := result.setImmutable('method', method);
   end;
 
 var
@@ -2354,7 +2412,11 @@ begin
   markSubmitIndices();
 
   requests[1].addXQValue(args[1], context.staticContext);
-  if requests[1].hasSubmitParams then removeOldSubmitParams;
+  if requests[1].hasSubmitParams then begin
+    removeOldSubmitParams;
+    if obj.hasProperty('form-request', nil) then
+      updateFormRequestForSubmit();
+  end;
 
 
   requests[0].mergeOverride(requests[1]);
