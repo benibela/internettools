@@ -457,19 +457,22 @@ var
 begin
   if not fconfig.equalsUserAgent(internetConfig^) or not fconfig.equalsProxy(internetConfig^) then begin
     connection.UserAgent:=internetConfig.userAgent;
+    connection.ProxyHost:='';
+    connection.ProxyPort:='';
+    connection.ProxyUser:='';
+    connection.ProxyPass:='';
+    connection.Sock.SocksIP:='';
+    connection.Sock.SocksPort:='';
+    connection.Sock.SocksUsername := '';
+    connection.Sock.SocksPassword := '';
     if internetConfig.useProxy then begin
       if internetConfig.proxyHTTPName<>'' then begin
         connection.ProxyHost:=internetConfig.proxyHTTPName;
         connection.ProxyPort:=internetConfig.proxyHTTPPort;
-      end else begin
-        connection.ProxyHost:='';
-        connection.ProxyPort:='';
       end;
       connection.ProxyUser:=internetConfig.proxyUsername;
       connection.ProxyPass:=internetConfig.proxyPassword;
 
-      connection.Sock.SocksUsername := '';
-      connection.Sock.SocksPassword := '';
       if internetConfig.proxySOCKSName <>'' then begin
         temp := internetConfig.proxySOCKSName;
         if strContains(temp, '@') then begin
@@ -481,10 +484,7 @@ begin
         end;
         connection.Sock.SocksIP:=temp;
         connection.Sock.SocksPort:=internetConfig.proxySOCKSPort;
-      end else begin
-        connection.Sock.SocksIP:='';
-        connection.Sock.SocksPort:='';
-      end;
+      end
      //TODO: https proxy
     end;
   end;
