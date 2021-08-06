@@ -121,6 +121,7 @@ type
     constructor Create;
     function getHeaderValue(kind: THeaderKind): string;
     function getHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
+    procedure add(const name, value: string);
     property headerValues[header: string]: string read GetheaderValue; default;
   end;
 
@@ -1451,6 +1452,11 @@ begin
     if striBeginsWith(Strings[i], header) then
       exit(trim(strCopyFrom(Strings[i], length(header) + 1)));
   exit('');
+end;
+
+procedure THTTPHeaderList.add(const name, value: string);
+begin
+  add(name + ': '+value);
 end;
 
 function TInternetAccess.getLastContentType: string;

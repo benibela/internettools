@@ -233,12 +233,12 @@ begin
         inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @transfer.writeBlock);
         deleteLocalRef(jbody);
 
-        lastHTTPHeaders.Clear;
+        transfer.receivedHTTPHeaders.Clear;
         jheaders := jresponse.callObjectMethodChecked(ResponseMethods.headers);
         headerCount := callIntMethodChecked(jheaders, HeadersMethods.size);
         for i := 0 to headerCount - 1 do begin
           args[0].i := i;;
-          lastHTTPHeaders.add( callStringMethodChecked(jheaders, HeadersMethods.name, @args[0]) + ':' + callStringMethodChecked(jheaders, HeadersMethods.value, @args[0]));
+          transfer.receivedHTTPHeaders.add( callStringMethodChecked(jheaders, HeadersMethods.name, @args[0]) + ':' + callStringMethodChecked(jheaders, HeadersMethods.value, @args[0]));
         end;
         deleteLocalRef(jheaders);
 

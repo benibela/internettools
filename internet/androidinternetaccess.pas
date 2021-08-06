@@ -382,12 +382,12 @@ begin
               j.DeleteLocalRef(jStatusLine);
 
               try
-                lastHTTPHeaders.Clear;
+                transfer.receivedHTTPHeaders.Clear;
                 jHeaderIterator := j.callObjectMethodChecked(jResponse,  jmHttpMessageHeaderIterator);
                 while j.CallBooleanMethod(jHeaderIterator,  jmHeaderIteratorHasNext) do begin
                   jHeader := j.callObjectMethodChecked(jHeaderIterator,  jmHeaderIteratorNextHeader);
-                  lastHTTPHeaders.Add(j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetName)) + ':'+
-                                      j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetValue)));
+                  transfer.receivedHTTPHeaders.Add(j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetName)),
+                                                   j.jStringToStringAndDelete(j.callObjectMethodChecked(jHeader, jmHeaderGetValue)));
                   j.DeleteLocalRef(jHeader);
                 end;
                 j.DeleteLocalRef(jHeaderIterator);

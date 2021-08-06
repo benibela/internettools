@@ -264,7 +264,7 @@ begin
     if (GetLastError = ERROR_INSUFFICIENT_BUFFER) and (i > 0) then begin
       setlength(headerOut, i+1);
       HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @headerOut[1], @i, nil);
-      lastHTTPHeaders.Text:=headerOut;
+      transfer.receivedHTTPHeaders.Text:=headerOut;
     end;
 
   if transfer.method <> 'HEAD' then begin
