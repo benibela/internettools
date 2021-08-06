@@ -455,27 +455,38 @@ procedure TSynapseInternetAccess.setConfig(internetConfig: PInternetConfig);
 var
   temp: String;
 begin
-  connection.UserAgent:=internetConfig.userAgent;
-  if internetConfig.useProxy then begin
-    if internetConfig.proxyHTTPName<>'' then begin
-      connection.ProxyHost:=internetConfig.proxyHTTPName;
-      connection.ProxyPort:=internetConfig.proxyHTTPPort;
-    end;
-    connection.ProxyUser:=internetConfig.proxyUsername;
-    connection.ProxyPass:=internetConfig.proxyPassword;
-    if internetConfig.proxySOCKSName <>'' then begin
-      temp := internetConfig.proxySOCKSName;
-      if strContains(temp, '@') then begin
-        connection.Sock.SocksUsername:=strSplitGet('@', temp);
-        if strContains(connection.Sock.SocksUsername, ':') then begin
-          connection.Sock.SocksPassword:=strSplit(connection.Sock.SocksUsername, ':')[1];
-          connection.Sock.SocksUsername:=strSplit(connection.Sock.SocksUsername, ':')[0];
-        end;
+  if not fconfig.equalsUserAgent(internetConfig^) or not fconfig.equalsProxy(internetConfig^) then begin
+    connection.UserAgent:=internetConfig.userAgent;
+    if internetConfig.useProxy then begin
+      if internetConfig.proxyHTTPName<>'' then begin
+        connection.ProxyHost:=internetConfig.proxyHTTPName;
+        connection.ProxyPort:=internetConfig.proxyHTTPPort;
+      end else begin
+        connection.ProxyHost:='';
+        connection.ProxyPort:='';
       end;
-      connection.Sock.SocksIP:=temp;
-      connection.Sock.SocksPort:=internetConfig.proxySOCKSPort;
+      connection.ProxyUser:=internetConfig.proxyUsername;
+      connection.ProxyPass:=internetConfig.proxyPassword;
+
+      connection.Sock.SocksUsername := '';
+      connection.Sock.SocksPassword := '';
+      if internetConfig.proxySOCKSName <>'' then begin
+        temp := internetConfig.proxySOCKSName;
+        if strContains(temp, '@') then begin
+          connection.Sock.SocksUsername:=strSplitGet('@', temp);
+          if strContains(connection.Sock.SocksUsername, ':') then begin
+            connection.Sock.SocksPassword:=strSplit(connection.Sock.SocksUsername, ':')[1];
+            connection.Sock.SocksUsername:=strSplit(connection.Sock.SocksUsername, ':')[0];
+          end;
+        end;
+        connection.Sock.SocksIP:=temp;
+        connection.Sock.SocksPort:=internetConfig.proxySOCKSPort;
+      end else begin
+        connection.Sock.SocksIP:='';
+        connection.Sock.SocksPort:='';
+      end;
+     //TODO: https proxy
     end;
-   //TODO: https proxy
   end;
   inherited setConfig(internetConfig);
 end;

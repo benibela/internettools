@@ -448,54 +448,54 @@ var args:array[0..1] of jvalue;
     jparams: jobject;
     tempClasses: TClassInformation;
 begin
-  if jhttpclient <> nil then needj.DeleteGlobalRef(jhttpclient);
-  tempClasses := initializeClasses();
-  try
-   with needJ do
-     with tempClasses do begin
-       jhttpclient := newGlobalRefAndDelete(NewObject(jcDefaultHttpClient, jmDefaultHttpClientConstructor));
-       if jhttpclient = nil then
-         raise EInternetException.create('Failed to create DefaultHttpClient');
+  if (jhttpclient = nil) or not fconfig.equalsUserAgent(internetConfig^) or not fconfig.equalsProxy(internetConfig^) then begin
+    if jhttpclient <> nil then needj.DeleteGlobalRef(jhttpclient);
+    tempClasses := initializeClasses();
+    try
+     with needJ do
+       with tempClasses do begin
+         jhttpclient := newGlobalRefAndDelete(NewObject(jcDefaultHttpClient, jmDefaultHttpClientConstructor));
+         if jhttpclient = nil then
+           raise EInternetException.create('Failed to create DefaultHttpClient');
 
+         //see http://hc.apache.org/httpcomponents-client-ga/
+         //http://developer.android.com/reference/org/apache/http/params/HttpParams.html
+         //http://wiki.freepascal.org/Android_Programming
 
-       jparams := CallObjectMethod(jhttpclient, jmDefaultHttpClientGetParams);
+         jparams := CallObjectMethod(jhttpclient, jmDefaultHttpClientGetParams);
 
-       args[0].l := NewStringUTF('http.useragent');
-       args[1].l  := j.stringToJString(internetConfig^.userAgent);
-       deleteLocalRef(callObjectMethod(jparams, jmHttpParamsSetParameter, @args));
-       deleteLocalRef(args[0].l);
-       deleteLocalRef(args[1].l);
+         args[0].l := NewStringUTF('http.useragent');
+         args[1].l  := j.stringToJString(internetConfig^.userAgent);
+         deleteLocalRef(callObjectMethod(jparams, jmHttpParamsSetParameter, @args));
+         deleteLocalRef(args[0].l);
+         deleteLocalRef(args[1].l);
 
-       //disable 3xx handling, so we can handle it ourselves like on all other platforms
-       args[0].l := NewStringUTF('http.protocol.handle-redirects');
-       args[1].z  := JNI_FALSE;
-       DeleteLocalRef(CallObjectMethod(jparams, jmHttpParamsSetBooleanParameter, @args));
-       DeleteLocalRef(args[0].l);
-
-       if internetConfig^.useProxy then begin
-         args[0].l := stringToJString(internetConfig^.proxyHTTPName);
-         args[1].i := StrToIntDef(internetConfig^.proxyHTTPPort, 8080);
-         temp := NewObject(jcHttpHost, jmHttpHostConstructor, @args);
+         //disable 3xx handling, so we can handle it ourselves like on all other platforms
+         args[0].l := NewStringUTF('http.protocol.handle-redirects');
+         args[1].z  := JNI_FALSE;
+         DeleteLocalRef(CallObjectMethod(jparams, jmHttpParamsSetBooleanParameter, @args));
          DeleteLocalRef(args[0].l);
 
-         args[0].l := NewStringUTF('http.route.default-proxy');
-         args[1].l := temp;
-         DeleteLocalRef(CallObjectMethod(jparams, jmHttpParamsSetParameter, @args));
-         DeleteLocalRef(args[0].l);
-         DeleteLocalRef(args[1].l);
+         if internetConfig^.useProxy then begin
+           args[0].l := stringToJString(internetConfig^.proxyHTTPName);
+           args[1].i := StrToIntDef(internetConfig^.proxyHTTPPort, 8080);
+           temp := NewObject(jcHttpHost, jmHttpHostConstructor, @args);
+           DeleteLocalRef(args[0].l);
+
+           args[0].l := NewStringUTF('http.route.default-proxy');
+           args[1].l := temp;
+           DeleteLocalRef(CallObjectMethod(jparams, jmHttpParamsSetParameter, @args));
+           DeleteLocalRef(args[0].l);
+           DeleteLocalRef(args[1].l);
+         end;
+
+         DeleteLocalRef(jparams);
        end;
-
-       DeleteLocalRef(jparams);
-     end;
-  finally
-   freeClasses(tempClasses);
+    finally
+     freeClasses(tempClasses);
+    end;
   end;
 
-
-
-  //see http://hc.apache.org/httpcomponents-client-ga/
-  //http://developer.android.com/reference/org/apache/http/params/HttpParams.html
-  //http://wiki.freepascal.org/Android_Programming
   inherited setConfig(internetConfig);
 end;
 

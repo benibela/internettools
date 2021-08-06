@@ -63,6 +63,8 @@ type
 
     procedure setProxy(proxy: string);
     procedure searchCertificates;
+    function equalsUserAgent(const otherConfig: TInternetConfig): boolean;
+    function equalsProxy(const otherConfig: TInternetConfig): boolean;
   end;
   { TDecodedUrl }
 
@@ -901,6 +903,21 @@ begin
     if DirectoryExists(SystemCAPaths[i]) then CAPath := SystemCAPaths[i];
   end;
   {$endif}
+end;
+
+function TInternetConfig.equalsUserAgent(const otherConfig: TInternetConfig): boolean;
+begin
+  result := userAgent = otherConfig.userAgent;
+end;
+
+function TInternetConfig.equalsProxy(const otherConfig: TInternetConfig): boolean;
+begin
+  if useProxy <> otherConfig.useProxy then exit(false);
+  if not useProxy then exit(true);
+  result := (proxyHTTPName = otherConfig.proxyHTTPName) and (proxyHTTPPort = otherConfig.proxyHTTPPort)
+         and (proxyHTTPSName = otherConfig.proxyHTTPSName) and (proxyHTTPSPort = otherConfig.proxyHTTPSPort)
+         and (proxySOCKSName = otherConfig.proxySOCKSName) and (proxySOCKSPort = otherConfig.proxySOCKSPort)
+         and (proxyUsername = otherConfig.proxyUsername) and (proxyPassword = otherConfig.proxyPassword)
 end;
 
 procedure TTransfer.beginTransfer(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent;

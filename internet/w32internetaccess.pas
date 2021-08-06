@@ -387,59 +387,61 @@ procedure TW32InternetAccess.setConfig(internetConfig: PInternetConfig);
 var proxyStr:string;
     timeout: longint = 2*60*1000;
 begin
-  if hLastConnection<>nil then InternetCloseHandle(hLastConnection);
-  if hsession <> nil then InternetCloseHandle(hsession);
-  hLastConnection := nil;
-  hsession := nil;
+  if (hSession = nil) or (fconfig.tryDefaultConfig <> internetConfig.tryDefaultConfig)
+     or not fconfig.equalsUserAgent(internetConfig^) or not fconfig.equalsProxy(internetConfig^) then begin
+    if hLastConnection<>nil then InternetCloseHandle(hLastConnection);
+    if hsession <> nil then InternetCloseHandle(hsession);
+    hLastConnection := nil;
+    hsession := nil;
 
 
-  if internetConfig.tryDefaultConfig then
-    hSession:=InternetOpenA(pchar(internetConfig.userAgent),
-                            INTERNET_OPEN_TYPE_PRECONFIG,
-                            nil,nil,0)
-  else if internetConfig.useProxy then begin
-    if internetConfig.proxyHTTPName='' then proxyStr:=''
-    else begin
-      if pos('//',internetConfig.proxyHTTPName)>0 then
-        proxyStr:='http='+internetConfig.proxyHTTPName
-       else
-        proxyStr:='http=http://'+internetConfig.proxyHTTPName;
-      if internetConfig.proxyHTTPPort<>'' then
-        proxyStr:=proxyStr+':'+internetConfig.proxyHTTPPort;
+    if internetConfig.tryDefaultConfig then
+      hSession:=InternetOpenA(pchar(internetConfig.userAgent),
+                              INTERNET_OPEN_TYPE_PRECONFIG,
+                              nil,nil,0)
+    else if internetConfig.useProxy then begin
+      if internetConfig.proxyHTTPName='' then proxyStr:=''
+      else begin
+        if pos('//',internetConfig.proxyHTTPName)>0 then
+          proxyStr:='http='+internetConfig.proxyHTTPName
+         else
+          proxyStr:='http=http://'+internetConfig.proxyHTTPName;
+        if internetConfig.proxyHTTPPort<>'' then
+          proxyStr:=proxyStr+':'+internetConfig.proxyHTTPPort;
+      end;
+
+      if internetConfig.proxyHTTPSName<>'' then begin
+        if pos('//',internetConfig.proxyHTTPSName)>0 then
+          proxyStr:=proxyStr+' https='+internetConfig.proxyHTTPSName
+         else
+          proxyStr:=proxyStr+' https=https://'+internetConfig.proxyHTTPSName;
+        if internetConfig.proxyHTTPSPort<>'' then
+          proxyStr:=proxyStr+':'+internetConfig.proxyHTTPSPort;
+      end;
+
+      if internetConfig.proxySOCKSName<>'' then begin
+        if pos('//',internetConfig.proxySOCKSName)>0 then
+          proxyStr:=proxyStr+' socks='+internetConfig.proxySOCKSName
+         else
+          proxyStr:=proxyStr+' socks=socks://'+internetConfig.proxySOCKSName;
+        if internetConfig.proxySOCKSPort<>'' then
+          proxyStr:=proxyStr+':'+internetConfig.proxySOCKSPort;
+      end;
+
+      hSession:=InternetOpenA(pchar(internetConfig.userAgent),
+                              INTERNET_OPEN_TYPE_PROXY,
+                              pchar(proxyStr),nil,0)
+    end else begin
+      hSession:=InternetOpenA(pchar(internetConfig.userAgent),
+                              INTERNET_OPEN_TYPE_DIRECT,
+                              nil,nil,0)
     end;
 
-    if internetConfig.proxyHTTPSName<>'' then begin
-      if pos('//',internetConfig.proxyHTTPSName)>0 then
-        proxyStr:=proxyStr+' https='+internetConfig.proxyHTTPSName
-       else
-        proxyStr:=proxyStr+' https=https://'+internetConfig.proxyHTTPSName;
-      if internetConfig.proxyHTTPSPort<>'' then
-        proxyStr:=proxyStr+':'+internetConfig.proxyHTTPSPort;
-    end;
+    if hSession=nil then
+      raise EInternetException.create(rsFailedToConnectToThe + getLastErrorDetails);
 
-    if internetConfig.proxySOCKSName<>'' then begin
-      if pos('//',internetConfig.proxySOCKSName)>0 then
-        proxyStr:=proxyStr+' socks='+internetConfig.proxySOCKSName
-       else
-        proxyStr:=proxyStr+' socks=socks://'+internetConfig.proxySOCKSName;
-      if internetConfig.proxySOCKSPort<>'' then
-        proxyStr:=proxyStr+':'+internetConfig.proxySOCKSPort;
-    end;
-
-    hSession:=InternetOpenA(pchar(internetConfig.userAgent),
-                            INTERNET_OPEN_TYPE_PROXY,
-                            pchar(proxyStr),nil,0)
-  end else begin
-    hSession:=InternetOpenA(pchar(internetConfig.userAgent),
-                            INTERNET_OPEN_TYPE_DIRECT,
-                            nil,nil,0)
+    InternetSetOptionA(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
   end;
-
-  if hSession=nil then
-    raise EInternetException.create(rsFailedToConnectToThe + getLastErrorDetails);
-
-  InternetSetOptionA(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
-
 
   inherited setConfig(internetConfig);
 end;
