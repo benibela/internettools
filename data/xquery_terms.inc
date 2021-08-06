@@ -721,12 +721,13 @@ begin
     exit(TXQTermVariable(variable));
   v := variable;
   while v <> nil do begin
-    if v.InheritsFrom(TXQTermSequence) then v := TXQTermSequence(v).children[0]
-    else if v.InheritsFrom(TXQTermVariable) then exit(TXQTermVariable(v))
-    else if v.InheritsFrom(TXQTermReadObjectProperty) then v := TXQTermReadObjectProperty(v).children[0]
-    else if v.InheritsFrom(TXQTermDynamicFunctionCall) then  v := TXQTermDynamicFunctionCall(v).children[0]
-    else if v.InheritsFrom(TXQTermFilterSequence) then v := TXQTermFilterSequence(v).children[0]
-    else if v.InheritsFrom(TXQTermJSONLookup) then v := TXQTermFilterSequence(v).children[0]
+    if v.InheritsFrom(TXQTermVariable) then exit(TXQTermVariable(v))
+    else if v.InheritsFrom(TXQTermSequence)
+         or v.InheritsFrom(TXQTermReadObjectProperty)
+         or v.InheritsFrom(TXQTermDynamicFunctionCall)
+         or v.InheritsFrom(TXQTermFilterSequence)
+         or v.InheritsFrom(TXQTermJSONLookup) then
+           v := TXQTermWithChildren(v).children[0]
     else raiseInternalError(1651217);
   end;
   raiseInternalError(1651218);
