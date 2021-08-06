@@ -213,6 +213,10 @@ type
     FOnProgress:TProgressEvent;
     procedure setLastUrl(AValue: string);
   protected
+    fconfig: TInternetConfig;
+    procedure setConfig(internetConfig: PInternetConfig); virtual;
+    function getConfig: PInternetConfig;
+  protected
     //active transfer
     lastTransfer: TTransfer;
     //**Override this if you want to sub class it
@@ -233,10 +237,8 @@ type
     class function makeHeaderLine(const kind: THeaderKind; const value: string): string; static;
     class function makeHeaderName(const kind: THeaderKind): string; static;
     //constructor, since .create is "abstract" and can not be called
-    procedure init;
   public
     //in
-    internetConfig: PInternetConfig; //**< Configuration to use. Defaults to defaultInternetConfig
     additionalHeaders: THTTPHeaderList; //**< Defines additional headers that should be send to the server
     ContentTypeForData: string; //**< Defines the Content-Type that is used to transmit data. Usually @code(application/x-www-form-urlencoded) or @code(multipart/form-data; boundary=...). @br This is overriden by a Content-Type set in additionalHeaders.
     multipartFormData: TMIMEMultipartData;
@@ -251,8 +253,12 @@ type
     //** Cookies receive from/to-send the server
     cookies: TCookieManager;
 
+    property config: PInternetConfig read getConfig write setConfig;
+
     constructor create();virtual;
+    constructor create(const internetConfig: TInternetConfig);virtual;
     destructor Destroy; override;
+
     //**post the (raw) data to the given url and returns the resulting document
     //**as string
     function post(const totalUrl, data:string):string;
@@ -296,6 +302,7 @@ type
     class function reactFromCodeString(const codes: string; actualCode: integer; var reaction: TInternetAccessReaction): string; static;
 
     function internalHandle: TObject; virtual; abstract;
+
   published
     property OnTransferStart: TTransferStartEvent read FOnTransferStart write FOnTransferStart;
     property OnTransferReact: TTransferReactEvent read FOnTransferReact write FOnTransferReact;
@@ -963,14 +970,12 @@ end;
 function TInternetAccess.request(method: string; url: TDecodedUrl; data: string): string;
 var builder: TStrBuilder;
 begin
-  if internetConfig=nil then raise Exception.create('No internet configuration set');
-
   builder.init(@result);
   request(method, url, data.unsafeView, TTransferClearEvent(@builder.clear), TTransferBlockWriteEvent(@builder.appendBuffer));
   builder.final;
 
-  if internetConfig^.logToPath<>'' then
-    writeString(internetConfig^.logToPath, url.combined+'<-DATA:'+data,result);
+  if fconfig.logToPath<>'' then
+    writeString(fconfig.logToPath, url.combined+'<-DATA:'+data,result);
 end;
 
 procedure clearStream(self: TStream);
@@ -1010,6 +1015,16 @@ procedure TInternetAccess.setLastUrl(AValue: string);
 begin
   lastTransfer.url := AValue;
   lastTransfer.decodedUrl := decodeURL(avalue);
+end;
+
+procedure TInternetAccess.setConfig(internetConfig: PInternetConfig);
+begin
+  fconfig := internetConfig^;
+end;
+
+function TInternetAccess.getConfig: PInternetConfig;
+begin
+  result := @fconfig
 end;
 
 procedure TInternetAccess.doTransferChecked(onClear: TTransferClearEvent; onReceivedBlock: TTransferBlockWriteEvent;
@@ -1402,19 +1417,6 @@ begin
    //if (not hadHeader[iahUserAgent]) then callKnownKind( iahUserAgent, internetConfig^.userAgent ); no central handling of agent, it is too different between the APIs
 end;
 
-procedure TInternetAccess.init;
-begin
-  internetConfig:=@defaultInternetConfiguration;
-  if defaultInternetConfiguration.userAgent='' then
-    defaultInternetConfiguration.userAgent:='Mozilla/5.0 (compatible)';
-
-  additionalHeaders := THTTPHeaderList.Create;
-  lastTransfer.receivedHTTPHeaders := THTTPHeaderList.Create;
-  lastTransfer.ownerAccess := self;
-
-  ContentTypeForData := ContentTypeUrlEncoded;
-end;
-
 function TInternetAccess.getFinalMultipartFormData: string;
 var
   boundary: String;
@@ -1458,7 +1460,25 @@ end;
 
 constructor TInternetAccess.create();
 begin
-  raise eabstracterror.create('Abstract internet class created (TInternetAccess)');
+  create(defaultInternetConfiguration);
+end;
+
+constructor TInternetAccess.create(const internetConfig: TInternetConfig);
+begin
+  if ClassType = TInternetAccess then
+    raise eabstracterror.create('Abstract internet class created (TInternetAccess)');
+
+  additionalHeaders := THTTPHeaderList.Create;
+  lastTransfer.receivedHTTPHeaders := THTTPHeaderList.Create;
+  lastTransfer.ownerAccess := self;
+
+  ContentTypeForData := ContentTypeUrlEncoded;
+
+  setConfig(@internetConfig);
+  if fconfig.userAgent='' then begin
+    fconfig.userAgent:='Mozilla/5.0 (compatible)';
+    setConfig(@fconfig);
+  end;
 end;
 
 destructor TInternetAccess.Destroy;
@@ -1505,10 +1525,10 @@ function TInternetAccess.existsConnection(): boolean;
 begin
   result:=false;
   try
-    if (internetConfig=nil) or (internetConfig^.connectionCheckPage='') then
-      result:=get('http','www.google.de','/')<>''
+    if fconfig.connectionCheckPage = '' then
+      result:=get('https','www.google.de','/')<>''
      else
-      result:=get('http',internetConfig^.connectionCheckPage,'/')<>'';
+      result:=get('https',fconfig.connectionCheckPage,'/')<>'';
   except
   end;
 end;

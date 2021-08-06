@@ -51,7 +51,8 @@ TOKHTTPInternetAccess=class(TInternetAccess)
 protected
   procedure doTransferUnchecked(var transfer: TTransfer);override;
 public
-  constructor create;override;
+  constructor create();override;
+  constructor create(const internetConfig: TInternetConfig);override;
   destructor destroy;override;
 
   function internalHandle: TObject; override;
@@ -209,7 +210,7 @@ begin
 
         enumerateAdditionalHeaders(transfer, @addHeader, jRequestBuilder);
         if additionalHeaders.IndexOfName('User-Agent') < 0 then
-           addHeader(jRequestBuilder, iahUserAgent, 'User-Agent', internetConfig^.userAgent);
+           addHeader(jRequestBuilder, iahUserAgent, 'User-Agent', fconfig.userAgent);
 
         //request = builder.build()
         jrequest := jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.build);
@@ -258,8 +259,12 @@ begin
 end;
 
 
-
 constructor TOKHTTPInternetAccess.create();
+begin
+  create(defaultInternetConfiguration);
+end;
+
+constructor TOKHTTPInternetAccess.create(const internetConfig: TInternetConfig);
 const BUILDER = 'okhttp3/OkHttpClient$Builder';
       REQUEST_BUILDER = 'okhttp3/Request$Builder';
 var
@@ -267,7 +272,7 @@ var
   jbuilderClass: jclass;
   tempargs: jvalue;
 begin
-  init;
+  inherited create(internetConfig);
   needJ;
   with okHttp do begin
     EnterCriticalsection(clientCreationCriticalSection);

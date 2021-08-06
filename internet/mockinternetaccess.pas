@@ -45,7 +45,8 @@ There are three ways to use it:
 )
 *)
 TMockInternetAccess = class(TInternetAccess)
-  constructor create; override;
+  constructor create();override;
+  constructor create(const internetConfig: TInternetConfig);override;
   procedure doTransferUnChecked(var transfer: TTransfer); override;
 
   destructor Destroy; override;
@@ -58,11 +59,14 @@ var DefaultMockPage: string = '<html>Internet disabled</html>';
 implementation
 uses bbutils;
 
-{ TInternetAccessNonSense }
-
-constructor TMockInternetAccess.create;
+constructor TMockInternetAccess.create();
 begin
-  init
+  inherited;
+end;
+
+constructor TMockInternetAccess.create(const internetConfig: TInternetConfig);
+begin
+  inherited;
 end;
 
 procedure TMockInternetAccess.doTransferUnChecked(var transfer: TTransfer);

@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 unit w32internetaccess;
 
 {$mode objfpc}{$H+}
+{$ModeSwitch autoderef}
 //{$define debug}//7Remove debug before publishing (write every opened page to the hard disk)
 //{$define simulateInet} //read the files previously written on the hard disks
 interface
@@ -52,8 +53,10 @@ type
     lastServer: TDecodedUrl;
     procedure doTransferUnchecked(var transfer: TTransfer); override;
     function windowsLastErrorToString: string;
+    procedure setConfig(internetConfig: PInternetConfig); override;
   public
     constructor create();override;
+    constructor create(const internetConfig: TInternetConfig);override;
     destructor destroy;override;
     function needConnection():boolean;override;
 
@@ -179,7 +182,7 @@ const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtm
       with transfer.decodedUrl do begin
         if striequal(protocol, 'https') then begin
           flags := flags or INTERNET_FLAG_SECURE;
-          if not internetConfig^.checkSSLCertificates then
+          if not fconfig.checkSSLCertificates then
             flags := flags or INTERNET_FLAG_SECURE or INTERNET_FLAG_IGNORE_CERT_CN_INVALID  or INTERNET_FLAG_IGNORE_CERT_DATE_INVALID
         end;
         result := HttpOpenRequestA(hLastConnection, pchar(transfer.method), pchar(path+params), nil, pchar(lastTransfer.url), ppchar(@defaultAccept[low(defaultAccept)]), flags, 0);
@@ -207,10 +210,10 @@ begin
       transfer.HTTPErrorDetails:= rsConnectingTo0SFailed + windowsLastErrorToString;
       exit;
     end;
-    if internetConfig^.proxyUsername <> '' then
-      InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_USERNAME, pchar(internetConfig^.proxyUsername), length(internetConfig^.proxyUsername));
-    if internetConfig^.ProxyPassword <> '' then
-      InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_PASSWORD, pchar(internetConfig^.ProxyPassword), length(internetConfig^.ProxyPassword));
+    if fconfig.proxyUsername <> '' then
+      InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_USERNAME, pchar(fconfig.proxyUsername), length(fconfig.proxyUsername));
+    if fconfig.ProxyPassword <> '' then
+      InternetSetOption(hLastConnection, INTERNET_OPTION_PROXY_PASSWORD, pchar(fconfig.ProxyPassword), length(fconfig.ProxyPassword));
     lastServer := transfer.decodedUrl; //remember to which server the connection points. We cannot use lastURLDecoded, since the connection has already changed, but lastURLDecoded is only set after redirects
   end;
 
@@ -231,7 +234,7 @@ begin
 
     if callResult then break;
 
-    if not internetConfig^.checkSSLCertificates then begin
+    if not fconfig.checkSSLCertificates then begin
       //as suggested by http://msdn.microsoft.com/en-us/subscriptions/aa917690.aspx
       temp := getLastError;
       if (temp = ERROR_INTERNET_INVALID_CA) or (temp = ERROR_INTERNET_SEC_CERT_REV_FAILED) or (temp = ERROR_INTERNET_SEC_CERT_NO_REV) then begin
@@ -380,58 +383,78 @@ begin
   end;
 end;
 
-constructor TW32InternetAccess.create();
+procedure TW32InternetAccess.setConfig(internetConfig: PInternetConfig);
 var proxyStr:string;
-    timeout: longint;
+    timeout: longint = 2*60*1000;
 begin
-  init;
-  if defaultInternetConfiguration.tryDefaultConfig then
-    hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
+  if hLastConnection<>nil then InternetCloseHandle(hLastConnection);
+  if hsession <> nil then InternetCloseHandle(hsession);
+  hLastConnection := nil;
+  hsession := nil;
+
+
+  if internetConfig.tryDefaultConfig then
+    hSession:=InternetOpenA(pchar(internetConfig.userAgent),
                             INTERNET_OPEN_TYPE_PRECONFIG,
                             nil,nil,0)
-  else if defaultInternetConfiguration.useProxy then begin
-    if defaultInternetConfiguration.proxyHTTPName='' then proxyStr:=''
+  else if internetConfig.useProxy then begin
+    if internetConfig.proxyHTTPName='' then proxyStr:=''
     else begin
-      if pos('//',defaultInternetConfiguration.proxyHTTPName)>0 then
-        proxyStr:='http='+defaultInternetConfiguration.proxyHTTPName
+      if pos('//',internetConfig.proxyHTTPName)>0 then
+        proxyStr:='http='+internetConfig.proxyHTTPName
        else
-        proxyStr:='http=http://'+defaultInternetConfiguration.proxyHTTPName;
-      if defaultInternetConfiguration.proxyHTTPPort<>'' then
-        proxyStr:=proxyStr+':'+defaultInternetConfiguration.proxyHTTPPort;
+        proxyStr:='http=http://'+internetConfig.proxyHTTPName;
+      if internetConfig.proxyHTTPPort<>'' then
+        proxyStr:=proxyStr+':'+internetConfig.proxyHTTPPort;
     end;
 
-    if defaultInternetConfiguration.proxyHTTPSName<>'' then begin
-      if pos('//',defaultInternetConfiguration.proxyHTTPSName)>0 then
-        proxyStr:=proxyStr+' https='+defaultInternetConfiguration.proxyHTTPSName
+    if internetConfig.proxyHTTPSName<>'' then begin
+      if pos('//',internetConfig.proxyHTTPSName)>0 then
+        proxyStr:=proxyStr+' https='+internetConfig.proxyHTTPSName
        else
-        proxyStr:=proxyStr+' https=https://'+defaultInternetConfiguration.proxyHTTPSName;
-      if defaultInternetConfiguration.proxyHTTPSPort<>'' then
-        proxyStr:=proxyStr+':'+defaultInternetConfiguration.proxyHTTPSPort;
+        proxyStr:=proxyStr+' https=https://'+internetConfig.proxyHTTPSName;
+      if internetConfig.proxyHTTPSPort<>'' then
+        proxyStr:=proxyStr+':'+internetConfig.proxyHTTPSPort;
     end;
 
-    if defaultInternetConfiguration.proxySOCKSName<>'' then begin
-      if pos('//',defaultInternetConfiguration.proxySOCKSName)>0 then
-        proxyStr:=proxyStr+' socks='+defaultInternetConfiguration.proxySOCKSName
+    if internetConfig.proxySOCKSName<>'' then begin
+      if pos('//',internetConfig.proxySOCKSName)>0 then
+        proxyStr:=proxyStr+' socks='+internetConfig.proxySOCKSName
        else
-        proxyStr:=proxyStr+' socks=socks://'+defaultInternetConfiguration.proxySOCKSName;
-      if defaultInternetConfiguration.proxySOCKSPort<>'' then
-        proxyStr:=proxyStr+':'+defaultInternetConfiguration.proxySOCKSPort;
+        proxyStr:=proxyStr+' socks=socks://'+internetConfig.proxySOCKSName;
+      if internetConfig.proxySOCKSPort<>'' then
+        proxyStr:=proxyStr+':'+internetConfig.proxySOCKSPort;
     end;
 
-    hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
+    hSession:=InternetOpenA(pchar(internetConfig.userAgent),
                             INTERNET_OPEN_TYPE_PROXY,
                             pchar(proxyStr),nil,0)
   end else begin
-    hSession:=InternetOpenA(pchar(defaultInternetConfiguration.userAgent),
+    hSession:=InternetOpenA(pchar(internetConfig.userAgent),
                             INTERNET_OPEN_TYPE_DIRECT,
                             nil,nil,0)
   end;
+
   if hSession=nil then
     raise EInternetException.create(rsFailedToConnectToThe + getLastErrorDetails);
+
+  InternetSetOptionA(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
+
+
+  inherited setConfig(internetConfig);
+end;
+
+constructor TW32InternetAccess.create();
+begin
+  create(defaultInternetConfiguration);
+end;
+
+constructor TW32InternetAccess.create(const internetConfig: TInternetConfig);
+begin
+  hSession := nil;
   hLastConnection:=nil;
   newConnectionOpened:=false;
-  timeout:=2*60*1000;
-  InternetSetOptionA(hSession,INTERNET_OPTION_RECEIVE_TIMEOUT,@timeout,4);
+  inherited create(internetConfig);
 end;
 
 

@@ -90,8 +90,10 @@ protected
   //lastCompleteUrl: string;
   //newConnectionOpened:boolean;
   procedure doTransferUnchecked(var transfer: TTransfer);override;
+  procedure setConfig(internetConfig: PInternetConfig); override;
 public
   constructor create();override;
+  constructor create(const internetConfig: TInternetConfig);override;
   destructor destroy;override;
 
   function internalHandle: TObject; override;
@@ -230,7 +232,7 @@ begin
   if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) or (VerifyCert <> FOldVerifyCert)  then begin
     result := Prepare(false);
     if result and VerifyCert and assigned(internetAccess) then
-      if SslCtxLoadVerifyLocations(FCtx, internetAccess.internetConfig^.CAFile, internetAccess.internetConfig^.CAPath) <> 1 then begin
+      if SslCtxLoadVerifyLocations(FCtx, internetAccess.config.CAFile, internetAccess.config.CAPath) <> 1 then begin
         SSLCheck;
         setCustomError(rsSSLErrorCAFileLoadingFailed);
         result := false;
@@ -261,7 +263,7 @@ begin
   if LastErrorDesc <> '' then begin
     err := LineEnding + err;
     err += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
-    err += LineEnding+'OpenSSL information: CA file: '+internetAccess.internetConfig^.CAFile+' , CA dir: '+internetAccess.internetConfig^.CAPath+' , '+GetSSLVersion+', '+LibVersion;
+    err += LineEnding+'OpenSSL information: CA file: '+internetAccess.config.CAFile+' , CA dir: '+internetAccess.config.CAPath+' , '+GetSSLVersion+', '+LibVersion;
   end;
   if transfer.HTTPErrorDetails.contains(err) then exit;
   if transfer.HTTPErrorDetails <> '' then transfer.HTTPErrorDetails += LineEnding;
@@ -418,7 +420,7 @@ begin
 
   transfer.HTTPResultCode := -4;
 
-  connection.Sock.SSL.VerifyCert := internetConfig^.checkSSLCertificates;
+  connection.Sock.SSL.VerifyCert := config.checkSSLCertificates;
   initConnection;
   if (transfer.decodedUrl.username <> '') then begin
     connection.UserName := strUnescapeHex(transfer.decodedUrl.username, '%');
@@ -449,26 +451,20 @@ begin
     transfer.HTTPErrorDetails := rsConnectionFailed;
 end;
 
-constructor TSynapseInternetAccess.create();
+procedure TSynapseInternetAccess.setConfig(internetConfig: PInternetConfig);
 var
   temp: String;
 begin
-  init;
-
-  connection:=THTTPSendWithFakeStream.Create;
-  (connection.Document as TSynapseSplitStream).internetAccess := self;
-  (connection.Sock.SSL as TSSLOpenSSLOverride).internetAccess := self;
-
-  connection.UserAgent:=defaultInternetConfiguration.userAgent;
-  if defaultInternetConfiguration.useProxy then begin
-    if defaultInternetConfiguration.proxyHTTPName<>'' then begin
-      connection.ProxyHost:=defaultInternetConfiguration.proxyHTTPName;
-      connection.ProxyPort:=defaultInternetConfiguration.proxyHTTPPort;
+  connection.UserAgent:=internetConfig.userAgent;
+  if internetConfig.useProxy then begin
+    if internetConfig.proxyHTTPName<>'' then begin
+      connection.ProxyHost:=internetConfig.proxyHTTPName;
+      connection.ProxyPort:=internetConfig.proxyHTTPPort;
     end;
-    connection.ProxyUser:=defaultInternetConfiguration.proxyUsername;
-    connection.ProxyPass:=defaultInternetConfiguration.proxyPassword;
-    if defaultInternetConfiguration.proxySOCKSName <>'' then begin
-      temp := defaultInternetConfiguration.proxySOCKSName;
+    connection.ProxyUser:=internetConfig.proxyUsername;
+    connection.ProxyPass:=internetConfig.proxyPassword;
+    if internetConfig.proxySOCKSName <>'' then begin
+      temp := internetConfig.proxySOCKSName;
       if strContains(temp, '@') then begin
         connection.Sock.SocksUsername:=strSplitGet('@', temp);
         if strContains(connection.Sock.SocksUsername, ':') then begin
@@ -477,10 +473,24 @@ begin
         end;
       end;
       connection.Sock.SocksIP:=temp;
-      connection.Sock.SocksPort:=defaultInternetConfiguration.proxySOCKSPort;
+      connection.Sock.SocksPort:=internetConfig.proxySOCKSPort;
     end;
-    //TODO: https proxy
+   //TODO: https proxy
   end;
+  inherited setConfig(internetConfig);
+end;
+
+constructor TSynapseInternetAccess.create();
+begin
+  inherited create();
+end;
+
+constructor TSynapseInternetAccess.create(const internetConfig: TInternetConfig);
+begin
+  connection:=THTTPSendWithFakeStream.Create;
+  (connection.Document as TSynapseSplitStream).internetAccess := self;
+  (connection.Sock.SSL as TSSLOpenSSLOverride).internetAccess := self;
+  inherited;
 end;
 
 destructor TSynapseInternetAccess.destroy;
