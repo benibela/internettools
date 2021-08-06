@@ -49,8 +49,7 @@ type
 //**Not yet supported: proxies, user/password authentication
 TOKHTTPInternetAccess=class(TInternetAccess)
 protected
-  procedure doTransferUnchecked(method:string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);override;
-  function ExceptionCheckAndClear: boolean;
+  procedure doTransferUnchecked(var transfer: TTransfer);override;
 public
   constructor create;override;
   destructor destroy;override;
@@ -132,7 +131,7 @@ begin
             ;
 end;
 
-procedure addHeader(jrequestbuilder: jobject; {%H-}headerKind: TOKHTTPInternetAccess.THeaderKind; const name, value: string);
+procedure addHeader(jrequestbuilder: jobject; {%H-}headerKind: THeaderKind; const name, value: string);
 var args: array[0..1] of jvalue;
 begin
   //jRequest.addHeader(n, v)
@@ -145,7 +144,12 @@ begin
   end;
 end;
 
-procedure TOKHTTPInternetAccess.doTransferUnchecked(method: string; const url: TDecodedUrl; const data: TInternetAccessDataBlock);
+procedure TOKHTTPInternetAccess.doTransferUnchecked(var transfer: TTransfer);
+  function ExceptionCheckAndClear: boolean;
+  begin
+    result := j.ExceptionCheck;
+    if result then transfer.HTTPErrorDetails := j.ExceptionDescribeAndClear
+  end;
 var jRequestBuilder: jobject;
 var jUrl, jrequestbody, jrequest, jmediatype, jcall, jresponse, jbody, jheaders: jobject;
   contenttype: String;
@@ -166,20 +170,20 @@ begin
         jRequestBuilder := RequestBuilderClass.NewObject(RequestBuilderMethods.init);
         if ExceptionCheckAndClear then exit;
 
-        jUrl := stringToJString(url.combinedExclude([dupUsername, dupPassword, dupLinkTarget]));
+        jUrl := stringToJString(transfer.url);
         if ExceptionCheckAndClear then exit;
         jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.url, @jurl).deleteLocalRef();
         jurl.deleteLocalRef();
 
         //todo: user/password
 
-        if not data.isEmpty then begin
-          wrappedData := env^^.NewByteArray(env, data.count);
+        if not transfer.data.isEmpty then begin
+          wrappedData := env^^.NewByteArray(env, transfer.data.length);
           if wrappedData = nil then begin
-            lastErrorDetails := 'Failed to allocate JNI array';
+            transfer.HTTPErrorDetails := 'Failed to allocate JNI array';
             exit;
           end;
-          env^^.SetByteArrayRegion(env, wrappedData, 0, data.count, data.data); //todo: is there a faster way than copying?
+          env^^.SetByteArrayRegion(env, wrappedData, 0, transfer.data.length, pointer(transfer.data.data)); //todo: is there a faster way than copying?
 
           //mediatype = MediaType.parse(contenttype)
           contenttype := trim(additionalHeaders.Values['Content-Type']);
@@ -197,13 +201,13 @@ begin
         end else jrequestbody := nil;
 
         //builder.method(method, body)
-        args[0].l := stringToJString(method);
+        args[0].l := stringToJString(transfer.method);
         args[1].l := jrequestbody;
         jRequestBuilder.callObjectMethodChecked(RequestBuilderMethods.method, @args).deleteLocalRef();
         deleteLocalRef(args[0].l);
         if args[1].l <> nil then deleteLocalRef(args[1].l);
 
-        enumerateAdditionalHeaders(url, @addHeader, not data.isEmpty, jRequestBuilder);
+        enumerateAdditionalHeaders(transfer, @addHeader, jRequestBuilder);
         if additionalHeaders.IndexOfName('User-Agent') < 0 then
            addHeader(jRequestBuilder, iahUserAgent, 'User-Agent', internetConfig^.userAgent);
 
@@ -221,11 +225,11 @@ begin
            exit; //here we do not want to raise an exception if the HTTP request fails. The caller will raise it if lastHTTPResultCode is not set
         jcall.deleteLocalRef();
 
-        lastHTTPResultCode := jresponse.callIntMethodChecked(ResponseMethods.code);
-        lastErrorDetails := jresponse.callStringMethodChecked(ResponseMethods.message);
+        transfer.HTTPResultCode := jresponse.callIntMethodChecked(ResponseMethods.code);
+        transfer.HTTPErrorDetails := jresponse.callStringMethodChecked(ResponseMethods.message);
 
         jbody := jresponse.callObjectMethodChecked(ResponseMethods.body);
-        inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @writeBlock);
+        inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @transfer.writeBlock);
         deleteLocalRef(jbody);
 
         lastHTTPHeaders.Clear;
@@ -241,7 +245,7 @@ begin
         deleteLocalRef(jresponse);
       except
         on e: EAndroidInterfaceException do begin
-          if (connectionResetRepeat > 0) and isRepeatableConnectionFailure(e.Message, data.isEmpty)
+          if (connectionResetRepeat > 0) and isRepeatableConnectionFailure(e.Message, transfer.data.isEmpty)
           then begin
             dec(connectionResetRepeat);
             Sleep(1000);
@@ -253,11 +257,6 @@ begin
   end;
 end;
 
-function TOKHTTPInternetAccess.ExceptionCheckAndClear: boolean;
-begin
-  result := j.ExceptionCheck;
-  if result then lastErrorDetails := j.ExceptionDescribeAndClear
-end;
 
 
 constructor TOKHTTPInternetAccess.create();
