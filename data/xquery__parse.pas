@@ -3552,7 +3552,7 @@ begin
   end;
   if nextToken() <> '' then begin
     result.free;
-    raiseSyntaxErrorFatal('Unexpected characters after end of expression (possibly an additional closing bracket)');
+    raiseSyntaxErrorFatal('Unexpected characters after end of expression (possibly an additional closing bracket or you put raw text where an XPath expression was expected)');
   end;
   if objInheritsFrom(result, TXQTermModule) then begin
     if staticContext.isLibraryModule then TXQTermModule(result).push(TXQTermSequence.Create);
