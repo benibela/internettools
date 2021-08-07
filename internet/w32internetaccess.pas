@@ -202,7 +202,8 @@ var
 begin
   if not assigned(hSession) Then exit;
 
-  if (lastServer.Protocol<>transfer.decodedUrl.protocol) or (lastServer.Host<>transfer.decodedUrl.host) or (lastServer.Port <> transfer.decodedUrl.port)
+  if (hLastConnection = nil)
+     or (lastServer.Protocol<>transfer.decodedUrl.protocol) or (lastServer.Host<>transfer.decodedUrl.host) or (lastServer.Port <> transfer.decodedUrl.port)
      or (lastServer.username <> transfer.decodedUrl.username) or (lastServer.password <> transfer.decodedUrl.password) then begin
     newConnection;
     if hLastConnection=nil then begin
