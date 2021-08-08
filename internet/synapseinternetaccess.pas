@@ -54,6 +54,7 @@ end;
 
 THTTPSendWithFakeStream = class(THTTPSend)
   constructor Create;
+  procedure closeConnection;
 end;
 
 TSSLOpenSSLOverride = class(TSSLOpenSSL)
@@ -185,6 +186,12 @@ begin
   inherited Create;
   FDocument.Free;
   FDocument := TSynapseSplitStream.Create;
+end;
+
+procedure THTTPSendWithFakeStream.closeConnection;
+begin
+  FAliveHost := '';
+  FAlivePort := '';
 end;
 
 type
@@ -456,6 +463,7 @@ var
   temp: String;
 begin
   if not fconfig.equalsUserAgent(internetConfig^) or not fconfig.equalsProxy(internetConfig^) then begin
+    connection.closeConnection;
     connection.UserAgent:=internetConfig.userAgent;
     connection.ProxyHost:='';
     connection.ProxyPort:='';
