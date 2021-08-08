@@ -419,7 +419,9 @@ var ok: Boolean;
   tempSSLType: TSSLType;
 begin
   if striequal(transfer.decodedUrl.protocol, 'https') then
-    if (not IsSSLloaded) then begin//check if ssl is actually loaded
+    if (SSLImplementation = TSSLNone)
+       or ((SSLImplementation = TSSLOpenSSLOverride) and not IsSSLloaded)
+    then begin//check if ssl is actually loaded
       errorFailedToLoadSSL;
       exit;
     end;
@@ -508,7 +510,8 @@ constructor TSynapseInternetAccess.create(const internetConfig: TInternetConfig)
 begin
   connection:=THTTPSendWithFakeStream.Create;
   (connection.Document as TSynapseSplitStream).internetAccess := self;
-  (connection.Sock.SSL as TSSLOpenSSLOverride).internetAccess := self;
+  if connection.Sock.SSL is TSSLOpenSSLOverride then
+    (connection.Sock.SSL as TSSLOpenSSLOverride).internetAccess := self;
   inherited;
 end;
 
