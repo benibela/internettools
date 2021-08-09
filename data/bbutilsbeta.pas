@@ -37,7 +37,7 @@ unit bbutilsbeta;
 
 interface
 
-uses bbutils;
+uses bbutils, sysutils;
 
 //** A generic enumerator that works for any fixed-length collection.
 //** @br Drawback: It is always slower than an enumerator custom written for a class. It should use SizeInt, but it cannot use sizeint, when the collection (e.g. TStringList) does not use SizeInt
@@ -126,6 +126,7 @@ type
     function moveToFound(target: pchar): boolean; inline;
   public
     procedure init(const buffer: string);
+    procedure init(const buffer: TBytes);
     function ToString: string;
 
     function length: SizeInt; reintroduce;
@@ -175,6 +176,10 @@ type
   end;
   TBBPcharHelper = type helper for pchar
     function nilMeansInfinity: pchar;
+  end;
+
+  TBB2BytesHelper = type helper for TBytes
+    function unsafeView: TCharArrayView;
   end;
 
   TCriticalSectionHelper = {$if FPC_FULLVERSION >= 030200}type{$else}record{$endif} helper for TRTLCriticalSection
@@ -387,6 +392,15 @@ procedure TCharArrayView.init(const buffer: string);
 begin
   data := pchar(buffer);
   dataend := data + system.length(buffer);
+end;
+
+procedure TCharArrayView.init(const buffer: TBytes);
+begin
+  if system.length(buffer) = 0 then self := default(TCharArrayView)
+  else begin
+    data := @buffer[0];
+    dataend := data + system.length(buffer);
+  end;
 end;
 
 function TCharArrayView.ToString: string;
@@ -627,6 +641,12 @@ function TBB2StringHelper.unsafeViewBehind(newStartSkip: pchar): TStringView;
 begin
   result := unsafeView.viewBehind(newStartSkip);
 end;
+
+function TBB2BytesHelper.unsafeView: TCharArrayView;
+begin
+  result.init(self);
+end;
+
 
 function TBBPcharHelper.nilMeansInfinity: pchar;
 begin
