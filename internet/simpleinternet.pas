@@ -266,8 +266,9 @@ begin
         end;
         tree.repairMissingStartTags := format = itfHTML;
         tree.parseTree(data, dataFileName);
-        context.ParentElement := tree.getLastTree;
-        context.RootElement := tree.getLastTree;
+        context.SeqValue := xqvalue(tree.getLastTree);
+        context.SeqIndex := 1;
+        context.SeqLength := 1;
       end else
         pxpParser.VariableChangelog.add('json', pxpParser.DefaultJSONParser.parse(data)); //TODO: this is bad, it leaks all JSON data, till the engine is reset
 

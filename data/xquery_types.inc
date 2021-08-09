@@ -3470,7 +3470,7 @@ var
 begin
   tempcontext := context;
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
-  tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
+  tempcontext.sharedEvaluationContext := outerContext.sharedEvaluationContext;
   if length(parameters) > 0 then begin
     evilkids := outercontext.temporaryVariables.topptr(high(parameters));
     for j := 0 to high(parameters) do

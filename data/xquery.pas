@@ -278,6 +278,18 @@ type
     NodeCollation: TXQCollation read getNodeCollation write FNodeCollation;
   end;
 
+  PXQExtensionEvaluationContext = ^TXQExtensionEvaluationContext;
+  TXQExtensionEvaluationContext = record
+    RootElement: TTreeNode;   //**< associated tree (returned by @code( / ) within an expression)
+    ParentElement: TTreeNode; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
+    TextNode: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
+  end;
+
+  TXQSharedEvaluationContext = class
+    variables: TXQVariableChangeLog; //**< List of variables declared variables (e.g. declare variable $foo...) (might be nil)
+    constructor Create;
+    destructor Destroy; override;
+  end;
 
   (***
   @abstract(evaluation context, internal used)
@@ -286,18 +298,15 @@ type
   *)
   TXQEvaluationContext = record
     //important maintaining note: when adding fields update getEvaluationContext
-    RootElement: TTreeNode;   //**< associated tree (returned by @code( / ) within an expression)
-    ParentElement: TTreeNode; //**< associated tree element (= context item @code( . ), if it is not overriden during the evaluation)
-    TextNode: TTreeNode; //**< Use this to override the text node returned by text(). This is useful if you have an element <a>xx<b/>yy</a>. If TextNode is nil text() will return xx, but you can set it to yy. However, ./text() will always return xx.
-
     SeqValue: IXQValue; //**<Context item / value of @code( . ),  if a sequence is processed (nil otherwise)
     SeqIndex, SeqLength: SizeInt; //**<Position in the sequence, if there is one
 
     temporaryVariables: TXQEvaluationStack; //**< List of variables defined in the outside scope (e.g. for/same/every)
-    globallyDeclaredVariables: TXQVariableChangeLog; //**< List of variables declared variables (e.g. declare variable $foo...) (might be nil)
-    namespaces: TNamespaceList;               //**< Namespace declared in the outside scope (only changed by xmlns attributes of constructed nodes)
 
     staticContext: TXQStaticContext;
+    sharedEvaluationContext: TXQSharedEvaluationContext;
+    extensionContext: PXQExtensionEvaluationContext;
+    namespaces: TNamespaceList;               //**< Namespace declared in the outside scope (only changed by xmlns attributes of constructed nodes)
 
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
@@ -2891,7 +2900,8 @@ public
   protected
     FModules, FPendingModules: TXQueryModuleList; //internal used
     FParserVariableVisitor: TObject;
-    VariableChangelogUndefined, FDefaultVariableHeap: TXQVariableChangeLog;
+    VariableChangelogUndefined: TXQVariableChangeLog;
+    FDefaultSharedEvaluationContext: TXQSharedEvaluationContext;
     FDefaultVariableStack: TXQEvaluationStack;
 
     function GetNativeModules: TStringList;
@@ -3459,7 +3469,6 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
-
 
 
 function TXQValueDateTimeData.hasTimeZone: boolean;
@@ -4331,10 +4340,13 @@ end;
 
 function TXQTermContextItem.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if context.SeqValue <> nil then result := context.SeqValue
-  else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
-  else if context.RootElement <> nil then result := xqvalue(context.RootElement)
-  else begin context.raiseXPDY0002ContextItemAbsent(); result := nil; end
+  if context.SeqValue <> nil then exit(context.SeqValue);
+  if context.extensionContext <> nil then begin
+    if context.extensionContext.ParentElement <> nil then exit(xqvalue(context.extensionContext.ParentElement));
+    if context.extensionContext.RootElement <> nil then exit(xqvalue(context.extensionContext.RootElement));
+  end;
+  context.raiseXPDY0002ContextItemAbsent();
+  result := nil;
 end;
 
 function TXQTermContextItem.debugTermToString: string;
@@ -5897,7 +5909,7 @@ begin
   stacksize := stack.Count;
   tempcontext := func.context;
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
-  tempcontext.globallyDeclaredVariables := outerContext.globallyDeclaredVariables;
+  tempcontext.sharedEvaluationContext := outerContext.sharedEvaluationContext;
   if def = nil then begin
     for i := 0 to high(func.parameters) do
       stack.push(f);
@@ -7145,7 +7157,21 @@ end;
 
 
 
-{ TXQEvaluationContext }
+constructor TXQSharedEvaluationContext.Create;
+begin
+  variables := TXQVariableChangeLog.create();
+end;
+
+destructor TXQSharedEvaluationContext.Destroy;
+begin
+  variables.Free;
+  inherited Destroy;
+end;
+
+
+
+
+
 
 function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 begin
@@ -7187,15 +7213,17 @@ begin
     if (SeqValue.kind = pvkNode) then exit(SeqValue.toNode.getRootHighest())
     else raise EXQEvaluationException.Create('XPTY0004' {<- fn:root needs this}, 'Need context item that is a node to get root element');
   end;
-  if ParentElement <> nil then exit(ParentElement.getRootHighest)
-  else if RootElement <> nil then exit(RootElement)
-  else raise EXQEvaluationException.Create('XPDY0002', 'no root element');
+  if extensionContext <> nil then begin
+    if extensionContext.ParentElement <> nil then exit(extensionContext.ParentElement.getRootHighest)
+    else if extensionContext.RootElement <> nil then exit(extensionContext.RootElement);
+  end;
+  raise EXQEvaluationException.Create('XPDY0002', 'no root element');
 end;
 
 function TXQEvaluationContext.hasGlobalVariable(const name: string; out value: IXQValue; const namespaceURL: string): boolean;
 begin
   result := true;
-  if globallyDeclaredVariables.hasVariable(name, value, namespaceURL) then exit;
+  if sharedEvaluationContext.variables.hasVariable(name, value, namespaceURL) then exit;
   if (staticContext.sender <> nil) and (staticContext.sender.VariableChangelog.hasVariable(name, value, namespaceURL)) then exit;
   result := false;
 end;
@@ -7222,13 +7250,16 @@ end;
 
 function TXQEvaluationContext.contextNode(mustExists: boolean): TTreeNode;
 begin
+  //todo: this is kind of similar to getRootHighest, could they be merged?
   if SeqValue <> nil then begin //tests pass without this branch. Why???
     result := SeqValue.toNode;
     if mustExists and (result = nil) then raise EXQEvaluationException.create('XPTY0004', 'Context item is not a node', nil, SeqValue);
     exit;
   end;
-  if ParentElement <> nil then exit(ParentElement);
-  if RootElement <> nil then exit(RootElement);
+  if extensionContext <> nil then begin
+    if extensionContext.ParentElement <> nil then exit(extensionContext.ParentElement);
+    if extensionContext.RootElement <> nil then exit(extensionContext.RootElement);
+  end;
   if staticContext.sender = nil then raise EXQEvaluationException.Create('XPTY0020', 'Context sender is nil');
   if mustExists then raiseXPDY0002ContextItemAbsent;
 
@@ -7294,7 +7325,7 @@ end;
 function TXQEvaluationContext.SeqValueAsString: string;
 begin
   if SeqValue <> nil then result := SeqValue.toString
-  else if ParentElement <> nil then result := TXQueryInternals.treeElementAsString(ParentElement)
+  else if assigned(extensionContext) and assigned(extensionContext.ParentElement) then result := TXQueryInternals.treeElementAsString(extensionContext.ParentElement)
   else begin raiseXPDY0002ContextItemAbsent; result := ''; end;
 end;
 
@@ -7312,10 +7343,7 @@ var context: TXQEvaluationContext;
 begin
   if fterm = nil then exit(xqvalue());
   context := staticContext.sender.getEvaluationContext(staticContext);
-  if tree <> nil then begin
-    context.ParentElement := tree;
-    context.RootElement := tree;
-  end;
+  if tree <> nil then context.setContextItem(xqvalue(tree), 1, 1);
   //initializeStaticContext(context);
   //result := fterm.evaluate(context);
   result := evaluate(context);
@@ -8054,7 +8082,7 @@ begin
   else result.staticContext := staticContextOverride;
   result.SeqIndex:=-1;
   result.temporaryVariables := FDefaultVariableStack;
-  result.globallyDeclaredVariables := FDefaultVariableHeap;
+  result.sharedEvaluationContext := FDefaultSharedEvaluationContext;
 end;
 
 
@@ -8085,7 +8113,7 @@ begin
   StaticContext.useLocalNamespaces:=true;
   StaticContext.jsonPXPExtensions:=true;
   FDefaultVariableStack := TXQEvaluationStack.create();
-  FDefaultVariableHeap := TXQVariableChangeLog.create();
+  FDefaultSharedEvaluationContext := TXQSharedEvaluationContext.Create;
   FModules := TXQueryModuleList.Create;
   FPendingModules := TXQueryModuleList.Create;
   inc(threadLocalCache.runningEngines);
@@ -8107,8 +8135,8 @@ destructor TXQueryEngine.Destroy;
 begin
   VariableChangelog.Free;
   VariableChangelogUndefined.free;
-  FDefaultVariableHeap.Free;
   FDefaultVariableStack.Free;
+  FDefaultSharedEvaluationContext.free;
   DefaultParser.Free;
   clear;
   GlobalNamespaces.free;
@@ -8814,7 +8842,7 @@ var
  i, backupA, backupB: SizeInt;
  value, backupItem: IXQValue;
  i64: Int64;
- oldParent: TTreeNode;
+ oldExtension: PXQExtensionEvaluationContext;
  filterTerm: TXQTerm;
 begin
   outList.Count := 0;
@@ -8843,10 +8871,10 @@ begin
   end; //end optimization
 
   try
-    oldParent := context.ParentElement;
+    oldExtension := context.extensionContext;
     context.getContextItem(backupItem, backupA, backupB);
     context.SeqLength:=sequence.getSequenceCount;
-    context.ParentElement := nil;
+    context.extensionContext := nil;
 
     outList.reserve(context.SeqLength);
     i := 1;
@@ -8859,7 +8887,7 @@ begin
       i+=1;
     end;
   finally
-    context.ParentElement := oldParent;
+    context.extensionContext := oldExtension;
     context.setContextItem(backupItem, backupA, backupB);
   end;
 end;
@@ -9025,7 +9053,7 @@ begin
           newList.clear;
           tempContext.SeqIndex += 1;
           tempContext.SeqValue := n^;
-          if n^.kind = pvkNode then tempContext.ParentElement := tempContext.SeqValue.toNode;
+          if n^.kind = pvkNode then tempContext.extensionContext := nil;
           newList.add(command.specialCase.evaluate(tempContext));
         end;
         tneaAttribute: begin
@@ -9159,7 +9187,7 @@ begin
     end
     else begin
       if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
-      else if context.ParentElement <> nil then result := xqvalue(context.ParentElement)
+      else if assigned(context.extensionContext) and assigned(context.extensionContext.ParentElement) then result := xqvalue(context.extensionContext.ParentElement)
       else if context.SeqValue = nil then error('XPDY0002', 'Context item is undefined')
       else error('XPTY0020', 'Expected node as context item');
       result := expandSequence(result,query, context, lastExpansion);
@@ -9360,8 +9388,8 @@ var
 begin
 //  if (context.temporaryVariables <> nil) then  we cannot free them here, because it fails when a query calls another module
 //    context.temporaryVariables.clear;
-  if context.globallyDeclaredVariables <> nil then
-    context.globallyDeclaredVariables.clear; //declared global variables
+  if context.sharedEvaluationContext.variables <> nil then
+    context.sharedEvaluationContext.variables.clear; //declared global variables
 
   staticContext := context.staticContext;
   if (length(staticContext.moduleContextItemDeclarations) > 0) then begin
@@ -9394,8 +9422,8 @@ begin
   end;
   //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
   for i := 0 to high(allVariables) do
-    if not context.globallyDeclaredVariables.hasVariable(allVariables[i].getVariable) then
-      context.globallyDeclaredVariables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
+    if not context.sharedEvaluationContext.variables.hasVariable(allVariables[i].getVariable) then
+      context.sharedEvaluationContext.variables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
 
   result := children[high(children)].evaluate(context);
 end;

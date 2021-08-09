@@ -2092,8 +2092,10 @@ var
       stackSize: SizeInt;
     begin
       letclause := TXQTermFlowerLet(children[pos]);
-      if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then
+      if (letclause.sequenceTyp <> nil) and not (letclause.sequenceTyp.instanceOf(v, context)) then begin
+        letclause.sequenceTyp.instanceOf(v, context);
         raiseTypeError0004('Invalid variable type, expected: type '+letclause.sequenceTyp.serialize, v);
+      end;
 
       stackSize := context.temporaryVariables.Count;
       context.temporaryVariables.push(letclause.loopvar, v);
@@ -3216,11 +3218,12 @@ var
   pe: TTreeNode;
   oldSeqIndex, oldSeqLength: SizeInt;
   pv: PIXQValue;
+  oldExtension: PXQExtensionEvaluationContext;
 begin
   seq := children[0].evaluate(context);
-  pe := context.ParentElement; //todo: this is irrelevant?
+  oldExtension := context.extensionContext; //todo: this is irrelevant?
   context.getContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
-  context.ParentElement := nil;
+  context.extensionContext := nil;
   context.SeqIndex := 1;
   context.SeqLength := seq.getSequenceCount;
   list := TXQVList.create(context.SeqLength);
@@ -3240,7 +3243,7 @@ begin
   finally
     xqvalueVaporize(context.SeqValue);
     context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
-    context.ParentElement := pe;
+    context.extensionContext := oldExtension;
   end;
 end;
 
@@ -3446,10 +3449,10 @@ end;
 
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue = nil) and (context.TextNode<>nil) then begin
+  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue = nil) and assigned(context.extensionContext) and assigned(context.extensionContext.TextNode) then begin
     if assigned(context.staticContext.sender.OnWarningDeprecated) then
       context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'DO NOT USE text() in pattern matching. Use either matched-text() or ./text() . So far text() has behaved like matched-text(), but the behavior will be changed to ./text(). (the behavior of matched-text() will later change to return the same value as matched-text() and ./matched-text() )');
-    result := xqvalue(context.TextNode);
+    result := xqvalue(context.extensionContext.TextNode);
   end else begin
     result := TXQueryEngine.evaluateSingleStepQuery(queryCommand,context, true);
     xqvalueSeqSqueeze(result);
@@ -3674,7 +3677,7 @@ end;
 
 function TXQTermVariableGlobal.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if context.globallyDeclaredVariables.hasVariable(definition.getVariable, result) then
+  if context.sharedEvaluationContext.variables.hasVariable(definition.getVariable, result) then
     exit();
   Result:=evaluateInitial(context);
 end;
@@ -3700,26 +3703,26 @@ var
   v: TXQTermVariable;
   pendingname: String;
 begin
-  if context.globallyDeclaredVariables = nil then context.globallyDeclaredVariables := TXQVariableChangeLog.create();
+  if context.sharedEvaluationContext.variables= nil then context.sharedEvaluationContext.variables:= TXQVariableChangeLog.create();
 
   v := definition.getVariable;
 
   if context.staticContext.model in PARSING_MODEL3 then begin
     pendingname := #0 + v.value;
-    if context.globallyDeclaredVariables.hasVariable(pendingname, v.namespace) then
+    if context.sharedEvaluationContext.variables.hasVariable(pendingname, v.namespace) then
       raise EXQEvaluationException.create('XQDY0054', 'Dependancy cycle: ' + v.ToString );
-    context.globallyDeclaredVariables.add(pendingname, xqvalue(), v.namespace);
+    context.sharedEvaluationContext.variables.add(pendingname, xqvalue(), v.namespace);
   end;
 
   result := definition.getClassicValue(context);
-  context.globallyDeclaredVariables.add(v, result);
+  context.sharedEvaluationContext.variables.add(v, result);
 end;
 
 function TXQTermVariableGlobalImported.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   oldSC: TXQStaticContext;
 begin
-  if context.globallyDeclaredVariables.hasVariable(definition.getVariable, result) then
+  if context.sharedEvaluationContext.variables.hasVariable(definition.getVariable, result) then
     exit;
   oldSC := context.staticContext;
   context.staticContext := staticContext;
@@ -4815,9 +4818,7 @@ begin
   end;
   result.context := context;
   if clearFocus then begin
-    result.context.ParentElement := nil;
-    result.context.RootElement := nil;
-    result.context.TextNode := nil;
+    result.context.extensionContext := nil;
     result.context.SeqValue := nil;
     result.context.SeqIndex := 0;
     result.context.SeqLength := 0;

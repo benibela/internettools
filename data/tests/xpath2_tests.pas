@@ -34,6 +34,7 @@ var
   testid,i: Integer;
   ps: TXQueryEngine;
   xml: TTreeParser;
+  extensionContext: TXQExtensionEvaluationContext;
 
   procedure performUnitTest(s1,s2,s3: string);
   var got: string;
@@ -42,18 +43,20 @@ var
   begin
     testid+=1;
     context := ps.getEvaluationContext();
+    context.extensionContext := @extensionContext;
     if s3 <> '' then begin
       rooted := s3[1] = '!';
       if rooted then s3[1] := ' ';
       xml.parseTree(s3);
-      if rooted then context.RootElement := xml.getLastTree
-      else context.RootElement:=nil;
+      if rooted then extensionContext.RootElement := xml.getLastTree
+      else extensionContext.RootElement:=nil;
       if s1 = '' then exit;
-    end;
+    end else extensionContext.RootElement := nil;
     ps.parseQuery(s1, xqpmXPath2);
     if ps.LastQuery.getTerm <> nil then ps.LastQuery.getTerm.getContextDependencies;
 //    if strContains(s1, '/') then writeln(s1, ': ', ps.debugTermToString(ps.FCurTerm));
-    context.ParentElement := xml.getLastTree;
+    extensionContext.ParentElement := xml.getLastTree;
+    extensionContext.TextNode := nil;
 //    writeln(s1);
 //    writeln('??');
 //    writeln(ps.debugtermToString(ps.FCurTerm));
@@ -128,6 +131,7 @@ begin
   //vars:= TXQVariableChangeLog.create();
   if strictTypeChecking then untypedAtomic := 'xs:untypedAtomic'
   else untypedAtomic := '';
+  extensionContext := default(TXQExtensionEvaluationContext);
 
   ps := TXQueryEngine.Create;
   ps.StaticContext.model := xqpmXPath2;

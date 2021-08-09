@@ -654,6 +654,7 @@ THtmlTemplateParser=class
 
     FVariables,FVariableLog,FOldVariableLog,FVariableLogCondensed: TXQVariableChangeLog;
     FParsingExceptions, FSingleQueryModule: boolean;
+    FExtensionContext: TXQExtensionEvaluationContext;
 
     FAttributeDefaultCaseSensitive: boolean;
     FAttributeDefaultMatching: string;
@@ -1379,9 +1380,9 @@ begin
   end;
   if template.templateAttributes = nil then exit(true);
   if template.condition = nil then exit(true);
+  FExtensionContext.ParentElement := html;
+  FExtensionContext.TextNode := nil;
   tempContext := FQueryContext;
-  tempContext.ParentElement := html;
-  tempContext.TextNode := nil;
   result := template.condition.evaluate(tempContext).toBoolean;
 end;
 
@@ -1449,8 +1450,8 @@ var xpathText: TTreeNode;
   begin
     if pxp = nil then exit(xqvalue());
     tempContext := FQueryContext;
-    tempContext.ParentElement := htmlParent;
-    tempContext.TextNode := xpathText;
+    FExtensionContext.ParentElement := htmlParent;
+    FExtensionContext.TextNode := xpathText;
     result := pxp.evaluate(tempContext);
   end;
 
@@ -1988,7 +1989,7 @@ begin
   FHTML.TargetEncoding := OutputEncoding;
   FHtmlTree := FHTML.parseTree(html, (uri), contenttype);
 
-  FQueryContext.RootElement := FHtmlTree;
+  FExtensionContext.RootElement := FHtmlTree;
   if FHtmlTree = nil then exit;
   FQueryEngine.StaticContext.baseURI := FHtmlTree.getDocument().baseURI; //todo: what was this for?
 
@@ -2150,6 +2151,7 @@ begin
   FQueryEngine.globalNamespaces.Add(TNamespace.make(HTMLPARSER_NAMESPACE_URL, 'template'));
   FQueryEngine.globalNamespaces.Add(TNamespace.make(HTMLPARSER_NAMESPACE_URL, 't'));
   FQueryContext := FQueryEngine.getEvaluationContext(FQueryEngine.StaticContext);
+  FQueryContext.extensionContext := @FExtensionContext;
 
   FVariableLog := FQueryEngine.VariableChangelog;
   FVariableLog.parentLog := FOldVariableLog;
@@ -2587,6 +2589,8 @@ begin
   temp.UnnamedVariableName := '$';
   temp.FQueryEngine := context.staticContext.sender;
   temp.FQueryContext := context;
+  temp.FQueryContext.SeqValue := nil; //todo: why is this needed?
+  temp.FQueryContext.extensionContext := @temp.FExtensionContext;
   temp.ParsingExceptions := false;
   temp.FTemplate.addTree(template.getDocument());
   temp.FHTML.addTree(data.getDocument());

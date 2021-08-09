@@ -1452,7 +1452,7 @@ begin
       end;
     end;
     try
-      TXQueryEngineBreaker(xq).FDefaultVariableHeap.clear;
+      TXQueryEngineBreaker(xq).FDefaultSharedEvaluationContext.variables.clear;
       ftree := QT3testsuite.tree.parseTreeFromFile(filename);
     except
       on e: ETreeParseException do ftree := nil;

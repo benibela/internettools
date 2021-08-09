@@ -893,7 +893,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; argc: SizeInt; ar
 begin
   if argc = 0 then begin
     if context.SeqValue <> nil then result := numberize(context.SeqValue)
-    else if context.ParentElement <> nil then result := numberize(xqvalue(context.ParentElement))
+    else if assigned(context.extensionContext) and assigned(context.extensionContext.ParentElement) then result := numberize(xqvalue(context.extensionContext.ParentElement))
     else begin context.raiseXPDY0002ContextItemAbsent; result := nil; end;
     exit();
   end;
@@ -1155,8 +1155,8 @@ begin
   if (context.SeqValue <> nil) and (context.SeqValue.kind = pvkNode) then begin
 //    raise EXQEvaluationException.Create('deep-text() needs a node, but context item is atomic value');
     result := xqvalue(TXQueryInternals.treeElementAsString(context.SeqValue.toNode,sep));
-  end else if context.ParentElement <> nil then //TODO: why doesn't it read textelement?
-    result := xqvalue(TXQueryInternals.treeElementAsString(context.ParentElement,sep))
+  end else if assigned(context.extensionContext) and assigned(context.extensionContext.ParentElement) then //TODO: why doesn't it read textelement?
+    result := xqvalue(TXQueryInternals.treeElementAsString(context.extensionContext.ParentElement,sep))
   else result := xqvalue('');
 end;
 
@@ -1209,13 +1209,13 @@ var node: TTreeNode;
   engine: TXQueryEngine;
 begin
   requiredArgCount(argc, 0, 0);
-  if context.TextNode <> nil then begin
+  if assigned(context.extensionContext) and assigned(context.extensionContext.TextNode) then begin
     engine := context.staticContext.sender;
-    if engine.getPatternMatcherTextStart = context.TextNode then begin //safety check, so it does not crash when there is an invalid pointer in textstart
+    if engine.getPatternMatcherTextStart = context.extensionContext.TextNode then begin //safety check, so it does not crash when there is an invalid pointer in textstart
       exit(xqvalue(TTreeNode.innerTextRangeInternal(engine.getPatternMatcherTextStart, engine.getPatternMatcherTextEnd)));
     end;
-    node := context.TextNode;
-  end else if context.ParentElement <> nil then node := context.ParentElement
+    node := context.extensionContext.TextNode;
+  end else if context.extensionContext.ParentElement <> nil then node := context.extensionContext.ParentElement
   else node := context.contextNode();
   exit(xqvalue(node.innerText));
 end;
@@ -4514,7 +4514,7 @@ end;
 function xqFunctionPosition(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if context.SeqValue <> nil then result := xqvalue(context.SeqIndex)
-  else if context.ParentElement <> nil then result := xqvalue(1)
+  else if assigned(context.extensionContext) and assigned(context.extensionContext.ParentElement) then result := xqvalue(1)
   else begin context.raiseXPDY0002ContextItemAbsent; result := nil; end;
 
 end;
@@ -4522,7 +4522,7 @@ end;
 function xqFunctionLast(const context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
   if context.SeqValue <> nil then result := xqvalue(context.SeqLength)
-  else if context.ParentElement <> nil then result := xqvalue(1)
+  else if assigned(context.extensionContext) and assigned(context.extensionContext.ParentElement) then result := xqvalue(1)
   else begin context.raiseXPDY0002ContextItemAbsent; result := nil; end;
 end;
 
@@ -7802,7 +7802,7 @@ begin
     raise EXQEvaluationException.create('FOQM0002', 'Failed to load module: ' + uri);
 
   moduleContext := context.staticContext.sender.getEvaluationContext();
-  moduleContext.globallyDeclaredVariables := TXQVariableChangeLog.create();
+  moduleContext.sharedEvaluationContext := TXQSharedEvaluationContext.create();
   helper.oldDeclareExternalVariable := context.staticContext.sender.OnDeclareExternalVariable;
   if argc >= 2 then begin
     temp := args[1].getProperty('context-item');
@@ -7828,11 +7828,11 @@ begin
     resMap.setMutable('variables', variablesMap);
     result := resMap;
 
-    with moduleContext do
-      for i := 0 to globallyDeclaredVariables.count - 1 do begin
-        if globallyDeclaredVariables.getNamespace(i) <> uri then continue;
-        variablesMap.setMutable(TXQValueQName.create(globallyDeclaredVariables.getNamespace(i), globallyDeclaredVariables.getName(i)),
-                              globallyDeclaredVariables.get(i)
+    with moduleContext.sharedEvaluationContext do
+      for i := 0 to variables.count - 1 do begin
+        if variables.getNamespace(i) <> uri then continue;
+        variablesMap.setMutable(TXQValueQName.create(variables.getNamespace(i), variables.getName(i)),
+                              variables.get(i)
                               );
       end;
     sc := module.getStaticContext;
@@ -7846,11 +7846,11 @@ begin
       functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), sc.functions[i].directClone);
       functionsMap.setMutable(temp, functionMap);
     end;
-    //todo: functions need to have their own context with globallyDeclaredVariables
+    //todo: functions need to have their own context with variables
 
   finally
     context.staticContext.sender.OnDeclareExternalVariable := helper.oldDeclareExternalVariable;
-    moduleContext.globallyDeclaredVariables.Free;
+    moduleContext.sharedEvaluationContext.free
   end;
 end;
 
