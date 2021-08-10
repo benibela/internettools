@@ -7737,18 +7737,25 @@ end;
 type TLoadXQueryHelper = object
   oldDeclareExternalVariable: TXQDeclareExternalVariableEvent;
   externalVariables: IXQValue;
-  procedure OnDeclareExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
+  context: TXQEvaluationContext;
+  procedure OnDeclareExternalVariable(const staticContext: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
 end;
 
-procedure TLoadXQueryHelper.OnDeclareExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
+procedure TLoadXQueryHelper.OnDeclareExternalVariable(const staticContext: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string; var value: IXQValue);
 var
   tempName: IXQValue;
   tempValue: TXQValue;
+  sequenceType: TXQTermSequenceType = nil;
 begin
-  ignore(sender); ignore(context);
+  ignore(sender); ignore(staticContext);
   tempName := TXQValueQName.create(namespaceUrl, variable);
-  if externalVariables.hasProperty(tempName, @tempValue) then
+  if (sender is TXQTermDefineVariable) then
+  sequenceType := TXQTermDefineVariable(sender).getSequenceType;
+  if externalVariables.hasProperty(tempName, @tempValue) then begin
     value := tempValue;
+    if not sequenceType.instanceOf(value, context) then
+      sequenceType.raiseEvaluationError('FOQM0005', 'Variable '+variable + ' with value ' +value.toXQuery() + ' has not the correct type '+sequenceType.serialize);
+  end;
   //oldDeclareExternalVariable(sender, context, namespaceUrl, variable, value);
 end;
 
@@ -7759,7 +7766,6 @@ var
   ps: TXQProperty;
   i: Integer;
   module: TXQuery;
-  moduleContext: TXQEvaluationContext;
   helper: TLoadXQueryHelper;
   resMap: TXQValueStringMap;
   functionsMap, variablesMap, functionMap: TXQValueStandardMap;
@@ -7802,25 +7808,29 @@ begin
   if module = nil then
     raise EXQEvaluationException.create('FOQM0002', 'Failed to load module: ' + uri);
 
-  moduleContext := context.staticContext.sender.getEvaluationContext();
-  moduleContext.sharedEvaluationContext := TXQSharedEvaluationContext.create();
+
+  helper.context := context.staticContext.sender.getEvaluationContext();
   helper.oldDeclareExternalVariable := context.staticContext.sender.OnDeclareExternalVariable;
   if argc >= 2 then begin
     temp := args[1].getProperty('context-item');
     case temp.getSequenceCount of
       1: begin
-        moduleContext.SeqValue := temp;
-        moduleContext.SeqLength := 1;
-        moduleContext.SeqIndex := 1;
+        helper.context.SeqValue := temp;
+        helper.context.SeqLength := 1;
+        helper.context.SeqIndex := 1;
       end;
     end;
+    with module.getStaticContext do
+      for i := 0 to high(moduleContextItemDeclarations) do
+        if (moduleContextItemDeclarations[i].getSequenceType <> nil) and not moduleContextItemDeclarations[i].getSequenceType.instanceOf(helper.context.SeqValue, context) then
+          moduleContextItemDeclarations[i].getSequenceType.raiseEvaluationError('FOQM0005', 'Context time with value ' +helper.context.SeqValue.toXQuery() + ' has not the correct type '+moduleContextItemDeclarations[i].getSequenceType.serialize);
     helper.externalVariables := args[1].getProperty('variables');
     context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
   end;
   helper.context.sharedEvaluationContext := TXQSharedEvaluationContext.create();
   try
-    moduleContext.staticContext := module.getstaticContext;
-    module.evaluate(moduleContext);
+    helper.context.staticContext := module.getstaticContext;
+    module.evaluate(helper.context);
 
 
     functionsMap := TXQValueStandardMap.create();
@@ -7830,7 +7840,7 @@ begin
     resMap.setMutable('variables', variablesMap);
     result := resMap;
 
-    with moduleContext.sharedEvaluationContext do
+    with helper.context.sharedEvaluationContext do
       for i := 0 to variables.count - 1 do begin
         if variables.getNamespace(i) <> uri then continue;
         variablesMap.setMutable(TXQValueQName.create(variables.getNamespace(i), variables.getName(i)),
@@ -7845,7 +7855,10 @@ begin
       end else
         functionMap := TXQValueStandardMap.create();
 
-      functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), sc.functions[i].directClone);
+      f := sc.functions[i].directClone;
+      (f as TXQValueFunction).context.sharedEvaluationContext := helper.context.sharedEvaluationContext;
+      helper.context.sharedEvaluationContext._AddRefIfNonNil;
+      functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), f);
       functionsMap.setMutable(temp, functionMap);
     end;
 
