@@ -3866,6 +3866,7 @@ var declarationDuplicateChecker: TStringList;
           if moduleName <> staticContext.importedModules[i] then declareNamespace(moduleName, moduleURL);
           exit; //allow external imports in shared contexts
         end;
+        if (moduleURL = namespaceGetURL(staticContext.moduleNamespace)) and isModel3 then exit;
         raiseParsingError('XQST0047', 'Duplicated module import of ' + moduleURL);
       end;
     end;
