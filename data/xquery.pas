@@ -287,7 +287,10 @@ type
 
   TXQSharedEvaluationContext = class
     variables: TXQVariableChangeLog; //**< List of variables declared variables (e.g. declare variable $foo...) (might be nil)
+    refcount: longint;
     constructor Create;
+    procedure _AddRefIfNonNil;
+    procedure _ReleaseIfNonNil;
     destructor Destroy; override;
   end;
 
@@ -1281,7 +1284,7 @@ type
     resulttype: txqtermsequencetype;
     body: TXQTerm;
     ownsTerms: boolean;
-    context: TXQEvaluationContext;
+    context: TXQEvaluationContext; //when changing context, set sharedEvaluationContext to nil!
     annotations: TXQAnnotations;
 
     constructor create(aterm: TXQTerm = nil); reintroduce; virtual;
@@ -5909,7 +5912,8 @@ begin
   stacksize := stack.Count;
   tempcontext := func.context;
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
-  tempcontext.sharedEvaluationContext := outerContext.sharedEvaluationContext;
+  if tempcontext.sharedEvaluationContext = nil then
+    tempcontext.sharedEvaluationContext := outerContext.sharedEvaluationContext;
   if def = nil then begin
     for i := 0 to high(func.parameters) do
       stack.push(f);
@@ -7160,6 +7164,18 @@ end;
 constructor TXQSharedEvaluationContext.Create;
 begin
   variables := TXQVariableChangeLog.create();
+end;
+
+procedure TXQSharedEvaluationContext._AddRefIfNonNil;
+begin
+  if self <> nil then InterlockedIncrement(refcount);
+end;
+
+procedure TXQSharedEvaluationContext._ReleaseIfNonNil;
+begin
+  if self <> nil then
+    if InterlockedDecrement(refcount) = 0 then
+      Destroy;
 end;
 
 destructor TXQSharedEvaluationContext.Destroy;

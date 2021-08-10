@@ -1263,6 +1263,7 @@ begin
       fresult.name:=fun.name;
       copyAnnotations(fresult.annotations, fun.annotations);
       fresult.context := fun.context;
+      fresult.context.sharedEvaluationContext := nil;
     end;
     pvkObject, pvkArray: begin
       if (length(arguments) <> 1 + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
@@ -4819,6 +4820,7 @@ begin
   result.context := context;
   if clearFocus then begin
     result.context.extensionContext := nil;
+    result.context.sharedEvaluationContext := nil;
     result.context.SeqValue := nil;
     result.context.SeqIndex := 0;
     result.context.SeqLength := 0;
@@ -5044,6 +5046,7 @@ begin
     result.resulttype := TXQTermSequenceType(f.interpretedFunction.resulttype.clone)
   else result.resulttype := functionReferenceGetResultType(f);
   result.context := context;
+  result.context.sharedEvaluationContext := nil;
 end;
 
 function TXQTermDefineFunction.defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
@@ -5080,6 +5083,7 @@ begin
   //but it is tricky to get right
   if f.resulttype <> nil then result.resulttype := TXQTermSequenceType(f.resulttype.clone);
   result.context := f.context;
+  result.context.sharedEvaluationContext := nil;
 end;
 
 

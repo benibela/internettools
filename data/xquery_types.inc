@@ -3447,6 +3447,7 @@ begin
     freeAnnotations(annotations);
     resulttype.free;
   end;
+  context.sharedEvaluationContext._ReleaseIfNonNil;
   inherited Destroy;
 end;
 
@@ -3470,7 +3471,8 @@ var
 begin
   tempcontext := context;
   tempcontext.temporaryVariables := outerContext.temporaryVariables;
-  tempcontext.sharedEvaluationContext := outerContext.sharedEvaluationContext;
+  if tempcontext.sharedEvaluationContext = nil then
+    tempcontext.sharedEvaluationContext := outerContext.sharedEvaluationContext;
   if length(parameters) > 0 then begin
     evilkids := outercontext.temporaryVariables.topptr(high(parameters));
     for j := 0 to high(parameters) do
@@ -3525,6 +3527,7 @@ begin
   SetLength(f.parameters, length(f.parameters));
   f.resulttype := resulttype;
   f.context := context;
+  f.context.sharedEvaluationContext._AddRefIfNonNil;
   if ownsTerms then f.assignCopiedTerms(self);
   result := f;
 end;

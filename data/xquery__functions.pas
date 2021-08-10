@@ -5126,6 +5126,7 @@ var newstate: TRandomNumberGenerator;
     result.ownsTerms := true;
     result.body := rng;
     result.context := context;
+    result.context.sharedEvaluationContext := nil;
     if mode = xqtrngmPermute then begin
       setlength(result.parameters, 1);
       result.parameters[0].variable := TXQTermVariable.create('arg');
@@ -7764,7 +7765,7 @@ var
   functionsMap, variablesMap, functionMap: TXQValueStandardMap;
   sc: TXQStaticContext;
   temp: IXQValue;
-  tempValue: TXQValue;
+  tempValue, f: TXQValue;
   pp: TXQStandardProperty;
 begin
   uri := args[0].toString;
@@ -7816,6 +7817,7 @@ begin
     helper.externalVariables := args[1].getProperty('variables');
     context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
   end;
+  helper.context.sharedEvaluationContext := TXQSharedEvaluationContext.create();
   try
     moduleContext.staticContext := module.getstaticContext;
     module.evaluate(moduleContext);
@@ -7846,11 +7848,9 @@ begin
       functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), sc.functions[i].directClone);
       functionsMap.setMutable(temp, functionMap);
     end;
-    //todo: functions need to have their own context with variables
 
   finally
     context.staticContext.sender.OnDeclareExternalVariable := helper.oldDeclareExternalVariable;
-    moduleContext.sharedEvaluationContext.free
   end;
 end;
 
