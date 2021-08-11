@@ -298,7 +298,7 @@ begin
         a := TAssertionAssert.Create(aakType, f.deepNodeText());
       end;
       'assert-xml': begin
-        a := TAssertionAssert.Create(aakXml, f.deepNodeText());
+        a := TAssertionAssert.Create(aakXml, trim(f.deepNodeText()));
         if f['file'] <> '' then TAssertionAssert(a).value  := strLoadFromFile(strResolveURI(f['file'], e.getDocument().baseURI));
         TAssertionAssert(a).ignorePrefixes := bbutils.StrToBoolDef(f['ignore-prefixes'], false);
       end;
