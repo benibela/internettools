@@ -158,6 +158,11 @@ type
     function cutAfterFindLast(const s: string): boolean;
 
     procedure trim(const trimCharacters: TCharSet = [#0..' ']);
+    procedure trimLeft(const trimCharacters: TCharSet = [#0..' ']);
+    procedure trimRight(const trimCharacters: TCharSet = [#0..' ']);
+    procedure trim(trimChar: char);
+    procedure trimLeft(trimChar: char);
+    procedure trimRight(trimChar: char);
 
     function viewTo(newLast: pchar): TCharArrayView; reintroduce;
     function viewUntil(newEnd: pchar): TCharArrayView; reintroduce;
@@ -595,6 +600,40 @@ begin
   l := length;
   strlTrim(data, l, trimCharacters);
   dataend := data + l;
+end;
+
+procedure TCharArrayView.trimLeft(const trimCharacters: TCharSet);
+var
+  l: SizeInt;
+begin
+  l := length;
+  strlTrimLeft(data, l, trimCharacters);
+  dataend := data + l;
+end;
+
+procedure TCharArrayView.trimRight(const trimCharacters: TCharSet);
+var
+  l: SizeInt;
+begin
+  l := length;
+  strlTrimRight(data, l, trimCharacters);
+  dataend := data + l;
+end;
+
+procedure TCharArrayView.trim(trimChar: char);
+begin
+  trimLeft(trimChar);
+  trimRight(trimChar);
+end;
+
+procedure TCharArrayView.trimLeft(trimChar: char);
+begin
+  trimLeft([trimChar]);
+end;
+
+procedure TCharArrayView.trimRight(trimChar: char);
+begin
+  trimRight([trimChar]);
 end;
 
 function TCharArrayView.viewTo(newLast: pchar): TCharArrayView;
