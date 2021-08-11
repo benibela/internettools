@@ -6057,7 +6057,7 @@ var
   function parseNumber: Ixqvalue;
   var
     temp64: Int64;
-    tempFloat: Extended;
+    tempFloat: double;
     tempd: BigDecimal;
     tempchar: Char;
   begin
@@ -6067,11 +6067,11 @@ var
         if striContains(scanner.CurTokenString, 'E')  then exit(baseSchema.double.createValue(tempd))
         else if strContains(scanner.CurTokenString, '.')  then exit(baseSchema.decimal.createValue(tempd))
         else exit(baseSchema.integer.createValue(tempd));
-      if TryStrToFloat(scanner.CurTokenString, tempFloat, XQFormats) then
+      if TryStrToXQFloat(scanner.CurTokenString, tempFloat) then
         if striContains(scanner.CurTokenString, 'E') then exit(baseSchema.double.createValue(tempFloat))
         else exit(TXQValueDecimal.create(tempFloat));
     end else begin
-      if TryStrToFloat(scanner.CurTokenString, tempFloat, XQFormats) then
+      if TryStrToXQFloat(scanner.CurTokenString, tempFloat) then
         exit(baseSchema.double.createValue(tempFloat))
     end;
     if (jpoLiberal in options) and ((scanner.CurTokenString = '+') or (scanner.CurTokenString = '-')) then begin

@@ -116,7 +116,7 @@ function TXQValue.toInt64: int64;
   var tempf:xqfloat;
   begin
     if not TryStrToInt64(s, result) then
-      if TryStrToFloat(s, tempf, XQFormats) then result:=trunc(tempf)
+      if TryStrToXQFloat(s, tempf) then result:=trunc(tempf)
       else result:=0;
   end;
 var
@@ -1426,8 +1426,8 @@ end;
 function TXQValueString.toFloatChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
-  result := xqfloat.parse(str);
-  if result.IsNan() and (trim(str) <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
+  if not TryStrToXQFloat(str, result) then
+    raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
 function TXQValueString.hashCode: uint32;
@@ -2406,14 +2406,11 @@ begin
 end;
 
 function TXQValueNode.toFloatChecked(scontext: TXQStaticContext): xqfloat;
-var
-  str: String;
 begin
   ignore(scontext);
   if scontext.strictTypeChecking and (nodeTypeAnnotation(node) = baseSchema.string_) then raiseXPTY0004TypeError(self, 'float/double');
-  str := toString;
-  result := xqfloat.parse(str);
-  if IsNan(result) and (str <> 'NaN') then raiseFORG0001InvalidConversion(self, 'float/double')
+  if not TryStrToXQFloat(toString, result) then
+    raiseFORG0001InvalidConversion(self, 'float/double')
 end;
 
 function TXQValueNode.toNode: TTreeNode;

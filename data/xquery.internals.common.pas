@@ -364,6 +364,9 @@ type xqfloat = double;
      SizeInt64 = Int64; //at least SizeInt and Int64. If there are ever 128 bit systems, it would need to be changed for them.
 function xqround(const f: xqfloat): Int64;
 
+function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
+function StrToXQFloat(const s: string): xqfloat;
+
 const
   ENT_EMPTY=-1;
   ENT_VALIDSTART=0;
@@ -376,6 +379,32 @@ const
 {$endif}
 
 var createMemoryLeakOnExit: boolean;
+
+var
+  XQFormats : TFormatSettings = (
+    CurrencyFormat: 1;
+    NegCurrFormat: 5;
+    ThousandSeparator: #0;
+    DecimalSeparator: '.';
+    CurrencyDecimals: 2;
+    DateSeparator: '-';
+    TimeSeparator: ':';
+    ListSeparator: ',';
+    CurrencyString: '$';
+    ShortDateFormat: 'y-m-d';
+    LongDateFormat: 'yyyy-mm-dd';
+    TimeAMString: 'AM';
+    TimePMString: 'PM';
+    ShortTimeFormat: 'hh:nn';
+    LongTimeFormat: 'hh:nn:ss';
+    ShortMonthNames: ('Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec');
+    LongMonthNames: ('January','February','March','April','May','June',
+                     'July','August','September','October','November','December');
+    ShortDayNames: ('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
+    LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
+    TwoDigitYearCenturyWindow: 50;
+  );
 
 implementation
 uses math;
@@ -766,6 +795,17 @@ begin
   tempf := f + 0.5;
   result := trunc(tempf);
   if frac(tempf) < 0 then result -= 1;
+end;
+
+function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
+begin
+  Result := TryStrToFloat(s, d, XQFormats);
+end;
+
+function StrToXQFloat(const s: string): xqfloat;
+begin
+  if not TryStrToXQFloat(s, result) then
+    result := NaN;
 end;
 
 procedure TJSONXHTMLStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);

@@ -506,7 +506,7 @@ var
       if not result then exit;
       if length(constrainingFacets) > 0 then
         if not constraintsSatisfied(StrToBigDecimal(v)) then exit(false);
-      if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToFloat(v, XQFormats)
+      if (tempexp = 0) or (length(v) - tempexp < 15) then tempe := StrToXQFloat(v, XQFormats)
       else if v[tempexp+1] = '-' then tempe := 0
       else if v[1]= '-' then tempe := getNegInf
       else tempe := getPosInf;}
@@ -579,8 +579,7 @@ begin
       if valcode = 0 then
         exit(tryCreateValue(tempi, outv));
     end else begin
-      val(v, tempd, valcode);
-      if valcode = 0 then begin
+      if TryStrToXQFloat(v, tempd) then begin
         if v[length(v)] in ['e', 'E'] then exit(xsceFORG0001);
         if (length(constrainingFacets) = 0) and (subType = xsstDouble) then begin
           if outv <> nil then outv^ := TXQValueFloat.create(self, tempd);

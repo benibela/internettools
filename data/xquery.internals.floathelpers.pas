@@ -22,32 +22,6 @@ type TBBDoubleHelper = type helper (TDoubleHelper) for double
   class function parse(const str: string): double; static;
 end;
 
-var
-  XQFormats : TFormatSettings = (
-    CurrencyFormat: 1;
-    NegCurrFormat: 5;
-    ThousandSeparator: #0;
-    DecimalSeparator: '.';
-    CurrencyDecimals: 2;
-    DateSeparator: '-';
-    TimeSeparator: ':';
-    ListSeparator: ',';
-    CurrencyString: '$';
-    ShortDateFormat: 'y-m-d';
-    LongDateFormat: 'yyyy-mm-dd';
-    TimeAMString: 'AM';
-    TimePMString: 'PM';
-    ShortTimeFormat: 'hh:nn';
-    LongTimeFormat: 'hh:nn:ss';
-    ShortMonthNames: ('Jan','Feb','Mar','Apr','May','Jun',
-                      'Jul','Aug','Sep','Oct','Nov','Dec');
-    LongMonthNames: ('January','February','March','April','May','June',
-                     'July','August','September','October','November','December');
-    ShortDayNames: ('Sun','Mon','Tue','Wed','Thu','Fri','Sat');
-    LongDayNames:  ('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday');
-    TwoDigitYearCenturyWindow: 50;
-  );
-
 implementation
 
 uses math;
@@ -153,17 +127,10 @@ begin
 end;
 
 class function TBBDoubleHelper.parse(const str:string): double; static;
-var
-  s: String;
 begin
-  s := trim(str);
-  if not TryStrToFloat(s, result, XQFormats) then
-    case s of
-      'INF', '+INF': result:=PositiveInfinity;
-      '-INF': result:=NegativeInfinity;
-      else {'NaN':} result:=NaN;
-    end;
+  result := StrToXQFloat(str);
 end;
+
 
 function TBBDoubleHelper.round(prec: integer = 0): double;
 var
