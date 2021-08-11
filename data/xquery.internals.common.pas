@@ -407,7 +407,7 @@ var
   );
 
 implementation
-uses math;
+uses math, bbutilsbeta;
 
 
 
@@ -798,8 +798,42 @@ begin
 end;
 
 function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
+  function tryWithTrimming: boolean;
+  var
+    v: TStringView;
+  begin
+    v := s.unsafeView;
+    v.trim(bbutils.WHITE_SPACE);
+    if not v.isEmpty then begin
+      v.trimLeft('0');
+      if v.isEmpty then begin
+        result := true;
+        d := 0;
+        exit;
+      end;
+    end;
+    result := TryStrToXQFloat(v.ToString, d);
+  end;
+
+var ss: ShortString;
+  code: integer;
 begin
-  Result := TryStrToFloat(s, d, XQFormats);
+  if s = '' then begin
+    d := 0;
+    result := false;
+    exit;
+  end;
+  if (s[1] in WHITE_SPACE) or (s[length(s)] in WHITE_SPACE) then
+    exit(tryWithTrimming);
+  if length(s) > 255 then begin
+    result := false;
+    if s[1] = '0' then result := tryWithTrimming();
+    exit;
+  end;
+  ss := s;
+  val(ss, d, code);
+  result := code  = 0;
+  ClearExceptions();
 end;
 
 function StrToXQFloat(const s: string): xqfloat;
