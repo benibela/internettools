@@ -6,6 +6,7 @@
 {$endif}
 
 
+//{$define USE_PASDBLSTRUTILS}
 
 
 //Here you can choose which Unicode database to use

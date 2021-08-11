@@ -407,7 +407,8 @@ var
   );
 
 implementation
-uses math, bbutilsbeta;
+uses math, bbutilsbeta
+    {$ifdef USE_PASDBLSTRUTILS}, PasDblStrUtils{$endif};
 
 
 
@@ -814,9 +815,10 @@ function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
     end;
     result := TryStrToXQFloat(v.ToString, d);
   end;
-
+{$ifndef USE_PASDBLSTRUTILS}
 var ss: ShortString;
   code: integer;
+{$endif}
 begin
   if s = '' then begin
     d := 0;
@@ -830,10 +832,14 @@ begin
     if s[1] = '0' then result := tryWithTrimming();
     exit;
   end;
+  {$ifdef USE_PASDBLSTRUTILS}
+  d := ConvertStringToDouble(s, rmNearest, @result);
+  {$else}
   ss := s;
   val(ss, d, code);
   result := code  = 0;
   ClearExceptions();
+  {$endif}
 end;
 
 function StrToXQFloat(const s: string): xqfloat;
