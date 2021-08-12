@@ -2109,6 +2109,34 @@ begin
   test(not v.isOnBounds(p + l + 1));
 end;
 procedure testStringViews;
+  procedure testDecimalParse(const s: string);
+  var view: TStringView;
+      refU: qword;
+      refI: Int64;
+      codeU, codeI: integer;
+      ok: boolean;
+      vi64: Int64;
+      vi32: Int32;
+      vu64: UInt64;
+      vu32: UInt32;
+  begin
+    val(s, refU, codeU);
+    val(s, refI, codeI);
+    view.init(s);
+    ok := view.tryParseDecimal(vi64);
+    test(ok, codeI = 0);
+    if ok then test(vi64, refI);
+    ok := view.tryParseDecimal(vu64);
+    test(ok, codeU = 0);
+    if ok then test(vu64 = refU);
+    ok := view.tryParseDecimal(vi32);
+    test(ok, (codeI = 0) and (refI >= low(Int32)) and (refI <= high(int32)));
+    if ok then test(vi32, refI);
+    ok := view.tryParseDecimal(vu32);
+    test(ok, (codeU = 0) and (refU >= low(UInt32)) and (refU <= high(Uint32)));
+    if ok then test(vu32 = refU);
+  end;
+
 var
   s: String;
   v: TStringView;
@@ -2283,6 +2311,27 @@ begin
   test(v.cutBeforeFind('f'));
   testbounds(v, p, 0);
 
+
+  testDecimalParse('0');
+  testDecimalParse('-0');
+  testDecimalParse('123');
+  testDecimalParse('-123');
+  testDecimalParse('-2147483647');
+  testDecimalParse('2147483647');
+  testDecimalParse('-2147483648');
+  testDecimalParse('2147483648');
+  testDecimalParse('4294967295');
+  testDecimalParse('-4294967295');
+  testDecimalParse('4294967296');
+  testDecimalParse('-4294967296');
+  testDecimalParse('9223372036854775807');
+  testDecimalParse('9223372036854775808');
+  testDecimalParse('-9223372036854775807');
+  testDecimalParse('-9223372036854775808');
+  testDecimalParse('18446744073709551615');
+  testDecimalParse('18446744073709551616');
+  testDecimalParse('99999999999999999999');
+  testDecimalParse('-99999999999999999999');
 end;
 {$endif}
 

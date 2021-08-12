@@ -10,6 +10,8 @@ uses
 procedure test(condition: boolean; name: string='');overload;
 procedure test(a, b: string; name: string = '');overload;
 procedure test(a, b: integer; name: string = '');overload;
+procedure test(a, b: int64; name: string = '');overload;
+procedure test(a, b: boolean; name: string = '');overload;
 
 function str10ToLE(const s: string): string;
 
@@ -50,6 +52,20 @@ begin
   inc(globalTestCount);
   if a <> b then
     raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
+end;
+
+procedure test(a, b: int64; name: string);
+begin
+  inc(globalTestCount);
+  if a <> b then
+    raise Exception.Create('test: '+name+': '+inttostr(a)+' <> '+inttostr(b));
+end;
+
+procedure test(a, b: boolean; name: string);
+begin
+  inc(globalTestCount);
+  if a <> b then
+    raise Exception.Create('test: '+name+': '+BoolToStr(a)+' <> '+BoolToStr(b));
 end;
 
 function str10ToLE(const s: string): string;
