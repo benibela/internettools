@@ -1312,9 +1312,9 @@ begin
   for i := 1 to fuzzCount do begin
     s := 0;
     try
-      for  j := 0 to Random(5) do s += Random(2) * power(2, Random(256) - 127);
-    except
-      on e: Exception do continue;
+      for  j := 0 to Random(5) do s += Random(2) * power(2, Random(256) - 127);  //this can give an exception but it is catched
+    except                                                                       //so do not worry about it
+      on e: Exception do continue;                                               //just run it without a debugger
     end;
     checkSingleRoundTripPM(s);
   end;
