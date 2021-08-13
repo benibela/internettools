@@ -365,6 +365,7 @@ type xqfloat = double;
 function xqround(const f: xqfloat): Int64;
 
 function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
+function TryStrToXQFloat(const str: pchar; length: SizeInt; out d: xqfloat): boolean;
 function StrToXQFloat(const s: string): xqfloat;
 
 const
@@ -798,12 +799,12 @@ begin
   if frac(tempf) < 0 then result -= 1;
 end;
 
-function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
+function TryStrToXQFloat(const str: pchar; length: SizeInt; out d: xqfloat): boolean;
   function tryWithTrimming: boolean;
   var
     v: TStringView;
   begin
-    v := s.unsafeView;
+    v.init(str, length);
     v.trim(bbutils.WHITE_SPACE);
     if not v.isEmpty then begin
       v.trimLeft('0');
@@ -820,26 +821,32 @@ var ss: ShortString;
   code: integer;
 {$endif}
 begin
-  if s = '' then begin
+  if length = 0 then begin
     d := 0;
     result := false;
     exit;
   end;
-  if (s[1] in WHITE_SPACE) or (s[length(s)] in WHITE_SPACE) then
+  if (str^ in WHITE_SPACE) or (str[length - 1] in WHITE_SPACE) then
     exit(tryWithTrimming);
-  if length(s) > 255 then begin
+  if length > 255 then begin
     result := false;
-    if s[1] = '0' then result := tryWithTrimming();
+    if str^ = '0' then result := tryWithTrimming();
     exit;
   end;
   {$ifdef USE_PASDBLSTRUTILS}
-  d := ConvertStringToDouble(s, rmNearest, @result);
+  d := ConvertStringToDouble(str, length, rmNearest, @result);
   {$else}
-  ss := s;
+  SetLength(ss, length);
+  move(str^, ss[1], length);
   val(ss, d, code);
   result := code  = 0;
   ClearExceptions();
   {$endif}
+end;
+
+function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
+begin
+  result := TryStrToXQFloat(pchar(s), length(s), d);
 end;
 
 function StrToXQFloat(const s: string): xqfloat;
