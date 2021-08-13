@@ -656,113 +656,6 @@ begin
 end;
 
 {$Push}{$OverflowChecks off}{$RangeChecks off}
-const
-  selectFirstHalfByte8 = UInt64($F0F0F0F0F0F0F0F0);
-  decimalZeros8        = UInt64($3030303030303030);
-  overflowMaxDigit8    = UInt64($0606060606060606);
-  selectFirstHalfByte4 = UInt32($F0F0F0F0);
-  decimalZeros4        = UInt32($30303030);
-  overflowMaxDigit4    = UInt32($06060606);
-function DecimalPcharToUInt64(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
-const
-  MaxDigits64          = 20; //18446744073709551615
-  FirstInvalidDigit    = '2';
-  MinWithMaxDigits     = Uint64(10000000000000000000);
-var
-  length: SizeUInt;
-  temp8: UInt64;
-  temp4: UInt32;
-  bytes: pbyte;
-  unsigned: UInt64;
-begin
-  result := false;
-  if pend <= pstart then exit;
-  while (pstart < pend) and (pstart^ = '0') do inc(pstart);
-  length := pend - pstart;
-  if length > MaxDigits64 then exit;
-  if (length = MaxDigits64) and (pstart^ >= FirstInvalidDigit) then exit;
-  unsigned := 0;
-  if PtrUInt(TObject(pstart)) and 7 = 0 then begin
-    while pstart + 8 < pend do begin
-      temp8 := PUInt64(pstart)^;
-      if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
-      temp8 := temp8 - decimalZeros8;
-      if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
-      bytes := @temp8;
-      unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
-      inc(pstart, 8);
-    end;
-    while pstart + 4 < pend do begin
-      temp4 := PUInt32(pstart)^;
-      if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
-      temp4 := temp4 - decimalZeros4;
-      if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
-      bytes := @temp4;
-      unsigned := unsigned * 10000 + ((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3]);
-      inc(pstart, 4);
-    end;
-  end;
-  while (pstart < pend) do begin
-    case pstart^ of
-    '0'..'9': unsigned := unsigned * 10 + UInt64(ord(pstart^) - ord('0'));
-    else exit;
-    end;
-    inc(pstart);
-  end;
-  if (length = MaxDigits64) and (unsigned < MinWithMaxDigits) then exit;
-  result := true;
-  unsignedResult:=unsigned;
-end;
-function DecimalPcharToUInt32(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
-const
-  MaxDigits32          = 10; //4294967295
-  FirstInvalidDigit    = '5';
-  MinWithMaxDigits     = Uint32(1000000000);
-var
-  length: SizeUInt;
-  temp8: UInt64;
-  temp4: UInt32;
-  bytes: pbyte;
-  unsigned: UInt32;
-begin
-  result := false;
-  if pend <= pstart then exit;
-  while (pstart < pend) and (pstart^ = '0') do inc(pstart);
-  length := pend - pstart;
-  if length > MaxDigits32 then exit;
-  if (length = MaxDigits32) and (pstart^ >= FirstInvalidDigit) then exit;
-  unsigned := 0;
-  if PtrUInt(TObject(pstart)) and 7 = 0 then begin
-    while pstart + 8 < pend do begin
-      temp8 := PUInt64(pstart)^;
-      if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
-      temp8 := temp8 - decimalZeros8;
-      if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
-      bytes := @temp8;
-      unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
-      inc(pstart, 8);
-    end;
-    while pstart + 4 < pend do begin
-      temp4 := PUInt32(pstart)^;
-      if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
-      temp4 := temp4 - decimalZeros4;
-      if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
-      bytes := @temp4;
-      unsigned := unsigned * 10000 + ((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3]);
-      inc(pstart, 4);
-    end;
-  end;
-  while (pstart < pend) do begin
-    case pstart^ of
-    '0'..'9': unsigned := unsigned * 10 + UInt32(ord(pstart^) - ord('0'));
-    else exit;
-    end;
-    inc(pstart);
-  end;
-  if (length = MaxDigits32) and (unsigned < MinWithMaxDigits) then exit;
-  result := true;
-  unsignedResult:=unsigned;
-end;
 
 
 const
@@ -776,12 +669,12 @@ begin
   result := false;
   if isEmpty then exit();
   if data^ = '-' then begin
-    if not DecimalPcharToUInt64(data + 1, dataend, temp) then exit;
+    if not strDecimalToUIntTry(data + 1, dataend, temp) then exit;
     if temp > MaxAbsoluteNegativeInt64AsUint then exit;
     //PQWord(@v)^ := (not temp) + 1;
     v := -temp;
   end else begin
-    if not DecimalPcharToUInt64(data, dataend, temp) then exit;
+    if not strDecimalToUIntTry(data, dataend, temp) then exit;
     if temp > QWord(high(int64)) then exit;
     v := temp
   end;
@@ -795,11 +688,11 @@ begin
   result := false;
   if isEmpty then exit();
   if data^ = '-' then begin
-    if not DecimalPcharToUInt32(data + 1, dataend, temp) then exit;
+    if not strDecimalToUIntTry(data + 1, dataend, temp) then exit;
     if temp > MaxAbsoluteNegativeInt32AsUint then exit;
     v := -temp;
   end else begin
-    if not DecimalPcharToUInt32(data, dataend, temp) then exit;
+    if not strDecimalToUIntTry(data, dataend, temp) then exit;
     if temp > QWord(high(int32)) then exit;
     v := temp
   end;
@@ -809,12 +702,12 @@ end;
 
 function TCharArrayView.tryParse(out v: UInt64): boolean;
 begin
-  result := DecimalPcharToUInt64(data, dataend, v);
+  result := strDecimalToUIntTry(data, dataend, v);
 end;
 
 function TCharArrayView.tryParse(out v: UInt32): boolean;
 begin
-  result := DecimalPcharToUInt32(data, dataend, v);
+  result := strDecimalToUIntTry(data, dataend, v);
 end;
 
 function TCharArrayView.viewTo(newLast: pchar): TCharArrayView;

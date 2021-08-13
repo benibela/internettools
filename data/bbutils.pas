@@ -455,6 +455,13 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
 
+function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
+function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
+function strHexToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
+function strHexToUIntTry(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
+
+
+
 type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions, dhefNormalizeLineEndings, dhefNormalizeLineEndingsAlso85_2028);
      EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
@@ -3434,6 +3441,163 @@ begin
   end;
   if special <> 0 then begin result := ''; setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
   else result := strGetUnicodeCharacter(CodePoint);
+end;
+
+{$Push}{$OverflowChecks off}{$RangeChecks off}
+const
+  selectFirstHalfByte8 = UInt64($F0F0F0F0F0F0F0F0);
+  decimalZeros8        = UInt64($3030303030303030);
+  overflowMaxDigit8    = UInt64($0606060606060606);
+  selectFirstHalfByte4 = UInt32($F0F0F0F0);
+  decimalZeros4        = UInt32($30303030);
+  overflowMaxDigit4    = UInt32($06060606);
+function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
+const
+  MaxDigits64          = 20; //18446744073709551615
+  FirstInvalidDigit    = '2';
+  MinWithMaxDigits     = Uint64(10000000000000000000);
+var
+  length: SizeUInt;
+  temp8: UInt64;
+  temp4: UInt32;
+  bytes: pbyte;
+  unsigned: UInt64;
+begin
+  result := false;
+  if pend <= pstart then exit;
+  while (pstart < pend) and (pstart^ = '0') do inc(pstart);
+  length := pend - pstart;
+  if length > MaxDigits64 then exit;
+  if (length = MaxDigits64) and (pstart^ >= FirstInvalidDigit) then exit;
+  unsigned := 0;
+  if PtrUInt(TObject(pstart)) and 7 = 0 then begin
+    while pstart + 8 < pend do begin
+      temp8 := PUInt64(pstart)^;
+      if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
+      temp8 := temp8 - decimalZeros8;
+      if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
+      bytes := @temp8;
+      unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
+      inc(pstart, 8);
+    end;
+    while pstart + 4 < pend do begin
+      temp4 := PUInt32(pstart)^;
+      if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
+      temp4 := temp4 - decimalZeros4;
+      if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
+      bytes := @temp4;
+      unsigned := unsigned * 10000 + ((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3]);
+      inc(pstart, 4);
+    end;
+  end;
+  while (pstart < pend) do begin
+    case pstart^ of
+    '0'..'9': unsigned := unsigned * 10 + UInt64(ord(pstart^) - ord('0'));
+    else exit;
+    end;
+    inc(pstart);
+  end;
+  if (length = MaxDigits64) and (unsigned < MinWithMaxDigits) then exit;
+  result := true;
+  unsignedResult:=unsigned;
+end;
+function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
+const
+  MaxDigits32          = 10; //4294967295
+  FirstInvalidDigit    = '5';
+  MinWithMaxDigits     = Uint32(1000000000);
+var
+  length: SizeUInt;
+  temp8: UInt64;
+  temp4: UInt32;
+  bytes: pbyte;
+  unsigned: UInt32;
+begin
+  result := false;
+  if pend <= pstart then exit;
+  while (pstart < pend) and (pstart^ = '0') do inc(pstart);
+  length := pend - pstart;
+  if length > MaxDigits32 then exit;
+  if (length = MaxDigits32) and (pstart^ >= FirstInvalidDigit) then exit;
+  unsigned := 0;
+  if PtrUInt(TObject(pstart)) and 7 = 0 then begin
+    while pstart + 8 < pend do begin
+      temp8 := PUInt64(pstart)^;
+      if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
+      temp8 := temp8 - decimalZeros8;
+      if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
+      bytes := @temp8;
+      unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
+      inc(pstart, 8);
+    end;
+    while pstart + 4 < pend do begin
+      temp4 := PUInt32(pstart)^;
+      if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
+      temp4 := temp4 - decimalZeros4;
+      if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
+      bytes := @temp4;
+      unsigned := unsigned * 10000 + ((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3]);
+      inc(pstart, 4);
+    end;
+  end;
+  while (pstart < pend) do begin
+    case pstart^ of
+    '0'..'9': unsigned := unsigned * 10 + UInt32(ord(pstart^) - ord('0'));
+    else exit;
+    end;
+    inc(pstart);
+  end;
+  if (length = MaxDigits32) and (unsigned < MinWithMaxDigits) then exit;
+  result := true;
+  unsignedResult:=unsigned;
+end;
+
+{$pop}
+
+function strHexToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
+var tempHigh, tempLow: UInt32;
+  length: SizeInt;
+begin
+  result := false;
+  if pend <= pstart then exit;
+  while pstart^ = '0' do inc(pstart);
+  length := pend - pstart;
+  result := length < 16;
+  tempLow := 0;
+  tempHigh := 0;
+  case length of
+    0: result := true;
+    1..8: result := strHexToUIntTry(pstart, pend, tempLow);
+    9..16: begin
+      result := strHexToUIntTry(pstart, pend - 8, tempHigh);
+      result := strHexToUIntTry(pend - 8, pend, tempLow);
+    end;
+    else exit;
+  end;
+  unsignedResult := (UInt64(tempHigh) shl 32) or (tempLow);
+end;
+
+function strHexToUIntTry(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
+var temp: UInt32;
+  length: SizeInt;
+begin
+  result := false;
+  if pend <= pstart then exit;
+  while pstart^ = '0' do inc(pstart);
+  length := pend - pstart ;
+  if length > 8 then exit();
+  temp := 0;
+  while pstart < pend do begin
+    case pstart^ of
+       '0'..'9': temp := (temp shl 4) or (ord(pstart^) - ord('0'));
+       'A'..'F': temp := (temp shl 4) or (ord(pstart^) - ord('A')) + 10;
+       'a'..'f': temp := (temp shl 4) or (ord(pstart^) - ord('a')) + 10;
+       else exit;
+    end;
+    inc(pstart);
+  end;
+  unsignedResult := temp;
+  result := true;
 end;
 
 
