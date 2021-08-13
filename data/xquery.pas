@@ -3422,7 +3422,7 @@ type TXQGlobalSerializationCallback = function (const context: TXQEvaluationCont
 var globalSerializationCallback: TXQGlobalSerializationCallback;
 
 implementation
-uses base64, jsonscanner, strutils, xquery__regex, bbutilsbeta, xquery.internals.floathelpers;
+uses base64, fastjsonscanner, strutils, xquery__regex, bbutilsbeta, xquery.internals.floathelpers;
 
 var
   interpretedFunctionSynchronization: TRTLCriticalSection;
@@ -6039,7 +6039,7 @@ var
       else if isInvalidUTF8Guess(scanner.CurLine, length(scanner.CurLine)) then code := 'FOUT1200'
       else code := 'FOJS0001';
     end;
-    raise EXQEvaluationException.create(code, message+' at ' + scanner.CurTokenString +' (' + token +') in '+scanner.CurLine);
+    raise EXQEvaluationException.create(code, message+' at ' + strFromPchar(scanner.CurTokenStart, scanner.CurTokenLength) +' (' + token +') in '+scanner.CurLine);
   end;
 
   function nextToken: TJSONToken;
@@ -6060,24 +6060,26 @@ var
     tempFloat: double;
     tempd: BigDecimal;
     tempchar: Char;
+    tempview: TStringView;
   begin
     if jsoniqMode then begin
-      if TryStrToInt64(scanner.CurTokenString, temp64) then exit(xqvalue(temp64));
-      if TryStrToBigDecimal(scanner.CurTokenString, @tempd) then
-        if striContains(scanner.CurTokenString, 'E')  then exit(baseSchema.double.createValue(tempd))
-        else if strContains(scanner.CurTokenString, '.')  then exit(baseSchema.decimal.createValue(tempd))
+      tempview.init(scanner.CurTokenStart, scanner.CurTokenLength);
+      if tempview.tryParse(temp64) then exit(xqvalue(temp64));
+      if TryStrToBigDecimal(tempview.data, tempview.length, @tempd) then
+        if tempview.contains('E')  or tempview.contains('e')   then exit(baseSchema.double.createValue(tempd))
+        else if tempview.contains('.')  then exit(baseSchema.decimal.createValue(tempd))
         else exit(baseSchema.integer.createValue(tempd));
-      if TryStrToXQFloat(scanner.CurTokenString, tempFloat) then
-        if striContains(scanner.CurTokenString, 'E') then exit(baseSchema.double.createValue(tempFloat))
+      if TryStrToXQFloat(scanner.CurTokenStart, scanner.CurTokenLength, tempFloat) then
+        if tempview.contains('E')  or tempview.contains('e')   then exit(baseSchema.double.createValue(tempFloat))
         else exit(TXQValueDecimal.create(tempFloat));
     end else begin
-      if TryStrToXQFloat(scanner.CurTokenString, tempFloat) then
+      if TryStrToXQFloat(scanner.CurTokenStart, scanner.CurTokenLength, tempFloat) then
         exit(baseSchema.double.createValue(tempFloat))
     end;
-    if (jpoLiberal in options) and ((scanner.CurTokenString = '+') or (scanner.CurTokenString = '-')) then begin
-      tempchar := scanner.CurTokenString[1];
+    if (jpoLiberal in options) and (scanner.CurTokenStart^ in ['+', '-']) then begin
+      tempchar := scanner.CurTokenStart^;
       if scanner.FetchToken = tkIdentifier then
-        case scanner.CurTokenString of
+        case tempview.ToString of
           'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity':
             case tempchar of
               '+': exit(xqvalue(xqfloat.PositiveInfinity)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
