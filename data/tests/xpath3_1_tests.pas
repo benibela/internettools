@@ -108,8 +108,9 @@ begin
   t('sort(("zzz", "aaa", "a", "tt"), default-collation(), function($x){string-length($x)})', 'a tt zzz aaa');
 
   t('serialize-json(parse-json("[1,2,{""foo"": 123}]"))', '[1, 2, {"foo": 123}]');
-  t('parse-json("[""ab\u0007cd"", null, 123]") ? *', 'ab'#7'cd 123');
+  t('parse-json("[""ab\u0007cd\\"", null, 123]") ? *', 'ab�cd\ 123');
   t('parse-json("[""ab\u0007cd"", null, 123]", map {"escape": true()} ) ? *', 'ab\u0007cd 123');
+  t('parse-json("[""ab\uffFFcd"", null, 123]", map {"fallback": upper-case#1} ) ? *', 'ab\UFFFFcd 123');
   t('parse-json("[1,]", map {"liberal": true()} ) ? *', '1');
 
   t('array{0 to 2, 7}!(?2,":",?*,":",?(1+2,1))', '1 : 0 1 2 7 : 2 0');

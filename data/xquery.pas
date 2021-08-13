@@ -416,6 +416,7 @@ type
       function parse(const data: string): IXQValue;
       class function parse(const data: string; someOptions: TOptions): IXQValue; static;
     end;
+    PXQBatchFunctionCall = ^TXQBatchFunctionCall;
     TXQBatchFunctionCall = record
       tempcontext: TXQEvaluationContext;
       func: TXQValueFunction;
@@ -6161,80 +6162,161 @@ var containerStack: array of TXQValue;
     end;
   end;
 
-  function escapeAll(s: string): string;
+var fallbackFunctionCaller: PXQBatchFunctionCall = nil;
+  function readString: string;
+//  const SUSPICIOUS_CHARS_NORMAL = [#0..#8, #11, #12, #14..#$1F, #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
+//  const SUSPICIOUS_CHARS_ESCAPE = [#0..#$1F, '\', #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
+  const REPLACEMENT_CHARACTER_CP = $FFFD;
   var sb: TStrBuilder;
-    cp: Integer;
-  begin
-    result := '';
-    sb.init(@result, length(s));
-    for cp in strIterator(s) do
-      case cp of
-        $20..ord('\')-1, ord('\')+1..$D7FF, $E000..$FFFD, $10000..$10FFFF: sb.appendCodePoint(cp);
-        ord('\'): sb.append('\\');
-        9: sb.append('\t');
-        10: sb.append('\n');
-        13: sb.append('\r');
-        8: sb.append('\b');
-        else if cp <= $FFFF then begin
-          sb.append('\u');
-          sb.append(IntToHex(cp, 4));
+    escapeCharacters: boolean;
+    procedure addWithEscapeFunction(p: pchar; l: integer);
+    begin
+      if fallbackFunctionCaller = nil then begin
+        new(fallbackFunctionCaller);
+        fallbackFunctionCaller^.init(context^, escapeFunction);
+      end;
+      fallbackFunctionCaller^.stack.topptr(0)^ := xqvalue(strFromPchar(p,l));
+      sb.append(fallbackFunctionCaller^.call().toString);
+    end;
+    procedure appendEscapeChar(toEscape: char);
+    var temp: string[2];
+    begin
+      temp[1] := '\';
+      case toEscape of
+        '\': temp[2] := '\';
+        #8: temp[2] := 'b';
+        #9: temp[2] := 't';
+        #10: temp[2] := 'n';
+        #12: temp[2] := 'f';
+        #13: temp[2] := 'r';
+      end;
+      if escapeCharacters then sb.append(@temp[1], 2)
+      else if escapeFunction = nil then sb.appendCodePoint(REPLACEMENT_CHARACTER_CP)
+      else addWithEscapeFunction(@temp[1], 2);
+    end;
+    procedure appendInvalidUnicode(buxxxx: pchar);
+    begin
+      if escapeCharacters then sb.append(buxxxx, 6)
+      else if escapeFunction = nil then sb.appendCodePoint(REPLACEMENT_CHARACTER_CP)
+      else addWithEscapeFunction(buxxxx, 6);
+    end;
+    procedure appendSurrogatePair(buxxxxbuxxxx: pchar);
+    var
+      tempA, tempB, codePoint: UInt32;
+    begin
+      strHexToUIntTry(buxxxxbuxxxx + 2, buxxxxbuxxxx + 2 + 4, tempA);
+      strHexToUIntTry(buxxxxbuxxxx + 6+2, buxxxxbuxxxx + 6+2 + 4, tempB);
+      codePoint := ((tempA and $03ff) shl 10) or (ord(tempB) and $03ff);
+      sb.appendCodePoint(codePoint + $10000);
+    end;
+    procedure appendSuspiciousCodepoint(codepoint: Int32; errpchar: pchar);
+    var temp: string[6];
+      function errstring: pchar;
+      begin
+        if errpchar <> nil then result := errpchar
+        else begin
+          temp := '\u' + IntToHex(codepoint, 4);
+          result := @temp;
         end;
       end;
-    sb.final;
-  end;
-  function escapeInvalid(s: string): string;
-  var sb: TStrBuilder;
-    cp: Integer;
-  begin
-    result := '';
-    sb.init(@result, length(s));
-    for cp in strIterator(s) do
-      if isValidXMLCharacter(cp) then sb.appendCodePoint(cp)
-      else sb.appendCodePoint($FFFD);
-    sb.final;
-  end;
-  function escapeInvalidCallback(s: string): string;
-  var sb: TStrBuilder;
-      f: TXQBatchFunctionCall;
-      cp: Integer;
 
-  begin
-    result := '';
-    f.init(context^, escapeFunction);
-    sb.init(@result, length(s));
-    for cp in strIterator(s) do
-      if isValidXMLCharacter(cp) then sb.appendCodePoint(cp)
-      else begin
-        f.stack.topptr(0)^ := xqvalue('\u'+IntToHex(cp, 4));
-        sb.append(f.call().toString);
-      end;
-    sb.final;
-  end;
-
-  function readString: string;
-  const SUSPICIOUS_CHARS_NORMAL = [#0..#8, #11, #12, #14..#$1F, #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
-  const SUSPICIOUS_CHARS_ESCAPE = [#0..#$1F, '\', #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
-  var
-    c: Char;
-    suspicious: Boolean;
-  begin
-    result := scanner.CurTokenString;
-    suspicious := false;
-    if jpoEscapeCharacters in options then begin
-     for c in result do begin
-       suspicious := c in SUSPICIOUS_CHARS_ESCAPE;
-       if suspicious then break;
-     end;
-    end else begin
-      for c in result do begin
-        suspicious := c in SUSPICIOUS_CHARS_NORMAL;
-        if suspicious then break;
+    begin
+      case codePoint of //see isValidXMLCharacter
+        $20..ord('\')-1, ord('\')+1..$7E, $A0..$D7FF, $E000..$FFFD, $10000..$10FFFF: sb.appendCodePoint(codePoint);
+        $9,$A,$D: if escapeCharacters or (baseSchema.version <> xsd11) then appendEscapeChar(chr(codePoint))
+                  else sb.append(chr(codePoint));
+        ord('\'): if escapeCharacters then appendEscapeChar('\') else sb.append('\');
+        $8, $C: appendEscapeChar(chr(codePoint));
+        $7F..$9F: if escapeCharacters then appendInvalidUnicode(errstring)
+                  else sb.appendCodePoint(codepoint);
+        else appendInvalidUnicode(errstring)
       end;
     end;
-    if not suspicious then exit;
-    if jpoEscapeCharacters in options then result := escapeAll(result)
-    else if (context = nil) or (escapeFunction = nil)  then result := escapeInvalid(result)
-    else result := escapeInvalidCallback(result)
+    procedure appendUnicodeEscape(buxxxx: pchar);
+    var
+      codePoint: UInt32;
+    begin
+      strHexToUIntTry(buxxxx + 2, buxxxx + 2 + 4, codePoint);
+      appendSuspiciousCodepoint(codePoint, buxxxx);
+    end;
+
+  var
+    escapeChar: Char;
+    p, pend, sectionstart, unicodeEscape1, unicodeEscape2: PAnsiChar;
+    procedure appendSectionAndAdvance(skip: integer);
+    begin
+      sb.append(sectionstart, p - sectionstart);
+      inc(p, skip);
+      sectionstart := p;
+    end;
+  begin
+    escapeCharacters := jpoEscapeCharacters in options;
+
+    sb.init(@result, scanner.CurTokenLength);
+    p := scanner.CurTokenStart;
+    sectionstart := p;
+    pend := p + scanner.CurTokenLength;
+    while p < pend do begin
+      case p^ of
+        '\': begin
+          escapeChar := (p+1)^;
+          case escapeChar of
+            '"', '''', '/' : begin
+              appendSectionAndAdvance(2);
+              sb.append(escapeChar);
+              continue;
+            end;
+            '\': escapeChar := '\';
+            'b': escapeChar:=#8;
+            't': escapeChar:=#9;
+            'n': escapeChar:=#10;
+            'f': escapeChar:=#12;
+            'r': escapeChar:=#13;
+            'u': begin
+              unicodeEscape1 := p;
+              appendSectionAndAdvance(2);
+              if (p[0] in ['D', 'd']) and (p[1] in ['8','9','A','B','a','b']) then begin
+                unicodeEscape2 := p + 4;
+                //first surrogate
+                if ((unicodeEscape2+2+4) > pend)
+                   or not (( ((unicodeEscape2)[2] in ['D', 'd']) and ((unicodeEscape2)[3] in ['C'..'F', 'c'..'f']) )) then begin
+                  appendInvalidUnicode(unicodeEscape1);
+                end else begin
+                  appendSurrogatePair(unicodeEscape1);
+                  inc(p, 6);
+                end;
+              end else appendUnicodeEscape(unicodeEscape1);
+              inc(p, 4);
+              sectionstart := p;
+              continue;
+            end;
+          end;
+          if escapeCharacters then begin
+           inc(p); //do nothing
+          end else begin
+            appendSectionAndAdvance(2);
+            if (escapeChar in [#8,#12]) then appendEscapeChar( escapeChar )
+            else sb.append(escapeChar);
+          end;
+        end;
+        #0..#$1F: begin
+          escapeChar := p^;
+          appendSectionAndAdvance(1);
+          case escapeChar of
+            #8,#9,#10,#12,#13: appendEscapeChar(escapeChar);
+            else appendSuspiciousCodepoint(ord(escapeChar), nil);
+          end;
+        end;
+        {#$80..#$C1,} #$C0, #$C1, #$ED, #$EF, #$F4..#$FF: begin
+          sb.append(sectionstart, p - sectionstart);
+          appendSuspiciousCodepoint(strDecodeUTF8Character(p, pend), nil);
+          sectionstart := p;
+        end;
+        else inc(p);
+      end;
+    end;
+    appendSectionAndAdvance(0);
+    sb.final;
   end;
 
   procedure readObjectKey;
@@ -6315,11 +6397,12 @@ begin
         tkIdentifier:
           if jpoLiberal in options then begin
             if parsingPhase = jppObjectExpectKey then readObjectKey
-            else case scanner.CurTokenString of
-              'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity': pushValue(xqvalue(xqfloat.PositiveInfinity));
-              'NAN', 'NaN', 'nan': pushValue(xqvalue(xqfloat.NaN));
-              else raiseError();
-            end;
+            else if strliEqual(scanner.CurTokenStart,  'INF', scanner.CurTokenLength)
+                    or strliEqual(scanner.CurTokenStart, 'INFinity', scanner.CurTokenLength) then
+              pushValue(xqvalue(xqfloat.PositiveInfinity))
+            else if strliEqual(scanner.CurTokenStart, 'NAN', scanner.CurTokenLength) then
+              pushValue(xqvalue(xqfloat.NaN))
+            else raiseError();
           end else raiseError();
         //tkComment:
         //tkUnknown
@@ -6340,6 +6423,10 @@ begin
       result := xqvalue;
     end;
   finally
+    if fallbackFunctionCaller <> nil then begin
+     fallbackFunctionCaller.done;
+     dispose(fallbackFunctionCaller);
+    end;
     //for i := 0 to containerCount - 1 do containerStack[i]._Release;
     scanner.free;
   end;
