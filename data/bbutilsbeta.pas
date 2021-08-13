@@ -93,6 +93,8 @@ type
   public
     data: pelement; //first element
     dataend: pelement; //after last element
+    procedure init(firstelement: PElement; length: sizeint);
+    procedure init(firstelement, behindlastelement: PElement);
     function length: SizeInt;
     function isEmpty: boolean; inline;
     function isInBounds(target: PElement): boolean; inline;
@@ -125,8 +127,8 @@ type
   private
     function moveToFound(target: pchar): boolean; inline;
   public
-    procedure init(const buffer: string);
-    procedure init(const buffer: TBytes);
+    procedure init(const buffer: string); overload;
+    procedure init(const buffer: TBytes); overload;
     function ToString: string;
 
     function length: SizeInt; reintroduce;
@@ -276,6 +278,18 @@ begin
   if newend > oldend then dataend := oldend
   else if newend < start then dataend := start
   else dataend := newend;
+end;
+
+procedure TArrayView.init(firstelement: PElement; length: sizeint);
+begin
+  data := firstelement;
+  dataend := data + length;
+end;
+
+procedure TArrayView.init(firstelement, behindlastelement: PElement);
+begin
+  data := firstelement;
+  dataend := behindlastelement;
 end;
 
 {$PUSH}
