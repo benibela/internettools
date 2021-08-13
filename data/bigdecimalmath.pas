@@ -171,6 +171,9 @@ type
 type TBigDecimalErrorCode = (bdceNoError, bdceParsingInvalidFormat, bdceParsingTooBig );
      PBigDecimalErrorCode = ^TBigDecimalErrorCode;
 
+//** Converts a decimal pchar to a bigdecimal. @br
+//** Supports standard decimal notation, like -123.456 or 1E-2    (@code(-?[0-9]+(.[0-9]+)?([eE][-+]?[0-9]+)))
+function TryStrToBigDecimal(pstart: pchar; length: SizeInt; res: PBigDecimal; errCode: PBigDecimalErrorCode = nil): boolean;
 //** Converts a decimal string to a bigdecimal. @br
 //** Supports standard decimal notation, like -123.456 or 1E-2    (@code(-?[0-9]+(.[0-9]+)?([eE][-+]?[0-9]+)))
 function TryStrToBigDecimal(const s: string; res: PBigDecimal; errCode: PBigDecimalErrorCode = nil): boolean;
@@ -369,101 +372,118 @@ const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,1
 
 //returns:
 //@þaram(intstart Position of the first digit in integer part)
-//@þaram(intend Position of the last digit in integer part)
-//@þaram(dot Position of the . character, or 0)
-//@þaram(exp Positiion of the [eE] character or 0)
-function TryStrDecodeDecimal(const s: string; out intstart, intend, dot, exp: integer): boolean;
+//@þaram(intend Position AFTER the last digit in integer part)
+//@þaram(dot Position of the . character, or nil)
+//@þaram(exp Position of the [eE] character or nil)
+function TryStrDecodeDecimal(const pstart, pend: pchar; out intstart, intend, dot, exp: pchar): boolean;
 var
-  i: Integer;
+  p: PChar;
 begin
   result := false;
-  if s = '' then exit();
-  dot := 0;
-  exp := 0;
-  if s[1] in ['+', '-'] then intstart := 2
-  else intstart := 1;
-
-  for i := intstart to length(s) do
-    case s[i] of
+  if pend <= pstart then exit();
+  dot := nil;
+  exp := nil;
+  p := pstart;
+  if p^ in ['+', '-'] then inc(p);
+  intstart := p;
+  while p < pend do begin
+    case p^ of
       '0'..'9': ;
-      '.': if (dot <> 0) or (exp <> 0) then exit() else dot := i;
-      'e', 'E': if exp <> 0 then exit() else exp := i;
-      '+', '-': if i <> exp + 1 then exit();
+      '.': if (dot <> nil) or (exp <> nil) then exit() else dot := p;
+      'e', 'E': if exp <> nil then exit() else exp := p;
+      '+', '-': if p <> exp + 1 then exit();
       else exit();
     end;
-  if exp = 1 then exit;
-  if exp = 0 then intend := length(s)
-  else intend := exp - 1;
-  if intend = dot then begin intend -= 1; dot := 0; end;
-  if intend < intstart then exit;
+    inc(p);
+  end;
+  if exp = pstart then exit;
+  if exp = nil then intend := pend
+  else intend := exp;
+  if intend = dot + 1 then begin intend -= 1; dot := nil; end;
+  if intend <= intstart then exit;
   result := true;
 end;
 
-function TryStrToBigDecimal(const s: string; res: PBigDecimal; errCode: PBigDecimalErrorCode = nil): boolean;
-var dot, exp, i: integer;
-  intstart: Integer;
-  intend: Integer;
+function TryStrToBigDecimal(pstart: pchar; length: SizeInt; res: PBigDecimal; errCode: PBigDecimalErrorCode): boolean;
+var dot, exp: pchar;
+  i: pchar;
+  intstart: pchar;
+  intend: pchar;
   trueexponent: int64;
   p: Integer;
   j: Integer;
-  totalintlength: Integer;
+  totalintlength, k, code: Integer;
+  pend: pchar;
+  expparsing: shortstring;
 begin
-  result := TryStrDecodeDecimal(s, intstart, intend, dot, exp);
+  pend := pstart + length;
+  result := TryStrDecodeDecimal(pstart, pstart + length, intstart, intend, dot, exp);
   if not result then begin
     if Assigned(errCode) then errCode^ := bdceParsingInvalidFormat;
     exit;
   end else if Assigned(errCode) then errCode^ := bdceNoError;
-  if exp = 0 then trueexponent := 0
+  if exp = nil then trueexponent := 0
   else begin
-    if (length(s) - exp <= 10) and (res = nil) then exit; //if the exponent is small, we know it is okay. If we do not need res, we can exit, otherwise we need to actually get the exponent
-    if not TryStrToInt64(copy(s, exp + 1, length(s)), trueexponent) then trueexponent := high(int64);
+    inc(exp);
+    if (pend - exp {length exp until pend} <= 10) and (res = nil) then exit; //if the exponent is small, we know it is okay. If we do not need res, we can exit, otherwise we need to actually get the exponent
+    expparsing := '';
+    SetLength(expparsing, pend - exp);
+    move(exp^, expparsing[1], pend - exp);
+    val(expparsing, trueexponent, code); //this is faster than using inttostr
+    if code <> 0 then trueexponent := high(int64);
     if (trueexponent < DIGITS_PER_ELEMENT * int64(low(integer))) or (trueexponent > DIGITS_PER_ELEMENT * int64(high(integer))) then begin
-      //exponent too big
-      for i := 1 to exp - 1 do
-        if not (s[i] in ['0', '.', '-']) then begin
+      dec(exp);
+      while pstart < exp do begin
+        if not (pstart^ in ['0', '.', '-']) then begin
+          //if there is anything non-zero, the exponent is too big
           if assigned(errCode) then errCode^ := bdceParsingTooBig;
           exit(false);
         end;
+        inc(pstart);
+      end;
       if res <> nil then res^.setZero(); //but if all digits are 0, the exponent can be ignored
       exit;
     end;
   end;
   if res = nil then exit;
   with res^ do begin
-    signed := s[1] = '-';
+    signed := pstart^ = '-';
     lastDigitHidden := false;
-    if dot <> 0 then trueexponent -= intend - dot;
+    if dot <> nil then trueexponent -= intend - dot - 1; //shifting the dot to the left corresponds to divisions by 10, so it reduces the exponent
     exponent := trueexponent div DIGITS_PER_ELEMENT;
     if (trueexponent < 0) and (int64(exponent) * DIGITS_PER_ELEMENT <> trueexponent) then exponent -= 1; //truncate to negative infinity
-    totalintlength := intend - intstart + 1  + (trueexponent - int64(exponent) * DIGITS_PER_ELEMENT);
-    if dot <> 0 then totalintlength -= 1;
+    totalintlength := (intend - intstart)  + (trueexponent - int64(exponent) * DIGITS_PER_ELEMENT);
+    if dot <> nil then totalintlength -= 1;
+    //parse digits from string
     SetLength(digits, (totalintlength + DIGITS_PER_ELEMENT - 1) div DIGITS_PER_ELEMENT);
     p := high(digits);
     i := intstart;
+    //if totalintlength is not divisible by DIGITS_PER_ELEMENT, the first and last bin need additional zeros
     if totalintlength mod DIGITS_PER_ELEMENT = 0 then j := 1
     else j := DIGITS_PER_ELEMENT + 1 - (totalintlength) mod DIGITS_PER_ELEMENT;
-    while i <= intend do begin
+    while i < intend do begin
       digits[p] := 0;
-      while (i <= intend) and (j <= DIGITS_PER_ELEMENT) do begin
+      while (i < intend) and (j <= DIGITS_PER_ELEMENT) do begin
         if i <> dot then begin
-          digits[p] := digits[p] * 10 + ord(s[i]) - ord('0');
+          digits[p] := digits[p] * 10 + ord(i^) - ord('0');
           j += 1;
         end;
         i += 1;
       end;
+      k := j;
       j := 1;
       p -= 1;
     end;
-    p += 1;
-    if (i > dot) and (dot > 0) then i -= 1;
-    i -= intstart - 1;
-    while i <= totalintlength do begin
-      digits[p] := digits[p] * 10;
-      i += 1;
-    end;
+    digits[0] := digits[0] * powersOf10[DIGITS_PER_ELEMENT - k + 1];
     if signed and res^.isZero() then res^.setZero();
   end;
 end;
+
+function TryStrToBigDecimal(const s: string; res: PBigDecimal; errCode: PBigDecimalErrorCode = nil): boolean;
+begin
+  result := TryStrToBigDecimal(pchar(s), length(s), res, errCode);
+end;
+
 
 function StrToBigDecimal(const s: string): BigDecimal;
 begin
