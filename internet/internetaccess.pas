@@ -1447,6 +1447,7 @@ end;
 
 constructor THTTPHeaderList.Create;
 begin
+  inherited;
   NameValueSeparator := ':';
 end;
 
