@@ -9297,8 +9297,11 @@ begin
     else begin
       if (context.SeqValue <> nil) and (context.SeqValue.kind in [pvkNode, pvkObject]) then result := context.SeqValue
       else if assigned(context.extensionContext) and assigned(context.extensionContext.ParentElement) then result := xqvalue(context.extensionContext.ParentElement)
-      else if context.SeqValue = nil then error('XPDY0002', 'Context item is undefined')
-      else error('XPTY0020', 'Expected node as context item');
+      else begin
+        if context.SeqValue = nil then error('XPDY0002', 'Context item is undefined')
+        else error('XPTY0020', 'Expected node as context item');
+        result := nil;
+      end;
       result := expandSequence(result,query, context, lastExpansion);
     end;
   end;
@@ -10133,6 +10136,7 @@ baseSchema.hide('function(*)');
 
 {$ifdef dumpFunctions}baseSchema.logConstructorFunctions;{$endif}
 
+interpretedFunctionSynchronization := default(TRTLCriticalSection);
 InitCriticalSection(interpretedFunctionSynchronization);
 finalization
   if not createMemoryLeakOnExit then begin

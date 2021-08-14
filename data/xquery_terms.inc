@@ -3216,7 +3216,6 @@ function TXQTermSimpleMap.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   seq, oldContextItem: IXQValue;
   list: TXQVList;
-  pe: TTreeNode;
   oldSeqIndex, oldSeqLength: SizeInt;
   pv: PIXQValue;
   oldExtension: PXQExtensionEvaluationContext;

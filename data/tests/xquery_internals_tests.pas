@@ -9,7 +9,7 @@ procedure unittests();
 
 implementation
 
-uses bbutils, commontestutils, xquery.internals.common, sysutils, bigdecimalmath, xquery, xquery.internals.floathelpers;
+uses bbutils, commontestutils, xquery.internals.common, sysutils, bigdecimalmath, xquery;
 
 procedure hashcodetests;
   procedure testnumcode(v: integer);

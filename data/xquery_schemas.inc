@@ -1080,7 +1080,7 @@ begin
     curType := TXSType(typeList.Objects[i]);
     parent := curType.base;
     if parent <> nil then
-      with graph[parent.id] do begin
+      with {%H-}graph[parent.id] do begin
         children[count] := i;
         count += 1;
         assert(count < 24);

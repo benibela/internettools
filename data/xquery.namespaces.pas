@@ -464,15 +464,16 @@ function isValidNCName(const s: string): boolean;
 const AsciiNameStartChar = ['A'..'Z', '_', 'a'..'z'];
       AsciiNameChar = AsciiNameStartChar + ['-', '.', '0'..'9'];
 var
-  curpos: SizeInt;
+  p, pend: pchar;
   cp: Integer;
 begin
   result := false;
   if s = '' then exit();
-  curpos := 1;
-  if s[1] in AsciiNameStartChar then inc(curpos)
+  p := pchar(s);
+  pend := p + length(s);
+  if p^ in AsciiNameStartChar then inc(p)
   else begin
-    cp := strDecodeUTF8Character(s, curpos);
+    cp := strDecodeUTF8Character(p, pend);
     if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
        or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
        or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))
@@ -480,10 +481,10 @@ begin
        or ((cp >= $3001) and (cp <= $D7FF)) or((cp >= $F900) and (cp <= $FDCF))
        or ((cp >= $FDF0) and (cp <= $FFFD)) or ((cp >= $10000) and (cp <= $EFFFF))) then exit();
   end;
-  while curpos <= length(s) do begin
-    if s[curpos] in AsciiNameChar then inc(curpos)
+  while p < pend do begin
+    if p^ in AsciiNameChar then inc(p)
     else begin
-      cp := strDecodeUTF8Character(s, curpos);
+      cp := strDecodeUTF8Character(p, pend);
       if not (((cp >= $C0) and (cp <= $D6)) or ((cp >= $D8) and (cp <= $F6))
          or ((cp >= $F8) and (cp <= $2FF)) or((cp >= $370) and (cp <= $37D))
          or ((cp >= $37F) and (cp <= $1FFF)) or((cp >= $200C) and (cp <= $200D))

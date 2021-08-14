@@ -2133,7 +2133,7 @@ procedure testStringViews;
     test(ok, (codeI = 0) and (refI >= low(Int32)) and (refI <= high(int32)));
     if ok then test(vi32, refI);
     ok := view.tryParse(vu32);
-    test(ok, (codeU = 0) and (refU >= low(UInt32)) and (refU <= high(Uint32)));
+    test(ok, (codeU = 0) and (refU <= high(Uint32)));
     if ok then test(vu32 = refU);
   end;
 
