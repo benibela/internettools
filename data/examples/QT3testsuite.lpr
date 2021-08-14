@@ -1830,6 +1830,10 @@ begin
     searchURL(TEnvironment(e));
     if transfer.HTTPResultCode <> 400 then exit;
   end;
+  try
+    if ur.Contains('%') then ur := strUnescapeHex(ur, '%');
+  except
+  end;
   if strBeginsWith(ur, 'http://www.w3.org/fots/') then begin
     delete(ur, 1, length('http://www.w3.org/fots/'));
     if FileExists(ur) then begin
