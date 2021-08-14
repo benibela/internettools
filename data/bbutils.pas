@@ -3471,7 +3471,7 @@ begin
   if (length = MaxDigits64) and (pstart^ >= FirstInvalidDigit) then exit;
   unsigned := 0;
   if PtrUInt(TObject(pstart)) and 7 = 0 then begin
-    while pstart + 8 < pend do begin
+    while pstart + 8 <= pend do begin
       temp8 := PUInt64(pstart)^;
       if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
       temp8 := temp8 - decimalZeros8;
@@ -3480,7 +3480,7 @@ begin
       unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
       inc(pstart, 8);
     end;
-    while pstart + 4 < pend do begin
+    if pstart + 4 <= pend then begin
       temp4 := PUInt32(pstart)^;
       if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
       temp4 := temp4 - decimalZeros4;
@@ -3521,7 +3521,7 @@ begin
   if (length = MaxDigits32) and (pstart^ >= FirstInvalidDigit) then exit;
   unsigned := 0;
   if PtrUInt(TObject(pstart)) and 7 = 0 then begin
-    while pstart + 8 < pend do begin
+    while pstart + 8 <= pend do begin
       temp8 := PUInt64(pstart)^;
       if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
       temp8 := temp8 - decimalZeros8;
@@ -3530,7 +3530,7 @@ begin
       unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
       inc(pstart, 8);
     end;
-    while pstart + 4 < pend do begin
+    if pstart + 4 <= pend then begin
       temp4 := PUInt32(pstart)^;
       if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
       temp4 := temp4 - decimalZeros4;
