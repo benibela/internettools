@@ -6033,12 +6033,16 @@ var
 
   procedure raiseError(message: string = 'error'; code: string = '');
   var token: string;
+    invalidUtf8: SizeInt;
   begin
     Str(scanner.CurToken, token);
     if code = '' then begin
       if jsoniqMode then code := 'jerr:JNDY0021'
-      else if isInvalidUTF8Guess(scanner.CurLine, length(scanner.CurLine)) then code := 'FOUT1200'
-      else code := 'FOJS0001';
+      else begin
+        strLengthUtf8(scanner.CurLine, invalidUtf8);
+        if invalidUtf8 > 0 then code := 'FOUT1200'
+        else code := 'FOJS0001';
+      end;
     end;
     raise EXQEvaluationException.create(code, message+' at ' + strFromPchar(scanner.CurTokenStart, scanner.CurTokenLength) +' (' + token +') in '+scanner.CurLine);
   end;

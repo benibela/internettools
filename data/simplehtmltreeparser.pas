@@ -2766,6 +2766,23 @@ begin
   end;
   result := good < 10 * bad;
 end;
+{stricter version:
+function isInvalidUTF8Guess(const s: string; cutoff: integer): boolean;
+var
+  p, pend: PChar;
+  len: SizeInt;
+begin
+  len := length(s);
+  if len > cutoff then len := cutoff;
+  p := pchar(s);
+  pend := p + len;
+  result := false;
+  while p < pend do begin
+    if p^ < #$80 then inc(p)
+    else if strDecodeUTF8Character(p, pend) < 0 then exit(true);
+  end;
+end;
+}
 
 
 function TTreeParser.parseTree(html: string; uri: string; contentType: string): TTreeDocument;
