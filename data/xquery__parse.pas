@@ -315,6 +315,7 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
             raiseParsingError('XPST0008', 'Private variable '+v.ToString, v);
           replacement := TXQTermVariableGlobalImported.Create;
           TXQTermVariableGlobalImported(replacement).staticContext := q.getStaticContext;
+          break;
         end;
       end;
     end //else if staticContext.isLibraryModule then begin raiseParsingError('XPST0008', 'Cannot find module for variable '+v.ToString, v); exit; end
