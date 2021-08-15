@@ -851,6 +851,7 @@ begin
   {$ifdef USE_PASDBLSTRUTILS}
   d := ConvertStringToDouble(str, length, rmNearest, @result);
   {$else}
+  ss := '';
   SetLength(ss, length);
   move(str^, ss[1], length);
   val(ss, d, code);

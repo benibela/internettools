@@ -23,7 +23,7 @@ const XMLNamespaceURL_Expath_Binary = 'http://expath.org/ns/binary';
 var XMLNamespace_Expath_Binary: TNamespace;
 implementation
 
-uses xquery.internals.common, xquery.internals.floathelpers, xquery, sysutils, classes, math, base64, bbutils, bigdecimalmath;
+uses xquery.internals.common,  xquery, sysutils, classes, math, base64, bbutils, bigdecimalmath;
 
 //error handling
 

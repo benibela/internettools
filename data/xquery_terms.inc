@@ -2949,9 +2949,6 @@ end;
 
 procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
 var
-  i: SizeInt;
-  f: TXQValueFunction;
-  q: ^IXQuery;
   privacyError: boolean;
 begin
   if not (kind in [xqfkNativeInterpreted, xqfkUnknown]) or (interpretedFunction <> nil) then exit;
