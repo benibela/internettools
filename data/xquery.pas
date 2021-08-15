@@ -8536,13 +8536,15 @@ begin
     result := TXQueryModule.Create(sc.moduleNamespace.getURL);
     FModules.include(sc.moduleNamespace.getURL, result);
   end;
-  result.queries.add(module);
+  if result.queries.indexOf(module) < 0 then
+    result.queries.add(module);
 end;
 
 function TXQueryEngine.registerPendingModule(module: IXQuery): TXQueryModule;
 begin
   result := registerModule(module);
-  FPendingModules.add(module);
+  if FPendingModules.indexOf(module) < 0 then
+    FPendingModules.add(module);
 end;
 
 procedure TXQueryEngine.removeModuleInternal(module: IXQuery; pendingOnly: boolean);

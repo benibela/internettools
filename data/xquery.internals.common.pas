@@ -283,6 +283,7 @@ public
   destructor Destroy; override;
   procedure delete(i: SizeInt); //**< Deletes a value (since it is an interface, the value is freed iff there are no other references to it remaining)
   procedure remove(const value: IT);
+  function indexOf(const value: IT): SizeInt;
   procedure add(const value: IT);
   procedure addAll(other: TFastInterfaceList);
   function get(i: SizeInt): IT; inline; //**< Gets an interface from the list.
@@ -1734,6 +1735,16 @@ begin
       delete(i);
 end;
 
+function TFastInterfaceList.indexOf(const value: IT): SizeInt;
+var
+  i: SizeInt;
+begin
+  for i := fcount - 1 downto 0 do
+    if fbuffer[i] = value then
+      exit(i);
+  result := -1
+end;
+
 procedure TFastInterfaceList.add(const value: IT);
 begin
   assert(value <> nil);
@@ -1838,7 +1849,7 @@ begin
   setBufferSize(0);
 end;
 
-function TFastInterfaceList.getEnumerator: TFastInterfaceList.TFastInterfaceListEnumerator;
+function TFastInterfaceList.getEnumerator: TFastInterfaceListEnumerator;
 begin
   if fcount = 0 then result := default(TFastInterfaceListEnumerator)
   else begin;
