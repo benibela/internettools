@@ -2490,7 +2490,10 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
-    allVariables: array of TXQTermDefineVariable; //variables of this module plus variables of imported modules
+    allVariables: array of record //variables of this module plus variables of imported modules
+      definition: TXQTermDefineVariable;
+      context: TXQStaticContext;
+    end;
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -9631,8 +9634,11 @@ begin
   end;
   //the variables must be evaluated now, because an evaluation-when-accessed might be after the context item has changed
   for i := 0 to high(allVariables) do
-    if not context.sharedEvaluationContext.variables.hasVariable(allVariables[i].getVariable) then
-      context.sharedEvaluationContext.variables.add(allVariables[i].getVariable, allVariables[i].getClassicValue(context));
+    if not context.sharedEvaluationContext.variables.hasVariable(allVariables[i].definition.getVariable) then begin
+      context.staticContext := allVariables[i].context;
+      context.sharedEvaluationContext.variables.add(allVariables[i].definition.getVariable, allVariables[i].definition.getClassicValue(context));
+    end;
+  context.staticContext := staticContext;
 
   result := children[high(children)].evaluate(context);
 end;

@@ -3669,7 +3669,8 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
     end;
     for i := 0 to truehigh do
       if isTrueDefineVariable(m.children[i]) then begin
-        m.allVariables[p] := TXQTermDefineVariable(m.children[i]);
+        m.allVariables[p].definition := TXQTermDefineVariable(m.children[i]);
+        m.allVariables[p].context := staticContext;
         inc(p);
       end;
   end;
