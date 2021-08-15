@@ -924,7 +924,7 @@ begin
       exit(tcrFail);
   try
     case kind of
-      aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL).toBoolean];
+      aakAssert: result := OK[xq.evaluate(value, ASSERTION_PARSING_MODEL, res).toBoolean];
       aakEq: try
         result := OK[xq.StaticContext.compareAtomic (res, xq.parseQuery(value, xqpmXPath3_1).evaluate(),  nil) = xqcrEqual];
       except
@@ -1994,7 +1994,6 @@ begin
   xq.StaticContext.model := config.version;
   TNamespace.releaseIfNonNil(xq.StaticContext.defaultTypeNamespace);
   xq.StaticContext.useLocalNamespaces:=false;
-  xq.AutomaticallyRegisterParsedModules := true;
   baseSchema.version := xsd11;
   defaultInternetAccessClass := TQT3FakeInternetAccess;
 
