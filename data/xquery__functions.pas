@@ -3469,17 +3469,16 @@ begin
   last := node;
   while node <> nil do begin
     if node.getAttributeTry('xml:base', temp, @context.staticContext.nodeCollation.equal) then begin
-      if temp <> '' then
+      if temp <> '' then begin
         uri := strResolveURI(uri, strTrimAndNormalize(temp, [#9,#10,#13,' ']));
+      end;
     end;
     last := node;
     node := node.getParent();
   end;
-  if last <> nil then begin
-    if objInheritsFrom(last, TTreeDocument) then uri := strResolveURI(uri, strTrimAndNormalize(TTreeDocument(last).baseURI, [#9,#10,#13,' ']))
-    else if last.typ in [tetOpen] then uri := strResolveURI(uri, strTrimAndNormalize(context.staticContext.baseURI, [#9,#10,#13,' ']))
-    else if (uri = '') and (last.typ in [tetAttribute, tetText, tetComment, tetProcessingInstruction]) then exit(xqvalue());
-  end;
+  if (uri = '') and not (last.typ in [tetDocument, tetOpen]) then
+    exit(xqvalue());
+  uri := strResolveURI(uri, strTrimAndNormalize(last.getDocument().baseURI, [#9,#10,#13,' ']));
   result := TXQValueString.create(baseSchema.anyURI,'');
   (result as TXQValueString).str :=  uri; // by pass validation
 end;

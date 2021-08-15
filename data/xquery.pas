@@ -6921,6 +6921,7 @@ function TXQStaticContext.needTemporaryNodes: TXQTempTreeNodes;
 begin
   if temporaryNodes = nil then begin
     temporaryNodes := TXQTempTreeNodes.create();
+    temporaryNodes.baseURI := baseURI;
     temporaryNodes.addRef;
   end;
   result := temporaryNodes;
