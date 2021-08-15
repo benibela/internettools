@@ -176,6 +176,19 @@ type
 
   //============================XQUERY CONTEXTS==========================
 
+  TXQQueryList = specialize TFastInterfaceList<IXQuery>;
+  TXQueryModule = class
+    namespaceURL: string;
+    //locationHints: array of string;
+    queries: TXQQueryList;
+    pendingQueries: TXQQueryList;
+    constructor Create(anUrl: string);
+    destructor Destroy; override;
+  end;
+  TXQQueryArray = array of TXQuery;
+
+  TXQTermModule = class;
+
   //** Static context containing default values and values read during parsing and not changed during evaluation. Mostly corresponds to the "static context" in the XQuery spec
   //**
   //** If a query contains multiple queries (e.g. from importing modules), each query can have its own static context.
@@ -191,8 +204,9 @@ type
     namespaces: TNamespaceList;  //**< All declared namespaces.
     moduleContextItemDeclarations: array of TXQTermDefineVariable;
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
-    associatedModules: TFPList;
-    importedModules: TXQMapStringObject; //**< All imported modules as (prefix, module: TXQuery) tuples
+    associatedModules: TFPList; //list of TXQuery
+    importedModules: TXQMapStringObject; //**< All imported modules as (prefix, module: TXQueryModule) tuples
+    moduleTerm: TXQTermModule;
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
     defaultFunctionNamespace: TNamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
     defaultElementTypeNamespace: TNamespace; //**< Default element type namespace (default is empty)
@@ -243,12 +257,14 @@ type
     function needTemporaryNodes: TXQTempTreeNodes;
     function ImplicitTimezoneInMinutes: integer; inline;
     function CurrentDateTime: TDateTime; inline;
-    function findModule(const namespaceURL: string): TXQuery;
-    function findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
-    function findFunction(const anamespace, alocalname: string; const argcount: integer): TXQValueFunction;
+    function findModule(const namespaceURL: string): TXQueryModule;
+    //function findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
+    function findFunction(const anamespace, alocalname: string; const argcount: integer): TXQValueFunction; //finds a function defined in this context
+    function findImportedFunction(const anamespace, alocalname: string; const argcount: integer; out privacyError: boolean; out functionContext: TXQStaticContext): TXQValueFunction; //finds a function that has been imported or defined in this context
     function findVariableDeclaration( v: TXQTermVariable): TXQTermDefineVariable;
     function findVariableDeclaration(const namespace, varname: string): TXQTermDefineVariable;
     function isLibraryModule: boolean;
+    function getAllImportedModuleQueries(): TXQQueryArray;
   protected
     function compareCommon(a, b: TXQValue; overrideCollation: TXQCollation; castUnknownToString: boolean): TXQCompareResult;
   public
@@ -2475,7 +2491,7 @@ type
   { TXQTermModule }
 
   TXQTermModule = class(TXQTermWithChildren)
-    allVariables: array of TXQTermDefineVariable;
+    allVariables: array of TXQTermDefineVariable; //variables of this module plus variables of imported modules
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -2507,6 +2523,7 @@ type
     function visit(visitor: TXQTerm_VisitorClass; parent: TXQTerm = nil): TXQTerm_VisitAction;
     function visit(visitor: TXQTerm_Visitor; parent: TXQTerm = nil): TXQTerm_VisitAction;
 
+    function getStaticContext: TXQStaticContext;
   end;
 
   { TXQuery }
@@ -2535,7 +2552,6 @@ type
     property Term: TXQTerm read getTerm write setTerm;
   end;
 
-  TXQueryModuleList = specialize TFastInterfaceList<IXQuery>;
 
   //============================EXCEPTIONS/EVENTS==========================
 
@@ -2887,9 +2903,11 @@ public
     //** Evaluates an expression with a certain tree element as current node.
     class function evaluateStaticCSS3(expression: string; tree:TTreeNode = nil): IXQValue; deprecated 'use global query() function for XQuery or defaultQueryEngine.evaluate* [afterwards call freeThreadVars]';
 
-    procedure registerModule(module: IXQuery);  //**< Registers an XQuery module. An XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
-    function findModule(const namespaceURL: string): TXQuery; //**< Finds a certain registered XQuery module
-    function findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery; //**< Finds a certain registered XQuery module or tries to load one
+    function registerModule(module: IXQuery): TXQueryModule;  //**< Registers an XQuery module. An XQuery module is created by parsing (not evaluating) a XQuery expression that contains a "module" declaration
+    function registerPendingModule(module: IXQuery): TXQueryModule;
+    procedure removeModuleInternal(module: IXQuery; pendingOnly: boolean);
+    function findModule(const namespaceURL: string): TXQueryModule; //**< Finds a certain registered XQuery module
+    function findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQueryModule; //**< Finds a certain registered XQuery module or tries to load one
     class function findNativeModule(const ns: string): TXQNativeModule; //**< Finds a native module.
 
     //** Registers a collation for custom string comparisons
@@ -2902,7 +2920,8 @@ public
     FLastQuery: IXQuery;
     FCreationThread: TThreadID;
   protected
-    FModules, FPendingModules: TXQueryModuleList; //internal used
+    FModules: TXQHashmapStrOwningObject; //list of TXQueryModule
+    FPendingModules: TXQQueryList;
     FParserVariableVisitor: TObject;
     VariableChangelogUndefined: TXQVariableChangeLog;
     FDefaultSharedEvaluationContext: TXQSharedEvaluationContext;
@@ -3472,6 +3491,20 @@ begin
   t := PPointer(@a)^ ;
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
+end;
+
+constructor TXQueryModule.Create(anUrl: string);
+begin
+  namespaceURL := anUrl;
+  queries := TXQQueryList.create();
+  pendingQueries := TXQQueryList.create();
+end;
+
+destructor TXQueryModule.Destroy;
+begin
+  queries.Free;
+  pendingQueries.Free;
+  inherited Destroy;
 end;
 
 
@@ -6563,19 +6596,18 @@ begin
   else result := FNodeCollation;
 end;
 
-function TXQStaticContext.findModule(const namespaceURL: string): TXQuery;
+function TXQStaticContext.findModule(const namespaceURL: string): TXQueryModule;
 var
   i: SizeInt;
+  //p: TXQHashmapStrOwningObject.TKeyValuePairOption;
 begin
   if (self = nil) or (importedModules = nil) then exit(nil);
-
-  for i := 0 to importedModules.count - 1 do
-    if TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace.getURL = namespaceURL then
-      exit(TXQuery(importedModules.Objects[i]));
-
+  for i := 0 to importedModules.Count - 1 do
+    if TXQueryModule(importedModules.Objects[i]).namespaceURL = namespaceURL then
+      exit(TXQueryModule(importedModules.Objects[i]));
   result := nil;
 end;
-
+                          {
 function TXQStaticContext.findModuleStaticContext(const namespaceURL: string): TXQStaticContext;
 var
   module: TXQuery;
@@ -6583,7 +6615,7 @@ begin
   module := findModule(namespaceURL);
   if module = nil then exit(self);
   exit(module.staticContext); //the main module can contain function in any namespace
-end;
+end;                       }
 
 function TXQStaticContext.findFunction(const anamespace, alocalname: string; const argcount: integer): TXQValueFunction;
 var
@@ -6598,6 +6630,32 @@ begin
       exit(f);
   end;
   exit(nil);
+end;
+
+function TXQStaticContext.findImportedFunction(const anamespace, alocalname: string; const argcount: integer; out privacyError: boolean;
+  out functionContext: TXQStaticContext): TXQValueFunction;
+var
+  otherModule: TXQueryModule;
+  q: ^IXQuery;
+  j: Integer;
+begin
+  privacyError := false;
+  otherModule := findModule(anamespace);
+  if otherModule <> nil then
+    for q in otherModule.queries do begin
+      functionContext := q^.getStaticContext;
+      result := functionContext.findFunction(anamespace,alocalname,argcount);
+      if result <> nil then begin
+        //if functionContext <> context {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
+          for j := 0 to high(result.annotations) do
+            if result.annotations[j].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
+              privacyError := true;
+        exit();
+      end;
+    end;
+
+  functionContext := self;
+  result := findFunction(anamespace,alocalname,argcount);
 end;
 
 function TXQStaticContext.findVariableDeclaration(v: TXQTermVariable): TXQTermDefineVariable;
@@ -6632,6 +6690,25 @@ begin
   result := moduleNamespace <> nil;
 end;
 
+function TXQStaticContext.getAllImportedModuleQueries(): TXQQueryArray;
+var
+  count, i: SizeInt;
+  q: ^IXQuery;
+begin
+  if importedModules = nil then exit(nil);
+  count := 0;
+  for i := 0 to importedModules.Count - 1 do
+    count += TXQueryModule(importedModules.Objects[i]).queries.Count;
+  system.SetLength(result, count);
+  count := 0;
+  for i := 0 to importedModules.Count - 1 do begin
+    for q in TXQueryModule(importedModules.Objects[i]).queries do begin
+      result[count]:= q^ as TXQuery;
+      count += 1;
+    end;
+  end;
+end;
+
 procedure TXQStaticContext.assign(sc: TXQStaticContext);
 var
   i: SizeInt;
@@ -6656,7 +6733,7 @@ begin
       result.associatedModules := TFPList.Create;
       result.associatedModules.Assign(associatedModules);
     end;
-    result.importedmodules := importedmodules;
+    result.importedModules := importedModules;
     if result.importedModules <> nil then begin
       result.importedModules := TXQMapStringObject.Create;
       for i:=0 to importedModules.count - 1 do result.importedModules.AddObject(importedModules[i], importedModules.Objects[i]);
@@ -6746,7 +6823,7 @@ begin
     exit;
   if importedModules <> nil then begin
     i := importedModules.IndexOf(nsprefix);
-    if i >= 0 then exit(TXQuery(importedModules.Objects[i]).staticContext.moduleNamespace.getSelf);
+    if i >= 0 then exit((TXQueryModule(importedModules.Objects[i]).queries.first as TXQuery).staticContext.moduleNamespace.getSelf);
   end;
   if (importedSchemas <> nil)  and (defaultNamespaceKind in [xqdnkAny, xqdnkElementType,  xqdnkType]) and (importedSchemas.hasNamespacePrefix(nsprefix, result)) then
     exit;
@@ -8223,8 +8300,8 @@ begin
   StaticContext.jsonPXPExtensions:=true;
   FDefaultVariableStack := TXQEvaluationStack.create();
   FDefaultSharedEvaluationContext := TXQSharedEvaluationContext.Create;
-  FModules := TXQueryModuleList.Create;
-  FPendingModules := TXQueryModuleList.Create;
+  FModules.init;
+  FPendingModules := TXQQueryList.create();
   inc(threadLocalCache.runningEngines);
   FCreationThread := GetThreadID;
   DefaultJSONParser.init;
@@ -8249,8 +8326,8 @@ begin
   DefaultParser.Free;
   clear;
   GlobalNamespaces.free;
-  FModules.Free;
-  FPendingModules.Free;
+  FModules.done;
+  FPendingModules.free;
   FParserVariableVisitor.free;
   StaticContext.Free;
   //We need to call freeCommonCaches on every thread.
@@ -8451,30 +8528,50 @@ begin
 end;
 
 
-procedure TXQueryEngine.registerModule(module: IXQuery);
-begin
-  FModules.Add(module);
-end;
-
-function TXQueryEngine.findModule(const namespaceURL: string): TXQuery;
+function TXQueryEngine.registerModule(module: IXQuery): TXQueryModule;
 var
-  i: Integer;
-  tempModule: TXQuery;
+  sc: TXQStaticContext;
 begin
-  for i := 0 to FModules.Count - 1 do begin
-    tempModule := FModules.Items[i] as TXQuery;
-    if tempModule.staticContext.moduleNamespace.getURL = namespaceURL then
-      exit(tempModule);
+  sc := (module as TXQuery).staticContext;
+  result := TXQueryModule(FModules.getOrDefault(sc.moduleNamespace.getURL));
+  if result = nil then begin
+    result := TXQueryModule.Create(sc.moduleNamespace.getURL);
+    FModules.include(sc.moduleNamespace.getURL, result);
   end;
-  for i := 0 to FPendingModules.Count - 1 do begin
-    tempModule := FPendingModules.Items[i] as TXQuery;
-    if tempModule.staticContext.moduleNamespace.getURL = namespaceURL then
-      exit(tempModule);
-  end;
-  exit(nil);
+  result.queries.add(module);
 end;
 
-function TXQueryEngine.findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQuery;
+function TXQueryEngine.registerPendingModule(module: IXQuery): TXQueryModule;
+begin
+  result := registerModule(module);
+  FPendingModules.add(module);
+end;
+
+procedure TXQueryEngine.removeModuleInternal(module: IXQuery; pendingOnly: boolean);
+var
+  m: TXQueryModule;
+  ns: String;
+begin
+  if module.getStaticContext.moduleNamespace = nil then exit;
+  ns := module.getStaticContext.moduleNamespace.getURL;
+  m := findModule(ns);
+  m.pendingQueries.remove(module);
+  if not pendingOnly then begin
+    m.queries.remove(module);
+    if m.queries.Count = 0 then begin
+      FModules.exclude(ns);
+      m.free;
+    end;
+  end;
+  FPendingModules.remove(module);
+end;
+
+function TXQueryEngine.findModule(const namespaceURL: string): TXQueryModule;
+begin
+  result := TXQueryModule(FModules.getOrDefault(namespaceURL));
+end;
+
+function TXQueryEngine.findModule(context: TXQStaticContext; const namespace: string; const at: array of string): TXQueryModule;
 begin
   result := findModule(namespace);
   if result <> nil then exit;

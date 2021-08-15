@@ -108,6 +108,7 @@ type
     function contains(const key: TKey): boolean;
     property values[const Key:TKey]: TBaseValue read getBaseValueOrDefault write SetBaseValue; default;
     function getEnumerator: TEntityEnumerator;
+    function isEmpty: boolean; inline;
     property Count: int32 read Size;
   end;
 
@@ -252,12 +253,19 @@ public
   property RefCount : longint read frefcount;
 end;
 
+
 //**a list to store interfaces, similar to TInterfaceList, but faster, because
 //**  (1) it assumes all added interfaces are non nil
 //**  (2) it is not thread safe
 //**  (3) it is generic, so you need no casting
 generic TFastInterfaceList<IT> = class
   type PIT = ^IT;
+  TFastInterfaceListEnumerator = record
+    fcurrent: PIT;
+    fend: PIT;
+    function moveNext: boolean;
+    property current: PIT read fcurrent;
+  end;
 protected
   fcount, fcapacity: SizeInt; // count
   fbuffer: PIT; // Backend storage
@@ -284,6 +292,7 @@ public
   property items[i: SizeInt]: IT read get write put; default;
   property Count: SizeInt read fcount write setCount;
   property Capacity: SizeInt read fcapacity write setCapacity;
+  function getEnumerator: TFastInterfaceListEnumerator;
 end;
 
 TXMLDeclarationStandalone = (xdsOmit, xdsYes, xdsNo);
@@ -767,6 +776,11 @@ end;
 function TXQBaseHashmap.getEnumerator: TEntityEnumerator;
 begin
   result.init(@self);
+end;
+
+function TXQBaseHashmap.isEmpty: boolean;
+begin
+  result := Count = 0;
 end;
 
 function TXQBaseHashmap.getBaseValueOrDefault(const Key: TKey): TBaseValue;
@@ -1667,6 +1681,11 @@ end;
 
 
 
+function TFastInterfaceList.TFastInterfaceListEnumerator.moveNext: boolean;
+begin
+  inc(fcurrent);
+  result := fcurrent < fend
+end;
 
 
 procedure TFastInterfaceList.setCapacity(AValue: SizeInt);
@@ -1817,6 +1836,15 @@ begin
   end;
   fcount:=0;
   setBufferSize(0);
+end;
+
+function TFastInterfaceList.getEnumerator: TFastInterfaceList.TFastInterfaceListEnumerator;
+begin
+  if fcount = 0 then result := default(TFastInterfaceListEnumerator)
+  else begin;
+    result.fcurrent := fbuffer - 1;
+    result.fend := fbuffer + fcount
+  end;
 end;
 
 destructor TFastInterfaceList.Destroy;

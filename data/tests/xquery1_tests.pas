@@ -626,7 +626,7 @@ begin
   t('let $pVal := 1, $vList := (2,4,7,11,16), $vList2 := ($pVal, subsequence($vList, 1, count($vList)-1)) return for $i in 1 to count($vList) return $vList[$i] - $vList2[$i]', '1 2 3 4 5');
 
 
-  mr('module namespace test = "pseudo://test-module"; declare function test:internalref(){ concat($test:var, ":", test:func()) }; declare variable $test:var := 123; declare function test:func(){ 456 };');
+  mr('module namespace test = "pseudo://test-module";  declare variable $test:var := 123; declare function test:internalref(){ concat($test:var, ":", test:func()) }; declare function test:func(){ 456 };');
   m('import module "pseudo://test-module"; $test:var', '123');
   m('import module "pseudo://test-module"; test:func()', '456');
   m('import module "pseudo://test-module"; test:internalref()', '123:456');

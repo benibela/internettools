@@ -2951,26 +2951,16 @@ procedure TXQTermNamedFunction.init(const context: TXQStaticContext);
 var
   i: SizeInt;
   f: TXQValueFunction;
+  q: ^IXQuery;
+  privacyError: boolean;
 begin
   if not (kind in [xqfkNativeInterpreted, xqfkUnknown]) or (interpretedFunction <> nil) then exit;
   case kind of
     xqfkUnknown: begin
-      functionStaticContext := context.findModuleStaticContext(name.namespaceURL);
-      if functionStaticContext <> nil then
-        for i := 0 to high(functionStaticContext.functions) do begin
-          f :=  functionStaticContext.functions[i];
-          if (f.name = name.localname)
-             and (length(f.parameters) = length(children))
-             and (f.namespaceURL = name.namespaceURL) then begin
-            interpretedFunction := f;
-            break;
-          end;
-        end;
+      interpretedFunction := context.findImportedFunction(name.namespaceURL, name.localname, length(children), privacyError, functionStaticContext);
       if interpretedFunction <> nil then begin
-        if functionStaticContext <> context {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
-          for i := 0 to high(interpretedFunction.annotations) do
-            if interpretedFunction.annotations[i].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
-              raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
+        if privacyError then
+          raiseParsingError('XPST0017', interpretedFunction.name + ' is private');
       end else begin
         findKindIndex(name.namespaceURL, name.localname, length(children), context, kind, func);
         if kind <> xqfkUnknown then exit();

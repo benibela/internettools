@@ -7765,7 +7765,7 @@ var
   at: TStringArray = nil;
   ps: TXQProperty;
   i: Integer;
-  module: TXQuery;
+  module: TXQueryModule;
   helper: TLoadXQueryHelper;
   resMap: TXQValueStringMap;
   functionsMap, variablesMap, functionMap: TXQValueStandardMap;
@@ -7773,6 +7773,7 @@ var
   temp: IXQValue;
   tempValue, f: TXQValue;
   pp: TXQStandardProperty;
+  q: ^IXQuery;
 begin
   uri := args[0].toString;
   if uri.IsEmpty then raise  EXQEvaluationException.create('FOQM0001', 'Empty module uri');
@@ -7820,19 +7821,17 @@ begin
         helper.context.SeqIndex := 1;
       end;
     end;
-    with module.getStaticContext do
-      for i := 0 to high(moduleContextItemDeclarations) do
-        if (moduleContextItemDeclarations[i].getSequenceType <> nil) and not moduleContextItemDeclarations[i].getSequenceType.instanceOf(helper.context.SeqValue, context) then
-          moduleContextItemDeclarations[i].getSequenceType.raiseEvaluationError('FOQM0005', 'Context time with value ' +helper.context.SeqValue.toXQuery() + ' has not the correct type '+moduleContextItemDeclarations[i].getSequenceType.serialize);
+    for q in module.queries do begin
+      with q.getStaticContext do
+        for i := 0 to high(moduleContextItemDeclarations) do
+          if (moduleContextItemDeclarations[i].getSequenceType <> nil) and not moduleContextItemDeclarations[i].getSequenceType.instanceOf(helper.context.SeqValue, context) then
+            moduleContextItemDeclarations[i].getSequenceType.raiseEvaluationError('FOQM0005', 'Context time with value ' +helper.context.SeqValue.toXQuery() + ' has not the correct type '+moduleContextItemDeclarations[i].getSequenceType.serialize);
+    end;
     helper.externalVariables := args[1].getProperty('variables');
     context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
   end;
   helper.context.sharedEvaluationContext := TXQSharedEvaluationContext.create();
   try
-    helper.context.staticContext := module.getstaticContext;
-    module.evaluate(helper.context);
-
-
     functionsMap := TXQValueStandardMap.create();
     variablesMap := TXQValueStandardMap.create();
     resMap := TXQValueStringMap.create();
@@ -7840,26 +7839,33 @@ begin
     resMap.setMutable('variables', variablesMap);
     result := resMap;
 
-    with helper.context.sharedEvaluationContext do
-      for i := 0 to variables.count - 1 do begin
-        if variables.getNamespace(i) <> uri then continue;
-        variablesMap.setMutable(TXQValueQName.create(variables.getNamespace(i), variables.getName(i)),
-                              variables.get(i)
-                              );
-      end;
-    sc := module.getStaticContext;
-    for i := 0 to high(sc.functions) do begin
-      temp := TXQValueQName.create(sc.functions[i].namespaceURL, sc.functions[i].name);
-      if functionsMap.hasProperty(temp, @tempValue) then begin
-        functionMap := tempValue as TXQValueStandardMap;
-      end else
-        functionMap := TXQValueStandardMap.create();
+    for q in module.queries do begin
+      helper.context.staticContext := q.getstaticContext;
+      q.evaluate(helper.context);
 
-      f := sc.functions[i].directClone;
-      (f as TXQValueFunction).context.sharedEvaluationContext := helper.context.sharedEvaluationContext;
-      helper.context.sharedEvaluationContext._AddRefIfNonNil;
-      functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), f);
-      functionsMap.setMutable(temp, functionMap);
+
+      with helper.context.sharedEvaluationContext do
+        for i := 0 to variables.count - 1 do begin
+          if variables.getNamespace(i) <> uri then continue;
+          variablesMap.setMutable(TXQValueQName.create(variables.getNamespace(i), variables.getName(i)),
+                                variables.get(i)
+                                );
+        end;
+
+      sc := q.getStaticContext;
+      for i := 0 to high(sc.functions) do begin
+        temp := TXQValueQName.create(sc.functions[i].namespaceURL, sc.functions[i].name);
+        if functionsMap.hasProperty(temp, @tempValue) then begin
+          functionMap := tempValue as TXQValueStandardMap;
+        end else
+          functionMap := TXQValueStandardMap.create();
+
+        f := sc.functions[i].directClone;
+        (f as TXQValueFunction).context.sharedEvaluationContext := helper.context.sharedEvaluationContext;
+        helper.context.sharedEvaluationContext._AddRefIfNonNil;
+        functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), f);
+        functionsMap.setMutable(temp, functionMap);
+      end;
     end;
 
   finally

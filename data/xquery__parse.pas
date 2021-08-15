@@ -288,7 +288,9 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   var v: TXQTermVariable;
     q: TXQuery;
     replacement: TXQTermVariableGlobal = nil;
-    declaration: TXQTermDefineVariable;
+    declaration: TXQTermDefineVariable = nil;
+    module: TXQueryModule;
+    i: Integer;
   begin
     v := TXQTermVariable(pt^);
     if (parent <> nil) and (parent.ClassType = TXQTermDefineVariable) and (TXQTermDefineVariable(parent).getVariable = v) then exit;
@@ -303,18 +305,22 @@ function TFinalVariableResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
     if (currentVariable <> nil) and (currentVariable.equalsVariable(v)) then
       raiseParsingError('XPST0008', 'Self-Dependancy: '+v.ToString, v);
 
-    q := staticContext.findModule(v.namespace);
-    if q <> nil then begin
-      declaration := q.getStaticContext.findVariableDeclaration(v);
-      if declaration <> nil then begin
-        if (q.getStaticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
-          raiseParsingError('XPST0008', 'Private variable '+v.ToString, v);
-        replacement := TXQTermVariableGlobalImported.Create;
-        TXQTermVariableGlobalImported(replacement).staticContext := q.getStaticContext;
+    module := staticContext.findModule(v.namespace);
+    if module <> nil then begin
+      for i := 0 to module.queries.Count - 1 do begin
+        q := (module.queries[i] as TXQuery);
+        declaration :=  q.getStaticContext.findVariableDeclaration(v);
+        if declaration <> nil then begin
+          if (q.getStaticContext <> staticContext) and hasAnnotation(declaration.annotations, XMLNamespaceURL_XQuery, 'private') then
+            raiseParsingError('XPST0008', 'Private variable '+v.ToString, v);
+          replacement := TXQTermVariableGlobalImported.Create;
+          TXQTermVariableGlobalImported(replacement).staticContext := q.getStaticContext;
+        end;
       end;
-    end else if staticContext.isLibraryModule then begin raiseParsingError('XPST0008', 'Cannot find module for variable '+v.ToString, v); exit; end
+    end //else if staticContext.isLibraryModule then begin raiseParsingError('XPST0008', 'Cannot find module for variable '+v.ToString, v); exit; end
     else begin
       declaration := staticContext.findVariableDeclaration(v);
+      if (declaration = nil) and (staticContext.isLibraryModule) then begin raiseParsingError('XPST0008', 'Cannot find module for variable '+v.ToString, v); exit; end;
       if declaration <> nil then
         replacement := TXQTermVariableGlobal.Create;
     end;
@@ -437,13 +443,25 @@ var oldContext: TXQStaticContext;
     moduleStack.Delete(moduleStack.Count - 1);
   end;
 
+  function findVariableDeclaration(modu: TXQTermModule; v: TXQTermDefineVariable): sizeint;
+  var
+    i: sizeint;
+  begin
+    for i := 0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
+      if modu.children[i] = v then
+        exit(i);
+    result := -1;
+  end;
+
 var
   modu: TXQTermModule;
-  q: TXQuery;
-  i, stackIndex, visitedIndex: SizeInt;
+  q: ^IXQuery;
+  i, newVariableIndex, stackIndex, visitedIndex: SizeInt;
   tnf: TXQTermNamedFunction;
 
   globalVar: TXQTermVariableGlobal;
+  module: TXQueryModule;
+
 begin
   Result:=inherited visit(term);
   stackIndex := stack.IndexOf(term^); //todo, only need to put variables and functions there?
@@ -471,24 +489,36 @@ begin
     v := globalVar. definition.getVariable;
     if (overridenVariables.hasVariable(v)) or acceptedVariables.hasVariable(v) then exit;
 
-    q := curcontext.findModule(v.namespace);
-    if q <> nil then begin
-      modu := q.Term as TXQTermModule;
-      goToNewContext(q.getStaticContext);
-    end else begin
+    newVariableIndex := -1;
+    modu := nil;
+    module := curcontext.findModule(v.namespace);
+    if module <> nil then
+      for q in module.queries do begin
+        modu := q^.Term as TXQTermModule;
+        newVariableIndex := findVariableDeclaration(modu, globalVar.definition);
+        if newVariableIndex >= 0 then begin
+          goToNewContext(q^.getStaticContext);
+          break;
+        end;
+      end;
+    if (newVariableIndex < 0) and (curcontext.moduleTerm <> nil) then begin
+      newVariableIndex := findVariableDeclaration(curcontext.moduleTerm, globalVar.definition);
+      if newVariableIndex >= 0 then begin
+        modu := curcontext.moduleTerm;
+        if modu <> mainmodule then goToNewContext(curcontext);//todo: does this work or does it miss cycles
+      end;
+    end;
+    if newVariableIndex < 0 then begin
       modu := mainmodule;
       oldLastVarIndex := lastVariableIndex;
       if curcontext <> outcontext then raise EXQParsingException.create('pxp:INTERNAL', '1650100');
+      newVariableIndex := findVariableDeclaration(modu, globalvar.definition);
+      if newVariableIndex < 0 then raise EXQParsingException.create('pxp:INTERNAL', '210815');
     end;
 
-
-    for i := 0 to high(modu.children) - ifthen(modu = mainmodule, 1,0) do
-      if modu.children[i] = globalVar.definition then begin
-        if (i > lastVariableIndex) then
-          raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
-        lastVariableIndex := i;
-        break;
-      end;
+    if (newVariableIndex > lastVariableIndex) then
+      raise EXQParsingException.create('XPST0008', 'Variable depends on later defined variable: '+v.ToString);
+    lastVariableIndex := newVariableIndex;
 
     if globalVar.definition.getExpression <> nil  then
       simpleTermVisit(@globalVar.definition.children[high(globalVar.definition.children)], nil);
@@ -496,9 +526,8 @@ begin
     acceptedVariables.add(v, tempValue);
 
 
-    if q <> nil then goToOldContext
+    if modu <> mainmodule {was q <> nil} then goToOldContext
     else lastVariableIndex := oldLastVarIndex;
-
   end;
 end;
 
@@ -3414,17 +3443,22 @@ var
   var
     i, oldlen: SizeInt;
     sc2: TXQStaticContext;
+    m: TXQueryModule;
+    q: ^IXQuery;
   begin
     if (visited.IndexOf(sc) >= 0) or (sc.importedModules = nil) then exit;
     visited.Add(sc);
    for i := 0 to sc.importedModules.Count - 1 do begin
-     sc2 := TXQuery(sc.importedModules.Objects[i]).getStaticContext;
-     if (length(sc2.moduleContextItemDeclarations) > 0) and (sc2 <> outsc) then begin
-       oldlen := length(outsc.moduleContextItemDeclarations);
-       SetLength(outsc.moduleContextItemDeclarations, oldlen + length(sc2.moduleContextItemDeclarations));
-       move(sc2.moduleContextItemDeclarations[0], outsc.moduleContextItemDeclarations[oldlen], length(sc2.moduleContextItemDeclarations) * sizeof(sc2.moduleContextItemDeclarations[0]));
+     m := TXQueryModule(sc.importedModules.Objects[i]);
+     for q in m.queries do begin
+       sc2 := q^.getStaticContext;
+       if (length(sc2.moduleContextItemDeclarations) > 0) and (sc2 <> outsc) then begin
+         oldlen := length(outsc.moduleContextItemDeclarations);
+         SetLength(outsc.moduleContextItemDeclarations, oldlen + length(sc2.moduleContextItemDeclarations));
+         move(sc2.moduleContextItemDeclarations[0], outsc.moduleContextItemDeclarations[oldlen], length(sc2.moduleContextItemDeclarations) * sizeof(sc2.moduleContextItemDeclarations[0]));
+       end;
+       rec(sc2);
      end;
-     rec(sc2);
    end;
   end;
 begin
@@ -3435,6 +3469,7 @@ begin
 end;
 
 procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext; cloneTerms: boolean);
+var importedQueries: TXQQueryArray;
   procedure checkVariableOverride(d: TXQTermDefineVariable);
   var
     i, j: Integer;
@@ -3442,18 +3477,15 @@ procedure finalizeFunctionsEvenMore(module: TXQTermModule; sc: TXQStaticContext;
     v: TXQTermVariable;
   begin
     v := TXQTermVariable(d.variable);
-    if sc.importedModules <> nil then begin
-      for i := 0 to sc.importedModules.Count - 1 do begin
-        modu := TXQuery(sc.importedModules.Objects[i]).Term as TXQTermModule;
-        if modu = module then continue;
-        for j :=  0 to high( modu.children ) do
-          if objInheritsFrom(modu.children[j], TXQTermDefineVariable)
-             and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then begin
-               if v.value <> '$' then //context item hack
-                  raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
-             end;
-
-      end;
+    for i := 0 to high(importedQueries) do begin
+      modu := importedQueries[i].Term as TXQTermModule;
+      if modu = module then continue;
+      for j :=  0 to high( modu.children ) do
+        if objInheritsFrom(modu.children[j], TXQTermDefineVariable)
+           and v.equalsVariable(TXQTermVariable(TXQTermDefineVariable(modu.children[j]).variable)) then begin
+             if v.value <> '$' then //context item hack
+                raise EXQParsingException.create('XQST0049', 'Local variable overrides imported variable:  ' + v.ToString);
+           end;
     end;
     modu := module;
     for j := 0 to high(modu.children) - 1 do
@@ -3478,6 +3510,7 @@ var
   otherFunction: TXQTermDefineFunction;
 begin
   children := module.children;
+  importedQueries := sc.getAllImportedModuleQueries();
 
   functionCount := 0;
   for i:=high(children) -  1 downto 0 do
@@ -3498,19 +3531,18 @@ begin
       end;
     if overriden >= oldFunctionCount then
       raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and '+sc.functions[overriden].toXQuery());
-    if sc.importedModules <> nil then
-      for j := 0 to sc.importedModules.Count - 1 do begin
-        otherModule := TXQuery(sc.importedModules.Objects[j]).Term as TXQTermModule;
-        if otherModule = module then continue;
-        for k := 0 to high(otherModule.children)  do
-          if objInheritsFrom(otherModule.children[k], TXQTermDefineFunction) then begin
-            otherFunction := TXQTermDefineFunction(otherModule.children[k]);
-            if (sc.functions[i].namespaceURL = otherFunction.name.namespaceURL)
-               and (sc.functions[i].name = otherFunction.name.localname)
-               and (length(sc.functions[i].parameters) = (otherFunction.parameterCount)) then
-                 raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and imported '+otherFunction.debugTermToString());
-          end;
-      end;
+    for j := 0 to high(importedQueries) do begin
+      otherModule := TXQuery(importedQueries[j]).Term as TXQTermModule;
+      if otherModule = module then continue;
+      for k := 0 to high(otherModule.children)  do
+        if objInheritsFrom(otherModule.children[k], TXQTermDefineFunction) then begin
+          otherFunction := TXQTermDefineFunction(otherModule.children[k]);
+          if (sc.functions[i].namespaceURL = otherFunction.name.namespaceURL)
+             and (sc.functions[i].name = otherFunction.name.localname)
+             and (length(sc.functions[i].parameters) = (otherFunction.parameterCount)) then
+               raise EXQParsingException.create('XQST0034', 'Multiple versions of ' + sc.functions[i].name + ' declared: '+sc.functions[i].toXQuery() + ' and imported '+otherFunction.debugTermToString());
+        end;
+    end;
     if overriden >= 0 then begin
       sc.functions[overriden].free;
       sc.functions[overriden] := sc.functions[i];
@@ -3538,7 +3570,7 @@ end;
 
 function TXQParsingContext.parseModule(): TXQTerm;
 var
-  pendings: TXQueryModuleList;
+  pendings: TXQQueryList;
   otherQuery: TXQuery;
   i: SizeInt;
   hadPending: Boolean;
@@ -3573,9 +3605,7 @@ begin
   if objInheritsFrom(result, TXQTermModule) then
     finalizeFunctionsEvenMore(TXQTermModule(result), staticContext, thequery.staticContextShared);
 
-
-  TXQueryEngineBreaker.forceCast(staticContext.sender).fmodules.AddAll(pendings);
-  pendings.Clear;
+  while pendings.Count > 0 do staticContext.sender.removeModuleInternal(pendings.last, true);
 end;
 
 
@@ -3591,6 +3621,7 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
     truehigh, i, j, ownvarcount, p, varcount: SizeInt;
     //l, r, varcount, i, j, p: Integer;
     imp: TXQTermModule;
+    importedQueries: TXQQueryArray;
   begin
     {sort children to (all variables, all functions, body term)
     works on it own, but does not work here, because it changes the order of the functions
@@ -3618,24 +3649,23 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
       if isTrueDefineVariable(m.children[i]) then
         ownvarcount += 1;
     varcount := ownvarcount;
-    if staticContext.importedModules <> nil then
-      for i := 0 to staticContext.importedModules.Count - 1 do begin
-        imp := TXQuery(staticContext.importedModules.Objects[i]).Term as TXQTermModule;
-        if (imp = nil) or (imp = m) then continue; //seems to happen with cycles. let's hope the main module still gets all the variables. todo? perhaps this helps to prevent duplicated variables? but we get duplicates anyways from different import paths to the same module. damnit
-        varcount += length(imp.allVariables);
-      end;
+    importedQueries := staticContext.getAllImportedModuleQueries;
+    for i := 0 to high(importedQueries) do begin
+      imp := importedQueries[i].Term as TXQTermModule;
+      if (imp = nil) or (imp = m) then continue; //seems to happen with cycles. let's hope the main module still gets all the variables. todo? perhaps this helps to prevent duplicated variables? but we get duplicates anyways from different import paths to the same module. damnit
+      varcount += length(imp.allVariables);
+    end;
 
     p := 0;
     SetLength(m.allVariables, varcount);
-    if staticContext.importedModules <> nil then
-      for i := 0 to staticContext.importedModules.Count - 1 do begin
-        imp := TXQuery(staticContext.importedModules.Objects[i]).Term as TXQTermModule;
-        if (imp = nil) or (imp = m) then continue;
-        for j := 0 to high(imp.allVariables) do begin
-          m.allVariables[p] := imp.allVariables[j];
-          inc(p);
-        end;
+    for i := 0 to high(importedQueries) do begin
+      imp := TXQuery(importedQueries[i]).Term as TXQTermModule;
+      if (imp = nil) or (imp = m) then continue;
+      for j := 0 to high(imp.allVariables) do begin
+        m.allVariables[p] := imp.allVariables[j];
+        inc(p);
       end;
+    end;
     for i := 0 to truehigh do
       if isTrueDefineVariable(m.children[i]) then begin
         m.allVariables[p] := TXQTermDefineVariable(m.children[i]);
@@ -3645,7 +3675,7 @@ procedure TXQParsingContext.parseQuery(aquery: TXQuery; onlySpecialString: boole
 
 var
   oldPendingCount, oldFunctionCount, i: SizeInt;
-  pendingModules: TXQueryModuleList;
+  pendingModules: TXQQueryList;
 begin
   debugInfo := TXQParsingErrorTracker.Create(str);
   thequery := aquery;
@@ -3676,8 +3706,8 @@ begin
       //thequeryinterface := thequery;  //this will automatically free the query later
       thequery._AddRef;
       if staticContext.sender.AutomaticallyRegisterParsedModules then
-        pendingModules.Remove(thequery);
-      while pendingModules.Count > oldPendingCount do pendingModules.Delete(pendingModules.count - 1); //we must delete pending modules, or failed module loads will prevent further parsing
+        staticContext.sender.removeModuleInternal(thequery, false); //also called for non-module queries, but the function should handle that
+      while pendingModules.Count > oldPendingCount do staticContext.sender.removeModuleInternal(pendingModules.last, false); //we must delete pending modules, or failed module loads will prevent further parsing
       thequery._Release;
 
       with errorTracking do
@@ -3838,9 +3868,10 @@ var declarationDuplicateChecker: TStringList;
     moduleName: String;
     moduleURL: String;
     at: array of string;
-    module: TXQuery;
+    module: TXQueryModule;
     nativeModule: TXQNativeModule;
     i: Integer;
+    oldModule: TXQueryModule;
   begin
     requireModule;
     skipWhitespaceAndComment();
@@ -3859,16 +3890,16 @@ var declarationDuplicateChecker: TStringList;
 
     if staticContext.importedModules = nil then
       staticContext.importedModules := TXQMapStringObject.Create;
-    for i := 0 to staticContext.importedModules.Count -  1 do begin
-      if namespaceGetURL(TXQuery(staticContext.importedModules.Objects[i]).getStaticContext.moduleNamespace) = moduleURL then begin
-        if i < oldImportedModulesCount then begin
-          if moduleName = '' then moduleName := TXQuery(staticContext.importedModules.Objects[i]).getStaticContext.moduleNamespace.getPrefix;
-          if moduleName <> staticContext.importedModules[i] then declareNamespace(moduleName, moduleURL);
-          exit; //allow external imports in shared contexts
-        end;
-        if (moduleURL = namespaceGetURL(staticContext.moduleNamespace)) and isModel3 then exit;
-        raiseParsingError('XQST0047', 'Duplicated module import of ' + moduleURL);
+    oldModule := staticContext.findModule(moduleURL);
+    if oldModule <> nil then begin
+      i := staticContext.importedModules.IndexOfObject(oldModule);
+      if i < oldImportedModulesCount then begin
+        if moduleName = '' then moduleName := (oldModule.queries[0] as TXQuery).getStaticContext.moduleNamespace.getPrefix;
+        if moduleName <> staticContext.importedModules[i] then declareNamespace(moduleName, moduleURL);
+        exit; //allow external imports in shared contexts
       end;
+      if (moduleURL = namespaceGetURL(staticContext.moduleNamespace)) and isModel3 then exit;
+      raiseParsingError('XQST0047', 'Duplicated module import of ' + moduleURL);
     end;
 
     module := engine.findModule(staticContext, moduleURL, at);
@@ -3881,7 +3912,7 @@ var declarationDuplicateChecker: TStringList;
       end;
       exit;
     end;
-    if moduleName = '' then moduleName := module.getStaticContext.moduleNamespace.getPrefix;
+    if moduleName = '' then moduleName := (module.queries[0] as txquery).getStaticContext.moduleNamespace.getPrefix;
     staticContext.importedModules.AddObject(moduleName, module);
   end;
 
@@ -4104,10 +4135,13 @@ begin
           expect(';');
           token := nextToken(true);
           if staticContext.importedModules = nil then staticContext.importedModules := TXQMapStringObject.Create;
+          //if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
           Assert(thequery <> nil);
-          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
+          staticContext.moduleTerm := result as TXQTermModule;
+          //staticContext.namespaces.add(staticContext.moduleNamespace);
+//          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
           if staticContext.sender.AutomaticallyRegisterParsedModules then
-            TXQueryEngineBreaker.forceCast(staticContext.sender).FPendingModules.Add(thequery);
+            TXQueryEngineBreaker.forceCast(staticContext.sender).registerPendingModule(thequery);
         end;
         else expect('namespace');
       end;
@@ -4611,8 +4645,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       t: TXSType;
       model: TXQParsingModel;
       schema: TXSSchema;
-      i: Integer;
       otherModuleStaticContext: TXQStaticContext;
+      privacyError: boolean;
     begin
       module := TXQueryEngine.findNativeModule(anamespace);
 
@@ -4642,18 +4676,13 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         end;
       end;
 
-      otherModuleStaticContext := staticContext.findModuleStaticContext(anamespace);
-      if (otherModuleStaticContext <> nil) then begin
-        f.interpretedFunction := otherModuleStaticContext.findFunction(anamespace,alocalname,argcount);
-        if f.interpretedFunction <> nil then begin
-          f.kind := xqfkUnknown;
-          f.functionStaticContext := otherModuleStaticContext;
-          if f.functionStaticContext <> staticContext {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
-            for i := 0 to high(f.interpretedFunction.annotations) do
-              if f.interpretedFunction.annotations[i].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
-                raiseParsingError('XPST0017', f.interpretedFunction.name + ' is private', f);
-          exit(true);
-        end;
+      f.interpretedFunction := staticContext.findImportedFunction(anamespace,alocalname,argcount,privacyError,otherModuleStaticContext);
+      if f.interpretedFunction <> nil then begin
+        if privacyError then
+          raiseParsingError('XPST0017', f.interpretedFunction.name + ' is private', f);
+        f.kind := xqfkUnknown;
+        f.functionStaticContext := otherModuleStaticContext;
+        exit(true);
       end;
 
       if argcount = 1 then begin
