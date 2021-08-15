@@ -2835,7 +2835,6 @@ type
 
     GlobalNamespaces: TNamespaceList;  //**< Globally defined namespaces
 
-    AutomaticallyRegisterParsedModules: boolean;
 
     procedure clear; //**< Clears all data.
     //** Parses a new XPath 2.0 expression and stores it in tokenized form.

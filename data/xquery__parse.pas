@@ -3706,8 +3706,7 @@ begin
       //free query
       //thequeryinterface := thequery;  //this will automatically free the query later
       thequery._AddRef;
-      if staticContext.sender.AutomaticallyRegisterParsedModules then
-        staticContext.sender.removeModuleInternal(thequery, false); //also called for non-module queries, but the function should handle that
+      staticContext.sender.removeModuleInternal(thequery, false); //also called for non-module queries, but the function should handle that
       while pendingModules.Count > oldPendingCount do staticContext.sender.removeModuleInternal(pendingModules.last, false); //we must delete pending modules, or failed module loads will prevent further parsing
       thequery._Release;
 
@@ -4141,9 +4140,7 @@ begin
           staticContext.moduleTerm := result as TXQTermModule;
           //staticContext.namespaces.add(staticContext.moduleNamespace);
 //          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
-          if staticContext.sender.AutomaticallyRegisterParsedModules then
-            TXQueryEngineBreaker.forceCast(staticContext.sender).registerPendingModule(thequery);
-        end;
+          TXQueryEngineBreaker.forceCast(staticContext.sender).registerPendingModule(thequery);        end;
         else expect('namespace');
       end;
     end;

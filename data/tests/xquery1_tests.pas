@@ -1796,7 +1796,6 @@ begin
 
   ps.StaticContext.strictTypeChecking:=false;
 
-  ps.AutomaticallyRegisterParsedModules := true;
   ps.parseQuery('module namespace test3 = "pseudo://test-module3"; declare function test3:double($x) { 2*$x}; declare variable $test3:var := 17; ', xqpmXQuery1);
   m('import module "pseudo://test-module3"; test3:double(10)', '20');
   m('import module "pseudo://test-module3" at "whatever"; test3:double(10)', '20');
