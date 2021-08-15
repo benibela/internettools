@@ -206,7 +206,6 @@ type
     functions: array of TXQValueFunction;   //**< All declared functions. Each function contain a pointer to a TXQTerm and a dynamic context containing a pointer to this staticcontext
     associatedModules: TFPList; //list of TXQuery
     importedModules: TXQMapStringObject; //**< All imported modules as (prefix, module: TXQueryModule) tuples
-    moduleTerm: TXQTermModule;
     importedSchemas: TNamespaceList; //**< All imported schemas. Currently they are just treated as to be equivalent to xs: {TODO.}
     defaultFunctionNamespace: TNamespace; //**< Default function namespace (engine default is http://www.benibela.de/2012/pxp/extensions)
     defaultElementTypeNamespace: TNamespace; //**< Default element type namespace (default is empty)
@@ -6645,7 +6644,7 @@ begin
       functionContext := q^.getStaticContext;
       result := functionContext.findFunction(anamespace,alocalname,argcount);
       if result <> nil then begin
-        //if functionContext <> context {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
+        if functionContext <> self  {not equalNamespaces(vfunc.namespace, context.staticContext.moduleNamespace)} then
           for j := 0 to high(result.annotations) do
             if result.annotations[j].name.isEqual(XMLNamespaceUrl_XQuery, 'private') then
               privacyError := true;

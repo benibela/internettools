@@ -502,13 +502,13 @@ begin
           break;
         end;
       end;
-    if (newVariableIndex < 0) and (curcontext.moduleTerm <> nil) then begin
+{    if (newVariableIndex < 0) and (curcontext.moduleTerm <> nil) then begin
       newVariableIndex := findVariableDeclaration(curcontext.moduleTerm, globalVar.definition);
       if newVariableIndex >= 0 then begin
         modu := curcontext.moduleTerm;
         if modu <> mainmodule then goToNewContext(curcontext);//todo: does this work or does it miss cycles
       end;
-    end;
+    end;}
     if newVariableIndex < 0 then begin
       modu := mainmodule;
       oldLastVarIndex := lastVariableIndex;
@@ -4135,12 +4135,9 @@ begin
           expect(';');
           token := nextToken(true);
           if staticContext.importedModules = nil then staticContext.importedModules := TXQMapStringObject.Create;
-          //if staticContext.namespaces = nil then staticContext.namespaces := TNamespaceList.Create;
           Assert(thequery <> nil);
-          staticContext.moduleTerm := result as TXQTermModule;
-          //staticContext.namespaces.add(staticContext.moduleNamespace);
-//          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, thequery); //every module import itself so it can lazy initialize its variables
-          TXQueryEngineBreaker.forceCast(staticContext.sender).registerPendingModule(thequery);        end;
+          staticContext.importedModules.AddObject(staticContext.moduleNamespace.getPrefix, TXQueryEngineBreaker.forceCast(staticContext.sender).registerPendingModule(thequery)); //every module imports itself so it can lazy initialize its variables
+        end;
         else expect('namespace');
       end;
     end;
