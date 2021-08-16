@@ -1904,9 +1904,10 @@ begin
 
   jsoniqlibtests('pseudo://libjn-test-module');
 
+  ps.StaticContext.baseURI := ''; //context base-uri takes priority over the second resolve parameter
   t('resolve-html(("a", 123, <a href="foobar">xyz</a>, <a href="http://google.de">xyz</a>, <unk href="a">b</unk>))', 'a 123 foobar http://google.de b');
   t('resolve-html(("a", 123, <a href="foobar">xyz</a>, <a href="http://google.de">xyz</a>, <unk href="a">b</unk>), "http://example.org")', 'http://example.org/a http://example.org/123 http://example.org/foobar http://google.de http://example.org/b');
-  t('serialize-json(resolve-html((<frame src="x"/>, <iframe src="y"/>, <img src="z"/>, <form action="f"><input name="inp" value="v"/></form>), "http://example.org"))', '["http://example.org/x", "http://example.org/y", "http://example.org/z", {"method": "GET", "url": "pseudo://test/f?inp=v"}]' {good idea to keep url from form?});
+  t('serialize-json(resolve-html((<frame src="x"/>, <iframe src="y"/>, <img src="z"/>, <form action="f"><input name="inp" value="v"/></form>), "http://example.org"))', '["http://example.org/x", "http://example.org/y", "http://example.org/z", {"method": "GET", "url": "http://example.org/f?inp=v"}]');
   t('serialize-json(resolve-html({"url": "b", "foo": "bar"}, "http://example.org"))', '{"url": "http://example.org/b", "foo": "bar"}');
   t('serialize-json(resolve-html(({ "foo": "bar"}, {"x": 1}), "http://example.org"))', '[{"foo": "bar"}, {"x": 1}]');
   t('resolve-html((<video src="abc"/>, <area href="def"/>, <track href="def" src="ghi"/>, <script src="jkl"/>, <link href="mno"/>), "http://example.org")', 'http://example.org/abc http://example.org/def http://example.org/ghi http://example.org/jkl http://example.org/mno');
