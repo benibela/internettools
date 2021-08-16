@@ -404,6 +404,22 @@ type
       procedure setFromString(const s: string);
     end;
 
+    PXQBatchFunctionCall = ^TXQBatchFunctionCall;
+    TXQBatchFunctionCall = record
+      tempcontext: TXQEvaluationContext;
+      func: TXQValueFunction;
+      stack: TXQEvaluationStack;
+      stacksize: SizeInt;
+      //prepares calls to f on outerContext.
+      //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
+      //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
+      procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
+      procedure done;
+      function call(): IXQValue; inline;
+      function call1(const v: IXQValue): IXQValue;
+      function call2(const v, w: IXQValue): IXQValue;
+    end;
+
     TXQJsonParser = object
       type
       //**Parsing options
@@ -420,6 +436,9 @@ type
       //**       )
       TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
       TOptions = set of TOption;
+    private
+      fallbackFunctionCaller: PXQBatchFunctionCall;
+      procedure appendEscapedString(var sb: TStrBuilder; p: pchar; l: integer);
     public
       context: PXQEvaluationContext;
       options: TOptions;
@@ -430,21 +449,6 @@ type
       function parse(argc: SizeInt; args: PIXQValue): IXQValue;
       function parse(const data: string): IXQValue;
       class function parse(const data: string; someOptions: TOptions): IXQValue; static;
-    end;
-    PXQBatchFunctionCall = ^TXQBatchFunctionCall;
-    TXQBatchFunctionCall = record
-      tempcontext: TXQEvaluationContext;
-      func: TXQValueFunction;
-      stack: TXQEvaluationStack;
-      stacksize: SizeInt;
-      //prepares calls to f on outerContext.
-      //It pushes a sufficient number of temp values on the stack (override with stack.topptr), so that the function can be called.
-      //Note that pushing can change all stack addresses, invalidating all pointers to the stack (i.e., if you use this in a function called by the interpreter, the function arguments become inaccessible)
-      procedure init(const outerContext: TXQEvaluationContext; const f: ixqvalue; const def: IXQValue = nil);
-      procedure done;
-      function call(): IXQValue; inline;
-      function call1(const v: IXQValue): IXQValue;
-      function call2(const v, w: IXQValue): IXQValue;
     end;
 
   (***
@@ -5991,12 +5995,23 @@ begin
   end;
 end;
 
+procedure TXQJsonParser.appendEscapedString(var sb: TStrBuilder; p: pchar; l: integer);
+begin
+  if fallbackFunctionCaller = nil then begin
+    new(fallbackFunctionCaller);
+    fallbackFunctionCaller^.init(context^, escapeFunction);
+  end;
+  fallbackFunctionCaller^.stack.topptr(0)^ := xqvalue(strFromPchar(p,l));
+  sb.append(fallbackFunctionCaller^.call().toString);
+end;
+
 procedure TXQJsonParser.init;
 begin
   context:=nil;
   options:=[];
   duplicateResolve:=xqmdrUseFirst;
   escapeFunction:=nil;
+  fallbackFunctionCaller := nil;
 end;
 
 procedure TXQJsonParser.setConfigFromMap(const map: IXQValue);
@@ -6200,161 +6215,11 @@ var containerStack: array of TXQValue;
     end;
   end;
 
-var fallbackFunctionCaller: PXQBatchFunctionCall = nil;
+var escapeCharactersMode: TJSONEscapeCharacters;
+    appendEscapeFunction: TAppendEscapeFunction = nil;
   function readString: string;
-//  const SUSPICIOUS_CHARS_NORMAL = [#0..#8, #11, #12, #14..#$1F, #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
-//  const SUSPICIOUS_CHARS_ESCAPE = [#0..#$1F, '\', #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
-  const REPLACEMENT_CHARACTER_CP = $FFFD;
-  var sb: TStrBuilder;
-    escapeCharacters: boolean;
-    procedure addWithEscapeFunction(p: pchar; l: integer);
-    begin
-      if fallbackFunctionCaller = nil then begin
-        new(fallbackFunctionCaller);
-        fallbackFunctionCaller^.init(context^, escapeFunction);
-      end;
-      fallbackFunctionCaller^.stack.topptr(0)^ := xqvalue(strFromPchar(p,l));
-      sb.append(fallbackFunctionCaller^.call().toString);
-    end;
-    procedure appendEscapeChar(toEscape: char);
-    var temp: string[2];
-    begin
-      temp[1] := '\';
-      case toEscape of
-        '\': temp[2] := '\';
-        #8: temp[2] := 'b';
-        #9: temp[2] := 't';
-        #10: temp[2] := 'n';
-        #12: temp[2] := 'f';
-        #13: temp[2] := 'r';
-      end;
-      if escapeCharacters then sb.append(@temp[1], 2)
-      else if escapeFunction = nil then sb.appendCodePoint(REPLACEMENT_CHARACTER_CP)
-      else addWithEscapeFunction(@temp[1], 2);
-    end;
-    procedure appendInvalidUnicode(buxxxx: pchar);
-    begin
-      if escapeCharacters then sb.append(buxxxx, 6)
-      else if escapeFunction = nil then sb.appendCodePoint(REPLACEMENT_CHARACTER_CP)
-      else addWithEscapeFunction(buxxxx, 6);
-    end;
-    procedure appendSurrogatePair(buxxxxbuxxxx: pchar);
-    var
-      tempA, tempB, codePoint: UInt32;
-    begin
-      strHexToUIntTry(buxxxxbuxxxx + 2, buxxxxbuxxxx + 2 + 4, tempA);
-      strHexToUIntTry(buxxxxbuxxxx + 6+2, buxxxxbuxxxx + 6+2 + 4, tempB);
-      codePoint := ((tempA and $03ff) shl 10) or (ord(tempB) and $03ff);
-      sb.appendCodePoint(codePoint + $10000);
-    end;
-    procedure appendSuspiciousCodepoint(codepoint: Int32; errpchar: pchar);
-    var temp: string[6];
-      function errstring: pchar;
-      begin
-        if errpchar <> nil then result := errpchar
-        else begin
-          temp := '\u' + IntToHex(codepoint, 4);
-          result := @temp;
-        end;
-      end;
-
-    begin
-      case codePoint of //see isValidXMLCharacter
-        $20..ord('\')-1, ord('\')+1..$7E, $A0..$D7FF, $E000..$FFFD, $10000..$10FFFF: sb.appendCodePoint(codePoint);
-        $9,$A,$D: if escapeCharacters or (baseSchema.version <> xsd11) then appendEscapeChar(chr(codePoint))
-                  else sb.append(chr(codePoint));
-        ord('\'): if escapeCharacters then appendEscapeChar('\') else sb.append('\');
-        $8, $C: appendEscapeChar(chr(codePoint));
-        $7F..$9F: if escapeCharacters then appendInvalidUnicode(errstring)
-                  else sb.appendCodePoint(codepoint);
-        else appendInvalidUnicode(errstring)
-      end;
-    end;
-    procedure appendUnicodeEscape(buxxxx: pchar);
-    var
-      codePoint: UInt32;
-    begin
-      strHexToUIntTry(buxxxx + 2, buxxxx + 2 + 4, codePoint);
-      appendSuspiciousCodepoint(codePoint, buxxxx);
-    end;
-
-  var
-    escapeChar: Char;
-    p, pend, sectionstart, unicodeEscape1, unicodeEscape2: PAnsiChar;
-    procedure appendSectionAndAdvance(skip: integer);
-    begin
-      sb.append(sectionstart, p - sectionstart);
-      inc(p, skip);
-      sectionstart := p;
-    end;
   begin
-    escapeCharacters := jpoEscapeCharacters in options;
-
-    sb.init(@result, scanner.CurTokenLength);
-    p := scanner.CurTokenStart;
-    sectionstart := p;
-    pend := p + scanner.CurTokenLength;
-    while p < pend do begin
-      case p^ of
-        '\': begin
-          escapeChar := (p+1)^;
-          case escapeChar of
-            '"', '''', '/' : begin
-              appendSectionAndAdvance(2);
-              sb.append(escapeChar);
-              continue;
-            end;
-            '\': escapeChar := '\';
-            'b': escapeChar:=#8;
-            't': escapeChar:=#9;
-            'n': escapeChar:=#10;
-            'f': escapeChar:=#12;
-            'r': escapeChar:=#13;
-            'u': begin
-              unicodeEscape1 := p;
-              appendSectionAndAdvance(2);
-              if (p[0] in ['D', 'd']) and (p[1] in ['8','9','A','B','a','b']) then begin
-                unicodeEscape2 := p + 4;
-                //first surrogate
-                if ((unicodeEscape2+2+4) > pend)
-                   or not (( ((unicodeEscape2)[2] in ['D', 'd']) and ((unicodeEscape2)[3] in ['C'..'F', 'c'..'f']) )) then begin
-                  appendInvalidUnicode(unicodeEscape1);
-                end else begin
-                  appendSurrogatePair(unicodeEscape1);
-                  inc(p, 6);
-                end;
-              end else appendUnicodeEscape(unicodeEscape1);
-              inc(p, 4);
-              sectionstart := p;
-              continue;
-            end;
-          end;
-          if escapeCharacters then begin
-           inc(p); //do nothing
-          end else begin
-            appendSectionAndAdvance(2);
-            if (escapeChar in [#8,#12]) then appendEscapeChar( escapeChar )
-            else sb.append(escapeChar);
-          end;
-        end;
-        #0..#$1F: begin
-          escapeChar := p^;
-          appendSectionAndAdvance(1);
-          case escapeChar of
-            #8,#9,#10,#12,#13: appendEscapeChar(escapeChar);
-            else appendSuspiciousCodepoint(ord(escapeChar), nil);
-          end;
-        end;
-        {#$80..#$C1,} #$C0, #$C1, #$ED, #$EF, #$F4..#$FF: begin
-          sb.append(sectionstart, p - sectionstart);
-          appendSuspiciousCodepoint(strDecodeUTF8Character(p, pend), nil);
-          sectionstart := p;
-        end;
-        else inc(p);
-      end;
-    end;
-    appendSectionAndAdvance(0);
-    sb.final;
+    result := TJSONScanner.decodeJSONString(scanner.CurTokenStart, scanner.CurTokenLength, escapeCharactersMode, appendEscapeFunction);
   end;
 
   procedure readObjectKey;
@@ -6383,7 +6248,12 @@ begin
   {$else}
   scannerOptions := true;
   {$endif}
-  scanner := TJSONScanner.Create(data, scannerOptions);
+  if jpoEscapeCharacters in options then escapeCharactersMode := jecEscapeAll
+  else if baseSchema.version = xsd11 then escapeCharactersMode := jecEscapeForXML11
+  else escapeCharactersMode := jecEscapeForXML10;
+  if escapeFunction <> nil then appendEscapeFunction := @appendEscapedString;
+  scanner := default(TJSONScanner);
+  scanner.init(data, scannerOptions);
   try
 
     nextToken;
@@ -6464,9 +6334,10 @@ begin
     if fallbackFunctionCaller <> nil then begin
      fallbackFunctionCaller.done;
      dispose(fallbackFunctionCaller);
+     fallbackFunctionCaller := nil;
     end;
     //for i := 0 to containerCount - 1 do containerStack[i]._Release;
-    scanner.free;
+    scanner.done;
   end;
 end;
 
