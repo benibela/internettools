@@ -79,6 +79,11 @@ accepting of new connections!
 }
 
 //{$INCLUDE 'jedi.inc'}
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$ASMMODE Intel}
+  {$UNDEF BORLAND}
+{$ENDIF}
 
 {$H+}
 
