@@ -856,6 +856,7 @@ var _SSL_get0_param: TSSL_get0_param = nil;
    _SslCtxSetMinProtoVersion: TSslCtxSetMinProtoVersion = nil;
    _SslCtxSetMaxProtoVersion: TSslCtxSetMaxProtoVersion = nil;
 
+   SslMethodTLSV11: TSslMethodTLS = nil;
    SslMethodTLSV12: TSslMethodTLS = nil;
    SslMethodTLS: TSslMethodTLS = nil;
 
@@ -875,6 +876,7 @@ begin
     if not assigned(_SslCtxSetMaxProtoVersion) then
       _SslCtxSetMaxProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_set_max_proto_version'));
 
+    SslMethodTLSV11 := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLSv1_1_method'));
     SslMethodTLSV12 := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLSv1_2_method'));
     SslMethodTLS := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLS_method'));
   end;
