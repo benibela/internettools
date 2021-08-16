@@ -846,6 +846,7 @@ type
   TX509_VERIFY_PARAM_set1_host = function(param: PX509_VERIFY_PARAM; name: pchar; nameLen: SizeUInt): integer; cdecl;
   TSslCtxSetMinProtoVersion = function(ctx: PSSL_CTX; version: integer): integer; cdecl;
   TSslCtxSetMaxProtoVersion = function(ctx: PSSL_CTX; version: integer): integer; cdecl;
+  TSslMethodTLS = function:PSSL_METHOD; cdecl;
 
 const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS = 4;
 var _SSL_get0_param: TSSL_get0_param = nil;
@@ -854,6 +855,10 @@ var _SSL_get0_param: TSSL_get0_param = nil;
    _OpenSSL_version: TOpenSSL_version = nil;
    _SslCtxSetMinProtoVersion: TSslCtxSetMinProtoVersion = nil;
    _SslCtxSetMaxProtoVersion: TSslCtxSetMaxProtoVersion = nil;
+
+   SslMethodTLSV12: TSslMethodTLS = nil;
+   SslMethodTLS: TSslMethodTLS = nil;
+
 
 class procedure TSSLOpenSSLOverride.LoadOpenSSL;
 begin
@@ -864,11 +869,14 @@ begin
     _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
     _OpenSSL_version := TOpenSSL_version(GetProcedureAddress(SSLLibHandle, 'OpenSSL_version'));
     _SslCtxSetMinProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_CTX_set_min_proto_version'));
-    if _SslCtxSetMinProtoVersion = nil then
+    if not assigned(_SslCtxSetMinProtoVersion) then
       _SslCtxSetMinProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_set_min_proto_version'));
     _SslCtxSetMaxProtoVersion := TSslCtxSetMaxProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_CTX_set_max_proto_version'));
-    if _SslCtxSetMaxProtoVersion = nil then
+    if not assigned(_SslCtxSetMaxProtoVersion) then
       _SslCtxSetMaxProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_set_max_proto_version'));
+
+    SslMethodTLSV12 := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLSv1_2_method'));
+    SslMethodTLS := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLS_method'));
   end;
 end;
 
@@ -950,13 +958,14 @@ var fallbackMethod: PSSL_METHOD = nil;
     minVersion, maxVersion: integer;
 var
   s: AnsiString;
-  isTLSv1_3: Boolean;
+  isTLSv1_3, isTLSv1_2: Boolean;
 begin
   Result := False;
   FLastErrorDesc := '';
   FLastError := 0;
   Fctx := nil;
-  isTLSv1_3 := (FSSLType > LT_TLSv1_2); //LT_TLSv1_3, but older synapse version do not have that
+  isTLSv1_2 := (ord(FSSLType) = ord(LT_TLSv1_1) + 1) and (FSSLType < LT_SSHv2); //LT_TLSv1_2 or LT_TLSv1_3, but older synapse version do not have that
+  isTLSv1_3 := (ord(FSSLType) = ord(LT_TLSv1_1) + 2) and (FSSLType < LT_SSHv2); //LT_TLSv1_3, but older synapse version do not have that
   //writeln(isTLSv1_3, ' ',assigned(_SslCtxSetMinProtoVersion), ' ',assigned(_SslCtxSetMaxProtoVersion));
   if isTLSv1_3 and not (assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion)) then begin
 //    setCustomError(rsSSLErrorOpenSSLTooOldForTLS13);
@@ -968,8 +977,9 @@ begin
     LT_SSLv3: begin fallbackMethod := SslMethodV3; minVersion := 0; maxVersion := minVersion; end;
     LT_TLSv1: begin fallbackMethod := SslMethodTLSV1; minVersion := TLS1_VERSION; maxVersion := minVersion; end;
     LT_TLSv1_1: begin fallbackMethod := SslMethodTLSV11; minVersion := TLS1_1_VERSION; maxVersion := minVersion; end;
-    LT_TLSv1_2: begin fallbackMethod := SslMethodTLSV12; minVersion := TLS1_2_VERSION; maxVersion := minVersion; end;
+    //LT_TLSv1_2: begin fallbackMethod := SslMethodTLSV12; minVersion := TLS1_2_VERSION; maxVersion := minVersion; end;
     LT_all: begin fallbackMethod := SslMethodV23; minVersion := TLS1_VERSION; maxVersion := TLS1_3_VERSION; end;
+    else if isTLSv1_2 then begin fallbackMethod := SslMethodTLSV12; minVersion := TLS1_2_VERSION; maxVersion := minVersion;  end
     else if isTLSv1_3 then begin minVersion := TLS1_3_VERSION; maxVersion := TLS1_3_VERSION;  end
     else exit;
   end;
