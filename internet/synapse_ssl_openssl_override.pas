@@ -432,74 +432,6 @@ begin
   Result := (FCertificateFile = '') and (FCertificate = '') and (FPFXfile = '') and (FPFX = '');
 end;
 
-function TSSLOpenSSLOverride.Init: Boolean;
-var
-  s: AnsiString;
-begin
-  Result := False;
-  FLastErrorDesc := '';
-  FLastError := 0;
-  Fctx := nil;
-  case FSSLType of
-    LT_SSLv2:
-      Fctx := SslCtxNew(SslMethodV2);
-    LT_SSLv3:
-      Fctx := SslCtxNew(SslMethodV3);
-    LT_TLSv1:
-      Fctx := SslCtxNew(SslMethodTLSV1);
-    LT_TLSv1_1:
-      Fctx := SslCtxNew(SslMethodTLSV11);
-    LT_TLSv1_2:
-      Fctx := SslCtxNew(SslMethodTLSV12);
-    LT_all:
-      begin
-        //try new call for OpenSSL 1.1.0 first
-        Fctx := SslCtxNew(SslMethodTLS);
-        if Fctx=nil then
-          //callback to previous versions
-          Fctx := SslCtxNew(SslMethodV23);
-      end;
-  else
-    Exit;
-  end;
-  if Fctx = nil then
-  begin
-    SSLCheck;
-    Exit;
-  end
-  else
-  begin
-    s := FCiphers;
-    SslCtxSetCipherList(Fctx, s);
-    if FVerifyCert then
-      SslCtxSetVerify(FCtx, SSL_VERIFY_PEER, nil)
-    else
-      SslCtxSetVerify(FCtx, SSL_VERIFY_NONE, nil);
-{$IFNDEF CIL}
-    SslCtxSetDefaultPasswdCb(FCtx, @PasswordCallback);
-    SslCtxSetDefaultPasswdCbUserdata(FCtx, self);
-{$ENDIF}
-
-    if server and NeedSigningCertificate then
-    begin
-      CreateSelfSignedcert(FSocket.ResolveIPToName(FSocket.GetRemoteSinIP));
-    end;
-
-    if not SetSSLKeys then
-      Exit
-    else
-    begin
-      Fssl := nil;
-      Fssl := SslNew(Fctx);
-      if Fssl = nil then
-      begin
-        SSLCheck;
-        exit;
-      end;
-    end;
-  end;
-  Result := true;
-end;
 
 function TSSLOpenSSLOverride.DeInit: Boolean;
 begin
@@ -897,6 +829,7 @@ end;
 
 resourcestring
   rsSSLErrorOpenSSLTooOld = 'OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+';
+  rsSSLErrorOpenSSLTooOldForTLS13 = 'OpenSSL version is too old for TLS1.3 (functions SSL_set_min/max_proto_version not found)';
   rsSSLErrorCAFileLoadingFailed = 'Failed to load CA files.';
   rsSSLErrorSettingHostname = 'Failed to set hostname for certificate validation.';
   rsSSLErrorConnectionFailed = 'HTTPS connection failed after connecting to server. Some possible causes: handshake failure, mismatched HTTPS version/ciphers, invalid certificate';
@@ -908,12 +841,33 @@ type
   TSSL_get0_param = function(ctx: PSSL_CTX): PX509_VERIFY_PARAM; cdecl;
   TX509_VERIFY_PARAM_set_hostflags = procedure(param: PX509_VERIFY_PARAM; flags: cardinal); cdecl;
   TX509_VERIFY_PARAM_set1_host = function(param: PX509_VERIFY_PARAM; name: pchar; nameLen: SizeUInt): integer; cdecl;
+  TSslCtxSetMinProtoVersion = function(ctx: PSSL_CTX; version: integer): integer; cdecl;
+  TSslCtxSetMaxProtoVersion = function(ctx: PSSL_CTX; version: integer): integer; cdecl;
 
 const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS = 4;
 var _SSL_get0_param: TSSL_get0_param = nil;
-var _X509_VERIFY_PARAM_set_hostflags: TX509_VERIFY_PARAM_set_hostflags = nil;
-var _X509_VERIFY_PARAM_set1_host: TX509_VERIFY_PARAM_set1_host = nil;
-var _OpenSSL_version: TOpenSSL_version = nil;
+   _X509_VERIFY_PARAM_set_hostflags: TX509_VERIFY_PARAM_set_hostflags = nil;
+   _X509_VERIFY_PARAM_set1_host: TX509_VERIFY_PARAM_set1_host = nil;
+   _OpenSSL_version: TOpenSSL_version = nil;
+   _SslCtxSetMinProtoVersion: TSslCtxSetMinProtoVersion = nil;
+   _SslCtxSetMaxProtoVersion: TSslCtxSetMaxProtoVersion = nil;
+
+class procedure TSSLOpenSSLOverride.LoadOpenSSL;
+begin
+  if not ssl_openssl_lib.InitSSLInterface then exit;
+  if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
+    _SSL_get0_param := TSSL_get0_param(GetProcedureAddress(SSLLibHandle, 'SSL_get0_param'));
+    _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
+    _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
+    _OpenSSL_version := TOpenSSL_version(GetProcedureAddress(SSLLibHandle, 'OpenSSL_version'));
+    _SslCtxSetMinProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_CTX_set_min_proto_version'));
+    if _SslCtxSetMinProtoVersion = nil then
+      _SslCtxSetMinProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_set_min_proto_version'));
+    _SslCtxSetMaxProtoVersion := TSslCtxSetMaxProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_CTX_set_max_proto_version'));
+    if _SslCtxSetMaxProtoVersion = nil then
+      _SslCtxSetMaxProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_set_max_proto_version'));
+  end;
+end;
 
 function TSSLOpenSSLOverride.LibVersion: String;
 begin
@@ -973,24 +927,100 @@ begin
 end;
 
 procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
-var
-  err: String;
 begin
   outErrorCode := id;
   outErrorMessage := LineEnding + msg;
   outErrorMessage += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
-  outErrorMessage += LineEnding+'OpenSSL information: CA file: '+CAFile+' , CA dir: '+CAPath+' , '+GetSSLVersion+', '+LibVersion;
+//  str(FSSLType, temp);
+  outErrorMessage += LineEnding+'OpenSSL information: CA file: '+CAFile+' , CA dir: '+CAPath+' , '+ {temp+', '+}GetSSLVersion+', '+LibVersion;
 end;
 
-class procedure TSSLOpenSSLOverride.LoadOpenSSL;
+
+
+function TSSLOpenSSLOverride.Init: Boolean;
+const
+  TLS1_VERSION = $0301;
+  TLS1_1_VERSION = $0302;
+  TLS1_2_VERSION = $0303;
+  TLS1_3_VERSION = $0304;
+var fallbackMethod: PSSL_METHOD = nil;
+    minVersion, maxVersion: integer;
+var
+  s: AnsiString;
+  isTLSv1_3: Boolean;
 begin
-  if not ssl_openssl_lib.InitSSLInterface then exit;
-  if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
-    _SSL_get0_param := TSSL_get0_param(GetProcedureAddress(SSLLibHandle, 'SSL_get0_param'));
-    _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
-    _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
-    _OpenSSL_version := TOpenSSL_version(GetProcedureAddress(SSLLibHandle, 'OpenSSL_version'));
+  Result := False;
+  FLastErrorDesc := '';
+  FLastError := 0;
+  Fctx := nil;
+  isTLSv1_3 := (FSSLType > LT_TLSv1_2); //LT_TLSv1_3, but older synapse version do not have that
+  //writeln(isTLSv1_3, ' ',assigned(_SslCtxSetMinProtoVersion), ' ',assigned(_SslCtxSetMaxProtoVersion));
+  if isTLSv1_3 and not (assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion)) then begin
+//    setCustomError(rsSSLErrorOpenSSLTooOldForTLS13);
+    exit;
   end;
+
+  case FSSLType of
+    LT_SSLv2: begin fallbackMethod := SslMethodV2; minVersion := 0; maxVersion := minVersion; end;
+    LT_SSLv3: begin fallbackMethod := SslMethodV3; minVersion := 0; maxVersion := minVersion; end;
+    LT_TLSv1: begin fallbackMethod := SslMethodTLSV1; minVersion := TLS1_VERSION; maxVersion := minVersion; end;
+    LT_TLSv1_1: begin fallbackMethod := SslMethodTLSV11; minVersion := TLS1_1_VERSION; maxVersion := minVersion; end;
+    LT_TLSv1_2: begin fallbackMethod := SslMethodTLSV12; minVersion := TLS1_2_VERSION; maxVersion := minVersion; end;
+    LT_all: begin fallbackMethod := SslMethodV23; minVersion := TLS1_VERSION; maxVersion := TLS1_3_VERSION; end;
+    else if isTLSv1_3 then begin minVersion := TLS1_3_VERSION; maxVersion := TLS1_3_VERSION;  end
+    else exit;
+  end;
+
+  if (FSSLType = LT_all) or (assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion)) then begin
+    Fctx := SslCtxNew(SslMethodTLS);
+    if Fctx <> nil then begin
+      if assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion) then begin
+        _SslCtxSetMinProtoVersion(Fctx, minVersion);
+        _SslCtxSetMaxProtoVersion(Fctx, maxVersion); //todo: check result?
+      end;
+    end;
+  end;
+
+  if (Fctx = nil) and assigned(fallbackMethod) then
+    Fctx := SslCtxNew(fallbackMethod);
+
+  if Fctx = nil then
+  begin
+    SSLCheck;
+    Exit;
+  end
+  else
+  begin
+    s := FCiphers;
+    SslCtxSetCipherList(Fctx, s);
+    if FVerifyCert then
+      SslCtxSetVerify(FCtx, SSL_VERIFY_PEER, nil)
+    else
+      SslCtxSetVerify(FCtx, SSL_VERIFY_NONE, nil);
+{$IFNDEF CIL}
+    SslCtxSetDefaultPasswdCb(FCtx, @PasswordCallback);
+    SslCtxSetDefaultPasswdCbUserdata(FCtx, self);
+{$ENDIF}
+
+    if server and NeedSigningCertificate then
+    begin
+      CreateSelfSignedcert(FSocket.ResolveIPToName(FSocket.GetRemoteSinIP));
+    end;
+
+    if not SetSSLKeys then
+      Exit
+    else
+    begin
+      Fssl := nil;
+      Fssl := SslNew(Fctx);
+      if Fssl = nil then
+      begin
+        SSLCheck;
+        exit;
+      end;
+    end;
+  end;
+  Result := true;
 end;
 
 

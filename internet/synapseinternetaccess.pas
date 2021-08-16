@@ -233,15 +233,17 @@ procedure TSynapseInternetAccess.doTransferUnchecked(var transfer: TTransfer);
    transfer.HTTPErrorDetails := Format(rsSSLErrorNoOpenSSL, [tempsep,tempsep,tempsep,tempsep]);
   end;
 
+var openSSLError: string = '';
+
   function InitAndHTTPMethod: boolean;
   begin
     initConnection;
     result := connection.HTTPMethod(transfer.method, transfer.url);
     if (not result) and (connection.Sock.SSL is TSSLOpenSSLOverride) then begin
       with connection.Sock.SSL as TSSLOpenSSLOverride do begin
-        if transfer.HTTPErrorDetails.contains(outErrorMessage) then exit;
-        if transfer.HTTPErrorDetails <> '' then transfer.HTTPErrorDetails += LineEnding;
-        transfer.HTTPErrorDetails += outErrorMessage;
+        if openSSLError.contains(outErrorMessage) then exit;
+        if openSSLError <> '' then openSSLError += LineEnding;
+        openSSLError += outErrorMessage;
       end;
     end;
   end;
@@ -293,7 +295,7 @@ begin
   if ok then begin
     checkHeaders;
   end else if transfer.HTTPResultCode = -4 then
-    transfer.HTTPErrorDetails := rsConnectionFailed;
+    transfer.HTTPErrorDetails := rsConnectionFailed + openSSLError;
 end;
 
 procedure TSynapseInternetAccess.setConfig(internetConfig: PInternetConfig);
