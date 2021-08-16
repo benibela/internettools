@@ -41,7 +41,7 @@ uses
   Classes, SysUtils, internetAccess,
   httpsend,  //this is the synapse http unit (from http://www.ararat.cz/synapse/doku.php/download)
   blcksock,
-  ssl_openssl //needed for https
+  synapse_ssl_openssl_override //needed for https
   ;
 
 type
@@ -55,19 +55,6 @@ end;
 THTTPSendWithFakeStream = class(THTTPSend)
   constructor Create;
   procedure closeConnection;
-end;
-
-TSSLOpenSSLOverride = class(TSSLOpenSSL)
-protected
-  FOldSSLType: TSSLType;
-  FOldVerifyCert: boolean;
-  internetAccess: TSynapseInternetAccess;
-  function customCertificateHandling: boolean;
-  function customQuickClientPrepare: boolean;
-  procedure setCustomError(msg: string; id: integer = -3);
-public
-  function Connect: boolean; override;
-  function LibVersion: String; override;
 end;
 
 { TSynapseInternetAccess }
@@ -118,11 +105,6 @@ resourcestring rsConnectionFailed = 'Connection failed. Some possible causes: Fa
                         'On Debian/Ubuntu install libssl-dev.%s' +
                         'On Fedora/CentOS install openssl-devel.%s' +
                         'On Windows install OpenSSL from https://slproweb.com/products/Win32OpenSSL.html';
-  rsSSLErrorOpenSSLTooOld = 'OpenSSL version is too old for certificate checking. Required is OpenSSL 1.0.2+';
-  rsSSLErrorCAFileLoadingFailed = 'Failed to load CA files.';
-  rsSSLErrorSettingHostname = 'Failed to set hostname for certificate validation.';
-  rsSSLErrorConnectionFailed = 'HTTPS connection failed after connecting to server. Some possible causes: handshake failure, mismatched HTTPS version/ciphers, invalid certificate';
-  rsSSLErrorVerificationFailed = 'HTTPS certificate validation failed';
 
 
 
@@ -194,171 +176,6 @@ begin
   FAlivePort := '';
 end;
 
-type
-  PX509_VERIFY_PARAM = pointer;
-  TOpenSSL_version = function(t: integer): pchar; cdecl;
-  TSSL_get0_param = function(ctx: PSSL_CTX): PX509_VERIFY_PARAM; cdecl;
-  TX509_VERIFY_PARAM_set_hostflags = procedure(param: PX509_VERIFY_PARAM; flags: cardinal); cdecl;
-  TX509_VERIFY_PARAM_set1_host = function(param: PX509_VERIFY_PARAM; name: pchar; nameLen: SizeUInt): integer; cdecl;
-
-const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS = 4;
-var _SSL_get0_param: TSSL_get0_param = nil;
-var _X509_VERIFY_PARAM_set_hostflags: TX509_VERIFY_PARAM_set_hostflags = nil;
-var _X509_VERIFY_PARAM_set1_host: TX509_VERIFY_PARAM_set1_host = nil;
-var _OpenSSL_version: TOpenSSL_version = nil;
-
-function TSSLOpenSSLOverride.customCertificateHandling: boolean;
-var
-  param: PX509_VERIFY_PARAM;
-label onError;
-begin
-  result := false;
-  if VerifyCert then begin
-    //see https://wiki.openssl.org/index.php/Hostname_validation
-    if not assigned(_SSL_get0_param) or not assigned(_X509_VERIFY_PARAM_set_hostflags) or not assigned(_X509_VERIFY_PARAM_set1_host) then begin
-      setCustomError(rsSSLErrorOpenSSLTooOld, -2);
-      exit;
-    end;
-    param := _SSL_get0_param(Fssl);
-    if param = nil then
-      goto onError;
-    _X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-    if _X509_VERIFY_PARAM_set1_host(param, pchar(SNIHost), length(SNIHost)) = 0 then
-      goto onError;
-  end;
-  result := true;
-  exit;
-
-onError:
-  setCustomError(rsSSLErrorSettingHostname, -2);
-  result := false;
-end;
-
-function TSSLOpenSSLOverride.customQuickClientPrepare: boolean;
-begin
-  if not assigned(FSsl) or not assigned(Fctx) or (FOldSSLType <> FSSLType) or (VerifyCert <> FOldVerifyCert)  then begin
-    result := Prepare(false);
-    if result and VerifyCert and assigned(internetAccess) then
-      if SslCtxLoadVerifyLocations(FCtx, internetAccess.config.CAFile, internetAccess.config.CAPath) <> 1 then begin
-        SSLCheck;
-        setCustomError(rsSSLErrorCAFileLoadingFailed);
-        result := false;
-      end;
-  end else begin
-    sslfree(Fssl);
-    Fssl := SslNew(Fctx);
-    result := FSsl <> nil;
-    if not result then
-      SSLCheck;
-  end;
-  if result then begin
-    FOldSSLType := FSSLType;
-    FOldVerifyCert := VerifyCert;
-  end;
-end;
-
-procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
-var
-  err: String;
-  transfer: PTransfer;
-begin
-  if internetAccess = nil then
-    exit;
-  transfer := internetAccess.currentTransfer;
-  transfer.HTTPResultCode := id;
-  err := msg;
-  if LastErrorDesc <> '' then begin
-    err := LineEnding + err;
-    err += LineEnding+'OpenSSL-Error: '+LastErrorDesc;
-    err += LineEnding+'OpenSSL information: CA file: '+internetAccess.config.CAFile+' , CA dir: '+internetAccess.config.CAPath+' , '+GetSSLVersion+', '+LibVersion;
-  end;
-  if transfer.HTTPErrorDetails.contains(err) then exit;
-  if transfer.HTTPErrorDetails <> '' then transfer.HTTPErrorDetails += LineEnding;
-  transfer.HTTPErrorDetails += err;
-
-end;
-
-function TSSLOpenSSLOverride.LibVersion: String;
-begin
-  Result:=inherited LibVersion;
-  if assigned(_OpenSSL_version) then
-    result += _OpenSSL_version(0);
-end;
-
-//copied from Synapse
-function TSSLOpenSSLOverride.Connect: boolean;
-type
-  TSocket = longint;
-const INVALID_SOCKET		= TSocket(NOT(0));
-var
-  x: integer;
-  //b: boolean;
-  //err: integer;
-begin
-  Result := False;
-  if FSocket.Socket = INVALID_SOCKET then
-    Exit;
-
-  if customQuickClientPrepare() then
-  begin
-
-    if not customCertificateHandling then
-      exit;
-
-{$IFDEF CIL}
-    if sslsetfd(FSsl, FSocket.Socket.Handle.ToInt32) < 1 then
-{$ELSE}
-    if sslsetfd(FSsl, FSocket.Socket) < 1 then
-{$ENDIF}
-    begin
-      SSLCheck;
-      Exit;
-    end;
-    if SNIHost<>'' then
-      SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
-    //if (internetAccess <> nil) or (FSocket.ConnectionTimeout <= 0) then //do blocking call of SSL_Connect
-    begin
-      //this is the branch used by internet tools
-      x := sslconnect(FSsl);
-      if x < 1 then
-      begin
-        SSLcheck;
-        setCustomError(rsSSLErrorConnectionFailed, -3);
-        Exit;
-      end;
-    end;
-    //this must be commented out, because ConnectionTimeout is missing in Synapse SVN r40
-    {else //do non-blocking call of SSL_Connect
-    begin
-      b := Fsocket.NonBlockMode;
-      Fsocket.NonBlockMode := true;
-      repeat
-        x := sslconnect(FSsl);
-        err := SslGetError(FSsl, x);
-        if err = SSL_ERROR_WANT_READ then
-          if not FSocket.CanRead(FSocket.ConnectionTimeout) then
-            break;
-        if err = SSL_ERROR_WANT_WRITE then
-          if not FSocket.CanWrite(FSocket.ConnectionTimeout) then
-            break;
-      until (err <> SSL_ERROR_WANT_READ) and (err <> SSL_ERROR_WANT_WRITE);
-      Fsocket.NonBlockMode := b;
-      if err <> SSL_ERROR_NONE then
-      begin
-        SSLcheck;
-        Exit;
-      end;
-    end;}
-
-    if FverifyCert then //seems like this is not needed, since sslconnect already fails on an invalid certificate
-      if (GetVerifyCert <> 0) or (not DoVerifyCert) then begin
-        setCustomError(rsSSLErrorVerificationFailed, -3);
-        Exit;
-      end;
-    FSSLEnabled := True;
-    Result := True;
-  end;
-end;
 
 
 procedure addHeader(data: pointer; headerKind: THeaderKind; const name, header: string);
@@ -415,41 +232,60 @@ procedure TSynapseInternetAccess.doTransferUnchecked(var transfer: TTransfer);
    transfer.HTTPResultCode := -2;
    transfer.HTTPErrorDetails := Format(rsSSLErrorNoOpenSSL, [tempsep,tempsep,tempsep,tempsep]);
   end;
+
+  function InitAndHTTPMethod: boolean;
+  begin
+    initConnection;
+    result := connection.HTTPMethod(transfer.method, transfer.url);
+    if (not result) and (connection.Sock.SSL is TSSLOpenSSLOverride) then begin
+      with connection.Sock.SSL as TSSLOpenSSLOverride do begin
+        if transfer.HTTPErrorDetails.contains(outErrorMessage) then exit;
+        if transfer.HTTPErrorDetails <> '' then transfer.HTTPErrorDetails += LineEnding;
+        transfer.HTTPErrorDetails += outErrorMessage;
+      end;
+    end;
+  end;
+
 var ok: Boolean;
   tempSSLType: TSSLType;
 begin
-  if striequal(transfer.decodedUrl.protocol, 'https') then
+  if connection.Sock.SSL is TSSLOpenSSLOverride then begin
+    if  not IsSSLloaded then TSSLOpenSSLOverride.LoadOpenSSL;
+    with (connection.Sock.SSL as TSSLOpenSSLOverride) do begin
+      outErrorMessage := '';
+      outErrorCode := -5;
+    end;
+  end;
+  if striequal(transfer.decodedUrl.protocol, 'https') then begin
     if (SSLImplementation = TSSLNone)
        or ((SSLImplementation = TSSLOpenSSLOverride) and not IsSSLloaded)
     then begin//check if ssl is actually loaded
       errorFailedToLoadSSL;
       exit;
     end;
+  end;
   currentTransfer := @transfer;
 
+  transfer.HTTPErrorDetails := '';
   transfer.HTTPResultCode := -4;
 
   connection.Sock.SSL.VerifyCert := config.checkSSLCertificates;
-  initConnection;
   if (transfer.decodedUrl.username <> '') then begin
     connection.UserName := strUnescapeHex(transfer.decodedUrl.username, '%');
     connection.Password := strUnescapeHex(transfer.decodedUrl.password, '%');
   end;
 
-  ok := connection.HTTPMethod(transfer.method, transfer.url);
+  ok := InitAndHTTPMethod;
 
-  if (not ok) and (checkEtcResolv) then begin
-    initConnection;
-    ok := connection.HTTPMethod(transfer.method, transfer.url);
-  end;
+  if (not ok) and (checkEtcResolv) then
+    ok := InitAndHTTPMethod;
 
 
   if (not ok) and (lastHTTPSFallbackHost <> transfer.decodedUrl.host) then begin
     lastHTTPSFallbackHost := transfer.decodedUrl.host;
     for tempSSLType := SSLFallbackMaxVersion downto SSLFallbackMinVersion do begin
       lastHTTPSFallbackType := tempSSLType;
-      initConnection;
-      ok := connection.HTTPMethod(transfer.method, transfer.url);
+      ok := InitAndHTTPMethod;
       if ok then break;
     end;
   end;
@@ -498,6 +334,10 @@ begin
      //TODO: https proxy
     end;
   end;
+  if connection.Sock.SSL is TSSLOpenSSLOverride then begin
+    (connection.Sock.SSL as TSSLOpenSSLOverride).CAFile := config.CAFile;
+    (connection.Sock.SSL as TSSLOpenSSLOverride).CAPath := config.CAPath;
+  end;
   inherited setConfig(internetConfig);
 end;
 
@@ -510,8 +350,6 @@ constructor TSynapseInternetAccess.create(const internetConfig: TInternetConfig)
 begin
   connection:=THTTPSendWithFakeStream.Create;
   (connection.Document as TSynapseSplitStream).internetAccess := self;
-  if connection.Sock.SSL is TSSLOpenSSLOverride then
-    (connection.Sock.SSL as TSSLOpenSSLOverride).internetAccess := self;
   inherited;
 end;
 
@@ -530,12 +368,6 @@ initialization
 
 assert(TSynapseInternetAccess.SSLFallbackMaxVersion >= LT_TLSv1_1);
 
-if (SSLLibHandle <> 0) and (SSLUtilHandle <> 0) then begin
-  _SSL_get0_param := TSSL_get0_param(GetProcedureAddress(SSLLibHandle, 'SSL_get0_param'));
-  _X509_VERIFY_PARAM_set_hostflags := TX509_VERIFY_PARAM_set_hostflags(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set_hostflags'));
-  _X509_VERIFY_PARAM_set1_host := TX509_VERIFY_PARAM_set1_host(GetProcedureAddress(SSLUtilHandle, 'X509_VERIFY_PARAM_set1_host'));
-  _OpenSSL_version := TOpenSSL_version(GetProcedureAddress(SSLLibHandle, 'OpenSSL_version'));
-end;
 
 {$IFDEF USE_SYNAPSE_WRAPPER}
 defaultInternetAccessClass := TSynapseInternetAccess;
@@ -543,7 +375,6 @@ defaultInternetAccessClass := TSynapseInternetAccess;
 
 {$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 defaultInternetConfiguration.searchCertificates;
-SSLImplementation := TSSLOpenSSLOverride;
 {$endif}
 
 {$if not (defined(WINDOWS) or defined(android))}
