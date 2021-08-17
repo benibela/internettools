@@ -61,7 +61,7 @@ Const
 
 Type
   TAppendEscapeFunction = procedure (var sb: TStrBuilder; p: pchar; l: integer) of object;
-  TJSONEscapeCharacters = (jecEscapeForXML10, jecEscapeForXML11, jecEscapeAll);
+  TJSONEscapeCharacters = (jecEscapeNothing, jecEscapeForXML10, jecEscapeForXML11, jecEscapeAll);
   TJSONScanner = record
   private
     FSource: RawByteString;
@@ -407,21 +407,54 @@ class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt
 //  const SUSPICIOUS_CHARS_ESCAPE = [#0..#$1F, '\', #$80..#$C1, #$ED, #$EF, #$F4..#$FF];
   const REPLACEMENT_CHARACTER_CP = $FFFD;
   var sb: TStrBuilder;
-    procedure appendEscapeChar(toEscape: char);
-    var temp: string[2];
+    //append 00..1F or \
+    procedure appendLowCodePoint(toEscape: char);
+    var temp: string[6];
+    label NoEscape, EscapeSingleLetter, EscapeU00xx, AppendEscapedTemp;
     begin
-      temp[1] := '\';
-      case toEscape of
-        '\': temp[2] := '\';
-        #8: temp[2] := 'b';
-        #9: temp[2] := 't';
-        #10: temp[2] := 'n';
-        #12: temp[2] := 'f';
-        #13: temp[2] := 'r';
+      case escapeCharacters of
+        jecEscapeNothing: goto NoEscape;
+        jecEscapeForXML10:
+          case toEscape of
+            '\', #$9, #10, #13: goto NoEscape;
+            #8, #12: goto EscapeSingleLetter;
+            else goto EscapeU00xx;
+          end;
+        jecEscapeForXML11:
+          if toEscape = #0 then goto EscapeU00xx
+          else goto NoEscape;
+        jecEscapeAll:
+          case toEscape of
+            '\', #8, #9, #10, #12, #13: goto EscapeSingleLetter;
+            else goto EscapeU00xx;
+          end;
       end;
-      if escapeFunction <> nil then escapeFunction(sb, @temp[1], 2)
-      else if escapeCharacters = jecEscapeAll then sb.append(@temp[1], 2)
-      else sb.appendCodePoint(REPLACEMENT_CHARACTER_CP)
+
+      NoEscape:
+        sb.append(@toEscape, 1);
+        exit;
+
+      EscapeSingleLetter:
+        temp := '\x';
+        case toEscape of
+          '\': temp[2] := '\';
+          #8: temp[2] := 'b';
+          #9: temp[2] := 't';
+          #10: temp[2] := 'n';
+          #12: temp[2] := 'f';
+          #13: temp[2] := 'r';
+        end;
+        goto AppendEscapedTemp;
+
+      EscapeU00xx:
+        temp := '\u00XX';
+        temp[5] := chr(ord(toEscape) shr 4 + ord('0'));
+        temp[6] := charEncodeHexDigitUp(ord(toEscape) and $F);
+
+      AppendEscapedTemp:
+        if escapeFunction <> nil then escapeFunction(sb, @temp[1], length(temp))
+        else if escapeCharacters = jecEscapeAll then sb.append(@temp[1], length(temp))
+        else sb.appendCodePoint(REPLACEMENT_CHARACTER_CP);
     end;
     procedure appendInvalidUnicode(buxxxx: pchar);
     begin
@@ -452,10 +485,7 @@ class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt
     begin
       case codePoint of //see isValidXMLCharacter
         $20..ord('\')-1, ord('\')+1..$7E, $A0..$D7FF, $E000..$FFFD, $10000..$10FFFF: sb.appendCodePoint(codePoint);
-        $9,$A,$D: if escapeCharacters in [jecEscapeForXML10, jecEscapeAll] then appendEscapeChar(chr(codePoint))
-                  else sb.append(chr(codePoint));
-        ord('\'): if escapeCharacters = jecEscapeAll then appendEscapeChar('\') else sb.append('\');
-        $8, $C: appendEscapeChar(chr(codePoint));
+        $0..$1F, ord('\'):  appendLowCodePoint(chr(codePoint));
         $7F..$9F: if escapeCharacters = jecEscapeAll then appendInvalidUnicode(errstring)
                   else sb.appendCodePoint(codepoint);
         else appendInvalidUnicode(errstring)
@@ -519,20 +549,16 @@ class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt
             end;
           end;
           if escapeCharacters = jecEscapeAll then begin
-           inc(p); //do nothing
+           inc(p); //do nothing, section copy will copy the already escaped char
           end else begin
             appendSectionAndAdvance(2);
-            if (escapeChar in [#8,#12]) then appendEscapeChar( escapeChar )
-            else sb.append(escapeChar);
+            appendLowCodePoint(escapeChar);
           end;
         end;
         #0..#$1F: begin
           escapeChar := p^;
           appendSectionAndAdvance(1);
-          case escapeChar of
-            #8,#9,#10,#12,#13: appendEscapeChar(escapeChar);
-            else appendSuspiciousCodepoint(ord(escapeChar), nil);
-          end;
+          appendLowCodePoint(escapeChar);
         end;
         {#$80..#$C1,} #$C0, #$C1, #$ED, #$EF, #$F4..#$FF: begin
           sb.append(sectionstart, p - sectionstart);
