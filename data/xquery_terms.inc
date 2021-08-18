@@ -2884,38 +2884,48 @@ begin
   result += ')';
 end;
 
-class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+class function TXQTermNamedFunction.findKindIndexInNativeModule(const anamespace, alocalname: string; const argcount: integer;
+  const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 var
   module: TXQNativeModule;
-  t: TXSType;
   model: TXQParsingModel;
-  schema: TXSSchema;
+  hashCode: TXQHashCode;
 begin
+  result := false;
   module := TXQueryEngine.findNativeModule(anamespace);
 
   if staticContext <> nil then model := staticContext.model
   else model := xqpmXQuery3_1;
 
   if (module <> nil) then begin
-    afunc := module.findBasicFunction(alocalname, argcount, model);
+    hashCode := TXQDefaultTypeInfo.hash(alocalname);
+    afunc := module.findBasicFunction(alocalname, HashCode, argcount, model);
     if afunc <> nil then begin
       akind:=xqfkBasic;
       exit(true);
     end;
 
-    afunc := module.findComplexFunction(alocalname, argcount, model);
+    afunc := module.findComplexFunction(alocalname, HashCode, argcount, model);
     if afunc <> nil then begin
       akind:=xqfkComplex;
       exit(true);
     end;
 
-    afunc := module.findInterpretedFunction(alocalname, argcount, model);
+    afunc := module.findInterpretedFunction(alocalname, HashCode, argcount, model);
     if afunc <> nil then begin
       akind:=xqfkNativeInterpreted;
       exit(true);
     end;
   end;
+end;
 
+class function TXQTermNamedFunction.findTypeConstructor(const anamespace, alocalname: string; const argcount: integer;
+  const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+var
+  schema: TXSSchema;
+  t: TXSType;
+begin
+  result := false;
   if argcount = 1 then begin
     if anamespace = baseSchema.url then schema := baseSchema
     else if staticContext <> nil then schema := staticContext.findSchema(anamespace)
@@ -2929,9 +2939,15 @@ begin
       end;
     end;
   end;
+end;
 
-  afunc := nil;
-  exit(false);
+class function TXQTermNamedFunction.findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+begin
+  result := findKindIndexInNativeModule(anamespace, alocalname, argcount, staticContext, akind, afunc);
+  if not result then
+    result := findTypeConstructor(anamespace, alocalname, argcount, staticContext, akind, afunc);
+  if not result then
+    afunc := nil;
 end;
 
 function TXQTermNamedFunction.convertToTypeConstructor: TXQTermNamedFunction;

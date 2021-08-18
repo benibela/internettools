@@ -4644,32 +4644,13 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       otherModuleStaticContext: TXQStaticContext;
       privacyError: boolean;
     begin
-      module := TXQueryEngine.findNativeModule(anamespace);
-
-      if staticContext <> nil then model := staticContext.model
-      else model := xqpmXQuery3_1;
-
-      if (module <> nil) then begin
-        f.func := module.findBasicFunction(alocalname, argcount, model);
-        if f.func <> nil then begin
-          f.kind:=xqfkBasic;
-          exit(true);
-        end;
-
-        f.func := module.findComplexFunction(alocalname, argcount, model);
-        if f.func <> nil then begin
-          f.kind:=xqfkComplex;
-          exit(true);
-        end;
-
-        f.func := module.findInterpretedFunction(alocalname, argcount, model);
-        if f.func <> nil then begin
-          f.kind:=xqfkNativeInterpreted;
+      if TXQTermNamedFunction.findKindIndexInNativeModule(anamespace, alocalname, argcount, staticContext, f.kind, f.func) then begin
+        if f.kind = xqfkNativeInterpreted then begin
           if TXQInterpretedFunctionInfo(f.func).func = nil then
               TXQInterpretedFunctionInfo(f.func).initialize();
           f.init(staticContext);
-          exit(true);
         end;
+        exit(true);
       end;
 
       f.interpretedFunction := staticContext.findImportedFunction(anamespace,alocalname,argcount,privacyError,otherModuleStaticContext);
@@ -4681,18 +4662,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         exit(true);
       end;
 
-      if argcount = 1 then begin
-        if anamespace = baseSchema.url then schema := baseSchema
-        else if staticContext <> nil then schema := staticContext.findSchema(anamespace)
-        else schema := nil;
-        if schema <> nil then begin
-          t := schema.findType(alocalname);
-          if (t <> nil) and not (baseSchema.isAbstractType(t)) and not (baseSchema.isValidationOnlyType(t)) then begin
-            f.func :=  TXQAbstractFunctionInfo(pointer(t));
-            f := f.convertToTypeConstructor;
-            exit(true)
-          end;
-        end;
+      result := TXQTermNamedFunction.findTypeConstructor(anamespace, alocalname, argcount, staticContext, f.kind, f.func);
+      if result then begin
+        f := f.convertToTypeConstructor;
+        exit(true)
       end;
 
       exit(false);

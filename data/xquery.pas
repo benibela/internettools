@@ -2173,6 +2173,8 @@ type
     function ToString: ansistring; override;
 
     //for internal usage
+    class function findKindIndexInNativeModule(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
+    class function findTypeConstructor(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
     class function findKindIndex(const anamespace, alocalname: string; const argcount: integer; const staticContext: TXQStaticContext; out akind: TXQTermNamedFunctionKind; out afunc: TXQAbstractFunctionInfo): boolean;
 
     function convertToTypeConstructor: TXQTermNamedFunction;
@@ -3224,9 +3226,13 @@ public
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQOperatorInfo;
 
+  function findBasicFunction(const name: string; hashCode: TXQHashCode; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQBasicFunctionInfo;
+  function findComplexFunction(const name: string; hashCode: TXQHashCode;argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQComplexFunctionInfo;
+  function findInterpretedFunction(const name: string; hashCode: TXQHashCode; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQInterpretedFunctionInfo;
   function findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQBasicFunctionInfo;
   function findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQComplexFunctionInfo;
   function findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel = xqpmXQuery3_1): TXQInterpretedFunctionInfo;
+
   //function findBinaryOp(const name: string; model: TXQParsingModel = xqpmXQuery3_1): TXQOperatorInfo;
 
   function findSimilarFunctionsDebug(searched: TList; const localname: string): string;
@@ -3235,7 +3241,7 @@ public
 protected
   basicFunctions, complexFunctions, interpretedFunctions: TXQHashmapStrOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
-  class function findFunction(const map: TXQHashmapStrOwningObject; const name: string; argCount: integer): TXQAbstractFunctionInfo;
+  class function findFunction(const map: TXQHashmapStrOwningObject; const name: string; hashCode: TXQHashCode; argCount: integer): TXQAbstractFunctionInfo;
 end;
 
 
@@ -9813,49 +9819,64 @@ begin
   end;
 end;
 
-function TXQNativeModule.findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQBasicFunctionInfo;
+function TXQNativeModule.findBasicFunction(const name: string; hashCode: TXQHashCode; argCount: integer; model: TXQParsingModel): TXQBasicFunctionInfo;
 var
   i: SizeInt;
 begin
   for i := 0 to high(parents) do begin
-    result := parents[i].findBasicFunction(name, argCount, model);
+    result := parents[i].findBasicFunction(name, hashCode, argCount, model);
     if result <> nil then exit;
   end;
   if model in acceptedModels then begin
-    result := TXQBasicFunctionInfo(findFunction(basicFunctions, name, argCount));
+    result := TXQBasicFunctionInfo(findFunction(basicFunctions, name, hashCode, argCount));
     if result <> nil then exit;
   end;
   result := nil;
+end;
+
+function TXQNativeModule.findComplexFunction(const name: string; hashCode: TXQHashCode; argCount: integer; model: TXQParsingModel): TXQComplexFunctionInfo;
+var
+  i: SizeInt;
+begin
+  for i := 0 to high(parents) do begin
+    result := parents[i].findComplexFunction(name, hashCode, argCount, model);
+    if result <> nil then exit;
+  end;
+  if model in acceptedModels then begin
+   result := TXQComplexFunctionInfo(findFunction(complexFunctions, name, hashCode, argCount));
+   if result <> nil then exit;
+  end;
+  result := nil;
+end;
+
+function TXQNativeModule.findInterpretedFunction(const name: string; hashCode: TXQHashCode; argCount: integer; model: TXQParsingModel): TXQInterpretedFunctionInfo;
+var
+  i: SizeInt;
+begin
+  for i := 0 to high(parents) do begin
+    result := parents[i].findInterpretedFunction(name, hashCode, argCount, model);
+    if result <> nil then exit;
+  end;
+  if model in acceptedModels then begin
+   result := TXQInterpretedFunctionInfo(findFunction(interpretedFunctions, name, hashCode, argCount));
+   if result <> nil then exit;
+  end;
+  result := nil;
+end;
+
+function TXQNativeModule.findBasicFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQBasicFunctionInfo;
+begin
+  result := findBasicFunction(name, TXQDefaultTypeInfo.hash(name), argCount, model);
 end;
 
 function TXQNativeModule.findComplexFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQComplexFunctionInfo;
-var
-  i: SizeInt;
 begin
-  for i := 0 to high(parents) do begin
-    result := parents[i].findComplexFunction(name, argCount, model);
-    if result <> nil then exit;
-  end;
-  if model in acceptedModels then begin
-   result := TXQComplexFunctionInfo(findFunction(complexFunctions, name, argCount));
-   if result <> nil then exit;
-  end;
-  result := nil;
+  result := findComplexFunction(name, TXQDefaultTypeInfo.hash(name), argCount, model);
 end;
 
 function TXQNativeModule.findInterpretedFunction(const name: string; argCount: integer; model: TXQParsingModel): TXQInterpretedFunctionInfo;
-var
-  i: SizeInt;
 begin
-  for i := 0 to high(parents) do begin
-    result := parents[i].findInterpretedFunction(name, argCount, model);
-    if result <> nil then exit;
-  end;
-  if model in acceptedModels then begin
-   result := TXQInterpretedFunctionInfo(findFunction(interpretedFunctions, name, argCount));
-   if result <> nil then exit;
-  end;
-  result := nil;
+  result := findInterpretedFunction(name, TXQDefaultTypeInfo.hash(name), argCount, model);
 end;
 
 {function TXQNativeModule.findBinaryOp(const name: string; model: TXQParsingModel): TXQOperatorInfo;
@@ -10019,9 +10040,12 @@ begin
 end;
 {$endif}
 
-class function TXQNativeModule.findFunction(const map: TXQHashmapStrOwningObject; const name: string; argCount: integer): TXQAbstractFunctionInfo;
+class function TXQNativeModule.findFunction(const map: TXQHashmapStrOwningObject; const name: string; hashCode: TXQHashCode; argCount: integer): TXQAbstractFunctionInfo;
+var ent: TXQHashmapStrOwningObject.PHashMapEntity;
 begin
-  result := TXQAbstractFunctionInfo(map.getOrDefault(name));
+  ent := map.findEntityWithHash(pchar(name), length(name), hashCode);
+  if ent = nil then exit(nil);
+  result := TXQAbstractFunctionInfo(ent^.value);
   while result <> nil do begin
     if (result.minArgCount <= argCount) and ((result.maxArgCount >= argCount) or (result.maxArgCount = high(result.maxArgCount))) then
       exit;
