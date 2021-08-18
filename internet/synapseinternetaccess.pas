@@ -337,8 +337,9 @@ begin
     end;
   end;
   if connection.Sock.SSL is TSSLOpenSSLOverride then begin
-    (connection.Sock.SSL as TSSLOpenSSLOverride).CAFile := config.CAFile;
-    (connection.Sock.SSL as TSSLOpenSSLOverride).CAPath := config.CAPath;
+    (connection.Sock.SSL as TSSLOpenSSLOverride).CAFile := internetConfig.CAFile;
+    (connection.Sock.SSL as TSSLOpenSSLOverride).CAPath := internetConfig.CAPath;
+    (connection.Sock.SSL).CertCAFile := internetConfig.CAFile;
   end;
   inherited setConfig(internetConfig);
 end;
@@ -375,9 +376,9 @@ assert(TSynapseInternetAccess.SSLFallbackMaxVersion >= LT_TLSv1_1);
 defaultInternetAccessClass := TSynapseInternetAccess;
 {$ENDIF}
 
-{$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
+//{$IFDEF COMPILE_SYNAPSE_INTERNETACCESS}
 defaultInternetConfiguration.searchCertificates;
-{$endif}
+//{$endif}
 
 {$if not (defined(WINDOWS) or defined(android))}
 InitCriticalSection(resolvConfCS{%H-});
