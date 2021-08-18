@@ -89,10 +89,12 @@ type
     function findCellWithHash(const Key: TKey; hashcode: TXQHashCode): UInt32;
     function findEmptyCell(const Key: TKey): UInt32; inline;
     procedure grow;
+    procedure grow(NewSize: Int32);
   protected
   {$if FPC_FULLVERSION <= 30004} public{$endif}
     LogSize: int32;
     Size: int32;
+  public
     Entities:array of THashMapEntity;
     CellToEntityIndex: TXQHashMapCellArray;
     function getBaseValueOrDefault(const Key:TKey):TBaseValue;
@@ -103,6 +105,7 @@ type
     constructor init;
     destructor done;
     procedure Clear;
+    procedure reserve(minSize: Int32);
     function findEntity(const Key:TKey; CreateIfNotExist:boolean=false): PHashMapEntity;
     function exclude(const Key:TKey):boolean;
     function contains(const key: TKey): boolean;
@@ -149,6 +152,10 @@ type
         function value: TValue;
         property current: TKeyValuePairOption read currentPair;
       end;
+      TValueEnumerator = object(TKeyPairEnumerator)
+        function getEnumerator: TValueEnumerator;
+        property current: TValue read value;
+      end;
   protected
     function GetValue(const Key: TKey): TValue; inline;
     function findKeyValuePair(const Key: TKey): TKeyValuePairOption;
@@ -156,6 +163,7 @@ type
     function get(const Key: TKey; const def: TValue): TValue; inline;
     function getOrDefault(const Key: TKey): TValue; inline;
     function getEnumerator: TKeyPairEnumerator;
+    function getEnumeratorValues: TValueEnumerator;
   end;
 
   generic TXQBaseHashmapValuePointerLike<TKey, TValue, TKeyInfo> = object(specialize TXQBaseHashmapValuePointerLikeReadOnly<TKey, TValue, TKeyInfo>)
@@ -421,6 +429,11 @@ implementation
 uses math, bbutilsbeta
     {$ifdef USE_PASDBLSTRUTILS}, PasDblStrUtils{$endif};
 
+function TXQBaseHashmapValuePointerLikeReadOnly.TValueEnumerator.getEnumerator: TValueEnumerator;
+begin
+  result := self
+end;
+
 
 
 class function TXQCompareResultHelper.fromIntegerResult(i: integer): TXQCompareResult;
@@ -582,6 +595,12 @@ begin
  SetLength(CellToEntityIndex,0);
 end;
 
+procedure TXQBaseHashmap.reserve(minSize: Int32);
+begin
+  if minSize <= length(CellToEntityIndex) then exit;
+  grow(minSize);
+end;
+
 
 function TXQBaseHashmap.findCell(const Key: TKey): UInt32;
 begin
@@ -638,13 +657,17 @@ begin
   result := THashMapHelper.findEmptyCellWithHash(CellToEntityIndex, LogSize, TInfo.hash(key));
 end;
 
-
 procedure TXQBaseHashmap.grow;
-var NewLogSize,NewSize,OldSize,Counter, Entity:int32;
+begin
+  grow(Size);
+end;
+
+
+procedure TXQBaseHashmap.grow(NewSize: Int32);
+var NewLogSize,OldSize,Counter, Entity:int32;
   Cell: UInt32;
 begin
  OldSize := Size;
- NewSize := Size;
  //set NewLogSize to number of digits in binary representation of NewSize
  NewLogSize:=0;
  while NewSize<>0 do begin
@@ -738,9 +761,18 @@ begin
     exit(@Entities[Entity]);
  end;
 
- if CreateIfNotExist then
-   result:=include(Key,default(TBaseValue))
-  else
+ if CreateIfNotExist then begin
+   if Size+1>=(1 shl LogSize) then result:=include(Key,default(TBaseValue))
+   else begin
+     Entity:=Size;
+     inc(Size);
+     assert(Entity<2 shl LogSize);
+     CellToEntityIndex[Cell]:=Entity;
+     result:=@Entities[Entity];
+     result^.Key:=Key;
+     result^.value:=default(TBaseValue)
+   end;
+  end else
    result:=nil;
 end;
 
@@ -1151,6 +1183,11 @@ end;
 function TXQBaseHashmapValuePointerLikeReadOnly.getEnumerator: TKeyPairEnumerator;
 begin
   result.init(@self);
+end;
+
+function TXQBaseHashmapValuePointerLikeReadOnly.getEnumeratorValues: TValueEnumerator;
+begin
+  result.init(@self)
 end;
 
 
