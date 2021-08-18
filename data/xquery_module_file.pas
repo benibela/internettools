@@ -752,6 +752,7 @@ begin
   with globalTypes do begin
     dependencyFiles := [low(TXQContextDependency),high(TXQContextDependency)];
     module :=  TXQNativeModule.create(XMLNamespace_Expath_File);
+    module.reserveFunctionMemory(5,27,3);
     module.registerFunction('exists', @exists, dependencyFiles).setVersionsShared([stringt, boolean]);
     module.registerFunction('is-dir', @is_dir, dependencyFiles).setVersionsShared([stringt, boolean]);
     module.registerFunction('is-file', @is_file, dependencyFiles).setVersionsShared([stringt, boolean]);

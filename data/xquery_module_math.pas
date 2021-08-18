@@ -315,6 +315,7 @@ begin
   if Assigned(module) then exit;
 
   module := TXQNativeModule.create(XMLNamespace_Math);
+  module.reserveFunctionMemory(14,0,0);
 
   with globalTypes do begin
     module.registerFunction('pi', @mathPi).setVersionsShared([double]);

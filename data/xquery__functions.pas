@@ -7928,6 +7928,9 @@ begin
   TXQueryEngine.registerNativeModule(op);
 
   //my functions
+  pxpold.reserveFunctionMemory(16,22,1);
+  x.reserveFunctionMemory(8,2,7);
+  pxp.reserveFunctionMemory(0,3,0);
   pxpold.registerFunction('extract',2,4,@xqFunctionExtract, []);
   pxpold.registerFunction('split-equal',2,3,@xqFunctionSplitEqual,[]); //to be removed ?
   pxpold.registerFunction('parse-date',1,2,@xqFunctionParse_Date, []);
@@ -7992,6 +7995,9 @@ transform
 
 
   //standard functions
+  fn.reserveFunctionMemory(69,44,0);
+  fn3.reserveFunctionMemory(8,23,5);
+  fn3_1.reserveFunctionMemory(4,12,2);
   fn.registerFunction('exists',@xqFunctionExists).setVersionsShared([itemStar, boolean]);
   fn.registerFunction('empty', @xqFunctionempty).setVersionsShared([itemStar, boolean]);
   fn.registerFunction('nilled', @xqFunctionNilled, dependencyNodeCollation).setVersionsShared([nodeOrEmpty, booleanOrEmpty]);
@@ -8229,6 +8235,7 @@ transform
   fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   fnarray.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnarray);
+  fnarray.reserveFunctionMemory(12,6,0);
   fnarray.registerFunction('size', @xqFunctionArraySize).setVersionsShared([arrayt, integer]);
   fnarray.registerFunction('get', @xqFunctionArrayGet).setVersionsShared([arrayt, integer, itemStar]);
   fnarray.registerFunction('put', @xqFunctionArrayPut).setVersionsShared([arrayt, integer, itemStar, arrayt]);
@@ -8255,6 +8262,7 @@ transform
   fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   fnmap.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnmap);
+  fnmap.reserveFunctionMemory(9,1,0);
   fnmap.registerFunction('merge', @xqFunctionMapMerge).setVersionsShared([mapStar, map],  [mapStar, map, map]);
   fnmap.registerFunction('size', @xqFunctionMapSize).setVersionsShared([map, integer]);
   fnmap.registerFunction('keys', @xqFunctionMapKeys).setVersionsShared([map, atomicStar]);

@@ -11,7 +11,7 @@ begin
   id := -1;
 
   if (schema = nil) and (base <> nil) then schema := base.schema;
-  if schema <> nil then schema.typeList.AddObject(name, self);
+  if schema <> nil then schema.typeList.include(name, self);
 end;
 
 {function TXSType.isAtomic: boolean;
@@ -1009,12 +1009,8 @@ end;
 { TXSSchema }
 
 function TXSSchema.findType(const typeName: string): TXSType;
-var
-  i: Integer;
 begin
-  i := typeList.IndexOf(typeName);
-  if i >= 0 then result := TXSType(typeList.Objects[i])
-  else result := nil;
+  result := TXSType(typeList[typeName]);
 end;
 
 class function TXSSchema.isValidNCName(const s: string): boolean;
@@ -1031,16 +1027,9 @@ begin
 end;
 
 procedure TXSSchema.hide(const s: string);
-var
-  objIdx: Integer;
 begin
-  if hiddenTypeList = nil then
-    hiddenTypeList := TXQMapStringOwningObject.Create;
-  objIdx := typeList.IndexOf(s);
-  hiddenTypeList.AddObject(typeList[objIdx], typeList.Objects[objIdx]);
-  typeList.OwnsObjects := false;
-  typeList.Delete(objIdx);
-  typeList.OwnsObjects := true;
+  hiddenTypeList.include(s, typeList[s]);
+  typeList.findEntity(s)^.Value := nil; //bypass ownership
 end;
 
 procedure TXSSchema.cacheDescendants;
@@ -1057,7 +1046,7 @@ end;
     result := int64(1) shl t.id;
     with graph[t.id] do begin
       for i := 0 to count - 1 do begin
-        c := TXSType(typeList.Objects[children[i]]);
+        c := TXSType(typeList.Entities[children[i]].Value);
         result := result or initDescendants(c);
       end;
     end;
@@ -1069,15 +1058,15 @@ var
   parent, curType: TXSType;
 begin
   assert(typeList.Count < 64);
-  assert((hiddenTypeList = nil) or (hiddenTypeList.count = 0));
+  assert((hiddenTypeList.count = 0));
   for i := 0 to typeList.Count - 1 do begin
-    TXSType(typeList.Objects[i]).id := i;
-    TXSType(typeList.Objects[i]).descendantsIds := 0;
+    TXSType(typeList.Entities[i].Value).id := i;
+    TXSType(typeList.Entities[i].Value).descendantsIds := 0;
     graph[i].count := 0;
   end;
   //convert schema parent relationships to tree
   for i := 0 to typeList.Count - 1 do begin
-    curType := TXSType(typeList.Objects[i]);
+    curType := TXSType(typeList.Entities[i].Value);
     parent := curType.base;
     if parent <> nil then
       with {%H-}graph[parent.id] do begin
@@ -1097,7 +1086,7 @@ begin
     end;
   end;
   for i := 0 to typeList.Count - 1 do
-    initDescendants(TXSType(typeList.Objects[i]));
+    initDescendants(TXSType(typeList.Entities[i].Value));
 
   {writeln('children:');
 
@@ -1130,15 +1119,10 @@ begin
 end;
 
 procedure TXSSchema.show(const s: string);
-var
-  objIdx: Integer;
 begin
-  if hiddenTypeList = nil then exit;
-  objIdx := hiddenTypeList.IndexOf(s);
-  typeList.AddObject(hiddenTypeList[objIdx], hiddenTypeList.Objects[objIdx]);
-  hiddenTypeList.OwnsObjects := false;
-  hiddenTypeList.Delete(objIdx);
-  hiddenTypeList.OwnsObjects := true;
+  assert(hiddenTypeList.contains(s));
+  typeList.include(s, hiddenTypeList[s]);
+  hiddenTypeList.findEntity(s)^.Value := nil; //bypass ownership
 end;
 
 function TXSSchema.isValidationOnlyType(t: TXSType): boolean;
@@ -1220,14 +1204,14 @@ constructor TXSSchema.Create;
 
 begin
   version := xsd11;
-  typeList := TXQMapStringOwningObject.Create;
+  typeList.init;
+  typeList.reserve(63);
   if baseSchema <> nil then begin
     anyType := baseSchema.anyType;
     anySimpleType := baseSchema.anySimpleType;
     anyAtomicType := baseSchema.anyAtomicType;
     exit;
   end;
-  typeList.sorted := false;
   AnyType := TXSSimpleType.Create('anyType', nil, nil, self);
     AnySimpleType := TXSSimpleType.Create('anySimpleType', AnyType);
       AnyAtomicType := TXSSimpleType.Create('anyAtomicType', AnySimpleType);
@@ -1332,22 +1316,17 @@ begin
   error := TXSUnionType.Create('error',nil,nil,[]);
   error.variety := xsvAbsent;
   error.schema := self;
-  typeList.AddObject('error', error);
+  typeList['error'] := error;
 
   numeric := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [double, decimal, float, integer]);
 
   untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, TXQValueString, [untypedAtomic, untyped, node]);
-  typeList.sorted := true;
 end;
 
 destructor TXSSchema.Destroy;
 begin
-  typeList.Clear;
-  typeList.Free;
-  if hiddenTypeList <> nil then begin
-    hiddenTypeList.Clear;
-    hiddenTypeList.Free;
-  end;
+  typeList.done;
+  hiddenTypeList.done;
   inherited Destroy;
 end;
 

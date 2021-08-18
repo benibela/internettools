@@ -1632,9 +1632,11 @@ type
     procedure show(const s: string); //do not use
     procedure hide(const s: string); //do not use
   private
-    typeList, hiddenTypeList: TXQMapStringOwningObject;
+    typeList, hiddenTypeList: TXQHashmapStrOwningObject;
     procedure cacheDescendants;
-    {$ifdef dumpFunctions}procedure logConstructorFunctions;{$endif}
+    {$ifdef dumpFunctions}procedure logConstructorFunctions;
+    class procedure printFunctionCount;
+    {$endif}
   end;
 
   { TJSONiqOverrideSchema }
@@ -1744,6 +1746,7 @@ type
     minArgCount, maxArgCount: word;
     versions: array of TXQFunctionParameterTypes;
     sharedVersions: boolean;
+    otherSameNameFunction: TXQAbstractFunctionInfo;
     //used for user defined functions where the parameters must be promoted to the right type
     class procedure convertType(var result: IXQValue; const typ: TXQTermSequenceType; const context: TXQEvaluationContext; term: TXQTerm); static;
     //used for native functions (which should be robust enough to handle different types on the Pascal side)
@@ -3228,10 +3231,11 @@ public
 
   function findSimilarFunctionsDebug(searched: TList; const localname: string): string;
   {$ifdef DUMPFUNCTIONS}procedure dumpFunctions;{$endif}
+  procedure reserveFunctionMemory(basic, complex, interpreted: integer);
 protected
-  basicFunctions, complexFunctions, interpretedFunctions: TXQMapStringOwningObject;
+  basicFunctions, complexFunctions, interpretedFunctions: TXQHashmapStrOwningObject;
   binaryOpLists: TXQMapStringOwningObject;
-  class function findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
+  class function findFunction(const map: TXQHashmapStrOwningObject; const name: string; argCount: integer): TXQAbstractFunctionInfo;
 end;
 
 
@@ -4848,9 +4852,10 @@ var nativeModules: TStringList;
 class function EXQException.searchClosestFunction(const addr: pointer): string;
 const terms: array[1..40] of TXQTermClass = (TXQTermWithChildren, TXQTermVariable, TXQTermSequenceType, TXQTermDefineFunction, TXQTerm, TXQTermWithChildren, TXQTermConstant, TXQTermSequence, TXQTermJSONArray, TXQTermSequenceType, TXQTermVariable, TXQTermDefineVariable, TXQTermDefineFunction, TXQTermNodeMatcher, TXQTermFilterSequence, TXQTermPatternMatcher, TXQTermNamedFunction, TXQTermDynamicFunctionCall, TXQTermBinaryOp  , TXQTermFlowerSubClause, TXQTermFlowerLet, TXQTermFlowerFor, TXQTermFlowerWindow, TXQTermFlowerLetPattern, TXQTermFlowerForPattern, TXQTermFlowerWhere, TXQTermFlowerOrder, TXQTermFlowerCount, TXQTermFlowerGroup, TXQTermFlower, TXQTermSomeEvery, TXQTermIf, TXQTermTypeSwitch, TXQTermSwitch, TXQTermReadObjectProperty, TXQTermConstructor, TXQTermMapConstructor, TXQTermJSONiqObjectConstructor, TXQTermTryCatch, TXQTermModule);
 var
-  i, j: SizeInt;
+  i: SizeInt;
   module: TXQNativeModule;
   delta: PtrUInt;
+  o: TObject;
   procedure checkAddr(tocheck: pointer; name: string); inline;
   begin
     if (tocheck <= addr) and ( addr - tocheck < delta ) then begin
@@ -4866,10 +4871,10 @@ begin
 
   for i := 0 to nativeModules.Count - 1 do begin
     module := TXQNativeModule(nativeModules.Objects[i]);
-    for j := 0 to module.basicFunctions.Count - 1 do
-      checkAddr( TXQBasicFunctionInfo(module.basicFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.basicFunctions[j]);
-    for j := 0 to module.complexFunctions.Count - 1 do
-    checkAddr( TXQComplexFunctionInfo(module.complexFunctions.Objects[j]).func, 'Q{' +nativeModules[i] + '}'+ module.complexFunctions[j]);
+    for o in module.basicFunctions.getEnumeratorValues do
+      checkAddr( TXQBasicFunctionInfo(o).func, 'Q{' +nativeModules[i] + '}'+ TXQBasicFunctionInfo(o).name);
+    for o in module.basicFunctions.getEnumeratorValues do
+      checkAddr( TXQComplexFunctionInfo(o).func, 'Q{' +nativeModules[i] + '}'+ TXQComplexFunctionInfo(o).name);
   end;
   if delta > 2048 then result := 'perhaps ' + result + ' ? but unlikely';
 end;
@@ -7921,6 +7926,7 @@ begin
       versions[i].returnType.Free;
     end;
   versions := nil;
+  otherSameNameFunction.free;
   inherited Destroy;
 end;
 
@@ -9365,6 +9371,7 @@ begin
   result := TXQNativeModule(nativeModules.Objects[index]);
 end;
 
+
 class function TXQueryEngine.findOperator(const pos: pchar): TXQOperatorInfo;
 var
   i: SizeInt;
@@ -9531,9 +9538,9 @@ var
 begin
   namespace := anamespace;
   namespace._AddRef;
-  basicFunctions:=TXQMapStringOwningObject.Create;
-  complexFunctions:=TXQMapStringOwningObject.Create;
-  interpretedFunctions:=TXQMapStringOwningObject.Create;
+  basicFunctions.init;
+  complexFunctions.init;
+  interpretedFunctions.init;
   binaryOpLists:=TXQMapStringOwningObject.Create;
   if length(aparentModule) > 0 then begin
     SetLength(parents, length(aparentModule));
@@ -9557,10 +9564,10 @@ begin
   interpretedFunctions.Clear;
   binaryOpLists.Clear;
 
-  basicFunctions.free;
-  complexFunctions.free;
+  basicFunctions.done;
+  complexFunctions.done;
   binaryOpLists.free;
-  interpretedFunctions.free;
+  interpretedFunctions.done;
 
   i := nativeModules.IndexOf(namespace.getURL);
   if (i >= 0) and (nativeModules.Objects[i] = self) then nativeModules.Delete(i);
@@ -9654,12 +9661,21 @@ begin
 end;
 {$endif}
 
+procedure addFunction(var map: TXQHashmapStrOwningObject; f: TXQAbstractFunctionInfo);
+var
+  ent: TXQHashmapStrOwningObject.PHashMapEntity;
+begin
+  ent := map.findEntity(f.name, true);
+  f.otherSameNameFunction := TXQAbstractFunctionInfo(ent^.Value);
+  ent^.Value := f;
+end;
+
 function TXQNativeModule.registerFunction(const name: string; func: TXQBasicFunction): TXQBasicFunctionInfo;
 begin
   result := TXQBasicFunctionInfo.Create;
   result.func := func;
   result.name := name;
-  basicFunctions.AddObject(name, result);
+  addFunction(basicFunctions, result);
 end;
 
 function TXQNativeModule.registerFunction(const name: string; func: TXQComplexFunction; contextDependencies: TXQContextDependencies
@@ -9669,7 +9685,7 @@ begin
   result.func := func;
   result.name := name;
   result.contextDependencies:=contextDependencies;
-  complexFunctions.AddObject(name, result);
+  addFunction(complexFunctions, result);
 end;
 
 var globalTypeParsingContext: TXQAbstractParsingContext;
@@ -9741,11 +9757,12 @@ var
   temp: TXQInterpretedFunctionInfo;
 begin
   temp := TXQInterpretedFunctionInfo.Create;
+  temp.name := name;
   temp.namespace := namespace;
   temp.sourceTypes:=typeDeclaration;
   temp.sourceImplementation := func;
   temp.contextDependencies:=contextDependencies;
-  interpretedFunctions.AddObject(name, temp);
+  addFunction(interpretedFunctions, temp);
   setTypeChecking(name, temp, sequenceTypes);
 end;
 
@@ -9885,18 +9902,19 @@ function TXQNativeModule.findSimilarFunctionsDebug(searched: TList; const localn
   end;
 var moduleResult: String;
   i: SizeInt;
+  p: TXQHashmapStrOwningObject.TKeyValuePairOption;
 begin
   result := '';
   if searched.IndexOf(self) >= 0 then exit;
   searched.Add(self);
   moduleResult := '';
-  for  i := 0 to basicFunctions.Count - 1 do
-    if strSimilar(localname, basicFunctions[i]) then begin
-      moduleResult += '    ' + functionName(basicFunctions[i], TXQBasicFunctionInfo(basicFunctions.Objects[i]));
+  for p in basicFunctions do
+    if strSimilar(localname, p.key) then begin
+      moduleResult += '    ' + functionName(p.key, TXQBasicFunctionInfo(p.value));
     end;
-  for i := 0 to complexFunctions.Count - 1 do
-    if strSimilar(localname, complexFunctions[i]) then
-      moduleResult += '    ' + functionName(complexFunctions[i], TXQComplexFunctionInfo(complexFunctions.Objects[i]));
+  for p in complexFunctions do
+    if strSimilar(localname, p.key) then
+      moduleResult += '    ' + functionName(p.key, TXQComplexFunctionInfo(p.value));
   if moduleResult <> '' then begin
     result += '  In module ' + namespaceGetURL(namespace);
 //    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
@@ -9905,6 +9923,13 @@ begin
   end;
   for i := 0 to high(parents) do
     result += parents[i].findSimilarFunctionsDebug(searched, localname);
+end;
+
+procedure TXQNativeModule.reserveFunctionMemory(basic, complex, interpreted: integer);
+begin
+  basicFunctions.reserve(basic);
+  complexFunctions.reserve(complex);
+  interpretedFunctions.reserve(interpreted);
 end;
 
 
@@ -9968,31 +9993,40 @@ begin
     writeln('<f m="' , XMLNamespaceURL_XMLSchema, '" version="'+sversion+'" name="', xmlStrEscape(t.name,true), '" args="($arg as xs:anyAtomicType?) as xs:' ,xmlStrEscape(t.name,true), '?"/>');
   end;
 end;
+class procedure TXQueryEngine.printFunctionCount;
+procedure dump(nm: TXQNativeModule);
+var
+  nm2: TXQNativeModule;
+begin
+  writeln(nm.namespace.prefix, ' ', nm.namespace.url);
+  writeln(nm.basicFunctions.Count);
+  writeln(nm.complexFunctions.Count);
+  writeln(nm.interpretedFunctions.Count);
+  for nm2 in nm.parents do
+    dump(nm2);;
+end;
+
+var
+  i: Integer;
+  nm: TXQNativeModule;
+begin
+  for i := 0 to nativeModules.count - 1 do begin
+    writeln();
+    writeln(i, ' ', nativeModules[i]);
+    nm :=TXQNativeModule(nativeModules.Objects[i]);
+    dump(nm);
+  end;
+end;
 {$endif}
 
-class function TXQNativeModule.findFunction(const sl: TStringList; const name: string; argCount: integer): TXQAbstractFunctionInfo;
-var
-  i: SizeInt;
-  idx: SizeInt;
-  info: TXQAbstractFunctionInfo;
+class function TXQNativeModule.findFunction(const map: TXQHashmapStrOwningObject; const name: string; argCount: integer): TXQAbstractFunctionInfo;
 begin
-  idx := sl.IndexOf(name);
-  if idx = -1 then exit(nil);
-  i := idx;
-  repeat
-    info := TXQAbstractFunctionInfo(sl.Objects[i]);
-    if (info.minArgCount <= argCount) and ((info.maxArgCount >= argCount) or (info.maxArgCount = high(info.maxArgCount))) then
-      exit(TXQAbstractFunctionInfo(sl.Objects[i]));
-    dec(i);
-  until (i < 0) or (sl[i] <> name);
-  i := idx + 1;
-  while (i < sl.Count) and (sl[i] = name) do begin
-    info := TXQAbstractFunctionInfo(sl.Objects[i]);
-    if (info.minArgCount <= argCount) and ((info.maxArgCount >= argCount) or (info.maxArgCount = high(info.maxArgCount))) then
-      exit(TXQAbstractFunctionInfo(sl.Objects[i]));
-    inc(i);
+  result := TXQAbstractFunctionInfo(map.getOrDefault(name));
+  while result <> nil do begin
+    if (result.minArgCount <= argCount) and ((result.maxArgCount >= argCount) or (result.maxArgCount = high(result.maxArgCount))) then
+      exit;
+    result := result.otherSameNameFunction;
   end;
-  result := nil;
 end;
 
 

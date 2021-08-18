@@ -201,6 +201,7 @@ initialization
 
   with globalTypes do begin
     jn := TXQNativeModule.Create(XMLNamespace_JSONiqFunctions);
+    jn.reserveFunctionMemory(7,1,0);
     TXQueryEngine.registerNativeModule(jn);
     jn.registerBasicFunction('keys', @xqFunctionKeys, [itemStar, stringStar]);
     jn.registerBasicFunction('members', @xqFunctionMembers, [itemStar, itemStar]);
@@ -239,6 +240,7 @@ values
 
     XMLNamespace_JSONiqLibraryFunctions:=TNamespace.makeWithRC1('http://jsoniq.org/function-library', 'libjn');
     libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
+    libjn.reserveFunctionMemory(0,0,9);
   //new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
     {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', [itemStar, map], '($seq as item()*) as object()',
       'jn:object( ' +
