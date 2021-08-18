@@ -1942,7 +1942,7 @@ begin
 
   modu := TXQNativeModule.Create(TNamespace.make('http://benibela.de/native-test-module', 'xyz'));
   TXQueryEngine.registerNativeModule(modu);
-  modu.registerInterpretedFunction('test-context', '() as item()*', '. + 1');
+  modu.registerInterpretedFunction('test-context', [globalTypes.itemStar], '() as item()*', '. + 1');
 
   m('declare namespace test = "http://benibela.de/native-test-module"; <a>17</a> / test:test-context()', '18');
   f('declare function local:local-context() { . + 1} ; <a>17</a> / local:local-context()', 'XPDY0002');

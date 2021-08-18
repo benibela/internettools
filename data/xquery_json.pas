@@ -240,7 +240,7 @@ values
     XMLNamespace_JSONiqLibraryFunctions:=TNamespace.makeWithRC1('http://jsoniq.org/function-library', 'libjn');
     libjn := TXQNativeModule.create(XMLNamespace_JSONiqLibraryFunctions);
   //new function from 1.0.1 not working libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()', '{| for $key in jn:keys($seq) return { $key : $seq($key) }  |}');
-    {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', '($seq as item()*) as object()',
+    {my own with 1.0.1 semantics} libjn.registerInterpretedFunction('accumulate', [itemStar, map], '($seq as item()*) as object()',
       'jn:object( ' +
         ' let $o := for $p in $seq '+
                     'return if ($p instance of object()) then $p else ()'+
@@ -250,7 +250,7 @@ values
          'return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
     //old accumulate function: libjn.registerInterpretedFunction('accumulate', '($o as object()*) as object()', 'jn:object( let $all-keys := for $object in $o return jn:keys($object) for $distinct-key in distinct-values($all-keys) let $values := $o($distinct-key) return if (count($values) eq 1) then { $distinct-key : $values } else { $distinct-key : [ $values ] } )');
 
-    libjn.registerInterpretedFunction('descendant-arrays', '($seq as item()*) as array()*',
+    libjn.registerInterpretedFunction('descendant-arrays', [itemStar, arrayt], '($seq as item()*) as array()*',
         'for $i in $seq ' +
         'return typeswitch ($i) ' +
         'case array() return ( ' +
@@ -261,7 +261,7 @@ values
         '    return libjn:descendant-arrays(libjn:values($i)) ' +
         'default return () ');
 
-    libjn.registerInterpretedFunction('descendant-objects', '($seq as item()*) as object()*',
+    libjn.registerInterpretedFunction('descendant-objects', [itemStar, mapStar], '($seq as item()*) as object()*',
         'for $i in $seq ' +
         'return typeswitch ($i) ' +
         'case object() return ( ' +
@@ -271,7 +271,7 @@ values
         'case array() return ' +
         '    libjn:descendant-objects(jn:members($i)) ' +
         'default return () ');
-    libjn.registerInterpretedFunction('descendant-pairs', '($seq as item()*) as item()*',
+    libjn.registerInterpretedFunction('descendant-pairs', [itemStar, mapStar], '($seq as item()*) as item()*',
         'for $i in $seq ' +
         'return typeswitch ($i) ' +
         'case object() return ' +
@@ -285,14 +285,14 @@ values
         '  libjn:descendant-pairs(jn:members($i)) ' +
         'default return () '
     );
-    libjn.registerInterpretedFunction('flatten', '($seq as item()*) as item()* ',
+    libjn.registerInterpretedFunction('flatten', [itemStar, itemStar], '($seq as item()*) as item()* ',
       'for $i in $seq ' +
       'return ' +
       '  typeswitch ($i) ' +
       '  case array() return libjn:flatten(jn:members($i)) ' +
       '  default return $i '
     );
-    libjn.registerInterpretedFunction('intersect', '($seq as item()*) as object()',
+    libjn.registerInterpretedFunction('intersect', [itemStar, map], '($seq as item()*) as object()',
       '{| ' +
       '  let $objects := $seq[. instance of object()] ' +
       '  for $key in jn:keys(($objects)[1]) ' +
@@ -303,7 +303,7 @@ values
     );
 
 
-    libjn.registerInterpretedFunction('project', '($seq as item()*, $keys as xs:string*) as item()*',
+    libjn.registerInterpretedFunction('project', [itemStar, stringStar, itemStar], '($seq as item()*, $keys as xs:string*) as item()*',
       'for $item in $seq ' +
       'return typeswitch ($item) ' +
       '       case $object as object() return ' +
@@ -315,7 +315,7 @@ values
       '       |} ' +
       '       default return $item ');
 
-    libjn.registerInterpretedFunction('remove-keys', '($seq as item()*, $keys as xs:string*) as item()*',
+    libjn.registerInterpretedFunction('remove-keys', [itemStar, stringStar, itemStar], '($seq as item()*, $keys as xs:string*) as item()*',
       'for $item in $seq ' +
       'return typeswitch ($item) ' +
       '       case $object as object() return ' +
@@ -327,7 +327,7 @@ values
       '       |} ' +
       '       default return $item ');
 
-    libjn.registerInterpretedFunction('values', '($seq as item()*) as item()*',
+    libjn.registerInterpretedFunction('values', [itemStar, itemStar], '($seq as item()*) as item()*',
       'for $i in $seq '+
       'for $k in jn:keys($i) '+
       'return $i($k)');

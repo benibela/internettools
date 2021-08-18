@@ -780,8 +780,8 @@ begin
     lastfn.setVersionsShared(2, [stringt, integer, integer, base64Binary]);
     module.registerFunction('read-text', @read_text, dependencyFiles).setVersionsShared([stringt, stringt],  [stringt, stringt, stringt]);
     //[stringt, stringStar]
-    module.registerInterpretedFunction('read-text-lines', '($file as xs:string) as xs:string*',                          'x:lines(file:read-text($file           ))');
-    module.registerInterpretedFunction('read-text-lines', '($file as xs:string, $encoding as xs:string) as xs:string*',  'x:lines(file:read-text($file, $encoding))');
+    module.registerInterpretedFunction('read-text-lines', [stringt, stringStar], '($file as xs:string) as xs:string*',                          'x:lines(file:read-text($file           ))');
+    module.registerInterpretedFunction('read-text-lines', [stringt, stringt, stringStar], '($file as xs:string, $encoding as xs:string) as xs:string*',  'x:lines(file:read-text($file, $encoding))');
     module.registerFunction('write', @write, dependencyFiles).setVersionsShared([stringt, itemStar, empty],  [stringt, itemStar, elementSerializationParams, empty]);
     module.registerFunction('write-binary', @write_binary, dependencyFiles).setVersionsShared([stringt, base64Binary, empty],  [stringt, base64Binary, integer, empty]);
     module.registerFunction('write-text', @write_text, dependencyFiles).setVersionsShared([stringt, stringt, empty],  [stringt, stringt, stringt, empty]);
@@ -798,8 +798,8 @@ begin
     module.registerFunction('line-separator', @line_separator).setVersionsShared([stringt]);
     module.registerFunction('path-separator', @path_separator).setVersionsShared([stringt]);
     module.registerFunction('temp-dir', @temp_dir).setVersionsShared([stringt]);
-    module.registerInterpretedFunction('base-dir', '() as xs:string', 'Q{'+XMLNamespaceURL_Expath_File+'}parent(static-base-uri())');
-    module.registerInterpretedFunction('current-dir', '() as xs:string', 'Q{'+XMLNamespaceURL_Expath_File+'}resolve-path(".")');
+    module.registerInterpretedFunction('base-dir', [stringt], '() as xs:string', 'Q{'+XMLNamespaceURL_Expath_File+'}parent(static-base-uri())');
+    module.registerInterpretedFunction('current-dir', [stringt], '() as xs:string', 'Q{'+XMLNamespaceURL_Expath_File+'}resolve-path(".")');
   end;
 
   TXQueryEngine.registerNativeModule(module);

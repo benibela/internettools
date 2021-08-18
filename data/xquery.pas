@@ -1775,7 +1775,7 @@ type
   //**Information about a complex xquery function (interpreted => the function is defined as XQuery function)
   TXQInterpretedFunctionInfo = class(TXQAbstractFunctionInfo)
     namespace: INamespace;
-    source: string;
+    sourceTypes, sourceImplementation: string;
     contextDependencies: TXQContextDependencies;
     definition: TXQTermDefineFunction;
     func: TXQValueFunction;
@@ -3214,7 +3214,7 @@ public
   function registerFunction(const name: string; func: TXQComplexFunction; const typeChecking: array of TXQTermSequenceType; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]): TXQComplexFunctionInfo;
   //** Registers a function from an XQuery body
   //**TypeChecking must a standard XQuery function declarations (without the function name but WITH the variable names) (it uses a simplified parser, so only space whitespace is allowed)
-  procedure registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+  procedure registerInterpretedFunction(const name: string; sequenceTypes: array of TXQTermSequenceType; const typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
   //** Registers a binary operator
   //**TypeChecking contains a list of standard XQuery function declarations (with or without the function name) for strict type checking.
   function registerBinaryOp(const name:string; func: TXQBinaryOp;  priority: integer; flags: TXQOperatorFlags; const typeChecking: array of string; contextDependencies: TXQContextDependencies): TXQOperatorInfo;
@@ -3432,6 +3432,7 @@ public
     functionItemAtomicStar, functionAtomicItemStarItemStar, functionItemStarAtomicStar,
     functionItemStarItemItemStar, functionItemItemStarItemStar, functionItemItemItemStar,
     functionItemStarItemStar, functionItemStarBoolean, functionItemStarItemStarItemStar,
+    functionItemItemStar, functionItemBoolean,
 
     node, nodeOrEmpty, nodeStar,
     element, elementStar,
@@ -3439,7 +3440,7 @@ public
     elementSerializationParams, elementSerializationParamsOrEmpty
     : TXQTermSequenceType;
   );
-  false: (cachedTypes: array[1..81] of TXQTermSequenceType);
+  false: (cachedTypes: array[1..83] of TXQTermSequenceType);
 end;
 var globalTypes: TXQGlobalTypes;
 
@@ -4759,7 +4760,7 @@ begin
          if namespace <> nil then temp.GlobalNamespaces.add(namespace);
          GlobalInterpretedNativeFunctionStaticContext.sender := temp;
          temp.StaticContext := GlobalInterpretedNativeFunctionStaticContext;
-         tempQuery := temp.parseTerm(source, xqpmXQuery3_1, temp.StaticContext);
+         tempQuery := temp.parseTerm('function ' + sourceTypes + '{' +  sourceImplementation + '}', xqpmXQuery3_1, temp.StaticContext);
          definition := tempQuery.fterm as TXQTermDefineFunction;
          func := tempQuery.evaluate() as TXQValueFunction;
          func._AddRef;
@@ -9735,16 +9736,17 @@ begin
 end;
 
 
-procedure TXQNativeModule.registerInterpretedFunction(const name, typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
+procedure TXQNativeModule.registerInterpretedFunction(const name: string;  sequenceTypes: array of TXQTermSequenceType; const typeDeclaration, func: string; contextDependencies: TXQContextDependencies = [low(TXQContextDependency)..high(TXQContextDependency)]);
 var
   temp: TXQInterpretedFunctionInfo;
 begin
   temp := TXQInterpretedFunctionInfo.Create;
   temp.namespace := namespace;
-  temp.source:='function ' + typeDeclaration + '{' +  func + '}';
+  temp.sourceTypes:=typeDeclaration;
+  temp.sourceImplementation := func;
   temp.contextDependencies:=contextDependencies;
   interpretedFunctions.AddObject(name, temp);
-  setTypeChecking(name, temp, [typeDeclaration]);
+  setTypeChecking(name, temp, sequenceTypes);
 end;
 
 function TXQNativeModule.registerBinaryOp(const name: string; func: TXQBinaryOp; priority: integer; flags: TXQOperatorFlags;

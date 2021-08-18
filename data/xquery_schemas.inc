@@ -1436,6 +1436,7 @@ begin
   functionItemAtomicStar := f([item, atomicStar]); functionAtomicItemStarItemStar := f([atomic,itemStar,itemStar]); functionItemStarAtomicStar := f([itemStar,atomicStar]);
   functionItemStarItemItemStar := f([itemStar,item,itemStar]); functionItemItemStarItemStar := f([item,itemStar,itemStar]); functionItemItemItemStar := f([item,item,itemStar]);
   functionItemStarItemStar := f([itemStar,itemStar]); functionItemStarBoolean := f([itemStar, boolean]); functionItemStarItemStarItemStar := f([itemStar,itemStar,itemStar]);
+  functionItemItemStar := f([item, itemStar]); functionItemBoolean := f([item, boolean]);
 
   node := TXQTermSequenceType.create(tikElementTest); node.nodeMatching.typ := tneaDirectChild; node.nodeMatching.matching := [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
   nodeOrEmpty := orEmpty(node); nodeStar := star(node);

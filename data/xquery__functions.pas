@@ -7973,20 +7973,20 @@ transform
 [[itemStar, functiont, itemStar]]
 transform
 [[functiont, itemStar]]}
-  pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*), $options as object()) as item()*',
+  pxpold.registerInterpretedFunction('transform', [itemStar, functiont, map, itemStar], '($root as item()*, $f as function(*), $options as object()) as item()*',
   'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
   '                typeswitch (.)'+
   '                  case element() return element {node-name(.)} { @* ! $f(.), node()!pxp:transform(., $f, $options) }'+
   '                  case document-node() return document {  node() ! pxp:transform(., $f, $options) }'+
   '                  default return .'+
   '             ) else . )');
-  pxpold.registerInterpretedFunction('transform', '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
-  pxpold.registerInterpretedFunction('transform', '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
+  pxpold.registerInterpretedFunction('transform', [itemStar, functiont, itemStar], '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
+  pxpold.registerInterpretedFunction('transform', [functiont, itemStar], '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
 
-  x.registerInterpretedFunction('replace-nodes', '($root as item()*, $nodes as item()*, $replacement as item()*) as item()*', 'pxp:transform($root, function($i) {' +
+  x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar, itemStar], '($root as item()*, $nodes as item()*, $replacement as item()*) as item()*', 'pxp:transform($root, function($i) {' +
     ' if ($nodes[. is $i]) then if ($replacement instance of function(*)) then $replacement($i) else $replacement else $i'+
   '})');
-  x.registerInterpretedFunction('replace-nodes', '($nodes as item()*, $replacement as item()*) as item()*', 'x:replace-nodes(($nodes!root())|(), $nodes, $replacement)');
+  x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar], '($nodes as item()*, $replacement as item()*) as item()*', 'x:replace-nodes(($nodes!root())|(), $nodes, $replacement)');
 
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
@@ -8150,9 +8150,9 @@ transform
 
   fn3.registerFunction('has-children', @xqFunctionHas_Children, [xqcdFocusItem]).setVersionsShared([boolean],  [nodeOrEmpty, boolean]);
   //[nodeStar, nodeStar]
-  fn3.registerInterpretedFunction('innermost', '($nodes as node()*) as node()*', '$nodes except $nodes/ancestor::node()', []);
+  fn3.registerInterpretedFunction('innermost', [nodeStar, nodeStar], '($nodes as node()*) as node()*', '$nodes except $nodes/ancestor::node()', []);
   //[nodeStar, nodeStar]
-  fn3.registerInterpretedFunction('outermost', '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
+  fn3.registerInterpretedFunction('outermost', [nodeStar, nodeStar], '($nodes as node()*) as node()*', '$nodes[not(ancestor::node() intersect $nodes)]/.', []);
   fn3.registerFunction('path', @xqFunctionPath, [xqcdFocusItem]).setVersionsShared([stringOrEmpty],  [nodeOrEmpty, stringOrEmpty]);
 
   fn3.registerFunction('format-integer', @xqFunctionFormat_Integer, [xqcdContextOther]).setVersionsShared([integerOrEmpty, stringt, stringt],  [integerOrEmpty, stringt, stringOrEmpty, stringt]);
@@ -8166,9 +8166,9 @@ transform
   fn3.registerFunction('function-arity', @xqFunctionFunction_Arity).setVersionsShared([functiont, integer]);
 
   //[itemStar, functiont, itemStar]
-  fn3.registerInterpretedFunction('for-each', '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
+  fn3.registerInterpretedFunction('for-each', [itemStar, functionItemItemStar, itemStar], '($seq as item()*, $f as function(item()) as item()*) as item()*', 'for $_ in $seq return $f($_)', []);
   //[itemStar, functiont, itemStar]
-  fn3.registerInterpretedFunction('filter', '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
+  fn3.registerInterpretedFunction('filter', [itemStar, functionItemBoolean, itemStar], '($seq as item()*, $f as function(item()) as xs:boolean) as item()*', 'for $_ in $seq where $f($_) return $_', []);
   fn3.registerFunction('fold-left', @xqFunctionFold_left, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemStarItemItemStar, itemStar]);
   fn3.registerFunction('fold-right', @xqFunctionFold_right, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemItemStarItemStar, itemStar]);
   fn3.registerFunction('for-each-pair', @xqFunctionFor_each_pair, [xqcdContextOther]).setVersionsShared([itemStar, itemStar, functionItemItemItemStar, itemStar]);
@@ -8184,11 +8184,11 @@ transform
 
   fn3.registerFunction('unparsed-text', @xqFunctionUnparsed_Text, dependencyNone).setVersionsShared([stringOrEmpty, stringOrEmpty],  [stringOrEmpty, stringt, stringOrEmpty]);
   fn3.registerFunction('unparsed-text-available', @xqFunctionUnparsed_Text_Available, dependencyNone).setVersionsShared([stringOrEmpty, boolean],  [stringOrEmpty, stringt, boolean]);
-  fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?) as xs:string*',                          'x:lines(fn:unparsed-text($href           ))');
-  fn3.registerInterpretedFunction('unparsed-text-lines', '($href as xs:string?, $encoding as xs:string) as xs:string*',  'x:lines(fn:unparsed-text($href, $encoding))');
+  fn3.registerInterpretedFunction('unparsed-text-lines', [stringOrEmpty, stringStar], '($href as xs:string?) as xs:string*',                          'x:lines(fn:unparsed-text($href           ))');
+  fn3.registerInterpretedFunction('unparsed-text-lines', [stringOrEmpty, stringt, stringStar], '($href as xs:string?, $encoding as xs:string) as xs:string*',  'x:lines(fn:unparsed-text($href, $encoding))');
 
-  x.registerInterpretedFunction('lines', '($text as xs:string?) as xs:string*',  'let $temp := fn:tokenize($text, "\r\n?|\n") return if ($temp[last()] = "") then subsequence($temp, 1, count($temp) - 1) else $temp');
-  x.registerInterpretedFunction('cps', '($list as item()*) as item()*',  '$list ! (typeswitch (.) case xs:decimal|xs:double|xs:float return codepoints-to-string(.) default return string-to-codepoints(.))');
+  x.registerInterpretedFunction('lines', [stringOrEmpty, stringStar], '($text as xs:string?) as xs:string*',  'let $temp := fn:tokenize($text, "\r\n?|\n") return if ($temp[last()] = "") then subsequence($temp, 1, count($temp) - 1) else $temp');
+  x.registerInterpretedFunction('cps', [itemStar, itemStar], '($list as item()*) as item()*',  '$list ! (typeswitch (.) case xs:decimal|xs:double|xs:float return codepoints-to-string(.) default return string-to-codepoints(.))');
 
 
   fn3.registerFunction('generate-id', @xqFunctionGenerateId, dependencyAll).setVersionsShared([stringt],  [nodeOrEmpty, stringt]);
@@ -8215,14 +8215,14 @@ transform
   fn3_1.registerFunction('load-xquery-module', @xqFunctionLoadXQueryModule, [xqcdContextOther]).setVersionsShared([stringt, map], [stringt, map, map]);
 
   //from https://gist.github.com/joewiz/d986da715facaad633db
-  fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?) as document-node()?', 'json-to-xml($json-text, map {})');
-  fn3_1.registerInterpretedFunction('json-to-xml', '($json-text as xs:string?, $options as map(*)) as document-node()?', '$json-text ! document { x:joewiz-json-to-xml-recurse(parse-json(., if ($options?duplicates = "retain") then map:put($options, "duplicates", "use-first") else $options )) }');
-  fn3_1.registerInterpretedFunction('xml-to-json', '($input as node()?) as xs:string?', ' xml-to-json($input, map {} )');
-  fn3_1.registerInterpretedFunction('xml-to-json', '($input as node()?, $options as map(*)) as xs:string?', ' $input ! (try { let $json := x:joewiz-xml-to-json-recurse(.) let $serialization-parameters := map { "method": "json", "indent": $options?indent } return serialize($json, $serialization-parameters) } catch *:FORG0001 | *:SERE0022 | *:SERE0020 { x:joewiz-FOJS0006($input) } )');
-  x.registerInterpretedFunction('joewiz-json-to-xml-recurse', '($json as item()*) as item()+',  'let $data-type := x:joewiz-json-data-type($json) return element { QName("http://www.w3.org/2005/xpath-functions", $data-type) } { if ($data-type eq "array") then for $array-index in 1 to array:size($json) let $array-member := $json($array-index) let $array-member-data-type := x:joewiz-json-data-type($array-member) return element {$array-member-data-type} { if ($array-member-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($array-member)/node() else $array-member } else if ($data-type eq "map") then map:for-each( $json, function($object-name, $object-value) { let $object-value-data-type := x:joewiz-json-data-type($object-value) return element { QName("http://www.w3.org/2005/xpath-functions", $object-value-data-type) } { attribute key {$object-name}, if ($object-value-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($object-value)/node() else $object-value } } ) else $json }');
-  x.registerInterpretedFunction('joewiz-json-data-type', '($json as item()?) as xs:string', ' if ($json instance of array(*)) then "array" else if ($json instance of map(*)) then "map" else if ($json instance of xs:string) then "string" else if ($json instance of xs:double) then "number" else if ($json instance of xs:boolean) then "boolean" else if (empty($json)) then "null" else error(xs:QName("ERR"), "Not a known data type for json data")');
-  x.registerInterpretedFunction('joewiz-xml-to-json-recurse', '($input as node()*) as item()*', 'for $node in $input return typeswitch ($node) case element(fn:map) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), map:merge( $node/* ! (let $key := @key return if ($key) then map {$key: x:joewiz-xml-to-json-recurse(.)} else x:joewiz-FOJS0006($node) ) ) ) case element(fn:array) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), array { $node/* } => array:for-each(x:joewiz-xml-to-json-recurse#1) ) case element(fn:string) return $node/string() case element(fn:number) return $node cast as xs:double case element(fn:boolean) return $node cast as xs:boolean case element(fn:null) return ($node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node)) case document-node() return x:joewiz-xml-to-json-recurse($node/node()) (: Comments, processing instructions, and whitespace text node children of map and array are ignored :) case text() return if (normalize-space($node) eq "") then () else x:joewiz-FOJS0006($node) case comment() | processing-instruction() return () case element() return x:joewiz-FOJS0006($node) default return error(xs:QName("ERR"), "Does not match known node types for xml-to-json data") ');
-  x.registerInterpretedFunction('joewiz-FOJS0006', '($node as node()*) as item()*', 'error(fn:QName("http://www.w3.org/2005/xqt-errors", "FOJS0006"), "Invalid XML representation of JSON: "||serialize($node))');
+  fn3_1.registerInterpretedFunction('json-to-xml', [stringOrEmpty, documentNodeOrEmpty], '($json-text as xs:string?) as document-node()?', 'json-to-xml($json-text, map {})');
+  fn3_1.registerInterpretedFunction('json-to-xml', [stringOrEmpty, map], '($json-text as xs:string?, $options as map(*)) as document-node()?', '$json-text ! document { x:joewiz-json-to-xml-recurse(parse-json(., if ($options?duplicates = "retain") then map:put($options, "duplicates", "use-first") else $options )) }');
+  fn3_1.registerInterpretedFunction('xml-to-json', [nodeOrEmpty, stringOrEmpty], '($input as node()?) as xs:string?', ' xml-to-json($input, map {} )');
+  fn3_1.registerInterpretedFunction('xml-to-json', [nodeOrEmpty, map, stringOrEmpty], '($input as node()?, $options as map(*)) as xs:string?', ' $input ! (try { let $json := x:joewiz-xml-to-json-recurse(.) let $serialization-parameters := map { "method": "json", "indent": $options?indent } return serialize($json, $serialization-parameters) } catch *:FORG0001 | *:SERE0022 | *:SERE0020 { x:joewiz-FOJS0006($input) } )');
+  x.registerInterpretedFunction('joewiz-json-to-xml-recurse', [itemStar, itemPlus], '($json as item()*) as item()+',  'let $data-type := x:joewiz-json-data-type($json) return element { QName("http://www.w3.org/2005/xpath-functions", $data-type) } { if ($data-type eq "array") then for $array-index in 1 to array:size($json) let $array-member := $json($array-index) let $array-member-data-type := x:joewiz-json-data-type($array-member) return element {$array-member-data-type} { if ($array-member-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($array-member)/node() else $array-member } else if ($data-type eq "map") then map:for-each( $json, function($object-name, $object-value) { let $object-value-data-type := x:joewiz-json-data-type($object-value) return element { QName("http://www.w3.org/2005/xpath-functions", $object-value-data-type) } { attribute key {$object-name}, if ($object-value-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($object-value)/node() else $object-value } } ) else $json }');
+  x.registerInterpretedFunction('joewiz-json-data-type', [itemOrEmpty, stringt], '($json as item()?) as xs:string', ' if ($json instance of array(*)) then "array" else if ($json instance of map(*)) then "map" else if ($json instance of xs:string) then "string" else if ($json instance of xs:double) then "number" else if ($json instance of xs:boolean) then "boolean" else if (empty($json)) then "null" else error(xs:QName("ERR"), "Not a known data type for json data")');
+  x.registerInterpretedFunction('joewiz-xml-to-json-recurse', [nodeStar, itemStar], '($input as node()*) as item()*', 'for $node in $input return typeswitch ($node) case element(fn:map) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), map:merge( $node/* ! (let $key := @key return if ($key) then map {$key: x:joewiz-xml-to-json-recurse(.)} else x:joewiz-FOJS0006($node) ) ) ) case element(fn:array) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), array { $node/* } => array:for-each(x:joewiz-xml-to-json-recurse#1) ) case element(fn:string) return $node/string() case element(fn:number) return $node cast as xs:double case element(fn:boolean) return $node cast as xs:boolean case element(fn:null) return ($node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node)) case document-node() return x:joewiz-xml-to-json-recurse($node/node()) (: Comments, processing instructions, and whitespace text node children of map and array are ignored :) case text() return if (normalize-space($node) eq "") then () else x:joewiz-FOJS0006($node) case comment() | processing-instruction() return () case element() return x:joewiz-FOJS0006($node) default return error(xs:QName("ERR"), "Does not match known node types for xml-to-json data") ');
+  x.registerInterpretedFunction('joewiz-FOJS0006', [nodeStar, itemStar], '($node as node()*) as item()*', 'error(fn:QName("http://www.w3.org/2005/xqt-errors", "FOJS0006"), "Invalid XML representation of JSON: "||serialize($node))');
 
 
 
