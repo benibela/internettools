@@ -166,10 +166,10 @@ type
     procedure trimLeft(trimChar: char);
     procedure trimRight(trimChar: char);
 
-    function tryParse(out v: Int64): boolean;
-    function tryParse(out v: Int32): boolean;
-    function tryParse(out v: UInt64): boolean;
-    function tryParse(out v: UInt32): boolean;
+    function decimalToIntTry(out v: Int64): boolean;
+    function decimalToIntTry(out v: Int32): boolean;
+    function decimalToUIntTry(out v: UInt64): boolean;
+    function decimalToUIntTry(out v: UInt32): boolean;
 
     function viewTo(newLast: pchar): TCharArrayView; reintroduce;
     function viewUntil(newEnd: pchar): TCharArrayView; reintroduce;
@@ -662,7 +662,7 @@ const
       MaxAbsoluteNegativeInt64AsUint = QWord(9223372036854775808);
       MaxAbsoluteNegativeInt32AsUint = DWord(2147483648);
 
-function TCharArrayView.tryParse(out v: Int64): boolean;
+function TCharArrayView.decimalToIntTry(out v: Int64): boolean;
 var
   temp: QWord;
 begin
@@ -681,7 +681,7 @@ begin
   result := true;
 end;
 
-function TCharArrayView.tryParse(out v: Int32): boolean;
+function TCharArrayView.decimalToIntTry(out v: Int32): boolean;
 var
   temp: UInt32;
 begin
@@ -700,12 +700,12 @@ begin
 end;
 {$pop}
 
-function TCharArrayView.tryParse(out v: UInt64): boolean;
+function TCharArrayView.decimalToUIntTry(out v: UInt64): boolean;
 begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;
 
-function TCharArrayView.tryParse(out v: UInt32): boolean;
+function TCharArrayView.decimalToUIntTry(out v: UInt32): boolean;
 begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;

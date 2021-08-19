@@ -6130,7 +6130,7 @@ var
   begin
     if jsoniqMode then begin
       tempview.init(scanner.CurTokenStart, scanner.CurTokenLength);
-      if tempview.tryParse(temp64) then exit(xqvalue(temp64));
+      if tempview.decimalToIntTry(temp64) then exit(xqvalue(temp64));
       if TryStrToBigDecimal(tempview.data, tempview.length, @tempd) then
         if tempview.contains('E')  or tempview.contains('e')   then exit(baseSchema.double.createValue(tempd))
         else if tempview.contains('.')  then exit(baseSchema.decimal.createValue(tempd))
