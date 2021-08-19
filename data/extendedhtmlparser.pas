@@ -2194,7 +2194,7 @@ function takeLoopCounter(var s: string; out minCount, maxCount: string): boolean
 var
   view, maxView: TStringView;
   comma: pchar;
-  temp: Longint;
+  temp: SizeInt;
   closingParen: pChar;
 begin
   result := false;
@@ -2223,14 +2223,12 @@ begin
       view.trim();
       maxView.trim();
       if view.isEmpty or maxView.isEmpty then exit;
-      //prevent TryStrToInt from parsing non-decimal bases:    (especially $abc as hex is bad)
-      //(it will still parse 0x.. but that is killed when the number is parsed as XPath (any XPath is allowed in the min/max attributes of <t:loop>))
-      if not (view.data^ in ['0'..'9']) or not (maxView.data^ in ['0'..'9']) then exit;
-      minCount := view.ToString;
-      maxCount := maxView.ToString;
-      result := TryStrToInt(minCount, temp) and TryStrToInt(maxCount, temp);
-      if result then
+      result := view.decimalToIntTry(temp) and maxView.decimalToIntTry(temp);
+      if result then begin
+        minCount := view.ToString;
+        maxCount := maxView.ToString;
         delete(s, 1, s.unsafeViewTo(closingParen).length);
+      end;
     end;
   end;
 end;

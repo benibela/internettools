@@ -6911,21 +6911,19 @@ var ak, bk: TXQValueKind;
   end;
 
   function compareAsPossibleInt64: TXQCompareResult; //assumption ak != bk; ak, bk != pvkBigDecimal
-  const MaxInt64LogDec = 18;
   var
     s: String;
     temp: int64;
   begin
     if ak = pvkInt64 then begin
       s := vtodecimalstr(bk, b);
-      if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then exit(compareAsBigDecimals(a, s));
+      if not s.decimalToIntTry(temp) then exit(compareAsBigDecimals(a, s));
       result := TXQCompareResult.compare( TXQValueInt64(a).value, temp);
     end else if bk = pvkInt64 then begin
       s := vtodecimalstr(ak, a);
-      if length(s) >= MaxInt64LogDec then exit(compareAsBigDecimals(b, s).inverted());
-        if (length(s) >= MaxInt64LogDec) or not TryStrToInt64(s, temp) then
-          if strContains(s, 'N') then exit(compareCommonFloat())
-          else exit(compareAsBigDecimals(b, s).inverted());
+      if not s.decimalToIntTry(temp) then
+        if s.Contains('N') then exit(compareCommonFloat())
+        else exit(compareAsBigDecimals(b, s).inverted());
       result := TXQCompareResult.compare(temp,  TXQValueInt64(b).value);
     end else begin raisePXPInternalError; result := xqcrIncomparable; end;
   end;

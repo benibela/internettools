@@ -4694,12 +4694,14 @@ const DefaultLongMonths: array[1..21] of THumanReadableName = (
   (n:'m'#$C3#$A4'rz';v:3));
 
 function readNumber(const s:string; var ip: integer; const count: integer): integer;
+var temp: Cardinal;
 begin
   if (dtpfStrict in options) and ((ip > length(s)) or not (s[ip] in ['0'..'9'])) then begin
     result := -1;
     exit;
   end;
-  result := StrToIntDef(copy(s, ip, count), -1);
+  if strDecimalToUIntTry(@s[ip], @s[ip] + count, temp) then result := temp
+  else result := -1;
   inc(ip,  count);
 end;
 

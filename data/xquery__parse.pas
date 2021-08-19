@@ -2719,7 +2719,7 @@ begin
   skipWhitespaceAndComment();
   case pos^ of
     '0'..'9': begin
-      if not {$ifdef cpu32}TryStrToInt{$else}TryStrToInt64{$endif}(nextToken(), result.integerKey) then raiseSyntaxError('Need (integer) key');
+      if not nextToken().decimalToIntTry(result.integerKey) then raiseSyntaxError('Need (integer) key');
       result.mode := xqtjlmInteger
     end;
     '*': begin

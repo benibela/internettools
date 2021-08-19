@@ -185,6 +185,11 @@ type
     function unsafeViewUntil(newEnd: pchar): TStringView;
     function unsafeViewFrom(newStart: pchar): TStringView;
     function unsafeViewBehind(newStartSkip: pchar): TStringView;
+
+    function decimalToIntTry(out v: Int64): boolean;
+    function decimalToIntTry(out v: Int32): boolean;
+    function decimalToUIntTry(out v: UInt64): boolean;
+    function decimalToUIntTry(out v: UInt32): boolean;
   end;
   TBBPcharHelper = type helper for pchar
     function nilMeansInfinity: pchar;
@@ -753,6 +758,26 @@ end;
 function TBB2StringHelper.unsafeViewBehind(newStartSkip: pchar): TStringView;
 begin
   result := unsafeView.viewBehind(newStartSkip);
+end;
+
+function TBB2StringHelper.decimalToIntTry(out v: Int64): boolean;
+begin
+  result := unsafeView.decimalToIntTry(v);
+end;
+
+function TBB2StringHelper.decimalToIntTry(out v: Int32): boolean;
+begin
+  result := unsafeView.decimalToIntTry(v);
+end;
+
+function TBB2StringHelper.decimalToUIntTry(out v: UInt64): boolean;
+begin
+  result := strDecimalToUIntTry(pchar(self), pchar(self) + length, v);
+end;
+
+function TBB2StringHelper.decimalToUIntTry(out v: UInt32): boolean;
+begin
+  result := strDecimalToUIntTry(pchar(self), pchar(self) + length, v);
 end;
 
 function TBB2BytesHelper.unsafeView: TCharArrayView;

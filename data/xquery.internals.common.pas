@@ -1615,6 +1615,7 @@ function urlHexDecode(s: string): string;
 var
   p: SizeInt;
   i: SizeInt;
+  temp: UInt32;
 begin
   result := '';
   SetLength(result, length(s));
@@ -1623,8 +1624,8 @@ begin
   while i <= length(s) do begin
     case s[i] of
       '+': result[p] := ' ';
-      '%': if (i + 2 <= length(s)) and (s[i+1] in ['a'..'f','A'..'F','0'..'9']) and (s[i+2] in ['a'..'f','A'..'F','0'..'9']) then begin
-        result[p] := chr(StrToInt('$'+s[i+1]+s[i+2])); //todo: optimize
+      '%': if (i + 2 <= length(s)) and strHexToUIntTry(@s[i+1], @s[i+1] + 2, temp) then begin
+        result[p] := chr(temp);
         i+=2;
       end else raiseXQEvaluationException('pxp:uri', 'Invalid input string at: '+copy(s,i,10))
       else result[p] := s[i];
