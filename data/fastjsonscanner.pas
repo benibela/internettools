@@ -215,7 +215,7 @@ begin
       begin
         if joStrict in Options then Error(SErrInvalidCharacter, [CurRow,CurColumn,FTokenStr[0]]);
         FCurTokenStart := FTokenStr;
-        while FTokenStr^ = #0 do inc(FTokenStr);
+        while (FTokenStr^ = #0) and (FTokenStr < FSourceEnd) do inc(FTokenStr);
         FCurTokenLength := FTokenStr - FCurTokenStart;
         Result := tkWhitespace;
       end;
