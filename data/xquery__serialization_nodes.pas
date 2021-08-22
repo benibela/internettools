@@ -61,6 +61,7 @@ protected
 end;
 
 TXQSerializationMethod = (xqsmXML, xqsmXHTML, xqsmHTML, xqsmText, xqsmJSON, xqsmAdaptive);
+TXQKeyOrder = (xqkoUnordered, xqkoInsertion, xqkoAscending, xqkoDescending);
 TXQSerializationParams = record
   isAbsentMarker: string;
   method: TXQSerializationMethod;
@@ -85,6 +86,7 @@ TXQSerializationParams = record
   //json only
   jsonNodeOutputMethod: string;
   allowDuplicateNames: boolean;
+  keyOrderExtension: TXQKeyOrder;
 
   //custom
   standardMode, allowEncodingConversion: boolean;
@@ -323,6 +325,7 @@ begin
   normalizationForm := unfUnknown;
   characterMaps := nil;
   allowDuplicateNames := false;
+  keyOrderExtension := xqkoUnordered;
   cdataSectionElements := nil;
   suppressIndentation := nil;
   includeContentType := isFromMap;

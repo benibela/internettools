@@ -94,6 +94,9 @@ begin
   t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
   t('serialize(<a>   <b xml:space="preserve">  <c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b xml:space="preserve">  <c>xx</c><c>yy</c></b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
 
+  t('serialize(map{"10": 123, 2: 456}, map {"method": "json", QName("x:key-order"): "ascending" })', '{"2":456,"10":123}');
+
+
   t('$stringmap := parse-json("{""1"":13}")', '');
   ps.StaticContext.AllowJSONiqOperations := false;
   t('map:find($stringmap, 1)', '' );

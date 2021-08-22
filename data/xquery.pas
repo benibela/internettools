@@ -374,6 +374,7 @@ type
   TXQSerializer = object(TIndentingJSONXHTMLStrBuilder)
     nodeFormat: TTreeNodeSerialization;
     allowDuplicateNames: boolean;
+    keyOrderExtension: TXQKeyOrder;
 
     procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
 
@@ -3551,6 +3552,7 @@ begin
   inherited init(abuffer, basecapacity, aencoding);
   nodeFormat := tnsText;
   allowDuplicateNames := true;
+  keyOrderExtension := xqkoUnordered;
   standard := false;
   sequenceTag :=  'seq';
   elementTag := 'e';

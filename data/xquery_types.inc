@@ -556,15 +556,79 @@ begin
 end;
 
 
+type TJSONKeySortingData = record
+  entireMap: array of record
+    key: string;
+    value: TXQValue;
+  end;
+  mapMap: array of SizeInt;
+end;
+PJSONKeySortingData=^TJSONKeySortingData;
 
+function compareJSONKeyMapMap(data: TObject; a, b: pointer): longint;
+var ai, bi: sizeint;
+begin
+  ai := PSizeInt(a)^;
+  bi := PSizeInt(b)^;
+  result := strCompareClever(PJSONKeySortingData(data)^.entireMap[ai].key, PJSONKeySortingData(data)^.entireMap[bi].key)
+end;
 
 procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
   procedure objectJsonSerialize(var serializer: TXQSerializer);
   var
-    prop: TXQProperty;
     isStringMap: Boolean;
     nameCheck: ^TXQHashmapStrStr;
     enumerator: TXQValueStringPropertyEnumerator;
+    procedure serializeDefault;
+    var prop: TXQProperty;
+    begin
+      with serializer do
+      while true do begin
+        prop := enumerator.Current;
+        if assigned(nameCheck) then begin
+          if nameCheck.contains(prop.key) then
+            raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
+          nameCheck.include(prop.key, '');
+        end;
+        appendJSONObjectKeyColon(prop.key);
+        prop.Value.jsonSerialize(serializer);
+        if not enumerator.MoveNext then break;
+        appendJSONObjectComma
+      end;
+    end;
+    procedure serializeOrdered;
+    var sortData: TJSONKeySortingData;
+      p, temp: SizeInt;
+      prop: TXQProperty;
+    begin
+      SetLength(sortData.entireMap, Size);
+      SetLength(sortData.mapMap, length(sortData.entireMap));
+      p := 0;
+      repeat
+        prop := enumerator.Current;
+        sortData.entireMap[p].key := prop.key;
+        sortData.entireMap[p].value := prop.value;
+        sortData.mapMap[p] := p;
+        inc(p);
+      until not enumerator.MoveNext;
+      stableSort(sortData.mapMap, @compareJSONKeyMapMap, tobject(@sortData));
+      if assigned(nameCheck) then
+        for p := 1 to high(sortData.mapMap)  do
+          if sortData.entireMap[sortdata.mapMap[p-1]].key = sortData.entireMap[sortdata.mapMap[p]].key then
+            raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
+      if serializer.keyOrderExtension = xqkoDescending then
+        for p := 0 to high(sortData.mapMap) div 2 do begin
+          temp := sortData.mapMap[p];
+          sortData.mapMap[p] := sortData.mapMap[high(sortData.mapMap) - p];
+          sortData.mapMap[high(sortData.mapMap) - p] := temp;
+        end;
+      with serializer do
+      for p := 0 to high(sortData.mapMap) do begin
+        if p <> 0 then appendJSONObjectComma;
+        appendJSONObjectKeyColon(sortData.entireMap[sortData.mapMap[p]].key);
+        sortData.entireMap[sortData.mapMap[p]].value.jsonSerialize(serializer);
+      end;
+    end;
   begin
     isStringMap := getPropertyKeyKind = xqmpkkStringKeys;
     if isStringMap or serializer.allowDuplicateNames then nameCheck := nil
@@ -574,18 +638,8 @@ procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
       if not enumerator.MoveNext then serializer.appendJSONEmptyObject
       else with serializer do begin
         appendJSONObjectStart;
-        while true do begin
-          prop := enumerator.Current;
-          if assigned(nameCheck) then begin
-            if nameCheck.contains(prop.key) then
-              raiseXQEvaluationError('SERE0022', 'Duplicate key names when serializing.', self);
-            nameCheck.include(prop.key, '');
-          end;
-          appendJSONObjectKeyColon(prop.key);
-          prop.Value.jsonSerialize(serializer);
-          if not enumerator.MoveNext then break;
-          appendJSONObjectComma
-        end;
+        if (keyOrderExtension in [xqkoInsertion,xqkoUnordered]) then serializeDefault
+        else serializeOrdered;
         appendJSONObjectEnd;
       end;
     finally
@@ -593,6 +647,7 @@ procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
       enumerator.free;
     end;
   end;
+
 
 begin
   case kind of

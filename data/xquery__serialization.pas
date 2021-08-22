@@ -20,6 +20,7 @@ type TXQSerializationParamsHelper = record helper for TXQSerializationParams
   procedure setStandalone(s: boolean);
   procedure setNormalizationForm(const s: string);
   procedure setEncoding(const s: string);
+  procedure setExtensionProperty(const key, value: string);
   function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
 end;
 
@@ -200,7 +201,10 @@ begin
          'version':        version := paramNode.getAttribute('value');
          else error();
        end;
+     end else if equalNamespaces(namespaceGetURL(paramNode.namespace), XMLNamespaceURL_MyExtensionsNew) then begin
+       setExtensionProperty(paramNode.value, paramNode.getAttribute('value'));
      end;
+
    end;
    duplicateValueCheck.done;
 end;
@@ -267,7 +271,11 @@ var
 
 begin
   for pp in v.getEnumeratorPropertiesUnsafe do begin
-    if not TXQValueOwnershipTracker.isKeyStringLike(pp.key.toValue) then continue;
+    if not TXQValueOwnershipTracker.isKeyStringLike(pp.key.toValue) then begin
+      if (pp.key.kind = pvkQName) and ((pp.key as TXQValueQName).url = XMLNamespaceURL_MyExtensionsNew) then
+        setExtensionProperty((pp.key as TXQValueQName).local, pp.value.toString);
+      continue;
+    end;
     case pp.Value.getSequenceCount of
       0: continue;
       1: ; //fine
@@ -375,6 +383,19 @@ begin
   encoding := s;
   encodingCP := strEncodingFromName(s);
   if encodingCP = $FFFF then raiseXQEvaluationException('SESU0007', 'Unknown encoding: '+s);
+end;
+
+procedure TXQSerializationParamsHelper.setExtensionProperty(const key, value: string);
+begin
+  case key of
+    'key-order': case value of
+      'ascending': keyOrderExtension := xqkoAscending;
+      'descending': keyOrderExtension := xqkoDescending;
+      'insertion': keyOrderExtension := xqkoInsertion;
+      'unordered': keyOrderExtension := xqkoUnordered;
+      else raise EXQEvaluationException.create('SEPM0017', 'Invalid serialization parameter: '+key+ '='+value);
+    end;
+  end;
 end;
 
 function TXQSerializationParamsHelper.needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
@@ -909,6 +930,7 @@ var
   interceptor: TSpecialStringHandler;
 begin
   serializer.allowDuplicateNames := params.allowDuplicateNames;
+  serializer.keyOrderExtension := params.keyOrderExtension;
   serializer.insertWhitespace := params.indent;
   case params.jsonNodeOutputMethod of
     'xml': serializer.nodeFormat := tnsXML;

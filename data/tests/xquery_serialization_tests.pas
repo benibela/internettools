@@ -9,7 +9,7 @@ procedure unittests();
 
 implementation
 
-uses bbutils, commontestutils, xquery.internals.common, xquery;
+uses bbutils, commontestutils, xquery.internals.common, xquery, xquery__serialization_nodes;
 
 procedure tquery(const q, expected: string);
 begin
@@ -50,6 +50,21 @@ begin
   query('{"a": 1}').jsonSerialize(xqs);
   xqs.final;
   test(buffer, '{"a": 1}');
+
+  xqs.init(@buffer);
+  query('{"b": 123, "c": 456, "a": 1}').jsonSerialize(xqs);
+  xqs.final;
+  test(buffer, '{"b": 123, "c": 456, "a": 1}');
+  xqs.init(@buffer);
+  xqs.keyOrderExtension := xqkoAscending;
+  query('{"b": 123, "c": 456, "a": 1}').jsonSerialize(xqs);
+  xqs.final;
+  test(buffer, '{"a": 1, "b": 123, "c": 456}');
+  xqs.init(@buffer);
+  xqs.keyOrderExtension := xqkoDescending;
+  query('{"b": 123, "c": 456, "a": 1}').jsonSerialize(xqs);
+  xqs.final;
+  test(buffer, '{"c": 456, "b": 123, "a": 1}');
 
   xqs.init(@buffer);
   query('{"a": (attribute {"foo"} {"bar"})}').jsonSerialize(xqs);
