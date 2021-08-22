@@ -589,7 +589,7 @@ procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
         appendJSONObjectEnd;
       end;
     finally
-      if assigned(nameCheck) then nameCheck^.done;
+      if assigned(nameCheck) then Dispose(nameCheck, done);
       enumerator.free;
     end;
   end;
