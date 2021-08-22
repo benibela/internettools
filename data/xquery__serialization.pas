@@ -388,13 +388,7 @@ end;
 procedure TXQSerializationParamsHelper.setExtensionProperty(const key, value: string);
 begin
   case key of
-    'key-order': case value of
-      'ascending': keyOrderExtension := xqkoAscending;
-      'descending': keyOrderExtension := xqkoDescending;
-      'insertion': keyOrderExtension := xqkoInsertion;
-      'unordered': keyOrderExtension := xqkoUnordered;
-      else raise EXQEvaluationException.create('SEPM0017', 'Invalid serialization parameter: '+key+ '='+value);
-    end;
+    'key-order': keyOrderExtension := XQKeyOrderFromString(value);
   end;
 end;
 

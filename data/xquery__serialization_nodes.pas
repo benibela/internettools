@@ -109,6 +109,8 @@ const XMLNamespaceUrl_XHTML = 'http://www.w3.org/1999/xhtml';
 type PSerializationParams = ^TXQSerializationParams;
 procedure serializeNodes(base: TTreeNode; var builder: TIndentingJSONXHTMLStrBuilder; nodeSelf: boolean; html: boolean; params: PSerializationParams);
 
+function XQKeyOrderFromString(const s: string): TXQKeyOrder;
+
 implementation
 uses
   bbutils,
@@ -688,6 +690,17 @@ begin
   else inner(base, elementIsHTML(base));
   known.free;
   deadPrefixes.Free;
+end;
+
+function XQKeyOrderFromString(const s: string): TXQKeyOrder;
+begin
+  case s of
+    'ascending': result := xqkoAscending;
+    'descending': result := xqkoDescending;
+    'insertion': result := xqkoInsertion;
+    'unordered': result := xqkoUnordered;
+    else raiseXQEvaluationException('SEPM0017', 'Invalid serialization parameter: key-order= ' + s);
+  end;
 end;
 
 
