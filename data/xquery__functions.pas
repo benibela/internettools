@@ -8398,14 +8398,14 @@ var n: TTreeNode = nil;
       else raiseInvalidXML(s);
     end;
   end;
-
-  function isEscaped(const kind: string): boolean;
+var currentStringEscaped: boolean;
+  procedure checkForEscapedAttribute(const kind: string);
   begin
-    result := strToBoolXQ(n.getAttribute(kind, 'false'));
+    currentStringEscaped := strToBoolXQ(n.getAttribute(kind, 'false'));
   end;
-  function unescapeString(const s, escapeKind: string): string;
+  function unescapeString(const s: string): string;
   begin
-    if isEscaped(escapeKind) then begin
+    if currentStringEscaped then begin
       //sb.appendJSONString(;
       result := TJSONScanner.decodeJSONString(s, jecEscapeNothing)
     end else
@@ -8413,10 +8413,7 @@ var n: TTreeNode = nil;
   end;
 
   procedure skipElement(forbidText: boolean = false);
-  var
-    nreverse: TTreeNode;
   begin
-    nreverse := n.reverse;
     n := n.next;
     while n <> nil do begin
       case n.typ of
@@ -8431,16 +8428,80 @@ var n: TTreeNode = nil;
 
 var
   sb: TXQSerializer;
-  procedure appendEscapedString(const s, escapeKind: string);
+  procedure appendJSONStringFromXML(const s: string);
+    procedure raiseInvalidString;
+    begin
+      raise EXQEvaluationException.create('FOJS0007', 'Invalid JSON string');
+    end;
+
+  var
+    p, pend: PChar;
+    cp: Integer;
   begin
-    sb.appendJSONString(unescapeString(s, escapeKind));
+    if not currentStringEscaped or not s.contains('\') then sb.appendJSONString(s)
+    else begin    //todo: can this be merged with json scanner ?
+                  //todo: block wise copy would be faster than byte by byte
+      p := pchar(s);
+      pend := p + length(s);
+      sb.append('"');
+      while p < pend do begin
+        case p^ of
+          '\': begin
+            sb.append('\');
+            inc(p);
+            sb.append(p^);
+            case p^ of
+              '"','t','b','n','r','f','\','/': inc(p);
+              'u': begin
+                inc(p);
+                if (not (p[0] in ['0'..'9','A'..'F','a'..'f'])) or
+                   (not (p[1] in ['0'..'9','A'..'F','a'..'f'])) or
+                   (not (p[2] in ['0'..'9','A'..'F','a'..'f'])) or
+                   (not (p[3] in ['0'..'9','A'..'F','a'..'f'])) then raiseInvalidString();
+                sb.append(p, 4);
+                inc(p, 4);
+              end;
+              else raiseInvalidString;
+            end;
+          end;
+          #0..#31, '"', '/': begin
+            sb.append('\');
+            case p^ of
+              '\', '"', '/': sb.append(p^);
+              #8: sb.append('b');
+              #9: sb.append('t');
+              #10: sb.append('n');
+              #12: sb.append('f');
+              #13: sb.append('r');
+              else begin
+                sb.append('u');
+                sb.appendHexNumber(ord(p^), 4);
+              end;
+            end;
+            inc(p);
+          end;
+          #$C4, #$C5: begin
+            cp := strDecodeUTF8Character(p, pend);
+            if (cp >= 127) and (cp <= 159) then begin
+              sb.append('\u');
+              sb.appendHexNumber(cp, 4);
+            end else sb.appendCodePoint(cp);
+          end
+          else begin
+            sb.append(p^);
+            inc(p);
+          end;
+        end;
+      end;
+      sb.append('"');
+    end;
   end;
 
 var resstr: string;
     tempxq: TXQValue;
     containers: TJsonArrayMapStackTracker;
     tempb: boolean;
-    key: string;
+    key, key2: string;
     tempdxq: TXQValueFloat;
     nlast: TTreeNode;
     firstInContainer: boolean;
@@ -8448,6 +8509,7 @@ var resstr: string;
 begin
   containers.init;
   sb.init(@resstr);
+  sb.standard := true;
   sb.insertWhitespace := xqsiwNever;
   tempdxq := TXQValueFloat.create();
   try
@@ -8495,10 +8557,12 @@ begin
       firstInContainer := false;
       if containers.currentKeySet <> nil then begin
         if not n.getAttributeTry('key', key) then raiseInvalidXML('missing key attribute');
-        key := unescapeString(key, 'escaped-key');
-        if containers.currentKeySet.contains(key) then raiseInvalidXML('duplicate map keys');
-        containers.currentKeySet.include(key);
-        sb.appendJSONObjectKeyColon(key);
+        checkForEscapedAttribute('escaped-key');
+        key2 := unescapeString(key);
+        if containers.currentKeySet.contains(key2) then raiseInvalidXML('duplicate map keys');
+        containers.currentKeySet.include(key2);
+        appendJSONStringFromXML(key);
+        sb.append(':');
       end;
       for attrib in n.getEnumeratorAttributes do
         if ((attrib.namespace = nil) or (attrib.namespace.getURL = XMLNamespaceURL_XPathFunctions)) and not attrib.isNamespaceNode then
@@ -8522,7 +8586,8 @@ begin
           skipElement;
         end;
         'string': begin
-          appendEscapedString(n.getStringValue(), 'escaped');
+          checkForEscapedAttribute('escaped');
+          appendJSONStringFromXML(n.getStringValue());
           skipElement;
         end;
         'array': begin
