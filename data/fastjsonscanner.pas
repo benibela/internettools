@@ -552,7 +552,7 @@ class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt
             end;
           end;
           if escapeCharacters = jecEscapeAll then begin
-           inc(p); //do nothing, section copy will copy the already escaped char
+           inc(p, 2); //do nothing, section copy will copy the already escaped char
           end else begin
             appendSectionAndAdvance(2);
             appendLowCodePoint(escapeChar);
