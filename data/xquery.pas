@@ -400,7 +400,7 @@ type
   end;
 
   type
-    TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine);
+    TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine, xqmdrRetain);
     TXQMapDuplicateResolveHelper = type helper for TXQMapDuplicateResolve
       procedure setFromString(const s: string);
     end;
@@ -437,7 +437,7 @@ type
       //**       )
       TOption = (jpoAllowMultipleTopLevelItems, jpoLiberal, jpoAllowTrailingComma, jpoEscapeCharacters, jpoJSONiq);
       TOptions = set of TOption;
-    private
+    protected
       fallbackFunctionCaller: PXQBatchFunctionCall;
       procedure appendEscapedString(var sb: TStrBuilder; p: pchar; l: integer);
     public
@@ -6005,6 +6005,7 @@ begin
     'use-any', 'use-first': self := xqmdrUseFirst;
     'use-last': self := xqmdrUseLast;
     'combine': self := xqmdrCombine;
+    'retain': self := xqmdrRetain;
     else raise EXQEvaluationException.create('FOJS0005', 'Invalid duplicates option: ' + s, nil, nil);
   end;
 end;

@@ -40,7 +40,7 @@ procedure finalizeFunctions;
 implementation
 
 uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
-  simplehtmltreeparser, htmlInformation,
+  simplehtmltreeparser, htmlInformation, fastjsonscanner,
   bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, bbrandomnumbergenerator, xquery__serialization_nodes, xquery__serialization,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
@@ -7873,6 +7873,453 @@ begin
 end;
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+type TTreeBuilder = object
+protected
+  elementStack: TList;
+  currentDocument: TTreeDocument;
+  currentRoot: TTreeNode;
+  currentNode: TTreeNode;
+  function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: SizeInt = 0):TTreeNode;
+public
+  procedure initDocument(creator: TTreeParser);
+  procedure done;
+
+  function appendElement(const localname: string): TTreeNode;
+  function appendElement(namespace: TNamespace; localname: string): TTreeNode;
+  procedure appendText(const value: string);
+  procedure appendAttribute(const name, value: string);
+  procedure closeElement;
+  procedure closeAllElements;
+end;
+
+type TJSONToXML = object(TXQJsonParser)
+  procedure init;
+  function parseToXML(const data: string): IXQValue;
+end;
+
+
+procedure TTreeBuilder.initDocument(creator: TTreeParser);
+begin
+  elementStack := TList.Create;
+  currentDocument := TTreeDocument.create(creator);
+  currentRoot := currentDocument;
+  currentNode := currentDocument;
+end;
+
+procedure TTreeBuilder.done;
+begin
+  elementStack.Free;
+end;
+
+function TTreeBuilder.appendNodeInternal(typ: TTreeNodeType; const s: string; offset: SizeInt): TTreeNode;
+begin
+  result:=currentDocument.createNode();
+  result.typ := typ;
+  result.value := s;
+  result.root := currentRoot;
+  //FTemplateCount+=1;
+
+  if offset > currentNode.offset then result.offset :=  offset
+  else result.offset := currentNode.offset + 1;
+
+  currentNode.next := result;
+  result.previous := currentNode;
+  currentNode:= result;
+
+  if typ <> tetClose then result.parent := TTreeNode(elementStack.Last)
+  else result.parent := TTreeNode(elementStack.Last).getParent();
+
+  //if (parsingModel = pmHTML) then
+  //  if (typ = tetClose) and (length(s) = 1) then
+  //    FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
+end;
+
+function TTreeBuilder.appendElement(const localname: string): TTreeNode;
+begin
+  result := appendNodeInternal(tetOpen, localname);
+  elementStack.Add(result);
+  result.namespace := currentNode.namespace;
+  result.hash := nodeNameHash(localname);
+end;
+
+function TTreeBuilder.appendElement(namespace: TNamespace; localname: string): TTreeNode;
+begin
+  result := appendNodeInternal(tetOpen, localname);
+  elementStack.Add(result);
+  currentDocument.addNamespace(namespace); //todo: ref count error??
+  result.namespace := namespace;
+  result.hash := nodeNameHash(localname);
+end;
+
+procedure TTreeBuilder.appendText(const value: string);
+begin
+  appendNodeInternal(tetText, value);
+end;
+
+procedure TTreeBuilder.appendAttribute(const name, value: string);
+begin
+  assert(currentNode.typ = tetOpen);
+  currentNode.addAttribute(name, value);
+end;
+
+procedure TTreeBuilder.closeElement;
+var
+  last: TTreeNode;
+  new: TTreeNode;
+begin
+  last := TTreeNode(elementStack.Last);
+  Assert(last<>nil);
+  if last.typ = tetOpen then begin
+    new := appendNodeInternal(tetClose, last.value, last.offset);
+    new.hash := last.hash;
+    //new := treeElementClass.create();
+    //new.typ:=tetClose;
+    //new.value:=last.value;
+    //new.offset:=last.offset;
+    //new.next:=last.next;
+    //last.next:=new;
+    last.reverse:=new; new.reverse:=last;
+  end;
+  elementStack.Delete(elementStack.Count-1);
+end;
+
+procedure TTreeBuilder.closeAllElements;
+begin
+  while elementStack.Count > 0 do closeElement;
+end;
+
+procedure TJSONToXML.init;
+begin
+  inherited init;
+end;
+
+function TJSONToXML.parseToXML(const data: string): IXQValue;
+var
+  scanner: TJSONScanner;
+  jsoniqMode: boolean;
+
+  //.............NO CHANGE below............
+  procedure raiseError(message: string = 'error'; code: string = '');
+  var token: string;
+    invalidUtf8: SizeInt;
+  begin
+    Str(scanner.CurToken, token);
+    if code = '' then begin
+      if jsoniqMode then code := 'jerr:JNDY0021'
+      else begin
+        strLengthUtf8(scanner.CurLine, invalidUtf8);
+        if invalidUtf8 > 0 then code := 'FOUT1200'
+        else code := 'FOJS0001';
+      end;
+    end;
+    raise EXQEvaluationException.create(code, message+' at ' + strFromPchar(scanner.CurTokenStart, scanner.CurTokenLength) +' (' + token +') in '+scanner.CurLine);
+  end;
+
+  function nextToken: TJSONToken;
+  begin
+    try
+      while scanner.FetchToken = tkWhitespace do ;
+    except
+      on e: EScannerError do
+        raiseError('Failed to parse JSON: '+ e.Message);
+    end;
+    result := scanner.CurToken;
+  end;
+  //.............NO CHANGE above............
+
+
+var containerKeySet: array of PXQHashsetStr = nil;
+    containerCount: SizeInt = 0;
+    parsingPhase: ( jppArrayExpectValue, jppArrayExpectComma,
+                   jppObjectExpectKey, jppObjectExpectComma, jppObjectExpectValue,
+                   jppRoot);
+    currentKeySet: PXQHashsetStr = nil;
+var treeBuilder: TTreeBuilder;
+    targetNamespace: TNamespace;
+
+  procedure setCurrentContainer; inline;
+  begin
+    if containerCount > 0 then
+      currentKeySet := containerKeySet[containerCount-1]
+     else
+      currentKeySet := nil;
+  end;
+
+  procedure popContainer;
+  begin
+    if containerCount = 0 then raiseError('Unexpected closing parenthesis');
+    containerCount -= 1;  //todo
+    if containerKeySet[containerCount] <> nil then dispose(containerKeySet[containerCount], done);
+    setCurrentContainer;
+    if containerCount = 0 then parsingPhase := jppRoot
+    else if currentKeySet = nil then parsingPhase := jppArrayExpectComma
+    else parsingPhase := jppObjectExpectComma;
+    treebuilder.closeElement;
+  end;
+
+  function pushContainerKeySet(ks: PXQHashsetStr): PXQHashsetStr;
+  begin
+    if length(containerKeySet) = containerCount then
+      if containerCount < 16 then setlength(containerKeySet, 16)
+      else setlength(containerKeySet, containercount * 2);
+    containerKeySet[containerCount] := ks;
+    inc(containerCount);
+    result := ks;
+  end;
+
+
+  var objectKey: string;
+
+//.............NO CHANGE below............
+var escapeCharactersMode: TJSONEscapeCharacters;
+    appendEscapeFunction: TAppendEscapeFunction = nil;
+  function readString: string;
+  begin
+    result := TJSONScanner.decodeJSONString(scanner.CurTokenStart, scanner.CurTokenLength, escapeCharactersMode, appendEscapeFunction);
+  end;
+  //.............NO CHANGE above............
+
+  procedure readObjectKey;
+    procedure skipTokenArrayOrMap;
+    //if the current token is {, it will read all tokens until matching }
+    //if the current token is [, it will read all tokens until matching ]
+    //otherwise, it will read one non-whitespace token
+
+    //todo: check if JSON is in/valid
+    var nesting: SizeInt = 0;
+    begin
+      repeat
+        case nextToken of
+          tkCurlyBraceOpen: inc(nesting);
+          tkCurlyBraceClose: dec(nesting);
+          tkSquaredBraceOpen: inc(nesting);
+          tkSquaredBraceClose: dec(nesting);
+        end;
+      until nesting <= 0;
+    end;
+  begin
+    //if not (scanner.CurToken in [tkString, tkIdentifier]) then raiseError('Expected property name');
+    objectKey := readString;
+    if nextToken <> tkColon then raiseError('Expected : between property name and value');
+    parsingPhase := jppObjectExpectValue;
+    if duplicateResolve = xqmdrRetain then exit;
+    if not currentKeySet.contains(objectKey) then begin
+      currentKeySet.include(objectKey);
+      exit;
+    end;
+    if duplicateResolve <> xqmdrUseFirst then raiseError('Duplicate key', 'FOJS0003');
+    skipTokenArrayOrMap;
+    parsingPhase := jppObjectExpectComma;
+  end;
+
+  function pushOpeningTag(const localname: string): TTreeNode;
+  begin
+    result := treebuilder.appendElement(localname);
+    result.namespace := targetNamespace;
+    case parsingPhase of
+      jppArrayExpectValue: begin
+        if currentKeySet <> nil then raiseError();
+        parsingPhase := jppArrayExpectComma;
+      end;
+      jppObjectExpectValue: begin
+        if currentKeySet = nil then raiseError();
+        parsingPhase := jppObjectExpectComma;
+        treeBuilder.appendAttribute('key', objectKey);
+        if (jpoEscapeCharacters in options) and objectKey.Contains('\') then treeBuilder.appendAttribute('escaped-key', 'true');
+      end;
+      jppRoot: begin
+        {hadResult := (result <> nil);
+        if hadResult and not (jpoAllowMultipleTopLevelItems in options) then
+          raiseError();}
+      end;
+      jppArrayExpectComma,
+      jppObjectExpectKey,
+      jppObjectExpectComma: raiseError('value not allowed');
+    end;
+  end;
+
+  procedure pushNode(const localname: string; value: string = '');
+  begin
+    pushOpeningTag(localname);
+    if (jpoEscapeCharacters in options) and value.Contains('\') then treeBuilder.appendAttribute('escaped', 'true');
+    if value <> '' then treeBuilder.appendText(value);
+    treebuilder.closeElement;
+  end;
+  procedure pushString;
+  begin
+    pushNode('string', readString);
+  end;
+  procedure pushNumber;
+  begin
+    pushNode('number', readString);
+  end;
+  procedure pushContainer(const localname: string);
+  begin
+    pushOpeningTag(localname);
+    if localname = 'map' then pushContainerKeySet(new(PXQHashsetStr, init))
+    else pushContainerKeySet(nil);
+  end;
+
+var scannerOptions:  {$if FPC_FULLVERSION > 30000}TJSONOptions{$else}boolean{$endif};
+  i: SizeInt;
+begin
+  result := nil;
+  treeBuilder.initDocument(context.staticContext.sender.DefaultParser);
+  targetNamespace := XMLNamespace_XPathFunctions as TNamespace;
+  treeBuilder.currentDocument.addNamespace(targetNamespace);
+  treeBuilder.currentDocument.baseURI := context.staticContext.baseURI;
+  if duplicateResolve = xqmdrUseLast then raise EXQEvaluationException.create( 'FOJS0005', 'Duplicate use-last is not allowed');
+  //.............NO CHANGE below............
+  containerCount := 0;
+  parsingPhase := jppRoot;
+  jsoniqMode := jpoJSONiq in options;
+  //tempSeq := nil;
+  {$if FPC_FULLVERSION > 30000}
+  scannerOptions := [joUTF8];
+  if not (jpoLiberal in options) then include(scannerOptions, joStrict);
+  if jpoAllowTrailingComma in options then include(scannerOptions, joIgnoreTrailingComma);
+  {$else}
+  scannerOptions := true;
+  {$endif}
+  if jpoEscapeCharacters in options then escapeCharactersMode := jecEscapeAll
+  else if baseSchema.version = xsd11 then escapeCharactersMode := jecEscapeForXML11
+  else escapeCharactersMode := jecEscapeForXML10;
+  if escapeFunction <> nil then appendEscapeFunction := @appendEscapedString;
+  scanner := default(TJSONScanner);
+  scanner.init(data, scannerOptions);
+  //.............NO CHANGE above............
+  try
+    nextToken;
+    while true do begin
+      case scanner.CurToken of
+        tkEOF: break;
+        tkString:
+          if parsingPhase = jppObjectExpectKey then readObjectKey
+          else pushString;
+        tkNumber: pushNumber;
+        tkFalse: pushNode('boolean', 'false');
+        tkTrue: pushNode('boolean', 'true');
+        tkNull: pushNode('null');
+
+        tkComma: case parsingPhase of
+          jppObjectExpectComma: parsingPhase := jppObjectExpectKey;
+          jppArrayExpectComma: parsingPhase := jppArrayExpectValue;
+          else raiseError();
+        end;
+        //tkColon,                 // ':'
+        tkCurlyBraceOpen: begin
+          pushContainer('map');
+          setCurrentContainer;
+          case nextToken of
+            tkCurlyBraceClose: popContainer;
+            else begin
+              parsingPhase := jppObjectExpectKey;
+              continue;
+            end;
+          end;
+        end;
+        tkCurlyBraceClose:
+          if (parsingPhase = jppObjectExpectComma) or ((parsingPhase = jppObjectExpectKey) and (jpoAllowTrailingComma in options)) then popContainer
+          else raiseError();
+        tkSquaredBraceOpen: begin
+          pushContainer('array');
+          setCurrentContainer;
+          case nextToken of
+            tkSquaredBraceClose: popContainer;
+            else begin
+              parsingPhase := jppArrayExpectValue;
+              continue;
+            end;
+          end;
+        end;
+        tkSquaredBraceClose:
+          if (parsingPhase = jppArrayExpectComma) or ((parsingPhase = jppArrayExpectValue) and (jpoAllowTrailingComma in options)) then popContainer
+          else raiseError();
+        tkIdentifier:
+          if jpoLiberal in options then begin
+            if parsingPhase = jppObjectExpectKey then readObjectKey
+            else if strliEqual(scanner.CurTokenStart,  'INF', scanner.CurTokenLength)
+                    or strliEqual(scanner.CurTokenStart, 'INFinity', scanner.CurTokenLength)
+                    or strliEqual(scanner.CurTokenStart, 'NAN', scanner.CurTokenLength) then
+              pushNumber()
+            else raiseError();
+          end else raiseError();
+        //tkComment:
+        //tkUnknown
+        else raiseError();
+      end;
+      nextToken;
+    end;
+
+{    if containerCount > 0 then begin
+      for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
+        if containerStack[i].ClassType = TXQValueJSONArray then TXQValueJSONArray(containerStack[i]).seq.clear
+        else TXQValueStringMap(containerStack[i]).mapdata.clear;
+      raiseError('unclosed');
+    end;}
+
+    treeBuilder.closeAllElements;
+    result := xqvalue(treeBuilder.currentDocument);
+
+    if treeBuilder.currentDocument.getFirstChild() = nil then begin
+      if not (jpoLiberal in options) then raiseError('No data');
+      result := xqvalue;
+    end;
+
+  finally
+    if result = nil then
+      treeBuilder.currentDocument.free;
+    treeBuilder.done;
+    for i := containerCount - 1 downto 0 do
+      if containerKeySet[i] <> nil then
+        dispose(containerKeySet[i], done);
+
+//.............NO CHANGE below............
+
+    if fallbackFunctionCaller <> nil then begin
+     fallbackFunctionCaller.done;
+     dispose(fallbackFunctionCaller);
+     fallbackFunctionCaller := nil;
+    end;
+    //for i := 0 to containerCount - 1 do containerStack[i]._Release;
+    scanner.done;
+  end;
+  //.............NO CHANGE above...........
+end;
+
+
+
+
+function xqFunctionJSON_to_XML(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  parser: TJSONToXML;
+begin
+  parser.init;
+  parser.context := @context;
+  if (argc = 2) then
+    parser.setConfigFromMap(args[1]);
+  if args[0].isUndefined then exit(xqvalue);
+  result := parser.parseToXML(args[0].toString);
+  //result := parser.parse(argc, args);
+end;
+
+
+
+
+
 var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
 
 
@@ -8221,12 +8668,9 @@ transform
   fn3_1.registerFunction('load-xquery-module', @xqFunctionLoadXQueryModule, [xqcdContextOther]).setVersionsShared([stringt, map], [stringt, map, map]);
 
   //from https://gist.github.com/joewiz/d986da715facaad633db
-  fn3_1.registerInterpretedFunction('json-to-xml', [stringOrEmpty, documentNodeOrEmpty], '($json-text as xs:string?) as document-node()?', 'json-to-xml($json-text, map {})');
-  fn3_1.registerInterpretedFunction('json-to-xml', [stringOrEmpty, map, documentNodeOrEmpty], '($json-text as xs:string?, $options as map(*)) as document-node()?', '$json-text ! document { x:joewiz-json-to-xml-recurse(parse-json(., if ($options?duplicates = "retain") then map:put($options, "duplicates", "use-first") else $options )) }');
+  fn3_1.registerFunction('json-to-xml', @xqFunctionJSON_to_XML, [xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty], [stringOrEmpty, map, documentNodeOrEmpty]);
   fn3_1.registerInterpretedFunction('xml-to-json', [nodeOrEmpty, stringOrEmpty], '($input as node()?) as xs:string?', ' xml-to-json($input, map {} )');
   fn3_1.registerInterpretedFunction('xml-to-json', [nodeOrEmpty, map, stringOrEmpty], '($input as node()?, $options as map(*)) as xs:string?', ' $input ! (try { let $json := x:joewiz-xml-to-json-recurse(.) let $serialization-parameters := map { "method": "json", "indent": $options?indent } return serialize($json, $serialization-parameters) } catch *:FORG0001 | *:SERE0022 | *:SERE0020 { x:joewiz-FOJS0006($input) } )');
-  x.registerInterpretedFunction('joewiz-json-to-xml-recurse', [itemStar, itemPlus], '($json as item()*) as item()+',  'let $data-type := x:joewiz-json-data-type($json) return element { QName("http://www.w3.org/2005/xpath-functions", $data-type) } { if ($data-type eq "array") then for $array-index in 1 to array:size($json) let $array-member := $json($array-index) let $array-member-data-type := x:joewiz-json-data-type($array-member) return element {$array-member-data-type} { if ($array-member-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($array-member)/node() else $array-member } else if ($data-type eq "map") then map:for-each( $json, function($object-name, $object-value) { let $object-value-data-type := x:joewiz-json-data-type($object-value) return element { QName("http://www.w3.org/2005/xpath-functions", $object-value-data-type) } { attribute key {$object-name}, if ($object-value-data-type = ("array", "map")) then x:joewiz-json-to-xml-recurse($object-value)/node() else $object-value } } ) else $json }');
-  x.registerInterpretedFunction('joewiz-json-data-type', [itemOrEmpty, stringt], '($json as item()?) as xs:string', ' if ($json instance of array(*)) then "array" else if ($json instance of map(*)) then "map" else if ($json instance of xs:string) then "string" else if ($json instance of xs:double) then "number" else if ($json instance of xs:boolean) then "boolean" else if (empty($json)) then "null" else error(xs:QName("ERR"), "Not a known data type for json data")');
   x.registerInterpretedFunction('joewiz-xml-to-json-recurse', [nodeStar, itemStar], '($input as node()*) as item()*', 'for $node in $input return typeswitch ($node) case element(fn:map) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), map:merge( $node/* ! (let $key := @key return if ($key) then map {$key: x:joewiz-xml-to-json-recurse(.)} else x:joewiz-FOJS0006($node) ) ) ) case element(fn:array) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), array { $node/* } => array:for-each(x:joewiz-xml-to-json-recurse#1) ) case element(fn:string) return $node/string() case element(fn:number) return $node cast as xs:double case element(fn:boolean) return $node cast as xs:boolean case element(fn:null) return ($node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node)) case document-node() return x:joewiz-xml-to-json-recurse($node/node()) (: Comments, processing instructions, and whitespace text node children of map and array are ignored :) case text() return if (normalize-space($node) eq "") then () else x:joewiz-FOJS0006($node) case comment() | processing-instruction() return () case element() return x:joewiz-FOJS0006($node) default return error(xs:QName("ERR"), "Does not match known node types for xml-to-json data") ');
   x.registerInterpretedFunction('joewiz-FOJS0006', [nodeStar, itemStar], '($node as node()*) as item()*', 'error(fn:QName("http://www.w3.org/2005/xqt-errors", "FOJS0006"), "Invalid XML representation of JSON: "||serialize($node))');
 
