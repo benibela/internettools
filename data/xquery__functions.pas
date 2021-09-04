@@ -7905,9 +7905,70 @@ public
   procedure closeAllElements;
 end;
 
+TJsonArrayMapStackTracker = record
+  containerKeySets: array of PXQHashsetStr;
+  count: SizeInt;
+  procedure init;
+  procedure done;
+  procedure pop;
+  procedure push(ks: PXQHashsetStr);
+  procedure pushArray;
+  procedure pushMap;
+  function currentKeySet: PXQHashsetStr;
+end;
+
 type TJSONToXML = object(TXQJsonParser)
   procedure init;
   function parseToXML(const data: string): IXQValue;
+end;
+
+procedure TJsonArrayMapStackTracker.init;
+begin
+  containerKeySets := nil;
+  count := 0;
+end;
+
+procedure TJsonArrayMapStackTracker.done;
+var
+  i: SizeInt;
+begin
+  for i := count - 1 downto 0 do
+    if containerKeySets[i] <> nil then
+      dispose(containerKeySets[i], done);
+  count := 0;
+end;
+
+procedure TJsonArrayMapStackTracker.pop;
+begin
+  count -= 1;  //todo
+  if containerKeySets[count] <> nil then dispose(containerKeySets[count], done);
+end;
+
+procedure TJsonArrayMapStackTracker.push(ks: PXQHashsetStr);
+begin
+  if length(containerKeySets) = count then
+    if count < 16 then setlength(containerKeySets, 16)
+    else setlength(containerKeySets, count * 2);
+  containerKeySets[count] := ks;
+  inc(count);
+end;
+
+procedure TJsonArrayMapStackTracker.pushArray;
+begin
+  push(nil);
+end;
+
+procedure TJsonArrayMapStackTracker.pushMap;
+begin
+  push(new(PXQHashsetStr, init))
+end;
+
+function TJsonArrayMapStackTracker.currentKeySet: PXQHashsetStr;
+begin
+  if count > 0 then
+    currentKeySet := containerKeySets[count-1]
+   else
+    currentKeySet := nil;
 end;
 
 
@@ -8001,6 +8062,10 @@ begin
   while elementStack.Count > 0 do closeElement;
 end;
 
+
+
+
+
 procedure TJSONToXML.init;
 begin
   inherited init;
@@ -8041,45 +8106,30 @@ var
   //.............NO CHANGE above............
 
 
-var containerKeySet: array of PXQHashsetStr = nil;
-    containerCount: SizeInt = 0;
+var
     parsingPhase: ( jppArrayExpectValue, jppArrayExpectComma,
                    jppObjectExpectKey, jppObjectExpectComma, jppObjectExpectValue,
                    jppRoot);
     currentKeySet: PXQHashsetStr = nil;
 var treeBuilder: TTreeBuilder;
+    containerStack: TJsonArrayMapStackTracker;
     targetNamespace: TNamespace;
 
   procedure setCurrentContainer; inline;
   begin
-    if containerCount > 0 then
-      currentKeySet := containerKeySet[containerCount-1]
-     else
-      currentKeySet := nil;
+    currentKeySet := containerStack.currentKeySet;
   end;
 
   procedure popContainer;
   begin
-    if containerCount = 0 then raiseError('Unexpected closing parenthesis');
-    containerCount -= 1;  //todo
-    if containerKeySet[containerCount] <> nil then dispose(containerKeySet[containerCount], done);
+    if containerStack.count = 0 then raiseError('Unexpected closing parenthesis');
+    containerStack.pop;
     setCurrentContainer;
-    if containerCount = 0 then parsingPhase := jppRoot
+    if containerStack.count = 0 then parsingPhase := jppRoot
     else if currentKeySet = nil then parsingPhase := jppArrayExpectComma
     else parsingPhase := jppObjectExpectComma;
     treebuilder.closeElement;
   end;
-
-  function pushContainerKeySet(ks: PXQHashsetStr): PXQHashsetStr;
-  begin
-    if length(containerKeySet) = containerCount then
-      if containerCount < 16 then setlength(containerKeySet, 16)
-      else setlength(containerKeySet, containercount * 2);
-    containerKeySet[containerCount] := ks;
-    inc(containerCount);
-    result := ks;
-  end;
-
 
   var objectKey: string;
 
@@ -8169,8 +8219,8 @@ var escapeCharactersMode: TJSONEscapeCharacters;
   procedure pushContainer(const localname: string);
   begin
     pushOpeningTag(localname);
-    if localname = 'map' then pushContainerKeySet(new(PXQHashsetStr, init))
-    else pushContainerKeySet(nil);
+    if localname = 'map' then containerStack.pushMap
+    else containerStack.pushArray;
   end;
 
 var scannerOptions:  {$if FPC_FULLVERSION > 30000}TJSONOptions{$else}boolean{$endif};
@@ -8182,8 +8232,8 @@ begin
   treeBuilder.currentDocument.addNamespace(targetNamespace);
   treeBuilder.currentDocument.baseURI := context.staticContext.baseURI;
   if duplicateResolve = xqmdrUseLast then raise EXQEvaluationException.create( 'FOJS0005', 'Duplicate use-last is not allowed');
+  containerStack.count := 0;
   //.............NO CHANGE below............
-  containerCount := 0;
   parsingPhase := jppRoot;
   jsoniqMode := jpoJSONiq in options;
   //tempSeq := nil;
@@ -8283,9 +8333,7 @@ begin
     if result = nil then
       treeBuilder.currentDocument.free;
     treeBuilder.done;
-    for i := containerCount - 1 downto 0 do
-      if containerKeySet[i] <> nil then
-        dispose(containerKeySet[i], done);
+    containerStack.done;
 
 //.............NO CHANGE below............
 
@@ -8316,8 +8364,189 @@ begin
   //result := parser.parse(argc, args);
 end;
 
+function tryXQValueToBooleanForOption(v: TXQValue; out tempb: boolean): boolean;
+begin
+  case v.kind of
+    pvkBoolean: begin
+      tempb := v.toBoolean;
+      exit(true);
+    end;
+    pvkString:
+      if v.instanceOf(baseSchema.untypedAtomic) or (v.kind = pvkNode) then begin
+        case trim(v.toString) of
+          'false': tempb := false;
+          'true': tempb := true;
+        end;
+        exit(true);
+      end;
+  end;
+  result := false;
+end;
 
+function xqFunctionXML_to_JSON(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var n: TTreeNode = nil;
+  procedure raiseInvalidXML(reason: string = '');
+  begin
+    if n <> nil then reason += LineEnding + 'at node: ' + n.toString();
+    raise EXQEvaluationException.create('FOJS0006', 'xml-to-json: Invalid XML: ' + reason);
+  end;
+  function strToBoolXQ(const s: string): boolean;
+  begin
+    case trim(s) of
+      'false', '0': result := false;
+      'true', '1': result := true;
+      else raiseInvalidXML(s);
+    end;
+  end;
 
+  function isEscaped(const kind: string): boolean;
+  begin
+    result := strToBoolXQ(n.getAttribute(kind, 'false'));
+  end;
+  function unescapeString(const s, escapeKind: string): string;
+  begin
+    if isEscaped(escapeKind) then begin
+      //sb.appendJSONString(;
+      result := TJSONScanner.decodeJSONString(s, jecEscapeNothing)
+    end else
+      result := s;
+  end;
+
+  procedure skipElement(forbidText: boolean = false);
+  var
+    nreverse: TTreeNode;
+  begin
+    nreverse := n.reverse;
+    n := n.next;
+    while n <> nil do begin
+      case n.typ of
+        tetClose: exit;
+        tetOpen: raiseInvalidXML();
+        tetText: if forbidText and (trim(n.value) <> '') then raiseInvalidXML();
+        tetComment, tetProcessingInstruction: ;
+      end;
+      n := n.next;
+    end;
+  end;
+
+var
+  sb: TXQSerializer;
+  procedure appendEscapedString(const s, escapeKind: string);
+  begin
+    sb.appendJSONString(unescapeString(s, escapeKind));
+  end;
+
+var resstr: string;
+    tempxq: TXQValue;
+    containers: TJsonArrayMapStackTracker;
+    tempb: boolean;
+    key: string;
+    tempdxq: TXQValueFloat;
+    nlast: TTreeNode;
+    firstInContainer: boolean;
+    attrib: TTreeAttribute;
+begin
+  containers.init;
+  sb.init(@resstr);
+  sb.insertWhitespace := xqsiwNever;
+  tempdxq := TXQValueFloat.create();
+  try
+    if (argc = 2) then begin
+      if args[1].hasProperty('indent', @tempxq) then begin
+        if not tryXQValueToBooleanForOption(tempxq, tempb) then  raise EXQEvaluationException.create('XPTY0004', 'xml-to-json indent option should be boolean');
+        if tempb then sb.insertWhitespace := xqsiwIndent
+      end;
+    end;
+
+    if args[0].isUndefined then exit(xqvalue);
+
+    n := args[0].toNode;
+    if n = nil then raiseInvalidXML('empty');
+    if n.typ = tetDocument then n := n.next;
+    //writeln(n.outerXML(true));
+    nlast := n.reverse;
+    while (n <> nil) do begin
+      if n.typ in [tetComment, tetClose, tetProcessingInstruction, tetText] then begin
+        case n.typ of
+          tetText: if (trim(n.getStringValue()) <> '') then raiseInvalidXML('text');
+          tetClose: begin
+            case n.value of
+              'map': begin
+                sb.appendJSONObjectEnd;
+                containers.pop;
+                firstInContainer := false;
+              end;
+              'array': begin
+                sb.appendJSONArrayEnd;
+                containers.pop;
+                firstInContainer := false;
+              end;
+            end;
+          end;
+        end;
+        if n = nlast then break;
+        n := n.next;
+        continue;
+      end;
+      if n = nlast then break;
+      if n.namespace = nil then raiseInvalidXML('no namespace');
+      if n.namespace.getURL <> XMLNamespaceURL_XPathFunctions then raiseInvalidXML('invalid namespace');
+      if not firstInContainer then sb.appendJSONObjectComma;
+      firstInContainer := false;
+      if containers.currentKeySet <> nil then begin
+        if not n.getAttributeTry('key', key) then raiseInvalidXML('missing key attribute');
+        key := unescapeString(key, 'escaped-key');
+        if containers.currentKeySet.contains(key) then raiseInvalidXML('duplicate map keys');
+        containers.currentKeySet.include(key);
+        sb.appendJSONObjectKeyColon(key);
+      end;
+      for attrib in n.getEnumeratorAttributes do
+        if ((attrib.namespace = nil) or (attrib.namespace.getURL = XMLNamespaceURL_XPathFunctions)) and not attrib.isNamespaceNode then
+          if ((attrib.value = 'key') or (attrib.value = 'escaped-key') ) then begin end
+          else if (attrib.value = 'escaped') {and (n.value = 'string') }then begin end
+          else raiseInvalidXML('invalid attribute');
+      case n.value of
+        'null': begin
+          sb.append('null');
+          skipElement(true);
+        end;
+        'boolean': begin
+          if strToBoolXQ(n.getStringValue()) then sb.append('true')
+          else sb.append('false');
+          skipElement;
+        end;
+        'number': begin
+          if not TryStrToXQFloat(n.getStringValue(), tempdxq.value) then raiseInvalidXML('number parsing');
+          if not tempdxq.value.isFinite() then raiseInvalidXML();
+          sb.append(tempdxq.tostring);
+          skipElement;
+        end;
+        'string': begin
+          appendEscapedString(n.getStringValue(), 'escaped');
+          skipElement;
+        end;
+        'array': begin
+          sb.appendJSONArrayStart;
+          containers.pushArray;
+          firstInContainer := true;
+          n := n.next;
+        end;
+        'map': begin
+          sb.appendJSONObjectStart;
+          containers.pushMap;
+          firstInContainer := true;
+          n := n.next;
+        end;
+        else raiseInvalidXML();
+      end;
+    end;
+  finally
+    sb.final;
+    tempdxq.Free;
+    containers.done;
+  end;
+  result := xqvalue(resstr);
+end;
 
 
 var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
@@ -8669,10 +8898,7 @@ transform
 
   //from https://gist.github.com/joewiz/d986da715facaad633db
   fn3_1.registerFunction('json-to-xml', @xqFunctionJSON_to_XML, [xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty], [stringOrEmpty, map, documentNodeOrEmpty]);
-  fn3_1.registerInterpretedFunction('xml-to-json', [nodeOrEmpty, stringOrEmpty], '($input as node()?) as xs:string?', ' xml-to-json($input, map {} )');
-  fn3_1.registerInterpretedFunction('xml-to-json', [nodeOrEmpty, map, stringOrEmpty], '($input as node()?, $options as map(*)) as xs:string?', ' $input ! (try { let $json := x:joewiz-xml-to-json-recurse(.) let $serialization-parameters := map { "method": "json", "indent": $options?indent } return serialize($json, $serialization-parameters) } catch *:FORG0001 | *:SERE0022 | *:SERE0020 { x:joewiz-FOJS0006($input) } )');
-  x.registerInterpretedFunction('joewiz-xml-to-json-recurse', [nodeStar, itemStar], '($input as node()*) as item()*', 'for $node in $input return typeswitch ($node) case element(fn:map) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), map:merge( $node/* ! (let $key := @key return if ($key) then map {$key: x:joewiz-xml-to-json-recurse(.)} else x:joewiz-FOJS0006($node) ) ) ) case element(fn:array) return ( $node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node), array { $node/* } => array:for-each(x:joewiz-xml-to-json-recurse#1) ) case element(fn:string) return $node/string() case element(fn:number) return $node cast as xs:double case element(fn:boolean) return $node cast as xs:boolean case element(fn:null) return ($node/text()[normalize-space(.) ne ""]/x:joewiz-FOJS0006($node)) case document-node() return x:joewiz-xml-to-json-recurse($node/node()) (: Comments, processing instructions, and whitespace text node children of map and array are ignored :) case text() return if (normalize-space($node) eq "") then () else x:joewiz-FOJS0006($node) case comment() | processing-instruction() return () case element() return x:joewiz-FOJS0006($node) default return error(xs:QName("ERR"), "Does not match known node types for xml-to-json data") ');
-  x.registerInterpretedFunction('joewiz-FOJS0006', [nodeStar, itemStar], '($node as node()*) as item()*', 'error(fn:QName("http://www.w3.org/2005/xqt-errors", "FOJS0006"), "Invalid XML representation of JSON: "||serialize($node))');
+  fn3_1.registerFunction('xml-to-json', @xqFunctionXML_to_JSON, [xqcdContextOther]).setVersionsShared([nodeOrEmpty, stringOrEmpty], [nodeOrEmpty, map, stringOrEmpty]);
 
 
 

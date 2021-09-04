@@ -87,7 +87,8 @@ Type
 
     function FetchToken: TJSONToken;
 
-    class function decodeJSONString(strStart: pchar; strLength: SizeInt; escapeCharacters: TJSONEscapeCharacters; escapeFunction: TAppendEscapeFunction): string; static;
+    class function decodeJSONString(strStart: pchar; strLength: SizeInt; escapeCharacters: TJSONEscapeCharacters; escapeFunction: TAppendEscapeFunction = nil): string; static;
+    class function decodeJSONString(str: string; escapeCharacters: TJSONEscapeCharacters; escapeFunction: TAppendEscapeFunction = nil): string; static;
 
     property CurLine: string read GetCurLine;
     property CurRow: Integer read FCurRow;
@@ -573,6 +574,12 @@ class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt
     end;
     appendSectionAndAdvance(0);
     sb.final;
+end;
+
+class function TJSONScanner.decodeJSONString(str: string; escapeCharacters: TJSONEscapeCharacters; escapeFunction: TAppendEscapeFunction
+  ): string;
+begin
+  result := decodeJSONString(pchar(str), length(str), escapeCharacters, escapeFunction);
 end;
 
 {function TJSONScanner.FetchToken: TJSONToken;
