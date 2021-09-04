@@ -2916,7 +2916,7 @@ begin
       akind:=xqfkNativeInterpreted;
       exit(true);
     end;
-  end;
+  end else afunc := nil;
 end;
 
 class function TXQTermNamedFunction.findTypeConstructor(const anamespace, alocalname: string; const argcount: integer;
