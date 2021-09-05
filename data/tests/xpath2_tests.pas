@@ -60,6 +60,7 @@ var
 //    writeln(s1);
 //    writeln('??');
 //    writeln(ps.debugtermToString(ps.FCurTerm));
+
     got := ps.evaluate(context).toString;
     if got<>s2 then
         raise Exception.Create('XPath Test failed: '+IntToStr(testid)+ ': '+s1+#13#10'got: "'+got+'" expected "'+s2+'". Parsed query: '+ps.LastQuery.Term.debugTermToString);
@@ -2841,6 +2842,10 @@ begin
   t('string-join(//self::*,";")', 'abcxfoobar;x', '!<html>abc<test>x</test>foobar</html>');
   t('string-join(time/x/a[3]/preceding::*,";")', 'q;1;2', '<time><p>q</p>t<x>u<a>1</a><a>2</a><a>3</a></x></time>');
   t('string-join(time/x/a[3]/preceding::a,";")', '1;2', '<time><p>q</p>t<x>u<a>1</a><a>2</a><a>3</a></x></time>');
+
+  t(' (//b) / string(ancestor-or-self::*[true()][1]/@x) ', '2', '<test x="0"><a x="1"><b x="2"></b></a></test>');
+  t(' (//b) / string((ancestor-or-self::*[true()][1])/@x) ', '2');
+
                //instance of tests (still failed xqts)
   t('4 instance of item()', 'true', '');
   t('(4,5) instance of item()', 'false', '');

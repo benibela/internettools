@@ -5000,7 +5000,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
   begin
     if (length(t.children) < 2) and (not objInheritsFrom(parent, TXQTermDefineVariable) or (TXQTermDefineVariable(parent).variable <> t)) then
       raiseSyntaxError('[] not allowed', t);
-    if objInheritsFrom(t.children[0], TXQTermNodeMatcher) then result := TXQTermPath.create(t) //this ensures the indices in filters are correct. i.e. in ancestors::*[$i] indices in reverse document order (opposite order of (ancestors::*)[$i])
+    if objInheritsFrom(t.children[0], TXQTermNodeMatcher) or objInheritsFrom(t.children[0], TXQTermPath) then result := TXQTermPath.create(t) //this ensures the indices in filters are correct. i.e. in ancestors::*[$i] indices in reverse document order (opposite order of (ancestors::*)[$i])
     else result := t;
   end;
 
