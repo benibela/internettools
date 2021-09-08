@@ -51,6 +51,7 @@ protected
   jhttpclient: jobject;
   currentTransfer: PTransfer;
   procedure doTransferUnchecked(var transfer: TTransfer);override;
+  procedure transferWriteBlock(const Buffer; Count: Longint);
   function ExceptionCheckAndClear: boolean;
   procedure setConfig(internetConfig: PInternetConfig); override;
 public
@@ -392,7 +393,7 @@ begin
                 end;
                 j.DeleteLocalRef(jHeaderIterator);
 
-                j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @transfer.writeBlock);
+                j.inputStreamReadAllAndDelete( j.callObjectMethodChecked(jResult,  jmHttpEntityGetContent), @transferWriteBlock);
               finally
                 j.DeleteLocalRef(jResult);
               end;
@@ -434,6 +435,11 @@ begin
       freeClasses(classInfos);
     end;
   end;
+end;
+
+procedure TAndroidInternetAccess.transferWriteBlock(const Buffer; Count: Longint);
+begin
+ currentTransfer^.writeBlock(buffer, count);
 end;
 
 function TAndroidInternetAccess.ExceptionCheckAndClear: boolean;

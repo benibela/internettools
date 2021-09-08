@@ -49,7 +49,9 @@ type
 //**Not yet supported: proxies, user/password authentication
 TOKHTTPInternetAccess=class(TInternetAccess)
 protected
+  currentTransfer: ^TTransfer;
   procedure doTransferUnchecked(var transfer: TTransfer);override;
+  procedure transferWriteBlock(const Buffer; Count: Longint);
 public
   constructor create();override;
   constructor create(const internetConfig: TInternetConfig);override;
@@ -230,7 +232,8 @@ begin
         transfer.HTTPErrorDetails := jresponse.callStringMethodChecked(ResponseMethods.message);
 
         jbody := jresponse.callObjectMethodChecked(ResponseMethods.body);
-        inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @transfer.writeBlock);
+        currentTransfer := @transfer;
+        inputStreamReadAllAndDelete( jbody.callObjectMethodChecked(ResponseBodyMethods.bytestream), @transferWriteBlock);
         deleteLocalRef(jbody);
 
         transfer.receivedHTTPHeaders.Clear;
@@ -256,6 +259,11 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TOKHTTPInternetAccess.transferWriteBlock(const Buffer; Count: Longint);
+begin
+  currentTransfer^.writeBlock(buffer, count);
 end;
 
 
