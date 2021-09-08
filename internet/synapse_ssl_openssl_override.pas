@@ -986,7 +986,7 @@ begin
     else exit;
   end;
 
-  if (FSSLType = LT_all) or (assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion)) then begin
+  if assigned(SslMethodTLS) and ( (FSSLType = LT_all) or (assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion)) ) then begin
     Fctx := SslCtxNew(SslMethodTLS);
     if Fctx <> nil then begin
       if assigned(_SslCtxSetMinProtoVersion) and assigned(_SslCtxSetMaxProtoVersion) then begin
