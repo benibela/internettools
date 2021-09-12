@@ -8320,6 +8320,7 @@ begin
     if n.typ = tetDocument then n := n.next;
     //writeln(n.outerXML(true));
     nlast := n.reverse;
+    firstInContainer := true;
     while (n <> nil) do begin
       if n.typ in [tetComment, tetClose, tetProcessingInstruction, tetText] then begin
         case n.typ of
