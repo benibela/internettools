@@ -231,7 +231,6 @@ public
   constructor Create;
   procedure FreeInstance; override;
   destructor destroy();override;
-  procedure initialized; virtual; //**<is called after an element is read, before the next one is read (therefore all fields are valid except next (and reverse for opening tags))
 
   function caseInsensitiveCompare(const a,b: string): boolean; //**< returns true if a=b case insensitive. Can be passed to getAttribute
   function caseSensitiveCompare(const a,b: string): boolean;   //**< returns true if a=b case sensitive. Can be passed to getAttribute
@@ -263,7 +262,27 @@ TBlockAllocator = record
   function take(size: SizeInt): PByte;
 end;
 
-{ TTreeDocument }
+TTreeBuilder = object
+protected
+  elementStack: TList;  //stack of currently open nodes that can have children (mostly elements, but the first node is the document)
+  currentRoot: TTreeNode;
+  currentNode: TTreeNode;
+  function currentParent: TTreeNode;
+  function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: SizeInt = 0):TTreeNode;
+public
+  currentDocument: TTreeDocument;
+
+  procedure initDocument(creator: TTreeParser);
+  procedure done;
+
+  function appendElement(const localname: string): TTreeNode;
+  function appendElement(namespace: TNamespace; localname: string): TTreeNode;
+  procedure appendText(const value: string);
+  procedure appendAttribute(const name, value: string);
+  procedure closeElement;
+  procedure closeAllElements;
+end;
+
 
 TTreeDocument = class(TTreeNode)
 protected
@@ -328,15 +347,12 @@ protected
   FAutoDetectHTMLEncoding: boolean;
   FReadProcessingInstructions: boolean;
 //  FConvertEntities: boolean;
-  FCurrentElement: TTreeNode;
-  FTemplateCount: Integer;
-  FElementStack: TList;
+  FTreeBuilder: TTreeBuilder;
   FAutoCloseTag: boolean;
   FCurrentFile: RawByteString;
   FParsingModel: TParsingModel;
   FTrimText, FReadComments: boolean;
   FTrees: TFPList;
-  FCurrentTree: TTreeDocument;
   FNCNameCache: TXQHashmapStrStr;
   FRepairMissingStartTags, FRepairMissingEndTags: boolean;
 
@@ -738,6 +754,109 @@ begin
   if attributes = attributeDataTypeHackList2 then exit(2);
   result := 0;
 end;
+
+
+
+
+procedure TTreeBuilder.initDocument(creator: TTreeParser);
+begin
+  elementStack := TList.Create;
+  currentDocument := TTreeDocument.create(creator);
+  currentRoot := currentDocument;
+  currentNode := currentDocument;
+  elementStack.Add(currentDocument);
+end;
+
+procedure TTreeBuilder.done;
+begin
+  elementStack.Free;
+  elementStack := nil
+end;
+
+function TTreeBuilder.currentParent: TTreeNode;
+begin
+  result := TTreeNode(elementStack.last)
+end;
+
+function TTreeBuilder.appendNodeInternal(typ: TTreeNodeType; const s: string; offset: SizeInt): TTreeNode;
+begin
+  result:=currentDocument.createNode();
+  result.typ := typ;
+  result.value := s;
+  result.root := currentRoot;
+  //FTemplateCount+=1;
+
+  if offset > currentNode.offset then result.offset :=  offset
+  else result.offset := currentNode.offset + 1;
+
+  currentNode.next := result;
+  result.previous := currentNode;
+  currentNode:= result;
+
+  if typ <> tetClose then result.parent := TTreeNode(elementStack.Last)
+  else result.parent := TTreeNode(elementStack.Last).getParent();
+
+  //if (parsingModel = pmHTML) then
+  //  if (typ = tetClose) and (length(s) = 1) then
+  //    FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
+end;
+
+function TTreeBuilder.appendElement(const localname: string): TTreeNode;
+begin
+  result := appendNodeInternal(tetOpen, localname);
+  elementStack.Add(result);
+  if result.parent <> nil then
+    result.namespace := result.parent.namespace;
+  result.hash := nodeNameHash(localname);
+end;
+
+function TTreeBuilder.appendElement(namespace: TNamespace; localname: string): TTreeNode;
+begin
+  result := appendNodeInternal(tetOpen, localname);
+  elementStack.Add(result);
+  currentDocument.addNamespace(namespace); //todo: ref count error??
+  result.namespace := namespace;
+  result.hash := nodeNameHash(localname);
+end;
+
+procedure TTreeBuilder.appendText(const value: string);
+begin
+  appendNodeInternal(tetText, value);
+end;
+
+procedure TTreeBuilder.appendAttribute(const name, value: string);
+begin
+  assert(currentNode.typ = tetOpen);
+  currentNode.addAttribute(name, value);
+end;
+
+procedure TTreeBuilder.closeElement;
+var
+  last: TTreeNode;
+  new: TTreeNode;
+begin
+  last := TTreeNode(elementStack.Last);
+  Assert(last<>nil);
+  if last.typ in [tetOpen, tetDocument] then begin
+    new := appendNodeInternal(tetClose, last.value, last.offset);
+    new.hash := last.hash;
+    //new := treeElementClass.create();
+    //new.typ:=tetClose;
+    //new.value:=last.value;
+    //new.offset:=last.offset;
+    //new.next:=last.next;
+    //last.next:=new;
+    last.reverse:=new; new.reverse:=last;
+  end;
+  elementStack.Delete(elementStack.Count-1);
+end;
+
+procedure TTreeBuilder.closeAllElements;
+begin
+  while elementStack.Count > 0 do closeElement;
+end;
+
+
 
 
 
@@ -1896,10 +2015,6 @@ begin
   inherited destroy();
 end;
 
-procedure TTreeNode.initialized;
-begin
-
-end;
 
 class function TTreeNode.compareInDocumentOrder(const a,b: TTreeNode): integer;
 begin
@@ -1988,7 +2103,6 @@ begin
   new := appendTreeNode(tetProcessingInstruction, target, longint(text - @FCurrentFile[1]));
   if content <> '' then new.addAttribute('', content);
   new.hash := nodeNameHash(new.value);
-  new.initialized;
 end;
 
 function TTreeParser.abortIfEncodingMismatch: TParsingResult;
@@ -2073,21 +2187,7 @@ end;
 
 function TTreeParser.appendTreeNode(typ: TTreeNodeType; s: string; offset: SizeInt): TTreeNode;
 begin
-  result:=FCurrentTree.createNode();
-  result.typ := typ;
-  result.value := s;
-  result.root := FCurrentTree;
-  FTemplateCount+=1;
-
-  if offset > FCurrentElement.offset then result.offset :=  offset
-  else result.offset := FCurrentElement.offset + 1;
-
-  FCurrentElement.next := result;
-  result.previous := FCurrentElement;
-  FCurrentElement := result;
-
-  if typ <> tetClose then result.parent := TTreeNode(FElementStack.Last)
-  else result.parent := TTreeNode(FElementStack.Last).getParent();
+  result := FTreeBuilder.appendNodeInternal(typ, s, offset);
 
   if (parsingModel = pmHTML) then
     if (typ = tetClose) and (length(s) = 1) then
@@ -2097,24 +2197,8 @@ begin
 end;
 
 procedure TTreeParser.autoCloseLastTag();
-var
-  last: TTreeNode;
-  new: TTreeNode;
 begin
-  last := TTreeNode(FElementStack.Last);
-  Assert(last<>nil);
-  if last.typ = tetOpen then begin
-    new := appendTreeNode(tetClose, last.value, last.offset);
-    new.hash := last.hash;
-    //new := treeElementClass.create();
-    //new.typ:=tetClose;
-    //new.value:=last.value;
-    //new.offset:=last.offset;
-    //new.next:=last.next;
-    //last.next:=new;
-    last.reverse:=new; new.reverse:=last;
-  end;
-  FElementStack.Delete(FElementStack.Count-1);
+  FTreeBuilder.closeElement;
   FAutoCloseTag:=false;
 end;
 
@@ -2125,27 +2209,22 @@ var
   closeFrom: Integer;
 begin
   result := nil;
-  closeFrom := FElementStack.Count;
-  for i := FElementStack.Count-1 downto 0 do begin
-    temp :=TTreeNode(FElementStack[i]);
+  closeFrom := FTreeBuilder.elementStack.Count;
+  for i := FTreeBuilder.elementStack.Count-1 downto 0 do begin
+    temp :=TTreeNode(FTreeBuilder.elementStack[i]);
     if (temp.typ = tetOpen) and striEqual(temp.value, ctag) then begin
       closeFrom:=i;
       result := temp;;
       break;
     end;
   end;
-  for i:=closeFrom to FElementStack.count-1 do
+  for i:=closeFrom to FTreeBuilder.elementStack.count-1 do
     autoCloseLastTag();
 end;
 
 function TTreeParser.prependTag(const tag: string): TTreeNode;
 begin
-  result := appendTreeNode(tetOpen, tag, FCurrentElement.offset+1);
-  result.hash := nodeNameHash(result.value);
-  if result.parent <> nil then
-    result.namespace := result.parent.namespace;
-  FElementStack.Add(result);
-  result.initialized;
+  result := FTreeBuilder.appendElement(tag);
 end;
 
 procedure TTreeParser.doRepairMissingStartTags(const tag: string);
@@ -2154,9 +2233,9 @@ procedure TTreeParser.doRepairMissingStartTags(const tag: string);
     u: TTreeNode;
   begin
     if (t = nil) or (t.reverse = nil) then exit;
-    if FCurrentElement = t.reverse then begin
-      FCurrentElement := FCurrentElement.previous;
-      FCurrentElement.next := nil;
+    if FTreeBuilder.currentNode = t.reverse then begin
+      FTreeBuilder.currentNode := FTreeBuilder.currentNode.previous;
+      FTreeBuilder.currentNode.next := nil;
     end else begin
       //t.reverse is somewhere in the middle => update doubly linked list
       u := t.reverse.previous;
@@ -2173,14 +2252,14 @@ procedure TTreeParser.doRepairMissingStartTags(const tag: string);
     end;
     t.reverse.free;
     t.reverse := nil;
-    FElementStack.Add(t);
+    FTreeBuilder.ElementStack.Add(t);
   end;
 
 var
   omittedTag: THTMLOmittedEndTagInfo;
 begin
   omittedTag := omittedStartTags.find(tag);
-  if (omittedTag <> nil) and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, omittedTag.parents[0]) then begin
+  if (omittedTag <> nil) and (FTreeBuilder.elementStack.Count > 0) and striEqual(TTreeNode(FTreeBuilder.elementStack.Last).value, omittedTag.parents[0]) then begin
     prependTag(omittedTag.additionallyclosed[0]);
     exit;
   end;
@@ -2253,15 +2332,15 @@ var
     omittedTag := omittedEndTags.find(tag);
     if omittedTag <> nil then begin
       specialCaseOptGroup := striEqual(tag, 'optgroup');
-      closeFrom := FElementStack.Count;
-      for i := FElementStack.Count-1 downto 0 do begin
-        temp :=TTreeNode(FElementStack[i]);
+      closeFrom := FTreeBuilder.elementStack.Count;
+      for i := FTreeBuilder.elementStack.Count-1 downto 0 do begin
+        temp :=TTreeNode(FTreeBuilder.elementStack[i]);
         if not (temp.typ in [tetOpen, tetClose] {is there ever a close?}) then continue;
         if arrayContainsI(omittedTag.parents, temp.value) then break;
         if arrayContainsI(omittedTag.siblings, temp.value) or arrayContainsI(omittedTag.additionallyclosed, temp.value) then
           closeFrom := i;
       end;
-      for i:=closeFrom to FElementStack.count-1 do
+      for i:=closeFrom to FTreeBuilder.elementStack.count-1 do
         autoCloseLastTag();
     end;
 
@@ -2318,7 +2397,7 @@ begin
     bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
   end;
   FAutoCloseTag:=htmlElementIsChildless(hash, tag);
-  if striEqual(tag, 'table') and (FElementStack.Count > 0) and striEqual(TTreeNode(FElementStack.Last).value, 'table') then
+  if striEqual(tag, 'table') and (FTreeBuilder.elementStack.Count > 0) and striEqual(TTreeNode(FTreeBuilder.elementStack.Last).value, 'table') then
     leaveHTMLTag(tagName, tagNameLen);
 
   new := enterTagCommon(hash, tag, tagName, prefixLen, properties);
@@ -2335,11 +2414,11 @@ begin
   new := appendTreeNode(tetOpen, tag, longint(prefix - @FCurrentFile[1]));
   result := new;
 
-  FElementStack.Add(new);
+  FTreeBuilder.elementStack.Add(new);
   if length(properties)>0 then begin
     for i := 0 to high(properties) do
       with properties[i] do
-        new.addAttribute(FCurrentTree.createAttribute(parseTextAttribute(name, nameLen), parseTextAttribute(value, valueLen)));
+        new.addAttribute(FTreeBuilder.currentDocument.createAttribute(parseTextAttribute(name, nameLen), parseTextAttribute(value, valueLen)));
 
     for attrib in new.getEnumeratorAttributes do
       if strBeginsWith(attrib.value, 'xmlns') then begin
@@ -2357,22 +2436,20 @@ begin
         attrib.namespace := findNamespace(strSplitGet(':', attrib.value));
       attrib.hash := nodeNameHash(attrib.value);
     end;
-    if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and ( (FCurrentTree.baseURI = '') or (FCurrentTree.baseURI = FCurrentTree.documentURI) ) and new.hasAttribute('href') then
-      FCurrentTree.baseURI := strResolveURI(new.getAttribute('href'), FCurrentTree.documentURI);
+    if (FParsingModel = pmHTML) and (striEqual(tag, 'base')) and ( (FTreeBuilder.currentDocument.baseURI = '') or (FTreeBuilder.currentDocument.baseURI = FTreeBuilder.currentDocument.documentURI) ) and new.hasAttribute('href') then
+      FTreeBuilder.currentDocument.baseURI := strResolveURI(new.getAttribute('href'), FTreeBuilder.currentDocument.documentURI);
   end;
   if prefixLen > 0 then begin
     new.namespace := findNamespace(parseRawText(prefix, prefixLen))
   end else
     new.namespace := FCurrentNamespace;
   new.hash := hash;
-
-  new.initialized;
 end;
 
 function TTreeParser.leaveXMLTag(tagName: pchar; tagNameLen: SizeInt): TParsingResult;
 begin
   result:=prContinue;
-  if TTreeNode(FElementStack.Last) = nil then begin
+  if TTreeNode(FTreeBuilder.elementStack.Last) = nil then begin
     leaveTagNoOpenTagCheck(tagName, tagNameLen);
     exit;
   end;
@@ -2387,7 +2464,7 @@ var
   last, new: TTreeNode;
 begin
   result:=prContinue;
-  last := TTreeNode(FElementStack.Last);
+  last := TTreeNode(FTreeBuilder.elementStack.Last);
   if Last = nil then begin
     leaveTagNoOpenTagCheck(tagName, tagNameLen);
     exit;
@@ -2444,7 +2521,7 @@ procedure TTreeParser.leaveTagNoOpenTagCheck(tagName: pchar; tagNameLen: SizeInt
 var
   last: TTreeNode;
 begin
-  last := TTreeNode(FElementStack.Last);
+  last := TTreeNode(FTreeBuilder.elementStack.Last);
   if (FParsingModel = pmStrict) and (last = nil) then
     raise ETreeParseException.create('The tag <'+parseRawText(tagName,tagNameLen)+'> was closed, but none was open');
 
@@ -2468,24 +2545,21 @@ var
   hashcode: TNodeNameHash;
 begin
   parseQName(tagName, tagNameLen, prefixLen, hashcode, tag);
-  last := TTreeNode(FElementStack.Last);
+  last := TTreeNode(FTreeBuilder.elementStack.Last);
   result := nil;
   if ( (pointer(tag) = pointer(last.value)) or striequal(tag, last.value) )
       and ( ((last.namespace = nil) and (prefixLen = 0) )
             or (last.namespace <> nil) and (strlequal(tagName, last.namespace.prefix, prefixLen)) )
   then begin
-    result := appendTreeNode(tetClose, tag, longint(tagName - @FCurrentFile[1]));
-    result.hash := hashcode;
-    result.reverse := last; last.reverse := result;
-    FElementStack.Delete(FElementStack.Count-1);
-    result.initialized;
+    FTreeBuilder.closeElement;
+    result := FTreeBuilder.currentNode;
   end else if FParsingModel = pmStrict then
-    raise ETreeParseException.Create('The tag <'+tag+'> was closed, but the latest opened was <'+last.getNodeName()+'>  (url: '+FCurrentTree.FBaseURI+')')
+    raise ETreeParseException.Create('The tag <'+tag+'> was closed, but the latest opened was <'+last.getNodeName()+'>  (url: '+FTreeBuilder.currentDocument.FBaseURI+')')
   else if FParsingModel in [pmHTML, pmUnstrictXML] then begin
     //try to auto detect unclosed tags
     match:=-1;
-    for i:=FElementStack.Count-1 downto 0 do
-      if striequal(tag, TTreeNode(FElementStack[i]).value) then begin
+    for i:=FTreeBuilder.elementStack.Count-1 downto 0 do
+      if striequal(tag, TTreeNode(FTreeBuilder.elementStack[i]).value) then begin
         match:=i;
         break;
       end;
@@ -2493,23 +2567,18 @@ begin
       //there are unclosed tags, but a tag opening the currently closed exist, close all in between
       if FParsingModel = pmHTML then begin
         weight := htmlTagWeight(tag);
-        for i:=match+1 to FElementStack.Count-1 do
-          if htmlTagWeight(TTreeNode(FElementStack[i]).value) > weight then
+        for i:=match+1 to FTreeBuilder.elementStack.Count-1 do
+          if htmlTagWeight(TTreeNode(FTreeBuilder.elementStack[i]).value) > weight then
               exit;
       end;
-      for i:=match+1 to FElementStack.Count-1 do
-        autoCloseLastTag();
-      result := appendTreeNode(tetClose, tag, longint(tagName - @FCurrentFile[1]));
-      result.hash := hashcode;
-      last := TTreeNode(FElementStack[match]);
-      last.reverse := result; result.reverse := last;
-      FElementStack.Count:=match;
-      result.initialized;
+      for i:=match to FTreeBuilder.elementStack.Count-1 do
+        FTreeBuilder.closeElement();
+      result := FTreeBuilder.currentNode;
     end;
 
     if (FParsingModel = pmHTML) and htmlElementIsChildless(hashcode, tag) then begin
       parenDelta := 0;
-      last := FCurrentElement;
+      last := FTreeBuilder.currentNode;
       weight := htmlTagWeight(tag);
       while last <> nil do begin
         if last.typ = tetClose then parenDelta -= 1
@@ -2571,11 +2640,11 @@ begin
   result:=prContinue;
 
   if not allowTextAtRootLevel then
-    if (FParsingModel = pmStrict) and (FElementStack.Count < 2)  then begin
+    if (FParsingModel = pmStrict) and (FTreeBuilder.elementStack.Count < 2)  then begin
       strlTrimLeft(text, textLen);
       if textLen = 0 then exit;
       if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
-         strBeginsWith(text, #43#47#118) then raise ETreeParseException.Create('xml ' + FCurrentTree.FBaseURI + ' starts with unicode BOM. That is not supported');
+         strBeginsWith(text, #43#47#118) then raise ETreeParseException.Create('xml ' + FTreeBuilder.currentDocument.FBaseURI + ' starts with unicode BOM. That is not supported');
       raise ETreeParseException.Create('Data not allowed at root level: '+strFromPchar(text,textLen));
     end;
 
@@ -2591,8 +2660,8 @@ begin
   if (FParsingModel = pmHTML) and repairMissingStartTags
      and ( (FBasicParsingState in [bpmAfterBody, bpmAfterAfterBody])
            or (not (FBasicParsingState in [bpmInBody, bpmInFrameset])
-               and ((FElementStack.Count = 0) or striEqual(TTreeNode(FElementStack.Last).value, 'head')
-                     or striEqual(TTreeNode(FElementStack.Last).value, 'html') or striEqual(TTreeNode(FElementStack.Last).value, ''))) )
+               and ((FTreeBuilder.elementStack.Count = 0) or striEqual(FTreeBuilder.currentParent.value, 'head')
+                     or striEqual(FTreeBuilder.currentParent.value, 'html') or striEqual(FTreeBuilder.currentParent.value, ''))) )
          then begin
     tempLen := textLen;
     temp := text;
@@ -2604,10 +2673,10 @@ begin
   typ := tetText;
   if tfCDATA in tf then t := parseCDATA(text, textLen)
   else t := parseTextAttribute(text, textLen);
-  if FCurrentElement.typ <> tetText then
-    appendTreeNode(typ, t, longint(text - @FCurrentFile[1])).initialized
+  if FTreeBuilder.currentNode.typ <> tetText then
+    appendTreeNode(typ, t, longint(text - @FCurrentFile[1]))
    else
-    FCurrentElement.value += t;
+    FTreeBuilder.currentNode.value += t;
 end;
 
 function TTreeParser.readComment(text: pchar; textLen: SizeInt): TParsingResult;
@@ -2617,7 +2686,7 @@ begin
     exit;
   if textLen <= 0 then
     exit;
-  appendTreeNode(tetComment, parseRawText(text, textLen), longint(text - @FCurrentFile[1])).initialized;
+  appendTreeNode(tetComment, parseRawText(text, textLen), longint(text - @FCurrentFile[1]));
 end;
 
 procedure TTreeParser.pushNamespace(const url, prefix: string);
@@ -2632,7 +2701,7 @@ begin
 
   ns := TNamespace.Make(nsurl, prefix);
   FCurrentNamespaces.Add(ns);
-  FCurrentNamespaceDefinitions.Add(FCurrentElement);
+  FCurrentNamespaceDefinitions.Add(FTreeBuilder.currentNode);
   FCurrentAndPreviousNamespaces.Add(ns);
   if prefix = '' then FCurrentNamespace := ns;
 end;
@@ -2698,7 +2767,6 @@ end;
 
 constructor TTreeParser.Create;
 begin
-  FElementStack := TList.Create;
   treeNodeClass := TTreeNode;
   FTrimText:=false;
   FReadComments:=false;
@@ -2721,9 +2789,9 @@ end;
 
 destructor TTreeParser.destroy;
 begin
-  FElementStack.free;
   clearTrees;
   ftrees.Free;
+  FTreeBuilder.done;
   FCurrentNamespaces.Free;
   FCurrentNamespaceDefinitions.Free;
   FCurrentAndPreviousNamespaces.free;
@@ -2791,9 +2859,7 @@ function TTreeParser.parseTree(html: string; uri: string; contentType: string): 
 var
   tempEncoding: TSystemCodePage;
 begin
-  FTemplateCount:=0;
-  FElementStack.Clear;
-  FCurrentTree:=nil;
+  if FTreeBuilder.elementStack <> nil then FTreeBuilder.done;
   FCurrentNamespaces.clear;
   FCurrentNamespaceDefinitions.Clear;
   FCurrentAndPreviousNamespaces.Clear;
@@ -2809,18 +2875,11 @@ begin
 
 
   //initialize document node
-  FCurrentTree:=TTreeDocument.create(self);
-  FCurrentTree.FCreator:=self;
-  FCurrentTree.typ := tetDocument;
-  FCurrentTree.FBaseURI:=uri;
-  FCurrentTree.FDocumentURI:=uri;
-  FCurrentTree.root := FCurrentTree;
-  FCurrentTree.FBaseEncoding := CP_NONE;
-  FCurrentElement:=FCurrentTree;
+  FTreeBuilder.initDocument(self);
+  FTreeBuilder.currentDocument.FBaseURI:=uri;
+  FTreeBuilder.currentDocument.FDocumentURI:=uri;
+  FTreeBuilder.currentDocument.FBaseEncoding := CP_NONE;
   FNCNameCache.clear;
-  FElementStack.Clear;
-  FElementStack.Add(FCurrentElement);
-  FTemplateCount:=1;
   FHasOpenedPTag := false;
   FBasicParsingState:=bpmBeforeHtml;
   FLastHead := nil;
@@ -2835,7 +2894,7 @@ begin
   FEncodingInputCertain := strEncodingFromContentType(contentType);
   if (FParsingModel = pmHTML) and (( FEncodingInputCertain = CP_LATIN1) or (FEncodingInputCertain = CP_ASCII) )  then FEncodingInputCertain := CP_WINDOWS1252;
   if FEncodingInputCertain = CP_NONE then FEncodingInputCertain := tempEncoding;
-  FCurrentTree.FBaseEncoding := FEncodingInputCertain;
+  FTreeBuilder.currentDocument.FBaseEncoding := FEncodingInputCertain;
   FReparseWithChangedEncoding := false;
 
   case FEncodingInputCertain of
@@ -2859,17 +2918,18 @@ begin
     leaveXMLTag(nil,0); //close root element
   end;
   if FReparseWithChangedEncoding then begin
-    FCurrentTree.Free;
+    FTreeBuilder.currentDocument.Free;
     result := parseTree(FCurrentFile, uri, contentType + '; charset='+strEncodingName(FEncodingMeta));
     exit;
   end;
 
-  addTree(FCurrentTree);
+  result := FTreeBuilder.currentDocument;
 
-  result := FCurrentTree;
+  addTree(result);
 
-  if FCurrentTree.FBaseEncoding = CP_NONE then FCurrentTree.fbaseEncoding := FEncodingCurrent;
-  FCurrentTree.FEncoding := TargetEncoding;
+
+  if result.FBaseEncoding = CP_NONE then result.fbaseEncoding := FEncodingCurrent;
+  result.FEncoding := TargetEncoding;
 end;
 
 function TTreeParser.parseTreeFromFile(filename: string): TTreeDocument;

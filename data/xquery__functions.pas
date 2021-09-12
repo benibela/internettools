@@ -7885,31 +7885,7 @@ end;
 
 
 
-
-
-
-
-
-
-
-type TTreeBuilder = object
-protected
-  elementStack: TList;
-  currentDocument: TTreeDocument;
-  currentRoot: TTreeNode;
-  currentNode: TTreeNode;
-  function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: SizeInt = 0):TTreeNode;
-public
-  procedure initDocument(creator: TTreeParser);
-  procedure done;
-
-  function appendElement(const localname: string): TTreeNode;
-  function appendElement(namespace: TNamespace; localname: string): TTreeNode;
-  procedure appendText(const value: string);
-  procedure appendAttribute(const name, value: string);
-  procedure closeElement;
-  procedure closeAllElements;
-end;
+type
 
 TJsonArrayMapStackTracker = record
   containerKeySets: array of PXQHashsetStr;
@@ -8002,95 +7978,6 @@ begin
 end;
 
 
-procedure TTreeBuilder.initDocument(creator: TTreeParser);
-begin
-  elementStack := TList.Create;
-  currentDocument := TTreeDocument.create(creator);
-  currentRoot := currentDocument;
-  currentNode := currentDocument;
-end;
-
-procedure TTreeBuilder.done;
-begin
-  elementStack.Free;
-end;
-
-function TTreeBuilder.appendNodeInternal(typ: TTreeNodeType; const s: string; offset: SizeInt): TTreeNode;
-begin
-  result:=currentDocument.createNode();
-  result.typ := typ;
-  result.value := s;
-  result.root := currentRoot;
-  //FTemplateCount+=1;
-
-  if offset > currentNode.offset then result.offset :=  offset
-  else result.offset := currentNode.offset + 1;
-
-  currentNode.next := result;
-  result.previous := currentNode;
-  currentNode:= result;
-
-  if typ <> tetClose then result.parent := TTreeNode(elementStack.Last)
-  else result.parent := TTreeNode(elementStack.Last).getParent();
-
-  //if (parsingModel = pmHTML) then
-  //  if (typ = tetClose) and (length(s) = 1) then
-  //    FHasOpenedPTag := FHasOpenedPTag and not ((s = 'p') or (s = 'P'));
-end;
-
-function TTreeBuilder.appendElement(const localname: string): TTreeNode;
-begin
-  result := appendNodeInternal(tetOpen, localname);
-  elementStack.Add(result);
-  result.namespace := currentNode.namespace;
-  result.hash := nodeNameHash(localname);
-end;
-
-function TTreeBuilder.appendElement(namespace: TNamespace; localname: string): TTreeNode;
-begin
-  result := appendNodeInternal(tetOpen, localname);
-  elementStack.Add(result);
-  currentDocument.addNamespace(namespace); //todo: ref count error??
-  result.namespace := namespace;
-  result.hash := nodeNameHash(localname);
-end;
-
-procedure TTreeBuilder.appendText(const value: string);
-begin
-  appendNodeInternal(tetText, value);
-end;
-
-procedure TTreeBuilder.appendAttribute(const name, value: string);
-begin
-  assert(currentNode.typ = tetOpen);
-  currentNode.addAttribute(name, value);
-end;
-
-procedure TTreeBuilder.closeElement;
-var
-  last: TTreeNode;
-  new: TTreeNode;
-begin
-  last := TTreeNode(elementStack.Last);
-  Assert(last<>nil);
-  if last.typ = tetOpen then begin
-    new := appendNodeInternal(tetClose, last.value, last.offset);
-    new.hash := last.hash;
-    //new := treeElementClass.create();
-    //new.typ:=tetClose;
-    //new.value:=last.value;
-    //new.offset:=last.offset;
-    //new.next:=last.next;
-    //last.next:=new;
-    last.reverse:=new; new.reverse:=last;
-  end;
-  elementStack.Delete(elementStack.Count-1);
-end;
-
-procedure TTreeBuilder.closeAllElements;
-begin
-  while elementStack.Count > 0 do closeElement;
-end;
 
 
 
