@@ -2488,7 +2488,7 @@ begin
      checkWords('declare', ['function', 'variable', 'namespace', 'default', 'boundary-space', 'base-uri', 'option', 'construction', 'copy-namespace']) or
      checkWords('for', ['sliding', 'tumbling'])}
      then
-    exit(ekXQuery3_1);
+    exit(ekXQuery4_0);
 
   result := ekDefault;
 
