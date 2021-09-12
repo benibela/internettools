@@ -92,6 +92,7 @@ protected
   procedure requireXQuery(s: string = '');
   procedure require3(s: string = '');
   procedure require3_1(s: string = '');
+  procedure require4(s: string = '');
   procedure requireXQuery3(s: string = '');
   function isModel3: boolean;
   procedure refuseReservedFunctionName(const name: string);
@@ -823,6 +824,12 @@ procedure TXQParsingContext.require3_1(s: string);
 begin
   if not (parsingModel in PARSING_MODEL3_1) then
     raiseInvalidModel('At least XQuery/XPath version 3.1 is required '+s);
+end;
+
+procedure TXQParsingContext.require4(s: string);
+begin
+  if not (parsingModel in PARSING_MODEL4) then
+    raiseInvalidModel('At least XQuery/XPath version 4.0 is required '+s);
 end;
 
 procedure TXQParsingContext.requireXQuery3(s: string);
@@ -2737,7 +2744,16 @@ begin
 
       expect(')');
     end;
-    else begin
+    '$': begin
+      require4('to use variable references. (use ?($variable) in older versions).');
+      result.mode := xqtjlmParenthesized;
+      result.push(parseVariable);
+    end;
+    '"', '''': begin
+      require4('to use string lookup. (use ?("...") in older versions).');
+      result.mode := xqtjlmName;
+      result.propname := parseString;
+    end else begin
       result.propname := nextTokenNCName();
       result.mode := xqtjlmName;
     end;

@@ -25,6 +25,9 @@ begin
   tester := TXQTester.create(xqpmXQuery4_0, testerrors);
   tester.testerrors:=testerrors;
 
+  t('let $a := 2 return [4,5,6]?$a', '5');
+  t('map {"x y": "z"}?"x y"', 'z');
+
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
 end;
