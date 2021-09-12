@@ -4637,10 +4637,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
 
   function findFunction(const anamespace, alocalname: string; const argcount: integer): boolean;
     var
-      module: TXQNativeModule;
-      t: TXSType;
-      model: TXQParsingModel;
-      schema: TXSSchema;
       otherModuleStaticContext: TXQStaticContext;
       privacyError: boolean;
     begin
