@@ -1811,9 +1811,11 @@ begin
   result := (result div powersOf10[digit - binPos * DIGITS_PER_ELEMENT]) mod 10;
 end;
 
+procedure multiplyNoAlias(out r: BigDecimal; const a,b: BigDecimal); forward;
+
 function power(const v: BigDecimal; const exp: Int64): BigDecimal;
 var p: UInt64;
-    c: BigDecimal;
+    c, d: BigDecimal;
     e: Int64;
 begin
   if v.isZero() then exit(v);
@@ -1825,9 +1827,12 @@ begin
     if  (e and p) <> 0 then
       Result := (Result*c);
     p := 2*p;
-    c := (c*c);
+    multiplyNoAlias(d, c, c);
+    c := d;
+    //c := (c*c);
   end;
   if exp < 0 then result := 1 / result;
+  result.normalize();
 end;
 
 {function power(const v, exp: BigDecimal): BigDecimal;
