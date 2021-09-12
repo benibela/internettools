@@ -7726,7 +7726,7 @@ begin
   parser := TXQJsonParser.create(context);
   try
     if (argc = 2) then
-      parser.setConfigFromMap(args[1]);
+      parser.setConfigFromMap(args[1], false);
     result := parser.parse(data);
   finally
     parser.free;
@@ -8261,7 +8261,7 @@ begin
   parser.context := @context;
   try
     if (argc = 2) then
-      parser.setConfigFromMap(args[1]);
+      parser.setConfigFromMap(args[1], true);
     if args[0].isUndefined then exit(xqvalue);
     result := parser.parseToXML(args[0].toString);
   finally

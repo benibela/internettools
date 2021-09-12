@@ -462,7 +462,7 @@ type
       constructor create;
       constructor create(const acontext: TXQEvaluationContext);
       constructor create(const someoptions: TJSONParserOptions);
-      procedure setConfigFromMap(const map: IXQValue);
+      procedure setConfigFromMap(const map: IXQValue; forJSONToXML: boolean = false);
       function parse(argc: SizeInt; args: PIXQValue): IXQValue; reintroduce;
       function parse(const data: string): IXQValue; reintroduce;
       class function parse(const data: string; someOptions: TJSONParserOptions): IXQValue; static;
@@ -6076,17 +6076,6 @@ begin
     if TryStrToXQFloat(scanner.CurTokenStart, scanner.CurTokenLength, tempFloat) then
       exit(baseSchema.double.createValue(tempFloat))
   end;
-  if (jpoLiberal in options) and (scanner.CurTokenStart^ in ['+', '-']) then begin
-    tempchar := scanner.CurTokenStart^;
-    if scanner.FetchToken = tkIdentifier then
-      case tempview.ToString of
-        'INF', 'Inf', 'inf', 'INFINITY', 'Infinity', 'infinity':
-          case tempchar of
-            '+': exit(xqvalue(xqfloat.PositiveInfinity)); //this actually never happens, because + is parsed as tkWhitespace rather than tkNumber
-            '-': exit(xqvalue(xqfloat.NegativeInfinity));
-          end;
-      end;
-  end;
   raiseError('Invalid number');
   result := nil; //hide warning
 end;
@@ -6254,7 +6243,7 @@ begin
   options := someoptions;
 end;
 
-procedure TXQJsonParser.setConfigFromMap(const map: IXQValue);
+procedure TXQJsonParser.setConfigFromMap(const map: IXQValue; forJSONToXML: boolean);
   procedure raiseInvalidParam(code: string = 'XPTY0004');
   begin
     raise EXQEvaluationException.create(code, 'Invalid parameter', nil, map);
@@ -6277,7 +6266,11 @@ begin
   if map.hasProperty('duplicates', @vo) then begin
     checkType(vo, baseSchema.string_);
     duplicateResolve.setFromString(vo.toString);
-    if duplicateResolve = xqmdrCombine then raiseInvalidParam;
+    case duplicateResolve of
+      xqmdrCombine: raiseInvalidParam('FOJS0005');
+      xqmdrRetain: if not forJSONToXML then raiseInvalidParam('FOJS0005');
+      xqmdrUseLast: if forJSONToXML then raiseInvalidParam('FOJS0005');
+    end;
   end;
   if map.hasProperty('escape', @vo) then begin
     checkType(vo, baseSchema.boolean);
@@ -6307,7 +6300,7 @@ end;
 function TXQJsonParser.parse(argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   if (argc = 2) then
-    setConfigFromMap(args[1]);
+    setConfigFromMap(args[1], false);
   if args[0].isUndefined then exit(xqvalue);
   result := parse(args[0].toString);
 end;
