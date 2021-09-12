@@ -13,73 +13,25 @@ procedure unittests(TestErrors, testerrmath:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, xquery_module_math, math, commontestutils;
+uses xquery, simplehtmltreeparser, xquery_module_math, math, commontestutils, commontestutilsxquery;
 
 procedure unittests(testerrors, testerrmath: boolean);
-var
-  count: integer;
-  ps: TXQueryEngine;
-  xml: TTreeParser;
-  j: Integer;
-  tt: String;
+ var tester: TXQTester;
+   j: Integer;
+   tt: String;
+ procedure t(a,b: string; c: string = '');
+ begin
+   tester.t(a,b,c);
+ end;
+ procedure f(a,code: string; c: string = '');
+ begin
+   tester.f(a,code,c);
+ end;
 
-  function performUnitTest(s1,s2,s3: string): string;
-  begin
-    inc(globalTestCount);
-    if s3 <> '' then xml.parseTree(s3);
-    ps.parseQuery(s1, xqpmXPath3_0);
-    ps.LastQuery.getTerm.getContextDependencies;
-    result := ps.evaluate(xml.getLastTree).toString;
-  end;
+ begin
+   tester := TXQTester.create(xqpmXPath3_0, testerrors);
 
-  procedure t(a,b: string; c: string = '');
-  var
-    got: String;
-  begin
-    try
-    count+=1;
-    got := performUnitTest('join('+a+')',b,c);
-    if got<>b then
-      raise Exception.Create('XPath 3 Test failed: '+IntToStr(count)+ ': '+a+#13#10'got: "'+got+'" expected "'+b+'"');
 
-    except on e:exception do begin
-      writeln('Error @ "',a, '"');
-      raise;
-    end end;
-  end;
-
-  procedure f(a, code: string; c: string = '');
-   var
-     err: string;
-   begin
-     if not TestErrors then exit;
-     err := '-';
-     try
-     performUnitTest(a,'<error>',c);
-
-     except on e: EXQEvaluationException do begin
-       err := e.namespace.getPrefix+':'+e.errorCode;
-     end; on e: EXQParsingException do begin
-       err := e.namespace.getPrefix+':'+e.errorCode;
-     end end;
-     if err = '' then raise Exception.Create('No error => Test failed ');
-     if (err <> code) and (err <> 'err:'+code) then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
-   end;
-
-begin
-  count:=0;
-  ps := TXQueryEngine.Create;
-  ps.StaticContext.model := xqpmXPath3;
-  ps.StaticContext.baseURI := 'pseudo://test';
-  ps.ImplicitTimezoneInMinutes:=-5 * 60;
-  //ps.OnEvaluateVariable:=@vars.evaluateVariable;
-  //ps.OnDefineVariable:=@vars.defineVariable;
-  ps.ParsingOptions.AllowJSONLiterals:=false;
-  xml := TTreeParser.Create;
-  xml.readComments:=true;
-  xml.readProcessingInstructions:=true;
-
-  ps.StaticContext.strictTypeChecking := true;
 
   XQGlobalTrimNodes:=false;
 
@@ -116,7 +68,7 @@ begin
   t('count(tail(()))', '0');
 
   //Jsoniq pxp extensions
-  ps.ParsingOptions.AllowJSON:=true;
+  tester.ps.ParsingOptions.AllowJSON:=true;
   t('($seq := ({"a": 1, "b": 2, "c": 3}, {"b": 4, "c": 5, "d": 6, "e": [{"a": 10, "b": 11}], "f": {"a": 20, "b": 21}}))[4]', '');
   t('$seq ! c', '3 5');
   t('$seq ! (./c) ', '3 5');
@@ -368,16 +320,15 @@ begin
 
   //interface tests
   t('. + 1', '2', '<t>1</t>');
-  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  test(ps.evaluateXPath3('let $a  := "&quot;" return $a').toString, '&quot;', 'evaluateXPath3 failed');
-  test(ps.evaluateXPath3('let $x := 2*. return $x', xqvalue(7)).toString, '14', 'evaluateXPath3(ixqvalue) failed');
-  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(tester.ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(tester.ps.evaluateXPath3('let $a  := "&quot;" return $a').toString, '&quot;', 'evaluateXPath3 failed');
+  test(tester.ps.evaluateXPath3('let $x := 2*. return $x', xqvalue(7)).toString, '14', 'evaluateXPath3(ixqvalue) failed');
+  test(tester.ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
   test(TXQueryEngine.evaluateStaticXPath3('1 + 1 + (let $t := 10 return $t)').toString, '12', 'evaluateStaticXPath3 a failed');
 
 
-  writeln('XPath 3.0: ', count, ' completed');
-  ps.free;
-  xml.Free;
+  writeln('XPath 3.0: ', tester.count, ' completed');
+  tester.free;
 end;
 
 

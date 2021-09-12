@@ -751,8 +751,8 @@ THtmlTemplateParser=class
 const HTMLPARSER_NAMESPACE_URL = 'http://www.benibela.de/2011/templateparser';
 
 type TExtractionKind = (ekAuto, ekDefault,
-                        ekXPath2, ekXPath3_0, ekXPath3_1,
-                        ekXQuery1, ekXQuery3_0, ekXQuery3_1,
+                        ekXPath2, ekXPath3_0, ekXPath3_1, ekXPath4_0,
+                        ekXQuery1, ekXQuery3_0, ekXQuery3_1, ekXQuery4_0,
                         ekPatternHTML, ekPatternXML, ekCSS, ekMultipage); //that is Xidel stuff, but used in simpleinternet as well. just ignore it
 function guessExtractionKind(e: string): TExtractionKind;
 
@@ -1169,7 +1169,7 @@ begin
   //        and if xquery is included in a pattern, the xquery shares the context of the pattern
   // but if we mix it, lastquery will still contain a reference to a static context that has expired. Which will crash when the query is freed (i.e. a new query is read)
   //using parseTerm avoids all that, since it does not keep a lastquery
-  result := QueryEngine.parseTermH(expression, xqpmXQuery3_1, context);
+  result := QueryEngine.parseTermH(expression, high(TXQParsingModel), context);
 end;
 
 function THtmlTemplateParser.GetTemplateNamespace: TNamespaceList;

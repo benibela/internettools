@@ -827,7 +827,7 @@ end;
 
 procedure TXQParsingContext.requireXQuery3(s: string);
 begin
-  if (parsingModel <> xqpmXQuery3_0) and (parsingModel <> xqpmXQuery3_1) then raiseInvalidModel('XQuery version 3.0 is required '+s);
+  if not (parsingModel in PARSING_MODEL_XQUERY3) then raiseInvalidModel('XQuery version 3.0 is required '+s);
 end;
 
 function TXQParsingContext.isModel3: boolean;
@@ -3107,7 +3107,7 @@ begin
       end;
     'some', 'every': if nextToken(true) = '$' then
       exit(parseSomeEvery(token));
-    'switch': if (parsingModel in [xqpmXQuery3_0, xqpmXQuery3_1]) and (nextToken(true) = '(') then
+    'switch': if (parsingModel in PARSING_MODEL_XQUERY3) and (nextToken(true) = '(') then
       exit(parseSwitch);
     'typeswitch': if parsingModel in PARSING_MODEL_XQUERY then
       exit(parseTypeSwitch);
@@ -3122,7 +3122,7 @@ begin
       end;
       exit;
     end;
-    'try': if (parsingModel in [xqpmXQuery3_0, xqpmXQuery3_1]) and (nextToken(true) = '{') then
+    'try': if (parsingModel in PARSING_MODEL_XQUERY3) and (nextToken(true) = '{') then
       exit(parseTryCatch);
   end;
   pos := marker;
@@ -4102,11 +4102,13 @@ begin
           if strBeginsWith(temp, '1.0') then parsingModel := xqpmXQuery1
           else if strBeginsWith(temp, '3.0') and isModel3 then parsingModel := xqpmXQuery3_0
           else if strBeginsWith(temp, '3.1') and isModel3 then parsingModel := xqpmXQuery3_1
+          else if strBeginsWith(temp, '4.0') and isModel3 then parsingModel := xqpmXQuery4_0
           else temp := 'fail';
           if not setXQueryVersion(temp) then
             raiseParsingError('XQST0031', 'Invalid xquery version, need 1.0 '
                                            + ifthen(not isModel3, ' (3.0 is disabled) ', 'or 3.0 ')
-                                           + ifthen(not (parsingModel in [xqpmXPath3_1, xqpmXQuery3_1]), ' (3.1 is disabled)', 'or 3.1')
+                                           + ifthen(not (parsingModel in PARSING_MODEL3_1), ' (3.1 is disabled)', 'or 3.1')
+                                           + ifthen(not (parsingModel in PARSING_MODEL4), ' (4.0 is disabled)', 'or 4.0')
                                            );
           token := nextToken(true);
           if token = 'encoding' then begin

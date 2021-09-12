@@ -3103,6 +3103,8 @@ end;
 function xqFunctionEval(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var term: TXQuery;
   model: TXQParsingModel;
+  ok: boolean;
+  lang: String;
 begin
   requiredArgCount(argc, 1, 2);
   //result := context.staticContext.sender.evaluateXPath2(args[0].toString);
@@ -3110,15 +3112,10 @@ begin
   model := xqpmXPath2;
   if argc = 2 then begin
     if args[1].kind <> pvkObject then raiseXPTY0004TypeError(args[1], 'object');
-    case args[1].getProperty('language').toString of
-      'xquery', 'xquery3', 'xquery3.1': model := xqpmXQuery3_1;
-      'xquery3.0': model := xqpmXQuery3_0;
-      'xquery1', 'xquery1.0': model := xqpmXQuery1;
-      'xpath', 'xpath3', 'xpath3.1': model := xqpmXPath3_1;
-      'xpath3.0': model := xqpmXPath3_0;
-      'xpath2': model := xqpmXPath2;
-      '':;
-      else raise EXQEvaluationException.create('PXP:EVAL','Invalid language');
+    lang := args[1].getProperty('language').toString;
+    if lang <> '' then begin
+      model := TXQParsingModels.parseName(lang, ok);
+      if not ok then raise EXQEvaluationException.create('PXP:EVAL','Invalid language');
     end;
   end;
   term := context.staticContext.sender.parseTermH(args[0].toString, model);

@@ -12,7 +12,7 @@ procedure unittests(TestErrors:boolean);
 
 implementation
 
-uses xquery, simplehtmltreeparser, commontestutils;
+uses xquery, simplehtmltreeparser, commontestutils, commontestutilsxquery;
 
 procedure test(a: IXQValue; b: string); overload;
 begin
@@ -22,93 +22,27 @@ end;
 procedure newinterfacetests; forward;
 
 procedure unittests(testerrors: boolean);
-var
-  count: integer;
-  ps: TXQueryEngine;
-  xml: TTreeParser;
-
-  function performUnitTest(s1,s2,s3: string): string;
-  begin
-    inc(globalTestCount);
-    if s3 <> '' then xml.parseTree(s3);
-    ps.parseQuery(s1, xqpmXQuery3_0);
-    ps.LastQuery.getTerm.getContextDependencies;
-    result := ps.evaluate(xml.getLastTree).toString;
-  end;
-
+  var tester: TXQTester;
   procedure t(a,b: string; c: string = '');
-  var
-    got: String;
   begin
-    try
-    count+=1;
-    got := performUnitTest('join('+a+')',b,c);
-    if got<>b then
-      raise Exception.Create('XQuery 3 Test failed: '+IntToStr(count)+ ': '+a+#13#10'got: "'+got+'" expected "'+b+'"');
-
-    except on e:exception do begin
-      writeln('Error @ "',a, '"');
-      raise;
-    end end;
+    tester.t(a,b,c);
   end;
-  procedure m(a,b: string; c: string = ''); //main module
-  var
-    got: String;
+  procedure f(a,code: string; c: string = '');
+   begin
+     tester.f(a,code,c);
+   end;
+  procedure m(a,b: string; c: string = '');
   begin
-    try
-    count+=1;
-    got := performUnitTest(a,b,c);
-    if got<>b then
-     raise Exception.Create('XQuery Test failed: '+IntToStr(count)+ ': '+a+#13#10'got: "'+got+'" expected "'+b+'"');
-
-    except on e:exception do begin
-      writeln('Error @ "',a, '"');
-      raise;
-    end end;
+  tester.m(a,b,c);
   end;
-
-  procedure f(a, code: string; c: string = '');
-  var
-    err: string;
+  procedure mr(a: string);
   begin
-    if not TestErrors then exit;
-    err := '';
-    try
-    count+=1;
-    performUnitTest(a,'',c);
-
-    except on e: EXQEvaluationException do begin
-      err := e.namespace.getPrefix+':'+e.errorCode;
-    end; on e: EXQParsingException do begin
-      err := e.namespace.getPrefix+':'+e.errorCode;
-    end end;
-    if err = '' then raise Exception.Create('No error => Test failed ');
-    if (err <> code) and (err <> 'err:'+code) then raise Exception.Create('Wrong error, expected '+code+ ' got '+err);
-  end;
-
-  procedure mr(s1: string); //module register
-  begin
-    try
-      ps.registerModule(ps.parseQuery(s1, xqpmXQuery3_0));
-    except on e:exception do begin
-      writeln('Error @ "',s1, '"');
-      raise;
-    end end;
+  tester.mr(a);
   end;
 
 begin
-  count:=0;
-  ps := TXQueryEngine.Create;
-  ps.StaticContext.model := xqpmXQuery3;
-  ps.StaticContext.baseURI := 'pseudo://test';
-  ps.ImplicitTimezoneInMinutes:=-5 * 60;
-  ps.StaticContext.strictTypeChecking := true;
-  //ps.OnEvaluateVariable:=@vars.evaluateVariable;
-  //ps.OnDefineVariable:=@vars.defineVariable;
-  ps.ParsingOptions.AllowJSONLiterals:=false;
-  xml := TTreeParser.Create;
-  xml.readComments:=true;
-  xml.readProcessingInstructions:=true;
+  tester := TXQTester.create(xqpmXQuery3_0, testerrors);
+  tester.ps.ParsingOptions.AllowJSON:=true; //jsoniq
 
   try
   t('"&quot;"',                   '"');
@@ -424,20 +358,19 @@ begin
 
   //interface tests
   t('. + <x>1</x>', '2', '<t>1</t>');
-  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
-  test(ps.evaluateXQuery3('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
-  test(ps.evaluateXQuery3('<a>2</a> || .', xqvalue(7)).toString, '27', 'evaluateXQuery1(ixqvalue) failed');
-  test(ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(tester.ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
+  test(tester.ps.evaluateXQuery3('"&quot;"').toString, '"', 'evaluateXQuery1 failed');
+  test(tester.ps.evaluateXQuery3('<a>2</a> || .', xqvalue(7)).toString, '27', 'evaluateXQuery1(ixqvalue) failed');
+  test(tester.ps.LastQuery.evaluate(xqvalue(100)).toString, '101', 'evaluate(ixqvalue) failed');
   test(TXQueryEngine.evaluateStaticXQuery3('<a>1</a> + 1 + 1').toString, '3', 'evaluateStaticXQuery1 a failed');
 
 
   newinterfacetests;
 
-  writeln('XQuery 3.0: ', count, ' completed');
+  writeln('XQuery 3.0: ', tester.count, ' completed');
 
   finally
-  ps.free;
-  xml.Free;
+  tester.free;
   end;
 end;
 

@@ -2895,7 +2895,7 @@ begin
   module := TXQueryEngine.findNativeModule(anamespace);
 
   if staticContext <> nil then model := staticContext.model
-  else model := xqpmXQuery3_1;
+  else model := high(TXQParsingModel);
 
   if (module <> nil) then begin
     hashCode := TXQDefaultTypeInfo.hash(alocalname);
