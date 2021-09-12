@@ -48,7 +48,7 @@ uses
 
 implementation
 
-uses jsonscanner, simplehtmltreeparser, bbutils, xquery.namespaces, xquery.internals.common;
+uses fastjsonreader, simplehtmltreeparser, bbutils, xquery.namespaces, xquery.internals.common;
 
 
 function xqFunctionIsNull({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -99,9 +99,12 @@ function xqFunctionParseJson({%H-}argc: SizeInt; args: PIXQValue): IXQValue; ove
 var
   parser: TXQJsonParser;
 begin
-  parser.init;
-  parser.options := [jpoAllowMultipleTopLevelItems, jpoJSONiq];
-  result := parser.parse(argc, args);
+  parser := TXQJsonParser.create([jpoAllowMultipleTopLevelItems, jpoJSONiq]);
+  try
+    result := parser.parse(argc, args);
+  finally
+    parser.free;
+  end;
 end;
 
 
@@ -118,11 +121,13 @@ begin
 
   data := context.staticContext.retrieveFromURI(url, contenttype, 'FODC0002');
 
-  parser.init;
-  parser.options := [jpoAllowMultipleTopLevelItems, jpoJSONiq];
-  if argc = 2 then parser.setConfigFromMap(args[1]);
-
-  result := parser.parse(data);
+  parser := TXQJsonParser.create([jpoAllowMultipleTopLevelItems, jpoJSONiq]);
+  try
+    if argc = 2 then parser.setConfigFromMap(args[1]);
+    result := parser.parse(data);
+  finally
+    parser.free
+  end;
 end;
 
 
@@ -134,14 +139,17 @@ begin
   if assigned(context.staticContext.sender.OnWarningDeprecated) then
     context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'json is deprecated. Use json-doc or parse-json functions.');
 
-  parser.init;
-  parser.options := context.staticContext.sender.DefaultJSONParser.options;
-  if argc = 2 then parser.setConfigFromMap(args[1]);
-  s := args[0].toString;
-  if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then begin
-    data := context.staticContext.retrieveFromURI(s, contenttype, 'FODC0002');
-  end else data := s;
-  result := parser.parse(data);
+  parser := TXQJsonParser.create(context.staticContext.sender.DefaultJSONParser.options);
+  try
+    if argc = 2 then parser.setConfigFromMap(args[1]);
+    s := args[0].toString;
+    if striBeginsWith(s, 'http://') or striBeginsWith(s, 'https://') or striBeginsWith(s, 'file://') then begin
+      data := context.staticContext.retrieveFromURI(s, contenttype, 'FODC0002');
+    end else data := s;
+    result := parser.parse(data);
+  finally
+    parser.free
+  end;
 end;
 
 function xqFunctionKeys({%H-}argc: SizeInt; args: PIXQValue): IXQValue;

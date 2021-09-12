@@ -40,7 +40,7 @@ procedure finalizeFunctions;
 implementation
 
 uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
-  simplehtmltreeparser, htmlInformation, fastjsonscanner,
+  simplehtmltreeparser, htmlInformation, fastjsonscanner, fastjsonreader,
   bbutils, internetaccess, strutils, base64, xquery__regex, bbutilsbeta, bbrandomnumbergenerator, xquery__serialization_nodes, xquery__serialization,
 
   {$IFDEF USE_BBFLRE_UNICODE}PUCU{$ENDIF} //get FLRE from https://github.com/BeRo1985/flre or https://github.com/benibela/flre/
@@ -7706,9 +7706,12 @@ function xqFunctionParseJson(const context: TXQEvaluationContext; argc: SizeInt;
 var
   parser: TXQJsonParser;
 begin
-  parser.init;
-  parser.context := @context;
-  result := parser.parse(argc, args);
+  parser := TXQJsonParser.create(context);
+  try
+    result := parser.parse(argc, args);
+  finally
+    parser.free
+  end;
 end;
 
 function xqFunctionJSON_Doc(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -7720,11 +7723,14 @@ begin
   if args[0].isUndefined then exit(args[0]);
   data := context.staticContext.retrieveFromURI(args[0].toString, contenttype, 'FOUT1170');
 
-  parser.init;
-  parser.context := @context;
-  if (argc = 2) then
-    parser.setConfigFromMap(args[1]);
-  result := parser.parse(data);
+  parser := TXQJsonParser.create(context);
+  try
+    if (argc = 2) then
+      parser.setConfigFromMap(args[1]);
+    result := parser.parse(data);
+  finally
+    parser.free;
+  end;
 end;
 
 function xqFunctionTransformPlaceholder(const {%H-}context: TXQEvaluationContext; {%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
@@ -7917,9 +7923,33 @@ TJsonArrayMapStackTracker = record
   function currentKeySet: PXQHashsetStr;
 end;
 
-type TJSONToXML = object(TXQJsonParser)
-  procedure init;
+type TJSONToXML = class(TXQJsonParser)
+public
+  currentKeySet: PXQHashsetStr;
+  treeBuilder: TTreeBuilder;
+  containerStackTracker: TJsonArrayMapStackTracker;
+  targetNamespace: TNamespace;
+
+  constructor create;
   function parseToXML(const data: string): IXQValue;
+protected
+  procedure pushNode(const localname: string; value: string = '');
+  function pushOpeningTag(const localname: string): TTreeNode;
+  procedure setCurrentContainer;
+  function popContainer: TJSONParsingPhase;
+
+  procedure readArray; override;
+  procedure readObject; override;
+  procedure readArrayEnd(var newParsingPhase: TJSONParsingPhase); override;
+  procedure readObjectEnd(var newParsingPhase: TJSONParsingPhase); override;
+  procedure readKey; override;
+  procedure readString; override;
+  procedure readNumber; override;
+  procedure readNumberInf; override;
+  procedure readNumberNaN; override;
+  procedure readFalse; override;
+  procedure readTrue; override;
+  procedure readNull; override;
 end;
 
 procedure TJsonArrayMapStackTracker.init;
@@ -8066,301 +8096,177 @@ end;
 
 
 
-procedure TJSONToXML.init;
+constructor TJSONToXML.create;
 begin
-  inherited init;
+  inherited;
+  targetNamespace := XMLNamespace_XPathFunctions as TNamespace;
 end;
 
 function TJSONToXML.parseToXML(const data: string): IXQValue;
-var
-  scanner: TJSONScanner;
-  jsoniqMode: boolean;
-
-  //.............NO CHANGE below............
-  procedure raiseError(message: string = 'error'; code: string = '');
-  var token: string;
-    invalidUtf8: SizeInt;
-  begin
-    Str(scanner.CurToken, token);
-    if code = '' then begin
-      if jsoniqMode then code := 'jerr:JNDY0021'
-      else begin
-        strLengthUtf8(scanner.CurLine, invalidUtf8);
-        if invalidUtf8 > 0 then code := 'FOUT1200'
-        else code := 'FOJS0001';
-      end;
-    end;
-    raise EXQEvaluationException.create(code, message+' at ' + strFromPchar(scanner.CurTokenStart, scanner.CurTokenLength) +' (' + token +') in '+scanner.CurLine);
-  end;
-
-  function nextToken: TJSONToken;
-  begin
-    try
-      while scanner.FetchToken = tkWhitespace do ;
-    except
-      on e: EScannerError do
-        raiseError('Failed to parse JSON: '+ e.Message);
-    end;
-    result := scanner.CurToken;
-  end;
-  //.............NO CHANGE above............
-
-
-var
-    parsingPhase: ( jppArrayExpectValue, jppArrayExpectComma,
-                   jppObjectExpectKey, jppObjectExpectComma, jppObjectExpectValue,
-                   jppRoot);
-    currentKeySet: PXQHashsetStr = nil;
-var treeBuilder: TTreeBuilder;
-    containerStack: TJsonArrayMapStackTracker;
-    targetNamespace: TNamespace;
-
-  procedure setCurrentContainer; inline;
-  begin
-    currentKeySet := containerStack.currentKeySet;
-  end;
-
-  procedure popContainer;
-  begin
-    if containerStack.count = 0 then raiseError('Unexpected closing parenthesis');
-    containerStack.pop;
-    setCurrentContainer;
-    if containerStack.count = 0 then parsingPhase := jppRoot
-    else if currentKeySet = nil then parsingPhase := jppArrayExpectComma
-    else parsingPhase := jppObjectExpectComma;
-    treebuilder.closeElement;
-  end;
-
-  var objectKey: string;
-
-//.............NO CHANGE below............
-var escapeCharactersMode: TJSONEscapeCharacters;
-    appendEscapeFunction: TAppendEscapeFunction = nil;
-  function readString: string;
-  begin
-    result := TJSONScanner.decodeJSONString(scanner.CurTokenStart, scanner.CurTokenLength, escapeCharactersMode, appendEscapeFunction);
-  end;
-  //.............NO CHANGE above............
-
-  procedure readObjectKey;
-    procedure skipTokenArrayOrMap;
-    //if the current token is {, it will read all tokens until matching }
-    //if the current token is [, it will read all tokens until matching ]
-    //otherwise, it will read one non-whitespace token
-
-    //todo: check if JSON is in/valid
-    var nesting: SizeInt = 0;
-    begin
-      repeat
-        case nextToken of
-          tkCurlyBraceOpen: inc(nesting);
-          tkCurlyBraceClose: dec(nesting);
-          tkSquaredBraceOpen: inc(nesting);
-          tkSquaredBraceClose: dec(nesting);
-        end;
-      until nesting <= 0;
-    end;
-  begin
-    //if not (scanner.CurToken in [tkString, tkIdentifier]) then raiseError('Expected property name');
-    objectKey := readString;
-    if nextToken <> tkColon then raiseError('Expected : between property name and value');
-    parsingPhase := jppObjectExpectValue;
-    if duplicateResolve = xqmdrRetain then exit;
-    if not currentKeySet.contains(objectKey) then begin
-      currentKeySet.include(objectKey);
-      exit;
-    end;
-    if duplicateResolve <> xqmdrUseFirst then raiseError('Duplicate key', 'FOJS0003');
-    skipTokenArrayOrMap;
-    parsingPhase := jppObjectExpectComma;
-  end;
-
-  function pushOpeningTag(const localname: string): TTreeNode;
-  begin
-    result := treebuilder.appendElement(localname);
-    result.namespace := targetNamespace;
-    case parsingPhase of
-      jppArrayExpectValue: begin
-        if currentKeySet <> nil then raiseError();
-        parsingPhase := jppArrayExpectComma;
-      end;
-      jppObjectExpectValue: begin
-        if currentKeySet = nil then raiseError();
-        parsingPhase := jppObjectExpectComma;
-        treeBuilder.appendAttribute('key', objectKey);
-        if (jpoEscapeCharacters in options) and objectKey.Contains('\') then treeBuilder.appendAttribute('escaped-key', 'true');
-      end;
-      jppRoot: begin
-        {hadResult := (result <> nil);
-        if hadResult and not (jpoAllowMultipleTopLevelItems in options) then
-          raiseError();}
-      end;
-      jppArrayExpectComma,
-      jppObjectExpectKey,
-      jppObjectExpectComma: raiseError('value not allowed');
-    end;
-  end;
-
-  procedure pushNode(const localname: string; value: string = '');
-  begin
-    pushOpeningTag(localname);
-    if (jpoEscapeCharacters in options) and value.Contains('\') then treeBuilder.appendAttribute('escaped', 'true');
-    if value <> '' then treeBuilder.appendText(value);
-    treebuilder.closeElement;
-  end;
-  procedure pushString;
-  begin
-    pushNode('string', readString);
-  end;
-  procedure pushNumber;
-  begin
-    pushNode('number', readString);
-  end;
-  procedure pushContainer(const localname: string);
-  begin
-    pushOpeningTag(localname);
-    if localname = 'map' then containerStack.pushMap
-    else containerStack.pushArray;
-  end;
-
-var scannerOptions:  {$if FPC_FULLVERSION > 30000}TJSONOptions{$else}boolean{$endif};
-  i: SizeInt;
 begin
   result := nil;
   treeBuilder.initDocument(context.staticContext.sender.DefaultParser);
-  targetNamespace := XMLNamespace_XPathFunctions as TNamespace;
   treeBuilder.currentDocument.addNamespace(targetNamespace);
   treeBuilder.currentDocument.baseURI := context.staticContext.baseURI;
   if duplicateResolve = xqmdrUseLast then raise EXQEvaluationException.create( 'FOJS0005', 'Duplicate use-last is not allowed');
-  containerStack.count := 0;
-  //.............NO CHANGE below............
-  parsingPhase := jppRoot;
-  jsoniqMode := jpoJSONiq in options;
-  //tempSeq := nil;
-  {$if FPC_FULLVERSION > 30000}
-  scannerOptions := [joUTF8];
-  if not (jpoLiberal in options) then include(scannerOptions, joStrict);
-  if jpoAllowTrailingComma in options then include(scannerOptions, joIgnoreTrailingComma);
-  {$else}
-  scannerOptions := true;
-  {$endif}
-  if jpoEscapeCharacters in options then escapeCharactersMode := jecEscapeAll
-  else if baseSchema.version = xsd11 then escapeCharactersMode := jecEscapeForXML11
-  else escapeCharactersMode := jecEscapeForXML10;
-  if escapeFunction <> nil then appendEscapeFunction := @appendEscapedString;
-  scanner := default(TJSONScanner);
-  scanner.init(data, scannerOptions);
-  //.............NO CHANGE above............
+  containerStackTracker.count := 0;
   try
-    nextToken;
-    while true do begin
-      case scanner.CurToken of
-        tkEOF: break;
-        tkString:
-          if parsingPhase = jppObjectExpectKey then readObjectKey
-          else pushString;
-        tkNumber: pushNumber;
-        tkFalse: pushNode('boolean', 'false');
-        tkTrue: pushNode('boolean', 'true');
-        tkNull: pushNode('null');
-
-        tkComma: case parsingPhase of
-          jppObjectExpectComma: parsingPhase := jppObjectExpectKey;
-          jppArrayExpectComma: parsingPhase := jppArrayExpectValue;
-          else raiseError();
-        end;
-        //tkColon,                 // ':'
-        tkCurlyBraceOpen: begin
-          pushContainer('map');
-          setCurrentContainer;
-          case nextToken of
-            tkCurlyBraceClose: popContainer;
-            else begin
-              parsingPhase := jppObjectExpectKey;
-              continue;
-            end;
-          end;
-        end;
-        tkCurlyBraceClose:
-          if (parsingPhase = jppObjectExpectComma) or ((parsingPhase = jppObjectExpectKey) and (jpoAllowTrailingComma in options)) then popContainer
-          else raiseError();
-        tkSquaredBraceOpen: begin
-          pushContainer('array');
-          setCurrentContainer;
-          case nextToken of
-            tkSquaredBraceClose: popContainer;
-            else begin
-              parsingPhase := jppArrayExpectValue;
-              continue;
-            end;
-          end;
-        end;
-        tkSquaredBraceClose:
-          if (parsingPhase = jppArrayExpectComma) or ((parsingPhase = jppArrayExpectValue) and (jpoAllowTrailingComma in options)) then popContainer
-          else raiseError();
-        tkIdentifier:
-          if jpoLiberal in options then begin
-            if parsingPhase = jppObjectExpectKey then readObjectKey
-            else if strliEqual(scanner.CurTokenStart,  'INF', scanner.CurTokenLength)
-                    or strliEqual(scanner.CurTokenStart, 'INFinity', scanner.CurTokenLength)
-                    or strliEqual(scanner.CurTokenStart, 'NAN', scanner.CurTokenLength) then
-              pushNumber()
-            else raiseError();
-          end else raiseError();
-        //tkComment:
-        //tkUnknown
-        else raiseError();
-      end;
-      nextToken;
-    end;
-
-{    if containerCount > 0 then begin
-      for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
-        if containerStack[i].ClassType = TXQValueJSONArray then TXQValueJSONArray(containerStack[i]).seq.clear
-        else TXQValueStringMap(containerStack[i]).mapdata.clear;
-      raiseError('unclosed');
-    end;}
+    parse(data);
 
     treeBuilder.closeAllElements;
     result := xqvalue(treeBuilder.currentDocument);
 
-    if treeBuilder.currentDocument.getFirstChild() = nil then begin
-      if not (jpoLiberal in options) then raiseError('No data');
+    if treeBuilder.currentDocument.getFirstChild() = nil then
       result := xqvalue;
-    end;
-
   finally
     if result = nil then
       treeBuilder.currentDocument.free;
     treeBuilder.done;
-    containerStack.done;
-
-//.............NO CHANGE below............
-
-    if fallbackFunctionCaller <> nil then begin
-     fallbackFunctionCaller.done;
-     dispose(fallbackFunctionCaller);
-     fallbackFunctionCaller := nil;
-    end;
-    //for i := 0 to containerCount - 1 do containerStack[i]._Release;
-    scanner.done;
+    containerStackTracker.done;
+    disposeFallbackFunctionCaller;
   end;
-  //.............NO CHANGE above...........
+end;
+
+procedure TJSONToXML.pushNode(const localname: string; value: string);
+begin
+  pushOpeningTag(localname);
+  if (jpoEscapeCharacters in options) and value.Contains('\') then treeBuilder.appendAttribute('escaped', 'true');
+  if value <> '' then treeBuilder.appendText(value);
+  treebuilder.closeElement;
+end;
+
+function TJSONToXML.pushOpeningTag(const localname: string): TTreeNode;
+begin
+  result := treebuilder.appendElement(localname);
+  result.namespace := targetNamespace;
+  case parsingPhase of
+    jppArrayExpectValue: begin
+      if currentKeySet <> nil then raiseError();
+      parsingPhase := jppArrayExpectComma;
+    end;
+    jppObjectExpectValue: begin
+      if currentKeySet = nil then raiseError();
+      parsingPhase := jppObjectExpectComma;
+      treeBuilder.appendAttribute('key', currentObjectKey);
+      if (jpoEscapeCharacters in options) and currentObjectKey.Contains('\') then treeBuilder.appendAttribute('escaped-key', 'true');
+    end;
+    jppRoot: begin
+      {hadResult := (result <> nil);
+      if hadResult and not (jpoAllowMultipleTopLevelItems in options) then
+        raiseError();}
+    end;
+    jppArrayExpectComma,
+    jppObjectExpectKey,
+    jppObjectExpectComma: raiseError('value not allowed');
+  end;
 end;
 
 
 
+procedure TJSONToXML.setCurrentContainer; inline;
+begin
+  currentKeySet := containerStackTracker.currentKeySet;
+end;
+
+function TJSONToXML.popContainer: TJSONParsingPhase;
+begin
+  if containerStackTracker.count = 0 then raiseError('Unexpected closing parenthesis');
+  containerStackTracker.pop;
+  setCurrentContainer;
+  if containerStackTracker.count = 0 then result := jppRoot
+  else if currentKeySet = nil then result := jppArrayExpectComma
+  else result := jppObjectExpectComma;
+  treebuilder.closeElement;
+end;
+
+procedure TJSONToXML.readArray;
+begin
+  pushOpeningTag('array');
+  containerStackTracker.pushArray;
+  setCurrentContainer;
+end;
+
+procedure TJSONToXML.readObject;
+begin
+  pushOpeningTag('map');
+  containerStackTracker.pushMap;
+  setCurrentContainer;
+end;
+
+procedure TJSONToXML.readArrayEnd(var newParsingPhase: TJSONParsingPhase);
+begin
+  newParsingPhase := popContainer;
+end;
+
+procedure TJSONToXML.readObjectEnd(var newParsingPhase: TJSONParsingPhase);
+begin
+  newParsingPhase := popContainer
+end;
+
+procedure TJSONToXML.readKey;
+begin
+  //if not (scanner.CurToken in [tkString, tkIdentifier]) then raiseError('Expected property name');
+  currentObjectKey := decodeStringToken;
+  if duplicateResolve = xqmdrRetain then exit;
+  if not currentKeySet.contains(currentObjectKey) then begin
+    currentKeySet.include(currentObjectKey);
+    exit;
+  end;
+  if duplicateResolve <> xqmdrUseFirst then raiseError('Duplicate key', 'FOJS0003');
+  if scanner.FetchTokenNoWhitespace <> tkColon then raiseError('Expected : between property name and value');
+  scanner.skipTokenArrayOrMap;
+  parsingPhase := jppObjectExpectComma;
+end;
+
+procedure TJSONToXML.readString;
+begin
+  pushNode('string', decodeStringToken);
+end;
+
+procedure TJSONToXML.readNumber;
+begin
+  pushNode('number', decodeStringToken);
+end;
+
+procedure TJSONToXML.readNumberInf;
+begin
+  pushNode('number', decodeStringToken);
+end;
+
+procedure TJSONToXML.readNumberNaN;
+begin
+  pushNode('number', decodeStringToken);
+end;
+
+procedure TJSONToXML.readFalse;
+begin
+  pushNode('boolean', 'false');
+end;
+
+procedure TJSONToXML.readTrue;
+begin
+  pushNode('boolean', 'true');
+end;
+
+procedure TJSONToXML.readNull;
+begin
+  pushNode('null');
+end;
 
 function xqFunctionJSON_to_XML(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   parser: TJSONToXML;
 begin
-  parser.init;
+  parser := TJSONToXML.create();
   parser.context := @context;
-  if (argc = 2) then
-    parser.setConfigFromMap(args[1]);
-  if args[0].isUndefined then exit(xqvalue);
-  result := parser.parseToXML(args[0].toString);
+  try
+    if (argc = 2) then
+      parser.setConfigFromMap(args[1]);
+    if args[0].isUndefined then exit(xqvalue);
+    result := parser.parseToXML(args[0].toString);
+  finally
+    parser.free
+  end;
   //result := parser.parse(argc, args);
 end;
 

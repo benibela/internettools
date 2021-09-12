@@ -86,6 +86,11 @@ Type
     procedure done;
 
     function FetchToken: TJSONToken;
+    function FetchTokenNoWhitespace: TJSONToken;
+    //if the current token is {, it will read all tokens until matching }
+    //if the current token is [, it will read all tokens until matching ]
+    //otherwise, it will read one non-whitespace token
+    procedure skipTokenArrayOrMap;
 
     class function decodeJSONString(strStart: pchar; strLength: SizeInt; escapeCharacters: TJSONEscapeCharacters; escapeFunction: TAppendEscapeFunction = nil): string; static;
     class function decodeJSONString(str: string; escapeCharacters: TJSONEscapeCharacters; escapeFunction: TAppendEscapeFunction = nil): string; static;
@@ -97,6 +102,8 @@ Type
     property CurToken: TJSONToken read FCurToken;
     property CurTokenStart: PAnsiChar read FCurTokenStart;
     property CurTokenLength: Integer read FCurTokenLength;
+
+    function CurTokenErrorMessage: string;
 
     // Parsing options
     Property Options : TJSONOptions Read FOptions Write FOptions;
@@ -404,6 +411,27 @@ begin
   FCurToken := Result{%H-};
 end;
 
+function TJSONScanner.FetchTokenNoWhitespace: TJSONToken;
+begin
+  repeat
+    result := FetchToken;
+  until result <> tkWhitespace;
+end;
+
+procedure TJSONScanner.skipTokenArrayOrMap;
+//todo: check if JSON is in/valid
+var nesting: SizeInt = 0;
+begin
+  repeat
+    case FetchTokenNoWhitespace of
+      tkCurlyBraceOpen: inc(nesting);
+      tkCurlyBraceClose: dec(nesting);
+      tkSquaredBraceOpen: inc(nesting);
+      tkSquaredBraceClose: dec(nesting);
+    end;
+  until nesting <= 0;
+end;
+
 class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt;
   escapeCharacters: TJSONEscapeCharacters;
   escapeFunction: TAppendEscapeFunction): string;
@@ -580,6 +608,13 @@ class function TJSONScanner.decodeJSONString(str: string; escapeCharacters: TJSO
   ): string;
 begin
   result := decodeJSONString(pchar(str), length(str), escapeCharacters, escapeFunction);
+end;
+
+function TJSONScanner.CurTokenErrorMessage: string;
+var token: string;
+begin
+  Str(CurToken, token);
+  result := strFromPchar(CurTokenStart, CurTokenLength) +' (' + token +') in '+CurLine;
 end;
 
 {function TJSONScanner.FetchToken: TJSONToken;
