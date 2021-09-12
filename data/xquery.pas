@@ -6138,7 +6138,6 @@ begin
   end;
 end;
 
-{$push}
 {$ImplicitExceptions off}
 procedure TXQJsonParser.readArray;
 begin
@@ -6202,7 +6201,7 @@ begin
   if jsoniqMode then pushValue(TXQValueJSONNull.create)
   else pushValue(xqvalue());
 end;
-{$pop}
+{$ImplicitExceptions on}
 
 procedure TXQJsonParser.raiseError(message: string);
 var code: string;
