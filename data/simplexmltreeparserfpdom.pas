@@ -189,7 +189,6 @@ begin
   end;
 
   addTree(doc);
-  FCurrentTree := doc;
 
   namespaces.free;
   result := doc;

@@ -8000,7 +8000,7 @@ begin
   try
     parse(data);
 
-    treeBuilder.closeAllElements;
+    treeBuilder.closeAllElementsAndDocument;
     result := xqvalue(treeBuilder.currentDocument);
 
     if treeBuilder.currentDocument.getFirstChild() = nil then

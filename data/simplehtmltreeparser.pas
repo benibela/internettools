@@ -263,6 +263,7 @@ TBlockAllocator = record
 end;
 
 TTreeBuilder = object
+  const ROOT_ELEMENT_INDEX = 1; //index in elementstack
 protected
   elementStack: TList;  //stack of currently open nodes that can have children (mostly elements, but the first node is the document)
   currentRoot: TTreeNode;
@@ -279,8 +280,8 @@ public
   function appendElement(namespace: TNamespace; localname: string): TTreeNode;
   procedure appendText(const value: string);
   procedure appendAttribute(const name, value: string);
-  procedure closeElement;
-  procedure closeAllElements;
+  function closeElement: TTreeNode;
+  procedure closeAllElementsAndDocument;
 end;
 
 
@@ -830,14 +831,14 @@ begin
   currentNode.addAttribute(name, value);
 end;
 
-procedure TTreeBuilder.closeElement;
+function TTreeBuilder.closeElement: TTreeNode;
 var
   last: TTreeNode;
   new: TTreeNode;
 begin
   last := TTreeNode(elementStack.Last);
   Assert(last<>nil);
-  if last.typ in [tetOpen, tetDocument] then begin
+  if last.typ = tetOpen then begin
     new := appendNodeInternal(tetClose, last.value, last.offset);
     new.hash := last.hash;
     //new := treeElementClass.create();
@@ -847,13 +848,21 @@ begin
     //new.next:=last.next;
     //last.next:=new;
     last.reverse:=new; new.reverse:=last;
-  end;
-  elementStack.Delete(elementStack.Count-1);
+    elementStack.Delete(elementStack.Count-1);
+    result := new
+  end else result := nil
 end;
 
-procedure TTreeBuilder.closeAllElements;
+procedure TTreeBuilder.closeAllElementsAndDocument;
+var
+  new, last: TTreeNode;
 begin
-  while elementStack.Count > 0 do closeElement;
+  while elementStack.Count > ROOT_ELEMENT_INDEX do closeElement;
+  last := TTreeNode(elementStack.Last);
+  new := appendNodeInternal(tetClose, last.value, last.offset);
+  new.hash := last.hash;
+  last.reverse:=new; new.reverse:=last;
+  elementStack.Clear;
 end;
 
 
@@ -2454,7 +2463,7 @@ begin
     exit;
   end;
   if (tagNameLen = 0) then
-    if  (tagName <> nil) then exit  //skip tags like </ br>
+    if  (tagName <> nil) then exit //skip tags like </ br>
     else tagName := pchar(''); //but allow (nil, 0) call to close all still open tags
   leaveTagCommon(tagname, tagNameLen);
 end;
@@ -2551,8 +2560,7 @@ begin
       and ( ((last.namespace = nil) and (prefixLen = 0) )
             or (last.namespace <> nil) and (strlequal(tagName, last.namespace.prefix, prefixLen)) )
   then begin
-    FTreeBuilder.closeElement;
-    result := FTreeBuilder.currentNode;
+    result := FTreeBuilder.closeElement;
   end else if FParsingModel = pmStrict then
     raise ETreeParseException.Create('The tag <'+tag+'> was closed, but the latest opened was <'+last.getNodeName()+'>  (url: '+FTreeBuilder.currentDocument.FBaseURI+')')
   else if FParsingModel in [pmHTML, pmUnstrictXML] then begin
@@ -2572,8 +2580,7 @@ begin
               exit;
       end;
       for i:=match to FTreeBuilder.elementStack.Count-1 do
-        FTreeBuilder.closeElement();
-      result := FTreeBuilder.currentNode;
+        result := FTreeBuilder.closeElement();
     end;
 
     if (FParsingModel = pmHTML) and htmlElementIsChildless(hashcode, tag) then begin
@@ -2640,7 +2647,7 @@ begin
   result:=prContinue;
 
   if not allowTextAtRootLevel then
-    if (FParsingModel = pmStrict) and (FTreeBuilder.elementStack.Count < 2)  then begin
+    if (FParsingModel = pmStrict) and (FTreeBuilder.elementStack.Count <= TTreeBuilder.ROOT_ELEMENT_INDEX)  then begin
       strlTrimLeft(text, textLen);
       if textLen = 0 then exit;
       if strBeginsWith(text, #239#187#191) or strBeginsWith(text,#254#255) or strBeginsWith(text, #255#254) or
@@ -2912,11 +2919,12 @@ begin
   //parse
   if FParsingModel = pmHTML then begin
     simplehtmlparser.parseHTML(FCurrentFile,@enterHTMLTag, @leaveHTMLTag, @readText, @readComment);
-    leaveHTMLTag(nil,0); //close root element
+    leaveHTMLTag(nil,0); //close root element, and possibly insert required missing element (like <body> if there is no <body>)
   end else begin
     simplehtmlparser.parseML(FCurrentFile,[poRespectXMLProcessingInstructions],@enterXMLTag, @leaveXMLTag, @readText, @readComment, @readProcessingInstruction);
     leaveXMLTag(nil,0); //close root element
   end;
+  FTreeBuilder.closeAllElementsAndDocument; //close document
   if FReparseWithChangedEncoding then begin
     FTreeBuilder.currentDocument.Free;
     result := parseTree(FCurrentFile, uri, contentType + '; charset='+strEncodingName(FEncodingMeta));
