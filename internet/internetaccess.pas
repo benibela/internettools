@@ -186,6 +186,7 @@ type
     //constructor create(); virtual; abstract;
     //procedure writeCompressedBlock(const Buffer; Count: Longint); virtual; abstract;
     class procedure injectDecoder(var transfer: TTransfer; const encoding: string); virtual; abstract;
+    procedure endTransfer; virtual; abstract;
   end;
   TTransferInflaterClass = class of TTransferContentInflater;
 
@@ -966,7 +967,10 @@ end;
 
 procedure TTransfer.endTransfer;
 begin
-  FreeAndNil(inflater);
+  if assigned(inflater) then begin
+    inflater.endTransfer;
+    FreeAndNil(inflater);
+  end;
   if Assigned(ownerAccess.FOnProgress) then begin
     if (currentSize < contentLength) then ownerAccess.FOnProgress(ownerAccess, currentSize, contentLength)
     else if contentLength = -1 then ownerAccess.FOnProgress(ownerAccess, 0, 0);
