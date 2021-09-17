@@ -151,6 +151,7 @@ protected
   function parseDefineVariable: TXQTermDefineVariable;
   function parseAnnotations: TXQAnnotations;
   function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
+  function parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
   function parseTryCatch: TXQTermTryCatch;
 
   //**Parses the next complete value@br
@@ -2399,6 +2400,43 @@ begin
   end;
 end;
 
+function TXQParsingContext.parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
+var
+  sm: TXQTermSimpleMap;
+begin
+  if (pos^ = '-') and ((pos+1)^ = '>') then begin
+    require4('for ->{} function declarations');
+    expect('->');
+    skipWhitespaceAndComment();
+    case pos^ of
+      '(': inc(pos);
+      '{': begin
+        inc(pos);
+        result := TXQTermDefineFunction.create();
+        result.annotations := annotations;
+        result.parameterCount := 1;
+        result.push(TXQTermDefineVariable.create('->', nil));
+        TXQTermDefineVariable(result.children[0]).push(TXQTermSequenceType.create(tikAny));
+        try
+          sm := TXQTermSimpleMap.Create;
+          result.push(sm);
+          sm.push(TXQTermVariable.create('->', nil));
+          sm.push(parseOptionalExpr31);
+          exit;
+        except
+          result.free;
+          raise;
+        end;
+      end
+      else raiseSyntaxError('');
+    end;
+  end else begin
+    expect('function'); expect('(');
+  end;
+  result := parseFunctionDeclaration(annotations, true)
+
+end;
+
 function TXQParsingContext.parseTryCatch: TXQTermTryCatch;
 var
   kind: TXQNamespaceMode;
@@ -2877,7 +2915,6 @@ var
     end;
   end;
 
-
 begin
   result := nil;
   skipWhitespaceAndComment();
@@ -2885,7 +2922,8 @@ begin
   case pos^ of
     '''', '"':  exit(TXQTermConstant.create(parseString()));
     '$': exit(parseVariableWithDotNotation());
-    '-', '+': begin
+    '+', '-': begin
+      if (pos^ = '-') and ((pos+1)^ = '>') then exit(parseInlineFunctionDeclaration(nil));
       word := nextToken();
       exit(TXQTermBinaryOp.createUnary(word, parseValue()));
     end;
@@ -2950,8 +2988,7 @@ begin
     '%': begin
       inc(pos);
       annotations := parseAnnotations;
-      expect('function'); expect('(');
-      exit(parseFunctionDeclaration(annotations, true));
+      exit(parseInlineFunctionDeclaration(annotations));
     end;
     'x': if ((pos+1)^ in ['"', '''']) then begin
       if not options.AllowExtendedStrings then raiseSyntaxError('Extended string syntax was disabled');
