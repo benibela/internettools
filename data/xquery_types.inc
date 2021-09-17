@@ -510,10 +510,10 @@ begin
     end;
     pvkArray      : begin
       result := 'array: [';
-      if TXQValueSequence(self).seq.Count > 0 then begin
-        result += TXQValueSequence(self).seq[0].debugAsStringWithTypeAnnotation(textOnly){%H-};
-        for i:=1 to TXQValueSequence(self).seq.Count-1 do
-          result += ', ' + (TXQValueSequence(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly){%H-};
+      if TXQValueJSONArray(self).seq.Count > 0 then begin
+        result += TXQValueJSONArray(self).seq[0].debugAsStringWithTypeAnnotation(textOnly){%H-};
+        for i:=1 to TXQValueJSONArray(self).seq.Count-1 do
+          result += ', ' + (TXQValueJSONArray(self).seq[i]).debugAsStringWithTypeAnnotation(textOnly){%H-};
       end;
       result+=']';
     end;
