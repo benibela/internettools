@@ -28,6 +28,9 @@ begin
   t('let $a := 2 return [4,5,6]?$a', '5');
   t('map {"x y": "z"}?"x y"', 'z');
 
+  t('index-where((0, 4, 9), fn:boolean#1)', '2 3');
+  t('is-NaN(fn:number("twenty-three"))', 'true');
+
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
 end;

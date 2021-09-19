@@ -8405,7 +8405,48 @@ begin
 end;
 
 
-var fn3, fn3_1, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
+
+
+
+
+
+
+
+
+
+
+
+function xqFunctionIndex_Where(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var f: TXQBatchFunctionCall;
+    seq: IXQValue;
+    pv: PIXQValue;
+    pos: SizeInt;
+    resseq: TXQValueSequence;
+begin
+  requiredArgCount(argc, 2);
+  seq := args[0];
+  resseq := TXQValueSequence.create(seq.Count);
+  result := resseq;
+  f.init(context, args[1]);
+  pos := 1;
+  for pv in seq.GetEnumeratorPtrUnsafe do begin
+    if f.call1(pv^).toBoolean then resseq.add(xqvalue(pos));
+    inc(pos);
+  end;
+  f.done;
+end;
+
+function xqFunctionIsNaN({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  if args[0].kind = pvkFloat then
+    if args[0].toFloat.IsNan() then
+      exit(xqvalueTrue);
+  result := xqvalueFalse;
+end;
+
+
+
+var fn3, fn3_1, fn4, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
 
 
 procedure initializeFunctions;
@@ -8442,7 +8483,9 @@ begin
    This is only used for binary comparisons operators in 3.1
 
   }
-  fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
+  fn4 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, []);
+  fn4.acceptedModels := PARSING_MODEL4;
+  fn3_1 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn4]);
   fn3_1.acceptedModels := PARSING_MODEL3_1;
   fn3 := TXQNativeModule.Create(XMLNamespace_XPathFunctions, [fn3_1]);
   fn3.acceptedModels := PARSING_MODEL3;
@@ -8752,9 +8795,12 @@ transform
   fn3_1.registerFunction('transform', @xqFunctionTransformPlaceholder, [xqcdContextOther]).setVersionsShared([map, map]);
   fn3_1.registerFunction('load-xquery-module', @xqFunctionLoadXQueryModule, [xqcdContextOther]).setVersionsShared([stringt, map], [stringt, map, map]);
 
-  //from https://gist.github.com/joewiz/d986da715facaad633db
   fn3_1.registerFunction('json-to-xml', @xqFunctionJSON_to_XML, [xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty], [stringOrEmpty, map, documentNodeOrEmpty]);
   fn3_1.registerFunction('xml-to-json', @xqFunctionXML_to_JSON, [xqcdContextOther]).setVersionsShared([nodeOrEmpty, stringOrEmpty], [nodeOrEmpty, map, stringOrEmpty]);
+
+
+  fn4.registerFunction('index-where', @xqFunctionIndex_Where, [itemStar, functionItemBoolean, integerStar], []);
+  fn4.registerFunction('is-NaN', @xqFunctionIsNan).setVersionsShared([atomic, boolean]);
 
 
 
@@ -8958,6 +9004,7 @@ begin
   fn.free;
   fn3.free;
   fn3_1.free;
+  fn4.free;
   op.free;
   op3_1.free;
   fnarray.free;
