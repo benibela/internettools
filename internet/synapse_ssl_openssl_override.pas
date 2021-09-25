@@ -500,6 +500,16 @@ end;
 
 function TSSLOpenSSLOverride.Shutdown: boolean;
 begin
+  if not IsSSLloaded then begin
+    //prevent crash if OpenSSL has been unloaded.
+    //this would only happen if the program is closed, so the main thread has run the ssl_openssl_lib finalization section,
+    //but this functino is called from a secondary thread.
+    //then sslShutdown cannot be called because it would try to enter a critsection which already has been destroyed
+    FSSLEnabled := false;
+    Fssl := nil;
+    Fctx := nil;
+    exit(false);
+  end;
   if assigned(FSsl) then
     sslshutdown(FSsl);
   DeInit;
