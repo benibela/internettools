@@ -3425,7 +3425,7 @@ public
 
     boolean, booleanOrEmpty,
 
-    integer, integerOrEmpty, integerStar,
+    integer, integerOrEmpty, integerStar, nonNegativeInteger,
     decimal, decimalOrEmpty,
     double, doubleOrEmpty,
     numeric, numericOrEmpty,
@@ -3463,7 +3463,7 @@ public
     functionItemAtomicStar, functionAtomicItemStarItemStar, functionItemStarAtomicStar,
     functionItemStarItemItemStar, functionItemItemStarItemStar, functionItemItemItemStar,
     functionItemStarItemStar, functionItemStarBoolean, functionItemStarItemStarItemStar,
-    functionItemItemStar, functionItemBoolean,
+    functionItemItemStar, functionItemBoolean, functionAtomicItemStarBoolean,
 
     node, nodeOrEmpty, nodeStar,
     element, elementStar,
@@ -3471,7 +3471,7 @@ public
     elementSerializationParams, elementSerializationParamsOrEmpty
     : TXQTermSequenceType;
   );
-  false: (cachedTypes: array[1..83] of TXQTermSequenceType);
+  false: (cachedTypes: array[1..85] of TXQTermSequenceType);
 end;
 var globalTypes: TXQGlobalTypes;
 

@@ -7699,6 +7699,25 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+function xqFunctionMapFilter(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
+var f: TXQBatchFunctionCall;
+    pp: TXQStandardProperty;
+    map: TXQValue;
+    resmap: TXQValueStandardMap;
+begin
+  resmap := TXQValueStandardMap.create();
+  result := resmap;
+  map := argv[0].toValue;
+  with f do begin
+    init(context, argv[1]);
+    for pp in map.getEnumeratorPropertiesUnsafe do begin
+      if call2(pp.key, pp.Value).toBooleanEffective then
+        resmap.setMutable(pp.key, pp.value);
+    end;
+    done;
+  end;
+end;
+
 function xqFunctionParseJson(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var
   parser: TXQJsonParser;
@@ -8434,6 +8453,7 @@ begin
     inc(pos);
   end;
   f.done;
+  xqvalueSeqSqueeze(result);
 end;
 
 function xqFunctionIsNaN({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -8444,9 +8464,21 @@ begin
   result := xqvalueFalse;
 end;
 
+function xqFunctionCharacters({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  s: String;
+  cp: Integer;
+  resseq: TXQValueSequence;
+begin
+  s := args[0].toString();
+  resseq := TXQValueSequence.create(length(s));
+  result := resseq;
+  for cp in s.enumerateUtf8CodePoints do
+    resseq.add(xqvalue(strGetUnicodeCharacter(cp)));
+  xqvalueSeqSqueeze(result);
+end;
 
-
-var fn3, fn3_1, fn4, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap: TXQNativeModule;
+var fn3, fn3_1, fn4, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap, fnmap4: TXQNativeModule;
 
 
 procedure initializeFunctions;
@@ -8801,6 +8833,9 @@ transform
 
   fn4.registerFunction('index-where', @xqFunctionIndex_Where, [itemStar, functionItemBoolean, integerStar], []);
   fn4.registerFunction('is-NaN', @xqFunctionIsNan).setVersionsShared([atomic, boolean]);
+  fn4.registerFunction('characters', @xqFunctionCharacters).setVersionsShared([stringOrEmpty, stringStar]);
+  fn4.registerInterpretedFunction('identity', [itemStar, itemStar], '($input as item()*) as item()*', '$input', []);
+  fn4.registerInterpretedFunction('replicate', [itemStar, integer{something wrong with: nonNegativeInteger ?!}, itemStar], '($input as item()*, $count as xs:integer) as item()*', '(1 to $count) ! $input', []);
 
 
 
@@ -8831,7 +8866,9 @@ transform
   lastfn.setVersionsShared(2, [arrayt, stringOrEmpty, functionItemStarAtomicStar, arrayt]);
   fnarray.registerFunction('flatten', @xqFunctionArrayFlatten).setVersionsShared([itemStar, itemStar]);
 
-  fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
+  fnmap4 := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
+  fnmap4.acceptedModels := PARSING_MODEL4;
+  fnmap := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap, [fnmap4]);
   fnmap.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnmap);
   fnmap.reserveFunctionMemory(9,1,0);
@@ -8846,6 +8883,7 @@ transform
   fnmap.registerFunction('remove', @xqFunctionMapRemove).setVersionsShared([map, atomicStar, map]);
   fnmap.registerFunction('for-each', @xqFunctionMapFor_each, [xqcdContextOther]).setVersionsShared([map, functionAtomicItemStarItemStar, itemStar]);
 
+  fnmap4.registerFunction('filter', @xqFunctionMapFilter, [xqcdContextOther]).setVersionsShared([map, functionAtomicItemStarBoolean, map]);
 
 
   //Operators
@@ -9009,6 +9047,7 @@ begin
   op3_1.free;
   fnarray.free;
   fnmap.free;
+  fnmap4.free;
 end;
 
 

@@ -30,6 +30,13 @@ begin
 
   t('index-where((0, 4, 9), fn:boolean#1)', '2 3');
   t('is-NaN(fn:number("twenty-three"))', 'true');
+  t('identity(("A", "B"))', 'A B');
+
+  t('characters("Thérèse")', 'T h é r è s e');
+
+  t('replicate(("A", "B"), 3)', 'A B A B A B');
+
+  t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ->($k,$v){string-length($k) > 1})=>map:keys()', 'foo bar');
 
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
