@@ -137,6 +137,16 @@ begin
   result := '';
 end;
 
+function TXQValue.toStringArray: TStringArray;
+var
+  i: SizeInt;
+begin
+  result := nil;
+  SetLength(result, getSequenceCount);
+  for i := 1 to getSequenceCount do
+    result[i - 1] := get(i).toString;
+end;
+
 function TXQValue.toJoinedString(const sep: string): string;
 begin
   ignore(sep);

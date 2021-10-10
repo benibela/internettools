@@ -629,6 +629,7 @@ type
     function toFloatChecked(scontext: TXQStaticContext): xqfloat; virtual;
     function toDecimal: BigDecimal; virtual; //**< Returns the value as BigDecimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
+    function toStringArray: TStringArray;
     function toJoinedString(const sep: string = ' '): string; virtual; //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
     function toDateTime: TDateTime; virtual; //**< Returns the value as dateTime; dynamically converted, if necessary
     function toNode: TTreeNode; virtual; //**< Returns the value as node, or nil if it is not a node
