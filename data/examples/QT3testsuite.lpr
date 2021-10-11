@@ -1258,6 +1258,15 @@ begin
 
   put('spec', 'XP20 XP30 XQ10 XQ30', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXQuery1, xqpmXQuery3_0]);
 
+  put('spec', 'XQ10 XQ30 XQ31', config.version in [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
+  put('spec', 'XQ30 XQ31', config.version in [xqpmXQuery3_0, xqpmXQuery3_1]);
+  put('spec', 'XP20 XP30 XP31 XQ10 XQ30 XQ31', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
+
+  put('spec', 'XP40+ XQ40+', config.version in [xqpmXPath4_0, xqpmXQuery4_0]);
+  put('spec', 'XP40 XQ40', config.version in [xqpmXPath4_0, xqpmXQuery4_0]);
+  put('spec', 'XQ40+', config.version in [xqpmXQuery4_0]);
+  put('spec', 'XQ40', config.version in [xqpmXQuery4_0]);
+  put('spec', 'XP40+', config.version in [xqpmXPath4_0]);
 
   put('spec', 'XP31', config.version in [xqpmXPath3_1]);
   put('spec', 'XP31+', config.version in [xqpmXPath3_1]);
@@ -1300,6 +1309,7 @@ begin
   put('feature', 'olson-timezone', false);
   put('feature', 'arbitraryPrecisionDecimal', true);
   put('feature', 'remote_http', false);
+  put('feature', 'XQUpdate', false);
 
   put('unicode-normalization-form', 'NFD', true);
   put('unicode-normalization-form', 'NFKD', true);
@@ -1882,7 +1892,7 @@ begin
   if (i < length(s))  then arrayAdd(result, strCopyFrom(s, i+1));
 //  writeln(strJoin(result,'|'));
 end;
-
+var tempok: boolean;
 begin
   {$IFDEF FPC_HAS_CPSTRING}
   //from lazarus
@@ -1911,19 +1921,12 @@ begin
   //clr.declareString('dependencies-false', 'Additional dependencies to assume as false');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
-  case clr.readString('mode') of
-    'xquery1': config.version := xqpmXQuery1;
-    'xquery3', 'xquery3.0': config.version := xqpmXQuery3_0;
-    'xquery3.1': config.version := xqpmXQuery3_1;
-    'xpath2': config.version := xqpmXPath2;
-    'xpath3', 'xpath3.0': config.version := xqpmXPath3_0;
-    'xpath3.1': config.version := xqpmXPath3_1;
-    else begin
-      writeln(stderr, 'unknown mode');
-      exit;
-    end;
+  config.version := TXQParsingModels.parseName(clr.readString('mode'), tempok);
+  if not tempok then begin
+    writeln(stderr, 'unknown mode');
+    exit;
   end;
-  if config.version in [xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1] then begin
+  if config.version in PARSING_MODEL3 then begin
     if GetEnvironmentVariable('QTTEST') <> '42' then begin
       {$ifndef windows}
       writeln(stderr, 'You must set enviroment variables QTTEST="42" QTTEST2="other" QTTESTEMPTY=""');
