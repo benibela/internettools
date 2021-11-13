@@ -1190,21 +1190,77 @@ end;
 
 var dependencyCacheTrue, dependencyCacheFalse: TStringList;
 
-    constructor TDependency.create(e: TTreeNode);
+function parseSpecString(spec: string): boolean;
+  procedure fail;
+  begin
+    raise Exception.Create('invalid spec: '+spec);
+  end;
+
+var
+  versions: sysutils.TStringArray;
+  s: String;
+  expectedVersion: Integer;
+  lang: Char;
+  orHigher: Boolean;
+  accepted: TXQParsingModels;
+begin
+  versions := spec.Split(' ');
+  for s in versions do begin
+    if not (length(s) in [4,5]) or (s[1] <> 'X') or not (s[2] in ['T','P','Q']) or not (s[3] in ['0'..'9']) or not (s[4] in ['0'..'9']) then fail;
+    expectedVersion := (ord(s[3]) - ord('0')) * 10 + (ord(s[4]) - ord('0'));
+    lang := s[2];
+    orHigher := length(s) = 5;
+    if orHigher and (s[5] <> '+') then fail;
+    //[xqpmXPath2, xqpmXQuery1, xqpmXPath3_0, xqpmXQuery3_0, xqpmXPath3_1, xqpmXQuery3_1, xqpmXPath4_0, xqpmXQuery4_0]
+    case expectedVersion of
+      10: begin
+        if lang <> 'Q' then fail;
+        if orHigher then accepted := PARSING_MODEL_XPATHXQUERY - [xqpmXPath2]
+        else accepted := [xqpmXQuery1];
+      end;
+      20: begin
+        if lang <> 'P' then fail;
+        if orHigher then accepted := PARSING_MODEL_XPATHXQUERY - [xqpmXQuery1]
+        else accepted := [xqpmXPath2];
+      end;
+      30: begin
+        if orHigher then accepted := PARSING_MODEL3
+        else accepted := [xqpmXPath3_0, xqpmXQuery3_0]
+      end;
+      31: begin
+        if orHigher then accepted := PARSING_MODEL3_1
+        else accepted := [xqpmXPath3_1, xqpmXQuery3_1]
+      end;
+      40: begin
+        if orHigher then accepted := PARSING_MODEL4
+        else accepted := [xqpmXPath4_0, xqpmXQuery4_0]
+      end;
+    end;
+    if lang = 'Q' then accepted := accepted * PARSING_MODEL_XQUERY
+    else if lang = 'P' then accepted := accepted * (PARSING_MODEL_XPATHXQUERY - PARSING_MODEL_XQUERY);
+    if config.version in accepted then exit(true);
+  end;
+  result := false
+end;
+
+constructor TDependency.create(e: TTreeNode);
 var
   typ: String;
-  value: String;
+  value, code: String;
   satisfied: Boolean;
 begin
   typ := e['type'];
   value := e['value'];
   satisfied := bbutils.StrToBoolDef(e['satisfied'], true);
 
-  if typ = 'spec' then value := strJoin(stableSort(strSplit(value, ' ')), ' ');
+  code := typ+#0+value;
 
-  if dependencyCacheTrue.IndexOf(typ+#0+value) >= 0 then isSatisfied := satisfied
-  else if dependencyCacheFalse.IndexOf(typ+#0+value) >= 0 then isSatisfied := not satisfied
-  else begin
+  if dependencyCacheTrue.IndexOf(code) >= 0 then isSatisfied := satisfied
+  else if dependencyCacheFalse.IndexOf(code) >= 0 then isSatisfied := not satisfied
+  else if typ = 'spec' then begin
+    isSatisfied := parseSpecString(value);
+    if isSatisfied then dependencyCacheTrue.Add(code) else dependencyCacheFalse.Add(code);
+  end else begin
     writeln(stderr, 'Unknown dependency: ' + typ+' = '+value);
     isSatisfied := not satisfied
     //raise exception.Create('invalid dependency: '+typ+' = '+value);
@@ -1230,58 +1286,12 @@ end;
 
 
 class procedure TDependency.init;
-
+const XPATH_MAX = xqpmXPath4_0;
 begin
   dependencyCacheTrue := TStringList.Create;
   dependencyCacheTrue.Sorted:=true;
   dependencyCacheFalse := TStringList.Create;
   dependencyCacheFalse.Sorted:=true;
-
-  put('spec', 'XP20', config.version in [xqpmXPath2]);
-  put('spec', 'XP20+', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1]);
-  put('spec', 'XP30', config.version in [xqpmXPath3_0]);
-  put('spec', 'XP30+', config.version in [xqpmXPath3_0, xqpmXPath3_1]);
-
-  put('spec', 'XQ10', config.version in [xqpmXQuery1]);
-  put('spec', 'XQ10+', config.version in [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
-  put('spec', 'XQ30', config.version in [xqpmXQuery3_0]);
-  put('spec', 'XQ30+', config.version in [xqpmXQuery3_0, xqpmXQuery3_1]);
-  put('spec', 'XQ10 XQ30', config.version in [xqpmXQuery1, xqpmXQuery3_0]);
-
-  put('spec', 'XP20 XQ10', config.version in [xqpmXPath2, xqpmXQuery1]);
-  put('spec', 'XP20+ XQ10+', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
-  put('spec', 'XP20+ XQ30+', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery3_0, xqpmXQuery3_1]);
-
-  put('spec', 'XP30 XQ30', config.version in [xqpmXPath3_0, xqpmXQuery3_0]);
-  put('spec', 'XP30+ XQ10+', config.version in [xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
-  put('spec', 'XP30+ XQ30+', config.version in [xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery3_1, xqpmXQuery3_0]);
-
-  put('spec', 'XP20 XP30 XQ10 XQ30', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXQuery1, xqpmXQuery3_0]);
-
-  put('spec', 'XQ10 XQ30 XQ31', config.version in [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
-  put('spec', 'XQ30 XQ31', config.version in [xqpmXQuery3_0, xqpmXQuery3_1]);
-  put('spec', 'XP20 XP30 XP31 XQ10 XQ30 XQ31', config.version in [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1]);
-
-  put('spec', 'XP40+ XQ40+', config.version in [xqpmXPath4_0, xqpmXQuery4_0]);
-  put('spec', 'XP40 XQ40', config.version in [xqpmXPath4_0, xqpmXQuery4_0]);
-  put('spec', 'XQ40+', config.version in [xqpmXQuery4_0]);
-  put('spec', 'XQ40', config.version in [xqpmXQuery4_0]);
-  put('spec', 'XP40+', config.version in [xqpmXPath4_0]);
-
-  put('spec', 'XP31', config.version in [xqpmXPath3_1]);
-  put('spec', 'XP31+', config.version in [xqpmXPath3_1]);
-  put('spec', 'XQ31', config.version in [xqpmXQuery3_1]);
-  put('spec', 'XQ31+', config.version in [xqpmXQuery3_1]);
-  put('spec', 'XQ31+ XP31+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-  put('spec', 'XP31+ XQ31+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-  put('spec', 'XQ31 XP31', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-  put('spec', 'XP31 XQ31', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-  put('spec', 'XP31+ XQ31', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-
-  put('spec', 'XT30+ XP31+ XQ31+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-  put('spec', 'XP31+ XQ31+ XT30+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
-
-  put('spec', 'XT30+', config.version in [xqpmXPath3_1, xqpmXQuery3_1]);
 
   put('feature', 'collection-stability', true);
   put('feature', 'non_unicode_codepoint_collation', true);
