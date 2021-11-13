@@ -1176,7 +1176,7 @@ var
 begin
   for i := 0 to modules.Count-1 do
     if (TModule(modules[i]).uri = namespace) and (FileExists(TModule(modules[i]).fn)) then
-      xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), config.version);
+      xq.parseQuery(strLoadFromFile(TModule(modules[i]).fn), context.model);
 end;
 
 function TTestCase.resultToString(const resultValue: TTestCaseResultValue): string;

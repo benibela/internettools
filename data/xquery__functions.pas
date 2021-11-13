@@ -7795,6 +7795,7 @@ var
   tempValue, f: TXQValue;
   pp: TXQStandardProperty;
   q: ^IXQuery;
+  oldParsingModel: TXQParsingModel;
 begin
   uri := args[0].toString;
   if uri.IsEmpty then raise  EXQEvaluationException.create('FOQM0001', 'Empty module uri');
@@ -7821,76 +7822,88 @@ begin
     end;
   end;
 
-  try
-    module := context.staticContext.sender.findModule(context.staticContext, uri, at);
-  except
-    on e: EXQException do
-      raise EXQEvaluationException.create('FOQM0003', 'Failed to load module: ' + uri + LineEnding + e.Message);
-  end;
-  if module = nil then
-    raise EXQEvaluationException.create('FOQM0002', 'Failed to load module: ' + uri);
-
-
-  helper.context := context.staticContext.sender.getEvaluationContext();
-  helper.oldDeclareExternalVariable := context.staticContext.sender.OnDeclareExternalVariable;
-  if argc >= 2 then begin
-    temp := args[1].getProperty('context-item');
-    case temp.getSequenceCount of
-      1: begin
-        helper.context.SeqValue := temp;
-        helper.context.SeqLength := 1;
-        helper.context.SeqIndex := 1;
-      end;
+  oldParsingModel := context.staticContext.model;
+  if context.staticContext.model in (PARSING_MODEL_XPATHXQUERY - PARSING_MODEL_XQUERY) then
+    case context.staticContext.model of
+      xqpmXPath2: context.staticContext.model := xqpmXQuery1;
+      xqpmXPath3_0: context.staticContext.model := xqpmXQuery3_0;
+      xqpmXPath3_1: context.staticContext.model := xqpmXQuery3_1;
+      xqpmXPath4_0: context.staticContext.model := xqpmXQuery4_0;
     end;
-    for q in module.queries do begin
-      with q.getStaticContext do
-        for i := 0 to high(moduleContextItemDeclarations) do
-          if (moduleContextItemDeclarations[i].getSequenceType <> nil) and not moduleContextItemDeclarations[i].getSequenceType.instanceOf(helper.context.SeqValue, context) then
-            moduleContextItemDeclarations[i].getSequenceType.raiseEvaluationError('FOQM0005', 'Context time with value ' +helper.context.SeqValue.toXQuery() + ' has not the correct type '+moduleContextItemDeclarations[i].getSequenceType.serialize);
-    end;
-    helper.externalVariables := args[1].getProperty('variables');
-    context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
-  end;
-  helper.context.sharedEvaluationContext := TXQSharedEvaluationContext.create();
   try
-    functionsMap := TXQValueStandardMap.create();
-    variablesMap := TXQValueStandardMap.create();
-    resMap := TXQValueStringMap.create();
-    resMap.setMutable('functions', functionsMap);
-    resMap.setMutable('variables', variablesMap);
-    result := resMap;
-
-    for q in module.queries do begin
-      helper.context.staticContext := q.getstaticContext;
-      q.evaluate(helper.context);
+    try
+      module := context.staticContext.sender.findModule(context.staticContext, uri, at);
+    except
+      on e: EXQException do
+        raise EXQEvaluationException.create('FOQM0003', 'Failed to load module: ' + uri + LineEnding + e.Message);
+    end;
+    if module = nil then
+      raise EXQEvaluationException.create('FOQM0002', 'Failed to load module: ' + uri);
 
 
-      with helper.context.sharedEvaluationContext do
-        for i := 0 to variables.count - 1 do begin
-          if variables.getNamespace(i) <> uri then continue;
-          variablesMap.setMutable(TXQValueQName.create(variables.getNamespace(i), variables.getName(i)),
-                                variables.get(i)
-                                );
+    helper.context := context.staticContext.sender.getEvaluationContext();
+    helper.oldDeclareExternalVariable := context.staticContext.sender.OnDeclareExternalVariable;
+    if argc >= 2 then begin
+      temp := args[1].getProperty('context-item');
+      case temp.getSequenceCount of
+        1: begin
+          helper.context.SeqValue := temp;
+          helper.context.SeqLength := 1;
+          helper.context.SeqIndex := 1;
         end;
-
-      sc := q.getStaticContext;
-      for i := 0 to high(sc.functions) do begin
-        temp := TXQValueQName.create(sc.functions[i].namespaceURL, sc.functions[i].name);
-        if functionsMap.hasProperty(temp, @tempValue) then begin
-          functionMap := tempValue as TXQValueStandardMap;
-        end else
-          functionMap := TXQValueStandardMap.create();
-
-        f := sc.functions[i].directClone;
-        (f as TXQValueFunction).context.sharedEvaluationContext := helper.context.sharedEvaluationContext;
-        helper.context.sharedEvaluationContext._AddRefIfNonNil;
-        functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), f);
-        functionsMap.setMutable(temp, functionMap);
       end;
+      for q in module.queries do begin
+        with q.getStaticContext do
+          for i := 0 to high(moduleContextItemDeclarations) do
+            if (moduleContextItemDeclarations[i].getSequenceType <> nil) and not moduleContextItemDeclarations[i].getSequenceType.instanceOf(helper.context.SeqValue, context) then
+              moduleContextItemDeclarations[i].getSequenceType.raiseEvaluationError('FOQM0005', 'Context time with value ' +helper.context.SeqValue.toXQuery() + ' has not the correct type '+moduleContextItemDeclarations[i].getSequenceType.serialize);
+      end;
+      helper.externalVariables := args[1].getProperty('variables');
+      context.staticContext.sender.OnDeclareExternalVariable := @helper.OnDeclareExternalVariable;
     end;
+    helper.context.sharedEvaluationContext := TXQSharedEvaluationContext.create();
+    try
+      functionsMap := TXQValueStandardMap.create();
+      variablesMap := TXQValueStandardMap.create();
+      resMap := TXQValueStringMap.create();
+      resMap.setMutable('functions', functionsMap);
+      resMap.setMutable('variables', variablesMap);
+      result := resMap;
 
+      for q in module.queries do begin
+        helper.context.staticContext := q.getstaticContext;
+        q.evaluate(helper.context);
+
+
+        with helper.context.sharedEvaluationContext do
+          for i := 0 to variables.count - 1 do begin
+            if variables.getNamespace(i) <> uri then continue;
+            variablesMap.setMutable(TXQValueQName.create(variables.getNamespace(i), variables.getName(i)),
+                                  variables.get(i)
+                                  );
+          end;
+
+        sc := q.getStaticContext;
+        for i := 0 to high(sc.functions) do begin
+          temp := TXQValueQName.create(sc.functions[i].namespaceURL, sc.functions[i].name);
+          if functionsMap.hasProperty(temp, @tempValue) then begin
+            functionMap := tempValue as TXQValueStandardMap;
+          end else
+            functionMap := TXQValueStandardMap.create();
+
+          f := sc.functions[i].directClone;
+          (f as TXQValueFunction).context.sharedEvaluationContext := helper.context.sharedEvaluationContext;
+          helper.context.sharedEvaluationContext._AddRefIfNonNil;
+          functionMap.setMutable(xqvalue(length(sc.functions[i].parameters)), f);
+          functionsMap.setMutable(temp, functionMap);
+        end;
+      end;
+
+    finally
+      context.staticContext.sender.OnDeclareExternalVariable := helper.oldDeclareExternalVariable;
+    end;
   finally
-    context.staticContext.sender.OnDeclareExternalVariable := helper.oldDeclareExternalVariable;
+    context.staticContext.model := oldParsingModel;
   end;
 end;
 
