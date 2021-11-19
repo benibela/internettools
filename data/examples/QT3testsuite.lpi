@@ -88,15 +88,15 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe  --test-set  varde --test-case extvardeclwithtype-23"/>
-        <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
+        <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe --test-case analyzeString-028"/>
+        <WorkingDirectory Value="\home\benito\opt\qt3tests"/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe  --test-set  varde --test-case extvardeclwithtype-23"/>
-            <WorkingDirectory Value="\home\benito\2011\QT3-test-suite"/>
+            <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe --test-case analyzeString-028"/>
+            <WorkingDirectory Value="\home\benito\opt\qt3tests"/>
           </local>
         </Mode0>
       </Modes>
