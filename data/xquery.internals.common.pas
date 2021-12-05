@@ -888,7 +888,7 @@ begin
   move(str^, ss[1], length);
   val(ss, d, code);
   result := code  = 0;
-  ClearExceptions();
+  ClearExceptions(false);
   {$endif}
 end;
 
