@@ -5873,6 +5873,7 @@ function TXQVariableChangeLog.condensed: TXQVariableChangeLog;
 var
   temp: IXQValue;
   i, last: SizeInt;
+  wasPropertyChange: Boolean;
 begin
   result := TXQVariableChangeLog.create();
   result.shared:=true;
@@ -5881,11 +5882,12 @@ begin
     if varstorage[i].propertyChange then begin
       last := result.indexOf(varstorage[i].name, varstorage[i].namespaceURL);
       if last >= 0 then begin
+        wasPropertyChange := result.varstorage[last].propertyChange;
         deleteVar(result, last);
 
         result.varstorage[result.varCount] := varstorage[i];
         //result.varstorage[result.varCount].name := varstorage[i].name; ???
-        result.varstorage[result.varCount].propertyChange:=false;
+        result.varstorage[result.varCount].propertyChange:=wasPropertyChange;
         result.varCount += 1;
         continue;
       end;
