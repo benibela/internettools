@@ -599,6 +599,16 @@ var known: TNamespaceList;
   end;
 
   function elementAndChildrenMightBeIndented(n: TTreeNode; insideHTMLElement: boolean): boolean;
+    function isBlankButNot13(const s: string): boolean;
+    var
+      temp: Pchar;
+      len: SizeInt;
+    begin
+      temp := pchar(s);
+      len := s.Length;
+      strlTrimLeft(temp, len, [#9,#10,' ']);
+      result := len = 0;
+    end;
   var
     sub: TTreeNode;
   begin
@@ -607,7 +617,7 @@ var known: TNamespaceList;
     sub := n.getFirstChild();
     while (sub <> nil) and result do begin
       case sub.typ of
-        tetText: result := sub.value.IsBlank();
+        tetText: result := isBlankButNot13(sub.value);
         tetOpen: result := not (insideHTMLElement and elementIsPhrasing(sub));
         tetProcessingInstruction: result := not insideHTMLElement;
         else;
