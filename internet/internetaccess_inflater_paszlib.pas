@@ -26,8 +26,9 @@ TTransferContentInflaterZlib = class(TTransferContentInflater)
 end;
 
 implementation
-
+uses math;
 const buffer_block_size=16384;
+var DEBUG_DECOMPRESSION: boolean = false;
 
 type THeader = (hExpectedHeader, hText, hInvalidHeader, hBufferTooSmall);
 function getHeaderLength(expectGZip: boolean; p: PByte; length: cardinal; out headerLength: cardinal): THeader;
@@ -83,7 +84,24 @@ procedure TTransferContentInflaterZlib.writeCompressedBlock(const abuffer; Count
 var err:smallint;
   headerLength: cardinal;
   header: THeader;
+  procedure raiseError;
+  var
+    s: String;
+  begin
+    s := zerror(err);
+    if stream.msg <> '' then s := s + ': ' + stream.msg;
+    s := s + LineEnding + 'Bytes in: ' + inttostr(stream.total_in) + ' Bytes out: ' + IntToStr(stream.total_out);
+    s := s + 'Last received: ' + strFromPchar(@buffer, max(count, 128)).EncodeHex;
+    raise Edecompressionerror.create(s);
+  end;
+
+  procedure debug;
+  begin
+    writeln(strFromPchar(@buffer, count).EncodeHex);
+  end;
+
 begin
+  if DEBUG_DECOMPRESSION then debug;
   stream.next_in:=@abuffer;
   stream.avail_in:=count;
   if not headerRead then begin
@@ -119,7 +137,7 @@ begin
 
     err:=inflate(stream, Z_NO_FLUSH);
     if (err<>Z_OK) and (err <> Z_STREAM_END) then
-      raise Edecompressionerror.create(zerror(err));
+      raiseError;
 
     writeUncompressedBlock(self.buffer^, stream.next_out - self.buffer);
 
@@ -182,6 +200,9 @@ begin
    inflateInit2(zlibencoder.stream, -MAX_WBITS);
    transfer.writeBlockCallback := @zlibencoder.writeCompressedBlock;
    transfer.inflater := zlibencoder;
+
+   DEBUG_DECOMPRESSION := GetEnvironmentVariable('XIDEL_DEBUG_DECOMPRESSION') = 'true';
+   if DEBUG_DECOMPRESSION then writeln(encodingIsGZIP, ' ', encoding);
 end;
 
 initialization
