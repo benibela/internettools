@@ -309,6 +309,9 @@ TXHTMLStrBuilder = object(TStrBuilder)
 protected
   procedure appendProcessingInstruction(const name, content: string);
 public
+  lineEnding: (xleLF, xleCRLF);
+  procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
+  procedure appendLineEnding;
   procedure appendHexEntity(codepoint: integer);
 
   procedure appendHTMLText(inbuffer: pchar; len: SizeInt);
@@ -1361,6 +1364,20 @@ begin
  end;
 end;
 
+procedure TXHTMLStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
+begin
+  inherited init(abuffer, basecapacity, aencoding);
+  lineEnding := xleLF;
+end;
+
+procedure TXHTMLStrBuilder.appendLineEnding;
+begin
+  case lineEnding of
+    xleLF: append(#10);
+    xleCRLF: append(#13#10);
+  end;
+end;
+
 procedure TXHTMLStrBuilder.appendHexEntity(codepoint: integer);
 begin
   append('&#x');
@@ -1382,6 +1399,7 @@ begin
       '&': append('&amp;');
       '<': append('&lt;');
       '>': append('&gt;');
+      #10: appendLineEnding;
       else append(inbuffer^);
     end;
     inc(inbuffer);
@@ -1501,6 +1519,7 @@ begin
       '''': append('&apos;');
       '"': append('&quot;');
       #13: append('&#xD;');
+      #10: appendLineEnding();
       #0..#8,#11,#12,#14..#$1F,#$7F: appendhexentity(ord(s[i]));
       #$C2: if (i = length(s)) or not (s[i+1] in [#$80..#$9F]) then append(#$C2) else begin
         i+=1;

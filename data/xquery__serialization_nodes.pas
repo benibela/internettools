@@ -440,7 +440,7 @@ var known: TNamespaceList;
   begin
     if indentationAllowed then begin
       builder.indent;
-      builder.append(LineEnding);
+      builder.appendLineEnding();
       builder.appendIndent;
     end;
     builder.append('<meta http-equiv="Content-Type"');
@@ -639,7 +639,7 @@ var known: TNamespaceList;
     while sub <> nil do begin
       if (not indentationAllowed) or (sub.typ <> tetText) then begin
         if indentationAllowed then begin
-          if not first then builder.append(LineEnding);
+          if not first then builder.appendLineEnding;
           first := false;
           builder.appendIndent;
         end;
@@ -647,7 +647,7 @@ var known: TNamespaceList;
       end;
       sub := sub.getNextSibling();
     end;
-    //if indentationAllowed then builder.append(LineEnding); without this there is no line break between multiple documents in a sequence, however with it there is a pointless break after the sequence
+    //if indentationAllowed then builder.appendLineEnding(); without this there is no line break between multiple documents in a sequence, however with it there is a pointless break after the sequence
     indentationAllowed := oldIndentationAllowed;
   end;
 
@@ -667,7 +667,7 @@ var known: TNamespaceList;
     sub := n.getFirstChild();
     while sub <> nil do begin
       if indentationAllowed and (sub.typ <> tetText) then begin
-        builder.append(LineEnding);
+        builder.appendLineEnding();
         builder.appendIndent;
       end;
       if (not indentationAllowed) or (sub.typ <> tetText) then
@@ -677,7 +677,7 @@ var known: TNamespaceList;
 
     if indentationAllowed then begin
       builder.unindent;
-      builder.append(LineEnding);
+      builder.appendLineEnding;
       builder.appendIndent;
     end;
     indentationAllowed := oldIndentationAllowed;
