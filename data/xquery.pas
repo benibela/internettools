@@ -3586,7 +3586,7 @@ begin
   inherited appendJSONArrayStart;
   if insertWhitespace = xqsiwIndent then begin
     indent;
-    append(LineEnding);
+    appendLineEnding();
     appendIndent;
   end;
 end;
@@ -3597,7 +3597,7 @@ begin
     xqsiwConservative: append(', ');
     xqsiwIndent: begin
       append(',');
-      append(LineEnding);
+      appendLineEnding();
       appendIndent;
     end;
     xqsiwNever: append(',');
@@ -3608,7 +3608,7 @@ procedure TXQSerializer.appendJSONArrayEnd;
 begin
   if insertWhitespace = xqsiwIndent then begin
     unindent;
-    append(LineEnding);
+    appendLineEnding();
     appendIndent;
   end;
   inherited appendJSONArrayEnd;
@@ -3619,7 +3619,7 @@ begin
   inherited appendJSONObjectStart;
   if insertWhitespace = xqsiwIndent then begin
     indent;
-    append(LineEnding);
+    appendLineEnding();
     appendIndent;
   end;
 end;
@@ -3640,7 +3640,7 @@ procedure TXQSerializer.appendJSONObjectEnd;
 begin
   if insertWhitespace = xqsiwIndent then begin
     unindent;
-    append(LineEnding);
+    appendLineEnding();
     appendIndent;
   end;
   inherited appendJSONObjectEnd;
