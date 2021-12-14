@@ -320,7 +320,8 @@ begin
       end;
       'parameter-document': if not staticOptions then
         raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
-      else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
+      else if staticOptions then raiseXQEvaluationException('XQST0109', 'Unknown serialization option.')
+      else if pp.key.toString.beginsWith('x:') then setExtensionProperty(pp.key.toString.substring(2), pp.value.toString);
     end;
   end;
 end;

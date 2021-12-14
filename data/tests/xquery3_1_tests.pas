@@ -44,6 +44,7 @@ begin
   t('serialize(<a>   <b xml:space="preserve">  <c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', ('<a>'#10'  <b xml:space="preserve">  <c>xx</c><c>yy</c></b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
 
   t('serialize(map{"10": 123, 2: 456}, map {"method": "json", QName("x:key-order"): "ascending" })', '{"2":456,"10":123}');
+  t('serialize(map{"10": 123, 2: 456}, map {"method": "json", "x:key-order": "ascending" })', '{"2":456,"10":123}');
 
 
   t('$stringmap := parse-json("{""1"":13}")', '');
