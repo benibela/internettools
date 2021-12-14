@@ -44,4 +44,4 @@
 {$modeswitch autoderef}
 {$goto on}
 {$COperators on}
-
+{$ifdef FPC_HAS_CPSTRING}{$define HAS_CPSTRING}{$endif}

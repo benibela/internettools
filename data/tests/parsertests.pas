@@ -76,7 +76,6 @@ var
     end;
     parents.free;
     oxml := tp.getLastTree.outerXML();
-    //todo: it is parsed as CP_ACP, but outerXML always returns CP_UTF8 ??
     //writeln(StringCodePage(o));
     //writeln(StringCodePage(oxml));
     //SetCodePage(oxml, CP_ACP, false);
