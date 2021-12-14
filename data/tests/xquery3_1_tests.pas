@@ -35,13 +35,13 @@ begin
   t('serialize(<a>]]>]]>xy]]>zä]]>]]></a>, map {"method": "xml", "cdata-section-elements": QName("", "a") })', '<a><![CDATA[]]]]><![CDATA[>]]]]><![CDATA[>xy]]]]><![CDATA[>zä]]]]><![CDATA[>]]]]><![CDATA[>]]></a>');
   t('serialize(<a>]]>]]>xy]]>zä]]>]]></a>, map {"method": "xml", "encoding": "us-ascii", "cdata-section-elements": QName("", "a") })', '<a><![CDATA[]]]]><![CDATA[>]]]]><![CDATA[>xy]]]]><![CDATA[>z]]>&#xE4;<![CDATA[]]]]><![CDATA[>]]]]><![CDATA[>]]></a>');
 
-  t('serialize(<a><b><c>xx</c><c>yy</c></b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'</a>'));
-  t('serialize(<a><b><c>xx</c><c>yy</c></b></a>, map {"indent": true(), "suppress-indentation": QName("", "b")})', str10ToLE('<a>'#10'  <b><c>xx</c><c>yy</c></b>'#10'</a>'));
-  t('serialize(<a>         <b>      <c>xx</c><c>  yy</c></b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>  yy</c>'#10'  </b>'#10'</a>'));
-  t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'</a>'));
-  t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b><b/></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'  <b/>'#10'</a>'));
-  t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
-  t('serialize(<a>   <b xml:space="preserve">  <c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', str10ToLE('<a>'#10'  <b xml:space="preserve">  <c>xx</c><c>yy</c></b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
+  t('serialize(<a><b><c>xx</c><c>yy</c></b></a>, map {"indent": true()})', ('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'</a>'));
+  t('serialize(<a><b><c>xx</c><c>yy</c></b></a>, map {"indent": true(), "suppress-indentation": QName("", "b")})', ('<a>'#10'  <b><c>xx</c><c>yy</c></b>'#10'</a>'));
+  t('serialize(<a>         <b>      <c>xx</c><c>  yy</c></b></a>, map {"indent": true()})', ('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>  yy</c>'#10'  </b>'#10'</a>'));
+  t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b></a>, map {"indent": true()})', ('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'</a>'));
+  t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b><b/></a>, map {"indent": true()})', ('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'  <b/>'#10'</a>'));
+  t('serialize(<a>   <b><c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', ('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
+  t('serialize(<a>   <b xml:space="preserve">  <c>xx</c><c>yy</c></b><b>1</b><b>  </b></a>, map {"indent": true()})', ('<a>'#10'  <b xml:space="preserve">  <c>xx</c><c>yy</c></b>'#10'  <b>1</b>'#10'  <b>'#10'  </b>'#10'</a>'));
 
   t('serialize(map{"10": 123, 2: 456}, map {"method": "json", QName("x:key-order"): "ascending" })', '{"2":456,"10":123}');
 
