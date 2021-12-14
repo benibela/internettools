@@ -488,7 +488,7 @@ var known: TNamespaceList;
       tetText: begin
         if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n, parentIsHTMLElement) then begin
           //empty
-        end else if not parentIsHTMLElement then append(xmlStrEscape(value)) //using appendXMLText fails (lacking automatic encoding conversion?)
+        end else if not parentIsHTMLElement then appendXMLText(value)
         else if inCDATAElement then append(value)
         else appendHTMLText(value);
       end;
