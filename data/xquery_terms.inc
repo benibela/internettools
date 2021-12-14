@@ -495,7 +495,7 @@ var varname: string;
     varnamespace: string;
     properties: TStringArray; //properties or array elements
     v: TXQTerm;
-    assignmentMode: (amOverride, amArrayOverride, amArrayInsert, amArrayAppend);
+    assignmentMode: (amOverride, amArrayOverride, amArrayInsert, amArrayAppend); //this says array but it means sequence
     arrayIndex: SizeInt;
     value: IXQValue;
 

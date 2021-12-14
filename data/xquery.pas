@@ -5893,9 +5893,9 @@ begin
       end;
 
       if not parentLog.hasVariable(varstorage[i].name, temp, varstorage[i].namespaceURL) then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but no variable of that name exists');
-      if temp.kind <> pvkObject then
-        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.toXQuery()+' is not an object ');
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object/array '+varstorage[i].name+', but no variable of that name exists');
+      if not (temp.kind in [pvkObject, pvkArray]) then
+        raise EXQEvaluationException.Create('pxp:OBJECT', 'Assignment to property of object/array '+varstorage[i].name+', but '+varstorage[i].name+'='+temp.toXQuery()+' is not an object/array ');
     end;
     result.varstorage[result.varCount] := varstorage[i];
     result.varCount += 1;
