@@ -76,6 +76,10 @@ function xqvalueArrowOperator(const cxt: TXQEvaluationContext; const ta, tb: IXQ
 begin
   result := raisePlaceHolderError(cxt, ta, tb, 'op: =>');
 end;
+function xqvalueOtherwiseOperator(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+begin
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: otherwise');
+end;
 
 
 
@@ -8925,6 +8929,7 @@ transform
   op.registerBinaryOp('|',@xqvalueUnion,115, [xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
   op.registerBinaryOp('union',@xqvalueUnion,115, [xqofAssociativeSyntax],[nodeStar, nodeStar, nodeStar], []);
 
+  op.registerBinaryOp('otherwise',@xqvalueOtherwiseOperator,110, [xqofAssociativeSyntax],[]).acceptedModels := PARSING_MODEL4;
 
   op.registerBinaryOp('idiv',@xqvalueDivideInt,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble],[numericOrEmpty, numericOrEmpty, integer], []);
   lastfn := op.registerBinaryOp('div',@xqvalueDivide,100,[xqofAssociativeSyntax,xqofCastUntypedToDouble]);

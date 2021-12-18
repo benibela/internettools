@@ -38,6 +38,13 @@ begin
 
   t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ->($k,$v){string-length($k) > 1})=>map:keys()', 'foo bar');
 
+  t('1 otherwise 2', '1');
+  t('() otherwise 2', '2');
+  t('4 otherwise () otherwise 6', '4');
+  t('() otherwise () otherwise 6', '6');
+  t('6 div () otherwise 2', '3');
+  t('-() otherwise 2', '2');
+
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
 end;

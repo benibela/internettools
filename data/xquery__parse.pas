@@ -4847,6 +4847,26 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       b.free;
     end;
 
+    function handleOtherwise: TXQTermFlower;
+    var
+      flower: TXQTermFlower;
+      let: TXQTermFlowerLet;
+      ifthen: TXQTermIf;
+    begin
+      flower := TXQTermFlower.Create;
+      let := TXQTermFlowerLet.Create;
+      let.loopvar := TXQTermVariable.create('#otherwise');
+      let.expr := b.children[0];
+      flower.push(let);
+      ifthen := TXQTermIf.create;
+      ifthen.push(TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'exists', let.loopvar.clone, staticContext));
+      ifthen.push(let.loopvar.clone);
+      ifthen.push(b.children[1]);
+      flower.push(ifthen);
+      b.children := nil;
+      b.free;
+      result := flower;
+    end;
 
   var
     st: TXQTermSequenceType;
@@ -4885,6 +4905,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         b.free;
       end;
       '=>': result := handleArrowOperator;
+      'otherwise': result := handleOtherwise;
     end;
   end;
 
