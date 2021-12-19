@@ -45,6 +45,10 @@ begin
   t('6 div () otherwise 2', '3');
   t('-() otherwise 2', '2');
 
+  t('all((true(), true()), identity#1)', 'true');
+  t('all((true(), false()), identity#1)', 'false');
+  t('some((true(), false()), identity#1)', 'true');
+
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
 end;

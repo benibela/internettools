@@ -8853,6 +8853,8 @@ transform
   fn4.registerFunction('characters', @xqFunctionCharacters).setVersionsShared([stringOrEmpty, stringStar]);
   fn4.registerInterpretedFunction('identity', [itemStar, itemStar], '($input as item()*) as item()*', '$input', []);
   fn4.registerInterpretedFunction('replicate', [itemStar, integer{something wrong with: nonNegativeInteger ?!}, itemStar], '($input as item()*, $count as xs:integer) as item()*', '(1 to $count) ! $input', []);
+  fn4.registerInterpretedFunction('all', [itemStar, functionItemBoolean, boolean], '($input as item()*, $predicate as function(*)) as boolean', 'every $i in $input satisfies $predicate($i)', []);
+  fn4.registerInterpretedFunction('some', [itemStar, functionItemBoolean, boolean], '($input as item()*, $predicate as function(*)) as boolean', 'some $i in $input satisfies $predicate($i)', []);
 
 
 
