@@ -1922,6 +1922,7 @@ type
   TXQTermWithChildren = class(TXQTerm)
     children: TXQTermArray;
     constructor Create;
+    constructor Create(child: TXQTerm);
     constructor Create(child1, child2: TXQTerm);
     constructor Create(somechildren: TXQTermArray);
     function getContextDependencies: TXQContextDependencies; override;

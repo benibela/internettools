@@ -3215,25 +3215,23 @@ var astroot: TXQTerm;
     if result = nil then raiseSyntaxErrorFatal('Unexpected query end');
   end;
 
+  function createBinOpTerm(opinfo: TXQOperatorInfo; replace: PXQTerm): TXQTermBinaryOp;
+  begin
+    result := TXQTermBinaryOp.Create(opinfo);
+    registerTermLocation(result);
+    result.push(replace^);
+    replace^ := result;
+  end;
 
   procedure pushBinaryOp(const opinfo: TXQOperatorInfo);
   var replace: PXQTerm;
-
-    function createBinOpTerm: TXQTermBinaryOp;
-    begin
-      result := TXQTermBinaryOp.Create(opinfo);
-      registerTermLocation(result);
-      result.push(replace^);
-      replace^ := result;
-    end;
-
   var res: TXQTermBinaryOp;
     procedure handleCastStrangeness;
     var
       st: TXQTermSequenceType;
       isCast: Boolean;
     begin
-      res := createBinOpTerm;
+      res := createBinOpTerm(opinfo, replace);
       expect(res.op.followedBy); //assume we read instance of/cast/castable/treat as
       isCast := ((res.op.func = @xqvalueCastAs) or (res.op.func = @xqvalueCastableAs));
       if isCast then st := parseSequenceType([xqstIsCast])
@@ -3255,7 +3253,7 @@ var astroot: TXQTerm;
       if opinfo.followedBy <> '' then handleCastStrangeness
       else raiseSyntaxError('20180922 Unknown operator');
     end else begin
-      res := createBinOpTerm;
+      res := createBinOpTerm(opinfo, replace);
       res.push(parseValue());
     end;
   end;
@@ -3304,6 +3302,27 @@ var astroot: TXQTerm;
         then
           msg += LineEnding + 'Hint: The order of declare statements is not arbitrary. E.g. "declare namespace" must come before "declare variable".';
     raiseSyntaxError(msg);
+  end;
+
+  procedure thinArrowOperator;
+  var
+    marker: PChar;
+    isFunctionDeclaration: Boolean;
+    op: TXQOperatorInfo;
+    tarrow: TXQTermBinaryOp;
+  begin
+    op := TXQueryEngine.findOperator('->');
+    replace := ripBinOpApart(@astroot, op.priority);
+    marker := pos;
+    expect('->');
+    require4();
+    skipWhitespaceAndComment();
+    isFunctionDeclaration := pos^ = '{';
+    tarrow := createBinOpTerm(op, replace);
+    if isFunctionDeclaration then begin
+      pos := marker;
+      tarrow.push(parseInlineFunctionDeclaration(nil));
+    end else tarrow.push(parseValue);
   end;
 
 var
@@ -3358,7 +3377,8 @@ begin
             replace := ripBinOpApart(@astroot, 10000);
             replace^ := parseJSONLookup(replace^);
           end else exit(astroot);
-        end
+        end;
+        '->': thinArrowOperator;
         else begin
           op := TXQueryEngine.findOperator(pos);
           if op <> nil then pushBinaryOp(op)
@@ -4830,7 +4850,18 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         case tdf.kind of
           xqtdfStaticPartialApplication: insertAt := 0;
           xqtdfDynamicPartialApplication: insertAt := 1;
-          else begin insertAt := 0; raiseSyntaxError('=>', b); end;
+          else begin
+            insertAt := 0;
+            if (not thin) or (tdf.kind <> xqtdfUserDefined) or (tdf.parameterCount <> 1) or ((tdf.children[0] as TXQTermDefineVariable).getVariable.value <> '->') then
+              raiseSyntaxError('need function after =>/-> operator', b);
+            result := tdf.children[1] as TXQTermSimpleMap;
+            (tdf.children[1] as TXQTermSimpleMap).children[0].free;
+            (tdf.children[1] as TXQTermSimpleMap).children[0] := b.children[0];
+            SetLength(tdf.children, 1);
+            b.children[0] := nil;
+            b.free;
+            exit;
+          end;
         end;
         tcall := tdf.children[0] as TXQTermWithChildren;
       end else begin

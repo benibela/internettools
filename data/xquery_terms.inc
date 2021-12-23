@@ -101,6 +101,11 @@ constructor TXQTermWithChildren.Create;
 begin
 end;
 
+constructor TXQTermWithChildren.Create(child: TXQTerm);
+begin
+  push(child);
+end;
+
 constructor TXQTermWithChildren.Create(child1, child2: TXQTerm);
 begin
   push(child1);
