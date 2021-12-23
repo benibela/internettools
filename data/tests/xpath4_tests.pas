@@ -58,6 +58,11 @@ begin
   t('all((true(), false()), identity#1)', 'false');
   t('some((true(), false()), identity#1)', 'true');
 
+  t('for member $m in [10,20,30] return $m', '10 20 30');
+  t('for member $m at $i in [10,20,30] return $m + $i', '11 22 33');
+  t('for member $m in [1,2], member $n in [40,50] return $m + $n', '41 51 42 52');
+  t('for member $m in [1,2], $n in (40,50) return $m + $n', '41 51 42 52');
+
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
 end;

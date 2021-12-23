@@ -2109,7 +2109,7 @@ var
 
   procedure evaluateForLoop(const pos: SizeInt);
   var clausekind: TXQTermFlowerSubClauseKind;
-    procedure addVariableBinding(v: IXQValue; index: SizeInt = 1);
+    procedure addVariableBinding(v: IXQValue; positionVar: TXQTermVariable; index: SizeInt);
     var
       letclause: TXQTermFlowerLet;
       stackSize: SizeInt;
@@ -2124,8 +2124,8 @@ var
       context.temporaryVariables.push(letclause.loopvar, v);
       if needFullTuple then
         currentTuple.vars[clauseIndex[pos]] := v;
-      if (clausekind = xqtfcFor) and (TXQTermFlowerFor(letclause).positionVar <> nil) then begin
-        context.temporaryVariables.push(TXQTermFlowerFor(letclause).positionVar, xqvalue(index));
+      if positionVar <> nil then begin
+        context.temporaryVariables.push(positionVar, xqvalue(index));
         if needFullTuple then
           currentTuple.vars[clauseIndex[pos] + 1] := context.temporaryVariables.top(0);
       end;
@@ -2359,6 +2359,8 @@ var
        newTuple: TOrderedTuple;
        tempv: PIXQValue;
        tempSeq: IXQValue;
+       forEnum: TXQValueEnumeratorPtrUnsafe;
+       forPositionVar: TXQTermVariable;
    begin
      if pos = high(children) then begin
        if currentTuple = nil then
@@ -2376,20 +2378,22 @@ var
      clausekind := clause.kind;
      case clausekind of
        xqtfcLet:
-         addVariableBinding(TXQTermFlowerLet(clause).expr.evaluate(context));
-       xqtfcFor: begin
+         addVariableBinding(TXQTermFlowerLet(clause).expr.evaluate(context), nil, 1);
+       xqtfcFor, xqtfcForMember: begin
          tempSeq := TXQTermFlowerFor(clause).expr.evaluate(context);
-         case tempSeq.getSequenceCount of
-           0: if TXQTermFlowerFor(clause).allowingEmpty then addVariableBinding(xqvalue(), 0);
-           1: addVariableBinding(tempSeq, 1);
-           else begin
-             i := 1;
-             for tempv in tempSeq.GetEnumeratorPtrUnsafe do begin
-               addVariableBinding(tempv^, i);
-               inc(i);
-             end;
-           end;
+         if clausekind = xqtfcFor then forEnum := tempseq.GetEnumeratorPtrUnsafe
+         else begin
+           if tempseq.kind <> pvkArray then raiseTypeError0004('expected array', tempseq);
+           forEnum := tempseq.GetEnumeratorMembersPtrUnsafe;
          end;
+         forPositionVar := TXQTermFlowerFor(clause).positionVar;
+         if forEnum.MoveNext then begin
+           i := 1;
+           repeat
+             addVariableBinding(forEnum.Current^, forPositionVar, i);
+             inc(i);
+           until not forEnum.MoveNext;
+         end else if TXQTermFlowerFor(clause).allowingEmpty then addVariableBinding(xqvalue(), forPositionVar, 0);
        end;
        xqtfcWindow: addWindowVariableBinding();
        xqtfcLetPattern: addPatternVariableBinding(TXQTermFlowerLetPattern(clause).expr.evaluate(context));
@@ -2672,7 +2676,7 @@ begin
   for i := 0 to high(children) - 1 do
     case TXQTermFlowerSubClause(children[i]).kind of
       xqtfcLet: inc(varCount);
-      xqtfcFor: begin
+      xqtfcFor, xqtfcForMember: begin
         inc(varCount);
         if assigned(TXQTermFlowerFor(children[i]).positionVar) then inc(varCount);
       end;
@@ -2713,7 +2717,7 @@ begin
           clauseIndex[i] := varCount;
           initialAddVariable(TXQTermFlowerLet(children[i]).loopvar);
         end;
-        xqtfcFor: begin
+        xqtfcFor, xqtfcForMember: begin
           clauseIndex[i] := varCount;
           initialAddVariable(TXQTermFlowerLet(children[i]).loopvar);
           if assigned(TXQTermFlowerFor(children[i]).positionVar) then

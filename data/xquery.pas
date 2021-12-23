@@ -2258,7 +2258,7 @@ type
   end;
 
   { TXQTermFlower }
-  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcLet, xqtfcWindow, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount, xqtfcGroup);
+  TXQTermFlowerSubClauseKind = (xqtfcFor, xqtfcForMember, xqtfcLet, xqtfcWindow, xqtfcForPattern, xqtfcLetPattern, xqtfcWhere, xqtfcOrder, xqtfcCount, xqtfcGroup);
   TXQTermFlowerSubClause = class(TXQTerm)
     class function kind: TXQTermFlowerSubClauseKind; virtual;
 
@@ -2289,6 +2289,9 @@ type
 
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override; //This will not undeclare the variables!
     procedure visitchildrenToUndeclare(visitor: TXQTerm_Visitor); override;
+  end;
+  TXQTermFlowerForMember = class(TXQTermFlowerFor)
+    class function kind: TXQTermFlowerSubClauseKind; override;
   end;
   TXQTermFlowerWindowVarsAndCondition = record
     currentItem, positionVar, previousItem, nextItem: TXQTermVariable;
@@ -3536,6 +3539,11 @@ begin
   t := PPointer(@a)^ ;
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
+end;
+
+class function TXQTermFlowerForMember.kind: TXQTermFlowerSubClauseKind;
+begin
+  Result:=xqtfcForMember;
 end;
 
 constructor TXQueryModule.Create(anUrl: string);

@@ -1616,8 +1616,12 @@ var token: String;
     end;
     repeat
       if pos^ <> '<' then begin
-        if isfor then result.push(TXQTermFlowerFor.Create)
-        else result.push(TXQTermFlowerLet.Create);
+        if isfor then begin
+          if (pos^ = 'm') and nextTokenIs('member') then begin
+            require4();
+            result.push(TXQTermFlowerForMember.Create)
+          end else result.push(TXQTermFlowerFor.Create)
+        end else result.push(TXQTermFlowerLet.Create);
         clause := TXQTermFlowerLet(result.children[high(result.children)]);
         registerTermLocation(clause);
         with clause do begin
@@ -1628,7 +1632,7 @@ var token: String;
             sequenceTyp := parseSequenceType([]);
           end else sequenceTyp := nil;
 
-          if kind = xqtfcFor then begin
+          if isfor then begin
             if nextTokenIs('allowing') then begin
               requireXQuery3;
               expect('empty');
@@ -3149,7 +3153,7 @@ begin
   token := nextToken(false);
   case token of
     'for': case nextToken(true) of
-      '$','tumbling', 'sliding': exit(parseFlower(token));
+      '$','tumbling', 'sliding', 'member': exit(parseFlower(token));
       '<': if checkForPatternMatching then exit(parseFlower(token));
     end;
     'let': if (parsingModel <> xqpmXPath2 ) then
@@ -5066,7 +5070,7 @@ function TFinalNamespaceResolving.leave(t: PXQTerm): TXQTerm_VisitAction;
     for i := 0 to high(f.children) - 1 do begin
       clause := TXQTermFlowerSubClause(f.children[i]);
       case clause.kind of
-        xqtfcFor:
+        xqtfcFor, xqtfcForMember:
           if (TXQTermFlowerFor(f.children[i]).positionVar <> nil) and TXQTermFlowerFor(f.children[i]).positionVar.equalsVariable(TXQTermFlowerFor(f.children[i]).loopvar) then
             raiseParsingError('XQST0089', 'Duplicate variable: ' + TXQTermFlowerFor(f.children[i]).positionVar.ToString, clause);
         xqtfcGroup: begin
