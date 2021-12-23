@@ -97,6 +97,21 @@ end;
 
 { TXQTerm }
 
+constructor TXQTermWithChildren.Create;
+begin
+end;
+
+constructor TXQTermWithChildren.Create(child1, child2: TXQTerm);
+begin
+  push(child1);
+  push(child2);
+end;
+
+constructor TXQTermWithChildren.Create(somechildren: TXQTermArray);
+begin
+  children := somechildren;
+end;
+
 function TXQTermWithChildren.getContextDependencies: TXQContextDependencies;
 begin
   result := ALL_CONTEXT_DEPENDENCIES;

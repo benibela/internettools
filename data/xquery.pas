@@ -1920,7 +1920,10 @@ type
   TXQTermClass = class of TXQTerm;
 
   TXQTermWithChildren = class(TXQTerm)
-    children: array of TXQTerm;
+    children: TXQTermArray;
+    constructor Create;
+    constructor Create(child1, child2: TXQTerm);
+    constructor Create(somechildren: TXQTermArray);
     function getContextDependencies: TXQContextDependencies; override;
     function debugTermToString: string; override;
     destructor destroy; override;

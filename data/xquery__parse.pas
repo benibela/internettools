@@ -4812,7 +4812,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   function visitBinaryOp(b: TXQTermBinaryOp): TXQTerm;
-    function handleArrowOperator: TXQTerm;
+    function handleArrowOperator(thin: boolean): TXQTerm;
     var
       tcall: TXQTermWithChildren;
       insertAt: SizeInt;
@@ -4834,7 +4834,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         end;
         tcall := tdf.children[0] as TXQTermWithChildren;
       end else begin
-        raiseSyntaxError('=>', b);
+        raiseSyntaxError('=>/->', b);
         exit
       end;
       setlength(tcall.children, length(tcall.children) + 1);
@@ -4845,6 +4845,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       if result is TXQTermNamedFunction then result := visitNamedFunction(TXQTermNamedFunction(result))
       else if result is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(result));
       b.free;
+      if thin then begin
+        result := TXQTermSimpleMap.Create(tcall.children[insertAt], result);
+        tcall.children[insertAt] := TXQTermContextItem.Create;
+      end;
     end;
 
     function handleOtherwise: TXQTermFlower;
@@ -4899,12 +4903,12 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       b.free;
     end else case b.op.name of
       '!': begin
-        result := TXQTermSimpleMap.Create;
-        TXQTermSimpleMap(result).children := b.children;
+        result := TXQTermSimpleMap.Create(b.children);
         b.children := nil;
         b.free;
       end;
-      '=>': result := handleArrowOperator;
+      '=>': result := handleArrowOperator(false);
+      '->': result := handleArrowOperator(true);
       'otherwise': result := handleOtherwise;
     end;
   end;

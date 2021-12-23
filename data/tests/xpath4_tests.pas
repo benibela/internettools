@@ -38,6 +38,14 @@ begin
 
   t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ->($k,$v){string-length($k) > 1})=>map:keys()', 'foo bar');
 
+  t('"The cat sat on the mat" => tokenize() -> concat(".") -> upper-case() => string-join(" ")', 'THE. CAT. SAT. ON. THE. MAT.');
+  t('("xyz", "abc") -> (upper-case#1)()', 'XYZ ABC');
+  t(' ("$" => concat(?))("abc") ', '$abc');
+  t(' ("$" -> concat(?))("abc") ', '$abc');
+  t('( ("x,y,z", "a,b,c") -> (tokenize#2)(?) ) ! (.(","))', 'x y z a b c');
+//  t(' 1 to 3 -> { . * 10 } ', '10 20 30' );
+
+
   t('1 otherwise 2', '1');
   t('() otherwise 2', '2');
   t('4 otherwise () otherwise 6', '4');
