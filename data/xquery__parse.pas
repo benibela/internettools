@@ -2416,11 +2416,10 @@ begin
         result.annotations := annotations;
         result.parameterCount := 1;
         result.push(TXQTermDefineVariable.create('->', nil));
-        TXQTermDefineVariable(result.children[0]).push(TXQTermSequenceType.create(tikAny));
+        TXQTermDefineVariable(result[0]).push(TXQTermSequenceType.create(tikAny));
         try
-          sm := TXQTermSimpleMap.Create;
+          sm := TXQTermSimpleMap.Create(TXQTermVariable.create('->', nil));
           result.push(sm);
-          sm.push(TXQTermVariable.create('->', nil));
           sm.push(parseOptionalExpr31);
           exit;
         except
@@ -4838,32 +4837,32 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       insertAt: SizeInt;
       tdf: TXQTermDefineFunction;
     begin
-      result := b.children[1];
-      if b.children[1] is TXQTermDynamicFunctionCall then begin
+      result := b[1];
+      if b[1] is TXQTermDynamicFunctionCall then begin
         insertAt := 1;
-        tcall := b.children[1] as TXQTermWithChildren;
-      end else if b.children[1] is TXQTermNamedFunction then begin
+        tcall := b[1] as TXQTermWithChildren;
+      end else if b[1] is TXQTermNamedFunction then begin
         insertAt := 0;
-        tcall := b.children[1] as TXQTermWithChildren;
-      end else if b.children[1] is TXQTermDefineFunction then begin
-        tdf := TXQTermDefineFunction(b.children[1]);
+        tcall := b[1] as TXQTermWithChildren;
+      end else if b[1] is TXQTermDefineFunction then begin
+        tdf := TXQTermDefineFunction(b[1]);
         case tdf.kind of
           xqtdfStaticPartialApplication: insertAt := 0;
           xqtdfDynamicPartialApplication: insertAt := 1;
           else begin
             insertAt := 0;
-            if (not thin) or (tdf.kind <> xqtdfUserDefined) or (tdf.parameterCount <> 1) or ((tdf.children[0] as TXQTermDefineVariable).getVariable.value <> '->') then
+            if (not thin) or (tdf.kind <> xqtdfUserDefined) or (tdf.parameterCount <> 1) or ((tdf[0] as TXQTermDefineVariable).getVariable.value <> '->') then
               raiseSyntaxError('need function after =>/-> operator', b);
-            result := tdf.children[1] as TXQTermSimpleMap;
-            (tdf.children[1] as TXQTermSimpleMap).children[0].free;
-            (tdf.children[1] as TXQTermSimpleMap).children[0] := b.children[0];
+            result := tdf[1] as TXQTermSimpleMap;
+            (tdf[1] as TXQTermSimpleMap)[0].free;
+            (tdf[1] as TXQTermSimpleMap)[0] := b[0];
             SetLength(tdf.children, 1);
-            b.children[0] := nil;
+            b[0] := nil;
             b.free;
             exit;
           end;
         end;
-        tcall := tdf.children[0] as TXQTermWithChildren;
+        tcall := tdf[0] as TXQTermWithChildren;
       end else begin
         raiseSyntaxError('=>/->', b);
         exit
@@ -4877,8 +4876,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       else if result is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(result));
       b.free;
       if thin then begin
-        result := TXQTermSimpleMap.Create(tcall.children[insertAt], result);
-        tcall.children[insertAt] := TXQTermContextItem.Create;
+        result := TXQTermSimpleMap.Create(tcall[insertAt], result);
+        tcall[insertAt] := TXQTermContextItem.Create;
       end;
     end;
 
@@ -4891,12 +4890,12 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
       flower := TXQTermFlower.Create;
       let := TXQTermFlowerLet.Create;
       let.loopvar := TXQTermVariable.create('#otherwise');
-      let.expr := b.children[0];
+      let.expr := b[0];
       flower.push(let);
       ifthen := TXQTermIf.create;
       ifthen.push(TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'exists', let.loopvar.clone, staticContext));
       ifthen.push(let.loopvar.clone);
-      ifthen.push(b.children[1]);
+      ifthen.push(b[1]);
       flower.push(ifthen);
       b.children := nil;
       b.free;

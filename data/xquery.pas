@@ -1920,6 +1920,10 @@ type
   TXQTermClass = class of TXQTerm;
 
   TXQTermWithChildren = class(TXQTerm)
+  private
+    function getChild(i: SizeInt): TXQTerm; inline;
+    procedure setChild(i: SizeInt; AValue: TXQTerm); inline;
+  public
     children: TXQTermArray;
     constructor Create;
     constructor Create(child: TXQTerm);
@@ -1932,6 +1936,7 @@ type
     //for internal use
     procedure push(t: TXQTerm);
     function push(t: array of TXQTerm): TXQTerm;
+    property defaultProperty[i: SizeInt]: TXQTerm read getChild write setChild; default;
   protected
     function getChildrenContextDependencies: TXQContextDependencies; virtual;
   public
@@ -2152,7 +2157,6 @@ type
   { TXQTermFilterSequence }
 
   TXQTermFilterSequence = class(TXQTermWithChildren)
-    constructor create(seq: TXQTerm; filter: TXQTerm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function getContextDependencies: TXQContextDependencies; override;
   end;
@@ -2214,7 +2218,6 @@ type
 
 
   TXQTermDynamicFunctionCall = class (TXQTermWithChildren)
-    constructor create(func: TXQTerm = nil; arg: TXQTerm = nil);
     function evaluate(var context: TXQEvaluationContext): IXQValue; override;
     function visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction; override;
     function getContextDependencies: TXQContextDependencies; override;

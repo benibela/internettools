@@ -97,6 +97,16 @@ end;
 
 { TXQTerm }
 
+function TXQTermWithChildren.getChild(i: SizeInt): TXQTerm;
+begin
+  result := children[i];
+end;
+
+procedure TXQTermWithChildren.setChild(i: SizeInt; AValue: TXQTerm);
+begin
+  children[i] := AValue;
+end;
+
 constructor TXQTermWithChildren.Create;
 begin
 end;
@@ -439,14 +449,6 @@ end;
 function TXQTermIf.getContextDependencies: TXQContextDependencies;
 begin
   result := getChildrenContextDependencies;
-end;
-
-{ TXQTermFilterSequence }
-
-constructor TXQTermFilterSequence.create(seq: TXQTerm; filter: TXQTerm);
-begin
-  push(seq);
-  if filter <> nil then push(filter);
 end;
 
 function TXQTermFilterSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
@@ -3034,14 +3036,6 @@ end;
 
 
 { TXQDynamicFunctionCall }
-
-constructor TXQTermDynamicFunctionCall.create(func: TXQTerm; arg: TXQTerm);
-begin
-  if func <> nil then begin
-    push(func);
-    if arg <> nil then push(arg);
-  end;
-end;
 
 function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
   procedure raiseOutofBounds(numindex: int64; a: TXQValueJSONArray);
