@@ -453,7 +453,6 @@ var known: TNamespaceList;
   end;
 
   procedure inner(n: TTreeNode; insideHTMLElement: boolean); forward;
-  procedure innerDocument(n: TTreeNode); forward;
 
   procedure outer(n: TTreeNode; parentIsHTMLElement: boolean);
     procedure appendNodeName(n: TTreeNode);
@@ -593,7 +592,7 @@ var known: TNamespaceList;
         while deadPrefixes.count > oldDeadPrefixCount do
           deadPrefixes.Delete(deadPrefixes.count-1);
       end;
-      tetDocument: innerDocument(n);
+      tetDocument: inner(n, false);
       else; //should not happen
     end;
   end;
@@ -626,48 +625,32 @@ var known: TNamespaceList;
     end;
   end;
 
-  procedure innerDocument(n: TTreeNode);
-  const insideHTMLElement = false;
-  var
-    sub: TTreeNode;
-    oldIndentationAllowed: Boolean;
-    first: boolean = true;
-  begin
-    oldIndentationAllowed := indentationAllowed;
-    indentationAllowed := indentationAllowed and elementAndChildrenMightBeIndented(n, insideHTMLElement);
-    sub := n.getFirstChild();
-    while sub <> nil do begin
-      if (not indentationAllowed) or (sub.typ <> tetText) then begin
-        if indentationAllowed then begin
-          if not first then builder.appendLineEnding;
-          first := false;
-          builder.appendIndent;
-        end;
-        outer(sub, insideHTMLElement);
-      end;
-      sub := sub.getNextSibling();
-    end;
-    //if indentationAllowed then builder.appendLineEnding(); without this there is no line break between multiple documents in a sequence, however with it there is a pointless break after the sequence
-    indentationAllowed := oldIndentationAllowed;
-  end;
-
   procedure inner(n: TTreeNode; insideHTMLElement: boolean);
   var sub: TTreeNode;
-    oldIndentationAllowed: Boolean;
+    oldIndentationAllowed, isDocument: Boolean;
+    first: Boolean;
   begin
-    if not (n.typ in TreeNodesWithChildren) then exit;
+    case n.typ of
+      tetOpen: isDocument := false;
+      tetDocument: isDocument := true;
+      else exit;
+    end;
     oldIndentationAllowed := indentationAllowed;
     if indentationAllowed  then begin
       indentationAllowed := elementAndChildrenMightBeIndented(n, insideHTMLElement);
-      if indentationAllowed then begin
+      if indentationAllowed and not isDocument then begin
         builder.indent;
-      end;
+        first := false;
+      end else first := true;
     end;
 
     sub := n.getFirstChild();
     while sub <> nil do begin
       if indentationAllowed and (sub.typ <> tetText) then begin
-        builder.appendLineEnding();
+        if not first then begin
+          builder.appendLineEnding();
+          first := false;
+        end;
         builder.appendIndent;
       end;
       if (not indentationAllowed) or (sub.typ <> tetText) then
@@ -675,7 +658,7 @@ var known: TNamespaceList;
       sub := sub.getNextSibling();
     end;
 
-    if indentationAllowed then begin
+    if indentationAllowed and not isDocument then begin
       builder.unindent;
       builder.appendLineEnding;
       builder.appendIndent;
