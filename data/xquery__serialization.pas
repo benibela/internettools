@@ -813,6 +813,13 @@ begin
         end;
 
         serializer.insertWhitespace := indent;
+        if assigned(params.characterMaps) and params.characterMaps.contains(#10) then begin
+          case params.characterMaps^[#10] of
+            #10: serializer.lineEnding := xleLF;
+            #13#10: serializer.lineEnding := xleCRLF;
+          end;
+        end;
+
 
         //headers
         if (method <> xqsmHTML) then begin
