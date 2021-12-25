@@ -283,7 +283,7 @@ begin
     HTMLNodeNameHashs.ruby: result := striequal(n.value,'ruby');
     HTMLNodeNameHashs.s: result := striequal(n.value,'s');
     HTMLNodeNameHashs.samp: result := striequal(n.value,'samp');
-    HTMLNodeNameHashs.script: result := striequal(n.value,'script');
+    HTMLNodeNameHashs.script: result := striequal(n.value,'script') and not (assigned(n.parent) and striEqual(n.parent.value, 'head'));
     HTMLNodeNameHashs.select: result := striequal(n.value,'select');
     HTMLNodeNameHashs.slot: result := striequal(n.value,'slot');
     HTMLNodeNameHashs.small: result := striequal(n.value,'small');

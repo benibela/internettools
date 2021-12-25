@@ -401,7 +401,7 @@ var known: TNamespaceList;
   function elementDescendantsMightBeIndented(n: TTreeNode; isHTMLElement: boolean): boolean;
   var a: TTreeAttribute;
   begin
-    if Assigned(params.suppressIndentation) then begin
+    if assigned(params) and Assigned(params.suppressIndentation) then begin
       if params.suppressIndentation.contains(n.namespace, n.value) then
         exit(false);
       if representsHTML and params.suppressIndentation.contains(n.namespace, lowercase(n.value)) then
@@ -597,38 +597,20 @@ var known: TNamespaceList;
     end;
   end;
 
-  function elementAndChildrenMightBeIndented(n: TTreeNode; insideHTMLElement: boolean): boolean;
-    function isBlankButNot13(const s: string): boolean;
-    var
-      temp: Pchar;
-      len: SizeInt;
-    begin
-      temp := pchar(s);
-      len := s.Length;
-      strlTrimLeft(temp, len, [#9,#10,' ']);
-      result := len = 0;
-    end;
+  function isBlankButNot13(const s: string): boolean;
   var
-    sub: TTreeNode;
+    temp: Pchar;
+    len: SizeInt;
   begin
-    result := true;
-    if Assigned(params) then result := elementDescendantsMightBeIndented(n, insideHTMLElement);
-    sub := n.getFirstChild();
-    while (sub <> nil) and result do begin
-      case sub.typ of
-        tetText: result := isBlankButNot13(sub.value);
-        tetOpen: result := not (insideHTMLElement and elementIsPhrasing(sub));
-        tetProcessingInstruction: result := not insideHTMLElement;
-        else;
-      end;
-      sub := sub.getNextSibling();
-    end;
+    temp := pchar(s);
+    len := s.Length;
+    strlTrimLeft(temp, len, [#9,#10,' ']);
+    result := len = 0;
   end;
 
   procedure inner(n: TTreeNode; insideHTMLElement: boolean);
   var sub: TTreeNode;
-    oldIndentationAllowed, isDocument: Boolean;
-    first: Boolean;
+    oldIndentationAllowed, isDocument, indentationAllowedAfterTextNode, indentationAllowedSomewhere: Boolean;
   begin
     case n.typ of
       tetOpen: isDocument := false;
@@ -637,31 +619,39 @@ var known: TNamespaceList;
     end;
     oldIndentationAllowed := indentationAllowed;
     if indentationAllowed  then begin
-      indentationAllowed := elementAndChildrenMightBeIndented(n, insideHTMLElement);
-      if indentationAllowed and not isDocument then begin
+      indentationAllowed := elementDescendantsMightBeIndented(n, insideHTMLElement);
+      if indentationAllowed and not isDocument then
         builder.indent;
-        first := false;
-      end else first := true;
     end;
+    indentationAllowedSomewhere := indentationAllowed;
+    indentationAllowedAfterTextNode := indentationAllowed;
 
     sub := n.getFirstChild();
     while sub <> nil do begin
-      if indentationAllowed and (sub.typ <> tetText) then begin
-        if not first then begin
-          builder.appendLineEnding();
-          first := false;
+      if sub.typ = tetText then begin
+        indentationAllowedAfterTextNode := indentationAllowedSomewhere and isBlankButNot13(sub.value);
+        if not indentationAllowedAfterTextNode then
+          outer(sub, insideHTMLElement);
+      end else begin
+        if indentationAllowedSomewhere then begin
+          indentationAllowed := (sub.typ <> tetProcessingInstruction) and not (insideHTMLElement and elementIsPhrasing(sub));
+          if indentationAllowedAfterTextNode and indentationAllowed then begin
+            builder.appendLineEnding();
+            builder.appendIndent;
+          end;
+          indentationAllowedAfterTextNode := indentationAllowedSomewhere;
         end;
-        builder.appendIndent;
-      end;
-      if (not indentationAllowed) or (sub.typ <> tetText) then
         outer(sub, insideHTMLElement);
+      end;
       sub := sub.getNextSibling();
     end;
 
-    if indentationAllowed and not isDocument then begin
+    if indentationAllowedSomewhere  and not isDocument then begin
       builder.unindent;
-      builder.appendLineEnding;
-      builder.appendIndent;
+      if indentationAllowedAfterTextNode and indentationAllowed then begin
+        builder.appendLineEnding;
+        builder.appendIndent;
+      end;
     end;
     indentationAllowed := oldIndentationAllowed;
   end;
