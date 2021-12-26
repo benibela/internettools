@@ -33,7 +33,7 @@ unit multipagetemplate;
 interface
 
 uses
-  Classes, SysUtils,bbutils,extendedhtmlparser, simplehtmltreeparser,simplexmlparser, xquery,internetaccess;
+  Classes, SysUtils,bbutils,extendedhtmlparser, simplehtmltreeparser,simplexmlparser, xquery,internetaccess,bbutilsbeta;
 
 type
 
@@ -295,6 +295,7 @@ type
 
 
     retryOnConnectionFailures: boolean;
+    actionTrace: TStringArrayList;
 
     //** Creates a reader using a certain template (atemplate is mandatory, ainternet optional)
     constructor create(atemplate:TMultiPageTemplate; ainternet: TInternetAccess; patternMatcher: THtmlTemplateParser = nil);
@@ -313,7 +314,7 @@ type
 
 implementation
 
-uses bbutilsbeta, xquery_json, xquery.namespaces;
+uses xquery_json, xquery.namespaces;
 
 type
 
@@ -1461,6 +1462,7 @@ begin
   retryOnConnectionFailures := true;
   queryCache := TXQMapStringObject.Create;
   queryCache.OwnsObjects := false;
+  actionTrace.init;
 end;
 
 
@@ -1503,7 +1505,10 @@ begin
   //OutputDebugString(pchar(lib.defaultVariables.Text));
   Assert(internet<>nil,'Internet nicht initialisiert');
 
+  if action is TTemplateActionMain then actionTrace.add(TTemplateActionMain(action).name);
   action.perform(self);
+  if action is TTemplateActionMain then actionTrace.deleteLast();
+
 
   if Assigned(onLog) then onLog(self, 'Leave performAction', 5);
 end;
