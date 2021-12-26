@@ -638,6 +638,7 @@ type
     procedure add(const item: TElement);
     procedure clear;
     procedure delete(Index: SizeInt);
+    procedure deleteLast();
     procedure exchange(Index1, Index2: SizeInt);
     procedure expand;
     function toSharedArray: TArrayBuffer;
@@ -1480,6 +1481,11 @@ begin
   move((p + index)^, p, sizeof(TElement) * moveCount);
   dec(fcount);
   fillchar(fbuffer[fcount], sizeof(TElement), 0);
+end;
+
+procedure TBaseArrayList.deleteLast();
+begin
+  delete(count - 1)
 end;
 
 procedure TBaseArrayList.exchange(Index1, Index2: SizeInt);
