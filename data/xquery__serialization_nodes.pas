@@ -610,7 +610,8 @@ var known: TNamespaceList;
 
   procedure inner(n: TTreeNode; insideHTMLElement: boolean);
   var sub: TTreeNode;
-    oldIndentationAllowed, isDocument, indentationAllowedAfterTextNode, indentationAllowedSomewhere: Boolean;
+    oldIndentationAllowed, isDocument, indentationAllowedAfterTextNode, indentationAllowedSomewhere,
+      indentationLineBreakBeforeElements: Boolean;
   begin
     case n.typ of
       tetOpen: isDocument := false;
@@ -623,6 +624,7 @@ var known: TNamespaceList;
       if indentationAllowed and not isDocument then
         builder.indent;
     end;
+    indentationLineBreakBeforeElements := not isDocument;
     indentationAllowedSomewhere := indentationAllowed;
     indentationAllowedAfterTextNode := indentationAllowed;
 
@@ -636,7 +638,8 @@ var known: TNamespaceList;
         if indentationAllowedSomewhere then begin
           indentationAllowed := (sub.typ <> tetProcessingInstruction) and not (insideHTMLElement and elementIsPhrasing(sub));
           if indentationAllowedAfterTextNode and indentationAllowed then begin
-            builder.appendLineEnding();
+            if indentationLineBreakBeforeElements then builder.appendLineEnding()
+            else indentationLineBreakBeforeElements := true;
             builder.appendIndent;
           end;
           indentationAllowedAfterTextNode := indentationAllowedSomewhere;
