@@ -91,7 +91,7 @@ var err:smallint;
     s := zerror(err);
     if stream.msg <> '' then s := s + ': ' + stream.msg;
     s := s + LineEnding + 'Bytes in: ' + inttostr(stream.total_in) + ' Bytes out: ' + IntToStr(stream.total_out);
-    s := s + 'Last received: ' + strFromPchar(@abuffer, max(count, 128)).EncodeHex;
+    s := s + 'Last received: ' + strFromPchar(@abuffer, count).EncodeHex;
     raise Edecompressionerror.create(s);
   end;
 
