@@ -116,7 +116,7 @@ begin
       exit;
     end;
     headerRead := true;
-    headerBuffer := '';
+  //  headerBuffer := ''; do not delete the buffer, it still needs to be read
     if header in [hExpectedHeader, hText] then begin
       inc(stream.next_in, headerLength);
       dec(stream.avail_in, headerLength);
