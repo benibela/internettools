@@ -180,6 +180,7 @@ class procedure TTransferContentInflaterZlib.injectDecoder(var transfer: TTransf
 var
   zlibencoder: TTransferContentInflaterZlib;
   encodingIsGZIP: boolean;
+  err: System.Integer;
 begin
   case encoding of
   'gzip': encodingIsGZIP := true;
@@ -197,7 +198,9 @@ begin
     err:=inflateInit(Fstream);
    }
    //inflateInit(zlibencoder.stream);
-   inflateInit2(zlibencoder.stream, -MAX_WBITS);
+   err := inflateInit2(zlibencoder.stream, -MAX_WBITS);
+   if err <> Z_OK then
+     raise Edecompressionerror.Create('Failed to initialize decompression: ' + zerror(err));
    transfer.writeBlockCallback := @zlibencoder.writeCompressedBlock;
    transfer.inflater := zlibencoder;
 
