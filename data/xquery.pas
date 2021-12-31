@@ -327,6 +327,7 @@ type
     sharedEvaluationContext: TXQSharedEvaluationContext;
     extensionContext: PXQExtensionEvaluationContext;
     namespaces: TNamespaceList;               //**< Namespace declared in the outside scope (only changed by xmlns attributes of constructed nodes)
+    function needNamespaceList: TNamespaceList;
 
     function findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
     function findNamespaceURL(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): string;
@@ -2461,12 +2462,58 @@ type
     function clone: TXQTerm; override;
   end;
 
-  TXQTermConstructorState = record
-    document: TTreeDocument;
-    root: TTreeNode;
-    baseOffset: TTreeNodeIntOffset;
-    olddocumentnamespacecount: SizeInt;
+  TXQTreeBuilderStackFrame = record
+    oldstatenamespacecount, olddocumentnamespacecount: SizeInt;
+    previousValueWasAtomic: boolean;
+  end;
+
+  TXQTreeBuilder = object(TTreeBuilder)
+  protected
+    frame: TXQTreeBuilderStackFrame;
+    errorTerm: TXQTerm;
+    procedure raiseEvaluationError(const code, msg: string);
+    function chooseRandomPrefix(): string;
+  public
+    copyNamespacePreserve, copyNamespaceInherit: boolean;
     namespaceOverrides: TNamespaceList;
+    evaluationContext: PXQEvaluationContext;
+    procedure initDocument(creator: TTreeParser);
+    procedure done;
+
+    procedure appendValue(const v: IXQValue);
+    procedure appendClonedNode(const n: TTreeNode);
+    procedure appendOwnedNodeAsChild(const n: TTreeNode);
+    procedure appendOwnedNode(const node: TTreeNode);
+
+    function enterElementConstructor: TXQTreeBuilderStackFrame;
+    procedure leaveElementConstructor(const aframe: TXQTreeBuilderStackFrame);
+
+    (*
+    Different kinds of namespaces:
+                                Nested, direct constructor              Copied node,inherit=true         Copied node,inherit=false
+    Explicit
+    xmlns:ns="foo"                     inherit                                 inherit                         no inherit
+    inherited                                                                                                  => REMOVE
+
+    Implicit
+    <ns:element/>                     no inherit                               inherit ?                       no inherit
+    not inherited                                                              => ADD
+
+    Computed
+    namespace xy{..}                  no inherit                               inherit ?                       no inherit
+    inherited                          => REMOVE                                                               => REMOVE
+    *)
+    procedure registerExplicitNamespace(n: TNamespace);
+    procedure registerImplicitNamespace(n: TNamespace);
+  end;
+
+  TXQTermConstructorState = object(TXQTreeBuilder)
+    procedure initFreeStandingElement(acontext: PXQEvaluationContext);
+    procedure initDocument(acontext: PXQEvaluationContext);
+    procedure done;
+  protected
+    olddocumentnamespacecount: SizeInt;
+    procedure initFromContext(acontext: PXQEvaluationContext);
   end;
 
   TXQTermConstructor = class(TXQTermWithChildren)
@@ -3540,6 +3587,9 @@ begin
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
 end;
+
+
+
 
 class function TXQTermFlowerForMember.kind: TXQTermFlowerSubClauseKind;
 begin
@@ -7272,6 +7322,11 @@ end;
 
 
 
+function TXQEvaluationContext.needNamespaceList: TNamespaceList;
+begin
+  if (namespaces = nil) then namespaces := TNamespaceList.Create;
+  result := namespaces;
+end;
 
 function TXQEvaluationContext.findNamespace(const nsprefix: string; const defaultNamespaceKind: TXQDefaultNamespaceKind): TNamespace;
 begin

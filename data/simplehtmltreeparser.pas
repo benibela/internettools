@@ -270,6 +270,7 @@ protected
   currentNode: TTreeNode;
   function currentParent: TTreeNode;
   function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: SizeInt = 0):TTreeNode;
+  procedure initInternal(document: TTreeDocument; root: TTreeNode);
 public
   currentDocument: TTreeDocument;
 
@@ -759,12 +760,18 @@ end;
 
 
 
-procedure TTreeBuilder.initDocument(creator: TTreeParser);
+procedure TTreeBuilder.initInternal(document: TTreeDocument; root: TTreeNode);
 begin
   elementStack := TList.Create;
+  currentDocument := document;
+  currentRoot := root;
+  currentNode := root;
+end;
+
+procedure TTreeBuilder.initDocument(creator: TTreeParser);
+begin
   currentDocument := TTreeDocument.create(creator);
-  currentRoot := currentDocument;
-  currentNode := currentDocument;
+  initInternal(currentDocument, currentDocument);
   elementStack.Add(currentDocument);
 end;
 
