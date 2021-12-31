@@ -822,7 +822,10 @@ end;
 
 procedure TTreeBuilder.appendText(const value: string);
 begin
-  appendNodeInternal(tetText, value);
+  if value <> '' then begin
+    if currentNode.typ <> tetText then appendNodeInternal(tetText, value)
+    else currentNode.value := currentNode.value + value;
+  end;
 end;
 
 procedure TTreeBuilder.appendAttribute(const name, value: string);
