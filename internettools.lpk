@@ -8,7 +8,7 @@
       <Version Value="11"/>
       <SearchPaths>
         <IncludeFiles Value="data;../lazarus/dialogs;import/synapse"/>
-        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system;../../../components/pascal/import/flre/src;import/flre/src"/>
+        <OtherUnitFiles Value="data;internet;import/regexpr/source;../lazarus/dialogs;import/synapse;system;../../../components/pascal/import/flre/src;import/flre/src;import/pasdblstrutils/src"/>
         <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
     </CompilerOptions>
@@ -33,7 +33,7 @@
       </Item4>
       <Item5>
         <Filename Value="data/htmlinformation.pas"/>
-        <UnitName Value="htmlinformation"/>
+        <UnitName Value="htmlInformation"/>
       </Item5>
       <Item6>
         <Filename Value="data/restoreRangeOverflowChecks.inc"/>
