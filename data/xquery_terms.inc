@@ -4023,6 +4023,15 @@ begin
   currentNode := kid;
 end;
 
+procedure TXQTreeBuilder.appendClonedTagAsChildUncheckedNoAttributes(kid: TTreeNode);
+begin
+  kid := kid.cloneShallowNoAttributes(currentDocument, currentRoot, baseoffset);
+  appendOwnedTagAsChildUnchecked(kid);
+  //used for TNodeTransformer
+  frame.previousValueWasAtomic := false;
+  if kid.typ = tetOpen then elementStack.Add(kid);
+end;
+
 procedure TXQTreeBuilder.appendOwnedNode(kid: TTreeNode);
 var
   doc: TTreeNode;
@@ -4125,10 +4134,35 @@ begin
   while evaluationContext.findNamespace(result, xqdnkAny) <> nil do result += 'X';
 end;
 
-procedure TXQTreeBuilder.initDocument(creator: TTreeParser);
+procedure TXQTreeBuilder.initFromContext(acontext: PXQEvaluationContext);
+begin
+  evaluationContext := acontext;
+  copyNamespaceInherit := evaluationContext.staticContext.copyNamespaceInherit;
+  copyNamespacePreserve := evaluationContext.staticContext.copyNamespacePreserve;
+end;
+
+procedure TXQTreeBuilder.initFreeStandingElement(acontext: PXQEvaluationContext);
 begin
   fillchar(self, sizeof(self), 0);
-  inherited initDocument(creator);
+  inherited initInternal(acontext.staticContext.needTemporaryNodes, nil);
+  initFromContext(acontext);
+end;
+
+procedure TXQTreeBuilder.appendFreeStandingRootNode(node: TTreeNode);
+begin
+  evaluationContext.staticContext.temporaryNodes.tempnodes.Add(node);
+  node.root := evaluationContext.staticContext.temporaryNodes;
+  currentRoot := node;
+  currentNode := node;
+  elementStack.add(node);
+  node.offset := 1
+end;
+
+procedure TXQTreeBuilder.initDocument(acontext: PXQEvaluationContext);
+begin
+  fillchar(self, sizeof(self), 0);
+  inherited initDocument(nil);
+  initFromContext(acontext);
 end;
 
 procedure TXQTreeBuilder.done;
@@ -4139,15 +4173,14 @@ end;
 
 procedure TXQTermConstructorState.initFreeStandingElement(acontext: PXQEvaluationContext);
 begin
-  fillchar(self, sizeof(self), 0);
-  inherited initInternal(acontext.staticContext.needTemporaryNodes, nil);
-  initFromContext(acontext);
+  inherited initFreeStandingElement(acontext);
+  initFromContext();
 end;
 
 procedure TXQTermConstructorState.initDocument(acontext: PXQEvaluationContext);
 begin
-  inherited initDocument(nil);
-  initFromContext(acontext);
+  inherited initDocument(acontext);
+  initFromContext();
   currentDocument.baseURI := acontext.staticContext.baseURI;
 end;
 
@@ -4159,13 +4192,10 @@ begin
   inherited;
 end;
 
-procedure TXQTermConstructorState.initFromContext(acontext: PXQEvaluationContext);
+procedure TXQTermConstructorState.initFromContext();
 begin
-  evaluationContext := acontext;
   olddocumentnamespacecount := -1;
   if evaluationContext.namespaces <> nil then olddocumentnamespacecount := evaluationContext.namespaces.Count;
-  copyNamespaceInherit := evaluationContext.staticContext.copyNamespaceInherit;
-  copyNamespacePreserve := evaluationContext.staticContext.copyNamespacePreserve;
 end;
 
 
@@ -4539,12 +4569,7 @@ begin
 
   with state do
     if currentRoot = nil then begin
-      context.staticContext.temporaryNodes.tempnodes.Add(tree);
-      tree.root := context.staticContext.temporaryNodes;
-      currentRoot := tree;
-      currentNode := tree;
-      state.elementStack.add(tree);
-      tree.offset := 1;
+      appendFreeStandingRootNode(tree)
     end else begin
       tree.root := currentRoot;
       tree.offset := currentNode.offset + 1;

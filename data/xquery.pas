@@ -1684,13 +1684,13 @@ type
   (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences *)
   TXQVCustomList = class(specialize TFastInterfaceList<IXQValue>)
   protected
-    procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
     procedure insertSingle(i: SizeInt; const child: IXQValue); inline; //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
   public
     procedure addInArray(const value: IXQValue); inline;
 
     procedure revert; //**< Reverts the list
     procedure sort(cmp: TPointerCompareFunction; data: TObject = nil); //**< Sorts the list
+    procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
   end;
 
   (*** @abstract(List of TXQValue-s). If a sequence is inserted/added, it is flattened, so only the contained items are added  *)
@@ -2469,20 +2469,24 @@ type
 
   TXQTreeBuilder = object(TTreeBuilder)
   protected
-    frame: TXQTreeBuilderStackFrame;
     errorTerm: TXQTerm;
     procedure raiseEvaluationError(const code, msg: string);
     function chooseRandomPrefix(): string;
+    procedure initFromContext(acontext: PXQEvaluationContext);
   public
     copyNamespacePreserve, copyNamespaceInherit: boolean;
     namespaceOverrides: TNamespaceList;
     evaluationContext: PXQEvaluationContext;
-    procedure initDocument(creator: TTreeParser);
+    frame: TXQTreeBuilderStackFrame;
+    procedure initFreeStandingElement(acontext: PXQEvaluationContext);
+    procedure appendFreeStandingRootNode(node: TTreeNode);
+    procedure initDocument(acontext: PXQEvaluationContext);
     procedure done;
 
     procedure appendValue(const v: IXQValue);
     procedure appendClonedNode(const n: TTreeNode);
     procedure appendOwnedTagAsChildUnchecked(const kid: TTreeNode);
+    procedure appendClonedTagAsChildUncheckedNoAttributes(kid: TTreeNode);
     procedure appendOwnedNode(kid: TTreeNode);
 
     function enterElementConstructor: TXQTreeBuilderStackFrame;
@@ -2515,7 +2519,7 @@ type
     procedure done;
   protected
     olddocumentnamespacecount: SizeInt;
-    procedure initFromContext(acontext: PXQEvaluationContext);
+    procedure initFromContext();
   end;
 
   TXQTermConstructor = class(TXQTermWithChildren)

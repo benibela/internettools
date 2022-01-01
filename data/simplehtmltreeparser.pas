@@ -213,6 +213,7 @@ TTreeNode = class
   function deleteElementFromDoubleLinkedList: TTreeNode; //removes the element from the double linked list (only updates previous/next), frees it and returns next  (mostly useful for attribute nodes)
   }
 
+  function cloneShallowNoAttributes(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode;
   function clone(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode; virtual;
   function clone(targetDocument: TTreeDocument): TTreeNode;
 protected
@@ -266,14 +267,14 @@ TTreeBuilder = object
   const ROOT_ELEMENT_INDEX = 1; //index in elementstack
 protected
   elementStack: TList;  //stack of currently open nodes that can have children (mostly elements, but the first node is the document)
-  currentRoot: TTreeNode;
   currentNode: TTreeNode;
-  baseoffset: TTreeNodeIntOffset;
   function currentParent: TTreeNode;
   function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: TTreeNodeIntOffset = 0):TTreeNode;
   procedure initInternal(document: TTreeDocument; root: TTreeNode);
 public
   currentDocument: TTreeDocument;
+  currentRoot: TTreeNode;
+  baseoffset: TTreeNodeIntOffset;
 
   procedure initDocument(creator: TTreeParser);
   procedure done;
@@ -301,7 +302,7 @@ public
   constructor create(creator: TTreeParser); reintroduce;
   property baseURI: string read FBaseURI write FBaseURI;
   property documentURI: string read FDocumentURI write FDocumentURI;
-  property baseEncoding: TSystemCodePage read FBaseEncoding;
+  property baseEncoding: TSystemCodePage read FBaseEncoding write FBaseEncoding;
 
   function getCreator: TTreeParser;
 
@@ -1803,6 +1804,7 @@ begin
   a.Free;
 end;
 
+
 function namespaceUsedByNodeOrChild(n: TTreeNode; const url, prefix: string): boolean;
 var
   m: TTreeNode;
@@ -1863,27 +1865,29 @@ begin
   end;
 end;
 
+function TTreeNode.cloneShallowNoAttributes(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode;
+begin
+  if typ in [tetAttribute, tetNamespace] then result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue)
+  else result := targetDocument.createNode;
+  result.assignNoAttributes(self);
+  if namespace <> nil then targetDocument.addNamespace(namespace);
+  result.root := newRoot;
+  result.offset := newBaseOffset;
+  inc(newBaseOffset);
+end;
+
 
 function TTreeNode.clone(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode;
-  function cloneShallow(t: TTreeNode): TTreeNode;
-  begin
-    result := targetDocument.createNode;
-    result.assignNoAttributes(t);
-    if t.namespace <> nil then targetDocument.addNamespace(t.namespace);
-    result.root := newRoot;
-    result.offset := newBaseOffset;
-    inc(newBaseOffset);
-  end;
 var
   kid: TTreeNode;
   a: TTreeAttribute;
 begin
   case typ of
     tetOpen: begin
-      result := cloneShallow(self);
+      result := cloneShallowNoAttributes(targetDocument, newRoot, newBaseOffset);
       for a in getEnumeratorAttributes do
         result.addAttribute(TTreeAttribute(a.clone(targetDocument, newRoot, newBaseOffset)));
-      result.reverse := cloneShallow(reverse);
+      result.reverse := reverse.cloneShallowNoAttributes(targetDocument, newRoot, newBaseOffset);
       result.reverse.reverse := result;
       result.next := result.reverse;
       result.reverse.previous := result;
@@ -1894,18 +1898,10 @@ begin
         kid := kid.getNextSibling();
       end;
     end;
-    tetText, tetComment: result := cloneShallow(self);
-    tetAttribute, tetNamespace: begin
-      if namespace <> nil then targetDocument.addNamespace(namespace);
-      result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue);
-      result.namespace := namespace;
-      result.typ := typ;
-      result.root := newRoot;
-      result.offset := newBaseOffset;
-      inc(newBaseOffset);
-    end;
+    tetText, tetComment, tetAttribute, tetNamespace:
+      result := cloneShallowNoAttributes(targetDocument, newRoot, newBaseOffset);
     tetProcessingInstruction: begin
-      result := cloneShallow(self);
+      result := cloneShallowNoAttributes(targetDocument, newRoot, newBaseOffset);
       if attributes <> nil then result.attributes := TTreeAttribute(attributes.clone(targetDocument, newRoot, newBaseOffset));
     end;
     tetDocument: exit( TTreeDocument(self).clone() );

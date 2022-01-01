@@ -330,10 +330,13 @@ begin
 
   //transform extension
   m('outer-xml($test-doc := document { <r> <a id="foo"> text </a> <span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span>  </r> })', '<r> <a id="foo"> text </a> <span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span>  </r>');
-  m('outer-xml(transform($test-doc, function($x) { if ($x instance of text()) then () else $x  }))', '<r><a id="foo"/><span class="bar"><!--comment--><a class="foo" href="index.html"/></span></r>');
+  m('outer-xml(x:transform-nodes($test-doc, function($x) { if ($x instance of text()) then () else $x  }))', '<r><a id="foo"/><span class="bar"><!--comment--><a class="foo" href="index.html"/></span></r>');
   m('outer-xml($test-doc!transform(function($x) { if ($x instance of attribute(href)) then attribute href { "changedlink.html" } else $x  }))', '<r> <a id="foo"> text </a> <span class="bar"><!--comment--><a class="foo" href="changedlink.html">...</a></span>  </r>');
   m('outer-xml($test-doc!transform(function($x) { if ($x/@id eq "foo") then <a id="foo" href=".."/> else if ($x instance of comment()) then () else $x  }))', '<r> <a id="foo" href=".."/> <span class="bar"><a class="foo" href="index.html">...</a></span>  </r>');
-  //that is not working because and is not shortcutted TODO m('outer-xml($test-doc!transform(function($x) { if ($x instance of text()) then normalize-space($x) else $x  }))', '<r><a id="foo">text</a><span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span></r>');
+  m('outer-xml($test-doc!transform(function($x) { if ($x instance of text()) then normalize-space($x) else $x  }))', '<r><a id="foo">text</a><span class="bar"><!--comment--><a class="foo" href="index.html">...</a></span></r>');
+
+  m('outer-xml(transform(<a/>, function($x) { switch(name($x)) case "a" return <b/> case "b" return <c/> default return <x/> }, {"always-recurse": true()}))', '<b/>');
+  m('outer-xml(transform(<a/>, function($x) { switch(name($x)) case "a" return <b><b/></b> case "b" return <c><c/></c> default return <x></x> }, {"always-recurse": true()}))', '<b><c><x/></c></b>');
 
   m('x:replace-nodes(<a x="y">b</a>, function($x) { if ($x instance of text()) then "foo" else $x  }) ! outer-xml(.)', '<a x="y">b</a>');
   m('x:replace-nodes(<a x="y">b</a>/text(), function($x) { if ($x instance of text()) then "foo" else $x  }) ! outer-xml(.)', '<a x="y">foo</a>');
@@ -343,6 +346,10 @@ begin
   m('x:replace-nodes(<a x="y">b<z/>c</a>/text(), "T") ! outer-xml(.)', '<a x="y">T<z/>T</a>');
   m('x:replace-nodes(<a x="y">b<z/>c</a>/*, "T") ! outer-xml(.)', '<a x="y">bTc</a>');
   m('x:replace-nodes(<a x="y">b<z/>c</a>/text(), function ($t) { upper-case($t) } ) ! outer-xml(.)', '<a x="y">B<z/>C</a>');
+  m('x:replace-nodes((), (), ())', '');
+  m('x:replace-nodes((), <a/>, "a")', '');
+  m('join(let $a := <a>aa</a>, $b := <b>bb</b>, $c := <c>cc</c> return  x:replace-nodes(($a, $b, $c), ($a, $c), ("x", "y")))', 'x y bb x y');
+  m('(let $a := <a>aa</a>, $b := <b>bb</b>, $c := <c>cc</c> return  x:replace-nodes(($a, $b, $c), ($a, $c)/text(), ("x", "y"))) ! outer-xml(.)', '<a>x y</a><b>bb</b><c>x y</c>');
 
   //serialization
   m('serialize(<abc>123</abc>)', '<abc>123</abc>');

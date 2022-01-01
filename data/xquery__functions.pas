@@ -8499,6 +8499,221 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+type TNodeTransformFlags = set of (ntfOnlyTransformSomeNodes, ntfAlwaysRecurse);
+     TNodeTransformer = record
+       context: PXQEvaluationContext;
+       flags: TNodeTransformFlags;
+       transformFunction: TXQValueFunction;
+       replacementValue: IXQValue;
+       nodesToChangeInDocumentOrder: array of TTreeNode;
+       function transformNode(root: TTreeNode; transformRootItself: boolean = true): IXQValue;
+       function transformNodes(const roots: ixqvalue): IXQValue;
+       function transformNodes(const roots: array of TTreeNode): IXQValue;
+     end;
+
+function TNodeTransformer.transformNode(root: TTreeNode; transformRootItself: boolean = true): IXQValue;
+var indexInReplacementNodes: SizeInt;
+    replacement: IXQValue;
+    f: TXQBatchFunctionCall;
+  function getTransformation(node: TTreeNode): boolean;
+    procedure recursiveTransform;
+    var old, r: IXQValue;
+      seq: TXQValueSequence;
+      pv: PIXQValue;
+    begin
+      if not (replacement.kind in [pvkNode, pvkSequence]) then exit;
+      old := replacement;
+      replacement := nil;
+      seq := nil;
+      for pv in old.GetEnumeratorPtrUnsafe do begin
+        if pv^.kind <> pvkNode then r := pv^
+        else r := transformNode(pv^.toNode, false);
+        xqvalueSeqConstruct(replacement, seq, r);
+      end;
+      if replacement = nil then replacement := xqvalue();
+    end;
+
+  var
+    wrapped: IXQValue;
+  begin
+    if ntfOnlyTransformSomeNodes in flags then begin
+      if (indexInReplacementNodes > high(nodesToChangeInDocumentOrder)) or (node <> nodesToChangeInDocumentOrder[indexInReplacementNodes]) then
+        exit(false);
+      inc(indexInReplacementNodes);
+    end;
+    if replacementValue <> nil then begin
+      replacement := replacementValue;
+      exit(true);
+    end;
+    result := false;
+    if transformFunction <> nil then begin
+      wrapped := xqvalue(node);
+      replacement := f.call1(wrapped);
+      //writeln('in: ', wrapped.toXQuery, ' out: ', replacement.toXQuery);
+      result := (replacement.kind <> pvkNode) or (node <> replacement.toNode);
+      if result and (ntfAlwaysRecurse in flags) then recursiveTransform;
+    end;
+  end;
+var treeBuilder: TXQTreeBuilder;
+  procedure transformAttributes(node: TTreeNode);
+  var a: TTreeAttribute;
+  begin
+    if node.attributes = nil then exit;
+    for a in node.getEnumeratorAttributes do begin
+      if getTransformation(a) then treeBuilder.appendValue(replacement)
+      else treeBuilder.appendAttribute(a.value, a.realvalue); //todo
+    end;
+  end;
+
+var node: TTreeNode;
+begin
+  indexInReplacementNodes := 0;
+  while (indexInReplacementNodes <= high(nodesToChangeInDocumentOrder)) and (root.getRootHighest() <> nodesToChangeInDocumentOrder[indexInReplacementNodes].getRootHighest()) do
+    inc(indexInReplacementNodes);
+  if transformFunction <> nil then
+    f.init(context^, transformFunction, nil);
+  try
+    if transformRootItself and getTransformation(root) then begin
+      result := replacement;
+      exit;
+    end;
+
+    case root.typ of
+      tetDocument: begin
+        treeBuilder.initDocument(context);
+        treeBuilder.currentDocument.baseURI := root.getDocument().baseURI;
+        treeBuilder.currentDocument.documentURI := root.getDocument().documentURI;
+        treeBuilder.currentDocument.baseEncoding := root.getDocument().baseEncoding;
+      end;
+      tetOpen: begin
+        treeBuilder.initFreeStandingElement(context);
+        treeBuilder.appendFreeStandingRootNode(root.cloneShallowNoAttributes(treeBuilder.currentDocument, treeBuilder.currentRoot, treeBuilder.baseoffset));
+      end;
+      else exit(xqvalue(root));
+    end;
+    try
+      if root.attributes <> nil then transformAttributes(root);
+      node := root.next;
+      while (node <> root.reverse) do begin
+        if node.typ = tetClose then begin
+          treeBuilder.closeElement;
+          treeBuilder.frame.previousValueWasAtomic := false;
+          node := node.next;
+        end else if getTransformation(node) then begin
+          treeBuilder.appendValue(replacement);
+          if node.reverse <> nil then node := node.reverse.next
+          else node := node.next;
+        end else begin
+          treeBuilder.appendClonedTagAsChildUncheckedNoAttributes(node);
+          if node.attributes <> nil then transformAttributes(node);
+          node := node.next;
+        end;
+      end;
+      if node = root.reverse then
+        if root.typ = tetOpen then treeBuilder.closeElement
+        else treeBuilder.closeAllElementsAndDocument;
+      result := xqvalue(treeBuilder.currentRoot);
+    finally
+      treeBuilder.done;
+    end;
+  finally
+    if transformFunction <> nil then
+      f.done;
+  end;
+end;
+
+function TNodeTransformer.transformNodes(const roots: ixqvalue): IXQValue;
+var aroots: array of TTreeNode;
+    i: sizeint;
+begin
+  SetLength(aroots, roots.Count);
+  for i := 0 to high(aroots) do aroots[i] := roots.get(i + 1).toNode;
+  result := transformNodes(aroots);
+end;
+
+function TNodeTransformer.transformNodes(const roots: array of TTreeNode): IXQValue;
+var
+  resseq: TXQValueSequence = nil;
+  i: sizeint;
+begin
+  result := nil;
+  for i := 0 to high(roots) do
+    xqvalueSeqConstruct(result, resseq, transformNode(roots[i]));
+  if result = nil then result := xqvalue;
+end;
+
+function xqFunctionTransform_Nodes(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var roots: array of TTreeNode;
+    transformer: TNodeTransformer;
+    i: SizeInt;
+begin
+  transformer := default(TNodeTransformer);
+  transformer.context := @context;
+  if argc = 1 then begin
+    SetLength(roots, 1);
+    roots[0] := context.contextNode(true);
+    transformer.transformFunction := args[0] as TXQValueFunction;
+  end else begin
+    SetLength(roots, args[0].Count);
+    for i := 0 to args[0].Count - 1 do roots[i] := args[0].get(i + 1).toNode;
+    transformer.transformFunction := args[1] as TXQValueFunction;
+  end;
+  if argc = 3 then begin
+    if args[2].getProperty('always-recurse').toBooleanEffective then include(transformer.flags, ntfAlwaysRecurse);
+  end;
+  result := transformer.transformNodes(roots);
+end;
+
+function xqFunctionTransform_Nodes_Deprecated(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  if assigned(context.staticContext.sender.OnWarningDeprecated) then
+    context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'pxp:transform(..) is deprecated, use x:transform-nodes(..)');
+  result := xqFunctionTransform_Nodes(context, argc, args);
+end;
+
+(*
+x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar, itemStar], '($root as item()*, $nodes as item()*, $replacement as item()* ) as item()*', 'pxp:transform($root, function($i) {' +
+  ' if ($nodes[. is $i]) then if ($replacement instance of function(* )) then $replacement($i) else $replacement else $i'+
+'})');
+x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar], '($nodes as item()*, $replacement as item()*) as item()*', 'x:replace-nodes(($nodes!root())|(), $nodes, $replacement)');
+*)
+function xqFunctionReplace_Nodes(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+var roots: array of TTreeNode;
+    transformer: TNodeTransformer;
+    i: SizeInt;
+    replacement: PIXQValue;
+    nodesToChange: TXQVList;
+    documentRoots: IXQValue;
+begin
+  transformer := default(TNodeTransformer);
+  transformer.context := @context;
+  transformer.flags := [ntfOnlyTransformSomeNodes];
+  nodesToChange := args[argc - 2].toXQVList;
+  try
+    nodesToChange.sortInDocumentOrderUnchecked();
+    SetLength(transformer.nodesToChangeInDocumentOrder, nodesToChange.Count);
+    for i := 0 to high(transformer.nodesToChangeInDocumentOrder) do
+      transformer.nodesToChangeInDocumentOrder[i] := nodesToChange[i].toNode;
+    replacement := @args[argc - 1];
+    if replacement.kind = pvkFunction then transformer.transformFunction := replacement^ as TXQValueFunction
+    else transformer.replacementValue := replacement^;
+    if argc = 3 then documentRoots := args[0]
+    else if length(transformer.nodesToChangeInDocumentOrder) = 0 then exit(xqvalue)
+    else begin
+      nodesToChange.clear;
+      nodesToChange.add(xqvalue(transformer.nodesToChangeInDocumentOrder[0].getRootHighest()));
+      for i := 1 to high(transformer.nodesToChangeInDocumentOrder) do
+        if transformer.nodesToChangeInDocumentOrder[i - 1].getRootHighest() <> transformer.nodesToChangeInDocumentOrder[i].getRootHighest() then
+          nodesToChange.add(xqvalue(transformer.nodesToChangeInDocumentOrder[i].getRootHighest()));
+      documentRoots := TXQValueSequence.create(nodesToChange);
+      nodesToChange := nil;
+    end;
+    result := transformer.transformNodes(documentRoots);
+  finally
+    nodesToChange.free;
+  end;
+end;
+
 var fn3, fn3_1, fn4, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap, fnmap4: TXQNativeModule;
 
 
@@ -8598,26 +8813,16 @@ begin
   pxpold.registerFunction('request-combine', @xqFunctionRequest_combine, dependencyNodeCollation).setVersionsShared([item, itemStar, map]); //planed replacement for form-combine and uri-combine (but name is not final yet)
   pxpold.registerFunction('request-decode', @xqFunctionRequest_decode, dependencyNodeCollation).setVersionsShared([item, map]);
 
-  {transform
-[[itemStar, functiont, map, itemStar]]
-transform
-[[itemStar, functiont, itemStar]]
-transform
-[[functiont, itemStar]]}
-  pxpold.registerInterpretedFunction('transform', [itemStar, functiont, map, itemStar], '($root as item()*, $f as function(*), $options as object()) as item()*',
-  'for $i in $root return $f($i)!(if (. instance of node() and ( . is $i or $options("always-recurse") ) ) then ('+
-  '                typeswitch (.)'+
-  '                  case element() return element {node-name(.)} { @* ! $f(.), node()!pxp:transform(., $f, $options) }'+
-  '                  case document-node() return document {  node() ! pxp:transform(., $f, $options) }'+
-  '                  default return .'+
-  '             ) else . )');
-  pxpold.registerInterpretedFunction('transform', [itemStar, functiont, itemStar], '($root as item()*, $f as function(*)) as item()*', 'pxp:transform($root, $f, {})');
-  pxpold.registerInterpretedFunction('transform', [functiont, itemStar], '($f as function(*)) as item()*', 'pxp:transform(., $f, {})');
+  pxpold.registerFunction('transform', @xqFunctionTransform_Nodes_Deprecated, [itemStar, functiont, map, itemStar], [xqcdContextOther]);
+  pxpold.registerFunction('transform', @xqFunctionTransform_Nodes_Deprecated, [itemStar, functiont, itemStar], [xqcdContextOther]);
+  pxpold.registerFunction('transform', @xqFunctionTransform_Nodes_Deprecated, [functiont, itemStar], [xqcdContextOther]);
 
-  x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar, itemStar], '($root as item()*, $nodes as item()*, $replacement as item()*) as item()*', 'pxp:transform($root, function($i) {' +
-    ' if ($nodes[. is $i]) then if ($replacement instance of function(*)) then $replacement($i) else $replacement else $i'+
-  '})');
-  x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar], '($nodes as item()*, $replacement as item()*) as item()*', 'x:replace-nodes(($nodes!root())|(), $nodes, $replacement)');
+
+  x.registerFunction('transform-nodes', @xqFunctionTransform_Nodes, [itemStar, functiont, map, itemStar], [xqcdContextOther]);
+  x.registerFunction('transform-nodes', @xqFunctionTransform_Nodes, [itemStar, functiont, itemStar], [xqcdContextOther]);
+  x.registerFunction('transform-nodes', @xqFunctionTransform_Nodes, [functiont, itemStar], [xqcdContextOther]);
+  x.registerFunction('replace-nodes',  @xqFunctionReplace_Nodes, [itemStar, itemStar, itemStar, itemStar], [xqcdContextOther]);
+  x.registerFunction('replace-nodes',  @xqFunctionReplace_Nodes, [itemStar, itemStar, itemStar], [xqcdContextOther]);
 
   pxp.registerFunction('serialize-json', @xqFunctionSerialize_Json, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
@@ -9074,6 +9279,7 @@ begin
   fnmap.free;
   fnmap4.free;
 end;
+
 
 
 end.
