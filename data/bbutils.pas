@@ -5384,15 +5384,29 @@ end;
 //TODO: make it iterative => merge the two functions
 procedure stableSortSD(a,b: PAnsiChar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
 const psize = sizeof(TSortData);
+  function isSorted(): boolean;
+  var
+    x: PAnsiChar;
+  begin
+    x := a + psize;
+    while x <= b do begin
+      if compareFunction(compareFunctionData, x - psize, x) > 0 then
+        exit(false);
+      x := x + psize;
+    end;
+    result := true;
+  end;
+
 var tempArray: array of TSortData = nil;
     length:SizeInt;
 begin
   //calculate length and check if the input (size) is possible
-  length:=(b-a) div psize; //will be divided by pointer size automatically
+  length:=(b-a) div psize;
   if @a[length*psize] <> b then
     raise Exception.Create('Invalid size for sorting');
   if b<=a then
-    exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)y
+    exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
+  if isSorted then exit;
   inc(length); //add 1 because a=b if there is exactly one element
   setlength(tempArray,length);
   stableSortSDr(a,b,compareFunction,compareFunctionData,tempArray);
@@ -5438,12 +5452,14 @@ begin
   if @PAnsiChar(a)[length*size] <> b then
     raise Exception.Create('Invalid size for sorting');
   inc(length);
-  setlength(tempArray,length);
   if {$IFNDEF FPC}@{$ENDIF}compareFunction = nil then begin
     compareFunction:=@compareRawMemory; //todo: use different wrappers for the two if branches
     compareFunctionData:=UIntToObj(size);
   end;
-  if size < sizeof(TSortData) then begin
+  if size = sizeof(TSortData) then begin
+    stableSortSD(a,b, compareFunction,compareFunctionData);
+  end else if size < sizeof(TSortData) then begin
+    setlength(tempArray,length);
     //copy the values in the temp array
     for i:=0 to length-1 do
       move(PAnsiChar(a)[i*size], tempArray[i], size);
@@ -5451,6 +5467,7 @@ begin
     for i:=0 to length-1 do
       move(tempArray[i], PAnsiChar(a)[i*size], size);
   end else begin
+    setlength(tempArray,length);
     //fill the temp array with pointer to the values
     for i:=0 to length-1 do
       tempArray[i]:=@PAnsiChar(a)[i*size];
