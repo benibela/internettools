@@ -34,7 +34,8 @@ install:
   - if [[ "$LAZ_ENV" = wine ]]; then find $WINEPREFIX -iname '*fpc.cfg' | head -1 | xargs -i{} ln {} ~/.fpc.cfg; ls -l ~; fi
   - if [[ ! -e ~/.fpc.cfg ]]; then echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg; fi
   - mkdir -p import
-  - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet"
+  - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet -Fuimport/pasdblstrutils/src"
+  - git clone https://github.com/BeRo1985/pasdblstrutils.git import/pasdblstrutils
   - if [[ "$REGEX" != "USE_SOROKINS_REGEX"  ]]; then 
       git clone https://github.com/benibela/flre.git import/flre; 
       echo "-Fuimport/flre/src/" >> ~/.fpc.cfg;
