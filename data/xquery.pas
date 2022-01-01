@@ -2482,8 +2482,8 @@ type
 
     procedure appendValue(const v: IXQValue);
     procedure appendClonedNode(const n: TTreeNode);
-    procedure appendOwnedNodeAsChild(const n: TTreeNode);
-    procedure appendOwnedNode(const node: TTreeNode);
+    procedure appendOwnedTagAsChildUnchecked(const kid: TTreeNode);
+    procedure appendOwnedNode(kid: TTreeNode);
 
     function enterElementConstructor: TXQTreeBuilderStackFrame;
     procedure leaveElementConstructor(const aframe: TXQTreeBuilderStackFrame);
@@ -2503,7 +2503,9 @@ type
     namespace xy{..}                  no inherit                               inherit ?                       no inherit
     inherited                          => REMOVE                                                               => REMOVE
     *)
+    //Explicitly declared namespace like xmlns:ns="foo"
     procedure registerExplicitNamespace(n: TNamespace);
+    //Implicitly declared namespace like ns in <ns:element/>, not to be confused with the unrelated TXQTermConstructor.implicitNamespaces property
     procedure registerImplicitNamespace(n: TNamespace);
   end;
 

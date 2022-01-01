@@ -268,8 +268,9 @@ protected
   elementStack: TList;  //stack of currently open nodes that can have children (mostly elements, but the first node is the document)
   currentRoot: TTreeNode;
   currentNode: TTreeNode;
+  baseoffset: TTreeNodeIntOffset;
   function currentParent: TTreeNode;
-  function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: SizeInt = 0):TTreeNode;
+  function appendNodeInternal(typ:TTreeNodeType; const s: string; offset: TTreeNodeIntOffset = 0):TTreeNode;
   procedure initInternal(document: TTreeDocument; root: TTreeNode);
 public
   currentDocument: TTreeDocument;
@@ -766,6 +767,7 @@ begin
   currentDocument := document;
   currentRoot := root;
   currentNode := root;
+  baseoffset := 1;
 end;
 
 procedure TTreeBuilder.initDocument(creator: TTreeParser);
@@ -786,7 +788,7 @@ begin
   result := TTreeNode(elementStack.last)
 end;
 
-function TTreeBuilder.appendNodeInternal(typ: TTreeNodeType; const s: string; offset: SizeInt): TTreeNode;
+function TTreeBuilder.appendNodeInternal(typ: TTreeNodeType; const s: string; offset: TTreeNodeIntOffset): TTreeNode;
 begin
   result:=currentDocument.createNode();
   result.typ := typ;
@@ -794,8 +796,9 @@ begin
   result.root := currentRoot;
   //FTemplateCount+=1;
 
-  if offset > currentNode.offset then result.offset :=  offset
-  else result.offset := currentNode.offset + 1;
+  if offset < baseoffset then offset := baseoffset;
+  baseoffset := offset + 1;
+  result.offset := offset;
 
   currentNode.next := result;
   result.previous := currentNode;
@@ -838,7 +841,8 @@ end;
 procedure TTreeBuilder.appendAttribute(const name, value: string);
 begin
   assert(currentNode.typ = tetOpen);
-  currentNode.addAttribute(name, value);
+  currentNode.addAttribute(name, value).offset := baseoffset;
+  inc(baseoffset)
 end;
 
 function TTreeBuilder.closeElement: TTreeNode;
