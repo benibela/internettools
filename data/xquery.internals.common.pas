@@ -388,6 +388,7 @@ function xqround(const f: xqfloat): Int64;
 function TryStrToXQFloat(const s: string; out d: xqfloat): boolean;
 function TryStrToXQFloat(const str: pchar; length: SizeInt; out d: xqfloat): boolean;
 function StrToXQFloat(const s: string): xqfloat;
+function StrToXQFloatNoValidation(const str: pchar; length: SizeInt): xqfloat;
 
 const
   ENT_EMPTY=-1;
@@ -430,7 +431,7 @@ var
 
 implementation
 uses math, bbutilsbeta
-    {$ifdef USE_PASDBLSTRUTILS}, PasDblStrUtils{$endif};
+    {$if defined(USE_PASDBLSTRUTILS) or defined(USE_PASDBLSTRUTILS_FOR_JSON)}, PasDblStrUtils{$endif};
 
 function TXQBaseHashmapValuePointerLikeReadOnly.TValueEnumerator.getEnumerator: TValueEnumerator;
 begin
@@ -904,6 +905,15 @@ function StrToXQFloat(const s: string): xqfloat;
 begin
   if not TryStrToXQFloat(s, result) then
     result := NaN;
+end;
+
+function StrToXQFloatNoValidation(const str: pchar; length: SizeInt): xqfloat;
+begin
+  {$ifdef USE_PASDBLSTRUTILS_FOR_JSON}
+  result := ConvertStringToDouble(str, length, rmNearest, nil);
+  {$else}
+  TryStrToXQFloat(str, length, result);
+  {$endif}
 end;
 
 procedure TJSONXHTMLStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);

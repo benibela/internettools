@@ -5,6 +5,8 @@
 {$DEFINE USE_FLRE_WITH_CACHE}          //As above, but parse every regex only once
 {$endif}
 
+//here you can choose which string to double converter to use
+{$DEFINE USE_PASDBLSTRUTILS_FOR_JSON}
 
 //{$define USE_PASDBLSTRUTILS}
 

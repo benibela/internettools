@@ -6165,15 +6165,10 @@ begin
       if tempview.contains('E')  or tempview.contains('e')   then exit(baseSchema.double.createValue(tempd))
       else if tempview.contains('.')  then exit(baseSchema.decimal.createValue(tempd))
       else exit(baseSchema.integer.createValue(tempd));
-    if TryStrToXQFloat(scanner.CurTokenStart, scanner.CurTokenLength, tempFloat) then
-      if tempview.contains('E')  or tempview.contains('e')   then exit(baseSchema.double.createValue(tempFloat))
-      else exit(TXQValueDecimal.create(tempFloat));
-  end else begin
-    if TryStrToXQFloat(scanner.CurTokenStart, scanner.CurTokenLength, tempFloat) then
-      exit(baseSchema.double.createValue(tempFloat))
   end;
-  raiseError('Invalid number');
-  result := nil; //hide warning
+  exit(baseSchema.double.createValue(StrToXQFloatNoValidation(scanner.CurTokenStart, scanner.CurTokenLength)))
+  //raiseError('Invalid number');
+  //result := nil; //hide warning
 end;
 
 procedure TXQJsonParser.setCurrentContainer;
