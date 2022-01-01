@@ -35,7 +35,7 @@ install:
   - if [[ ! -e ~/.fpc.cfg ]]; then echo '#INCLUDE /etc/fpc.cfg' > ~/.fpc.cfg; fi
   - mkdir -p import
   - FPCSEARCHPATHS="-Fudata -Fidata -Fuinternet -Fuimport/pasdblstrutils/src"
-  - git clone https://github.com/BeRo1985/pasdblstrutils.git import/pasdblstrutils
+  - mkdir -p import/pasdblstrutils/src && curl https://raw.githubusercontent.com/BeRo1985/pasdblstrutils/master/src/PasDblStrUtils.pas > import/pasdblstrutils/src/PasDblStrUtils.pas
   - if [[ "$REGEX" != "USE_SOROKINS_REGEX"  ]]; then 
       git clone https://github.com/benibela/flre.git import/flre; 
       echo "-Fuimport/flre/src/" >> ~/.fpc.cfg;
