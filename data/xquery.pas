@@ -9243,6 +9243,7 @@ begin
             cachedNamespaceURL := oldnode.getNamespaceURL(command.namespaceURLOrPrefix);
             if cachedNamespaceURL = '' then continue;
           end;
+          newList.Count:=0;
 
           for attrib in oldnode.getEnumeratorAttributes do begin
             if      (not (qmValue in command.matching) or ((attrib.hash = command.valueHash) and striEqual(attrib.value, command.value)))
