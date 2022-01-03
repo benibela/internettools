@@ -1413,10 +1413,10 @@ begin
   jsonItemOrEmpty := TXQTermSequenceType.create(baseJSONiqSchema.jsonItem, true);  jsonItemStar := star(jsonItemOrEmpty);
 
   functiont := TXQTermSequenceType.create(tikFunctionTest); functiontOrEmpty := orEmpty(functiont);
-  functionItemAtomicStar := f([item, atomicStar]); functionAtomicItemStarItemStar := f([atomic,itemStar,itemStar]); functionItemStarAtomicStar := f([itemStar,atomicStar]);
+  functionItemAtomicStar := f([item, atomicStar]); functionItemAtomicOrEmpty := f([item, atomicOrEmpty]);  functionAtomicItemStarItemStar := f([atomic,itemStar,itemStar]); functionItemStarAtomicStar := f([itemStar,atomicStar]);
   functionItemStarItemItemStar := f([itemStar,item,itemStar]); functionItemItemStarItemStar := f([item,itemStar,itemStar]); functionItemItemItemStar := f([item,item,itemStar]);
   functionItemStarItemStar := f([itemStar,itemStar]); functionItemStarBoolean := f([itemStar, boolean]); functionItemStarItemStarItemStar := f([itemStar,itemStar,itemStar]);
-  functionItemItemStar := f([item, itemStar]); functionItemBoolean := f([item, boolean]); functionAtomicItemStarBoolean := f([atomic,itemStar,boolean]);
+  functionItemItemStar := f([item, itemStar]); functionItemBoolean := f([item, boolean]); functionAtomicItemStarBoolean := f([atomic,itemStar,boolean]); functionItemStarItemBoolean := f([itemStar, item, boolean]);
 
   node := TXQTermSequenceType.create(tikElementTest); node.nodeMatching.typ := tneaDirectChild; node.nodeMatching.matching := [qmElement, qmText, qmComment, qmProcessingInstruction, qmAttribute, qmDocument];
   nodeOrEmpty := orEmpty(node); nodeStar := star(node);

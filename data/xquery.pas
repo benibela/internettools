@@ -3524,10 +3524,10 @@ public
     null, jsonItemOrEmpty, jsonItemStar,
 
     functiont, functiontOrEmpty,
-    functionItemAtomicStar, functionAtomicItemStarItemStar, functionItemStarAtomicStar,
+    functionItemAtomicStar, functionItemAtomicOrEmpty,  functionAtomicItemStarItemStar, functionItemStarAtomicStar,
     functionItemStarItemItemStar, functionItemItemStarItemStar, functionItemItemItemStar,
     functionItemStarItemStar, functionItemStarBoolean, functionItemStarItemStarItemStar,
-    functionItemItemStar, functionItemBoolean, functionAtomicItemStarBoolean,
+    functionItemItemStar, functionItemBoolean, functionAtomicItemStarBoolean, functionItemStarItemBoolean,
 
     node, nodeOrEmpty, nodeStar,
     element, elementStar,
@@ -3535,7 +3535,7 @@ public
     elementSerializationParams, elementSerializationParamsOrEmpty
     : TXQTermSequenceType;
   );
-  false: (cachedTypes: array[1..85] of TXQTermSequenceType);
+  false: (cachedTypes: array[1..87] of TXQTermSequenceType);
 end;
 var globalTypes: TXQGlobalTypes;
 

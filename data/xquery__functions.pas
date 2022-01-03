@@ -7447,6 +7447,41 @@ begin
   flatten(argv^.GetEnumeratorPtrUnsafe, list);
 end;
 
+function xqFunctionArrayPartition(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
+var
+  f: TXQBatchFunctionCall;
+  resseq, currentPartition: TXQValueSequence;
+  pv: PIXQValue;
+  list: IXQValue;
+begin
+  resseq := nil;
+  result := nil;
+  currentPartition := TXQValueSequence.create();
+  currentPartition._AddRef;
+  list := argv[0];
+  f.init(context, argv[1], xqvalue());
+  try
+    for pv in list.GetEnumeratorPtrUnsafe do with f do begin
+      stack.topptr(0)^ := pv^;
+      if call.toBooleanEffective then begin
+        if currentPartition.seq.Count > 0 then
+          xqvalueSeqConstruct(result, resseq, TXQValueJSONArray.create(currentPartition.seq));
+        currentPartition.seq := TXQVList.create();
+      end;
+      currentPartition.add(pv^);
+      case currentPartition.seq.Count of
+        //0: stack.topptr(1)^ := xqvalue;
+        1: stack.topptr(1)^ := currentPartition.seq[0];
+        else stack.topptr(1)^ := currentPartition;
+      end;
+    end;
+  finally
+    f.done;
+    xqvalueSeqConstruct(result, resseq, TXQValueJSONArray.create(currentPartition.seq));
+    currentPartition.seq := nil;
+    currentPartition._Release;
+  end;
+end;
 
 function xqFunctionMapMerge(argc: SizeInt; argv: PIXQValue): IXQValue;
 var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
@@ -8714,7 +8749,7 @@ begin
   end;
 end;
 
-var fn3, fn3_1, fn4, fn, pxp, pxpold, op, op3_1, x, fnarray, fnmap, fnmap4: TXQNativeModule;
+var fn3, fn3_1, fn4, fn, pxp, pxpold, op, op3_1, x, fnarray, fnarray4, fnmap, fnmap4: TXQNativeModule;
 
 
 procedure initializeFunctions;
@@ -9067,7 +9102,9 @@ begin
 
 
 
-  fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
+  fnarray4 := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
+  fnarray4.acceptedModels := PARSING_MODEL4;
+  fnarray := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray, [fnarray4]);
   fnarray.acceptedModels := PARSING_MODEL3_1;
   TXQueryEngine.registerNativeModule(fnarray);
   fnarray.reserveFunctionMemory(12,6,0);
@@ -9093,6 +9130,7 @@ begin
   lastfn.setVersionsShared(1, [arrayt, stringOrEmpty, arrayt]);
   lastfn.setVersionsShared(2, [arrayt, stringOrEmpty, functionItemStarAtomicStar, arrayt]);
   fnarray.registerFunction('flatten', @xqFunctionArrayFlatten).setVersionsShared([itemStar, itemStar]);
+  fnarray4.registerFunction('partition', @xqFunctionArrayPartition, [xqcdContextOther]).setVersionsShared([itemStar, functionItemStarItemBoolean, arrayStar{arrayPlus}]);
 
   fnmap4 := TXQNativeModule.Create(XMLnamespace_XPathFunctionsMap);
   fnmap4.acceptedModels := PARSING_MODEL4;
@@ -9112,6 +9150,7 @@ begin
   fnmap.registerFunction('for-each', @xqFunctionMapFor_each, [xqcdContextOther]).setVersionsShared([map, functionAtomicItemStarItemStar, itemStar]);
 
   fnmap4.registerFunction('filter', @xqFunctionMapFilter, [xqcdContextOther]).setVersionsShared([map, functionAtomicItemStarBoolean, map]);
+  fnmap4.registerInterpretedFunction('group-by', [itemStar, functionItemAtomicOrEmpty, map], '($input as item()*, $key as function(item()) as xs:anyAtomicType?) as map(*))', 'map:merge(for $item in $input,$k in $key($item) return map:entry($k, $item),map{"duplicates":"combine"})', []);
 
 
   //Operators
@@ -9276,6 +9315,7 @@ begin
   op.free;
   op3_1.free;
   fnarray.free;
+  fnarray4.free;
   fnmap.free;
   fnmap4.free;
 end;
