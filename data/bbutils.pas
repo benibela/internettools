@@ -834,7 +834,7 @@ const WHITE_SPACE=[#9,#10,#13,' '];
 //----------------------------Others-----------------------------------
 //**Compare function to compare the two values to which a and b, ideally returning -1 for a^<b^, 0 for a^=b^, +1 for a^>b^
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
-//**so the function use the same call convention like a method
+//**so the function use the same calling convention as a method
 type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**General stable sort function @br
 //**a is the first element in the array to sort, and b is the last. size is the size of every element@br
@@ -5309,108 +5309,93 @@ end;
 
 
 //================================Others===================================
-type TSortData = Pointer;
-     PSortData = ^TSortData; //ppointer would be to confusing (and howfully there will be generics in the stable binaries soon)
-//universal stabile sort function (using merge sort in the moment)
-procedure stableSortSDr(a,b: pansichar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject; tempArray: array of TSortData);
-const psize = sizeof(TSortData);
-var length,i,j,mi: cardinal;
-    m,n,oldA:PAnsiChar;
-    tempItem: TSortData;
-begin
-  //calculate length and check if the input (size) is possible
-  length:=(b-a) div sizeof(TSortData);
-  if @a[sizeof(TSortData) * length] <> b then
-    raise Exception.Create('Invalid size for sorting');
-  if b<=a then
-    exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
-  inc(length); //add 1 because a=b if there is exactly one element
-
-  //check for small input and use insertsort if small
-  if length<8 then begin
-    for i:=1 to length-1 do begin
-      j:=i;
-      //use place to insert
-      while (j>0) and (compareFunction(compareFunctionData, a + (j-1)*psize, a+i*psize) > 0) do
-        dec(j);
-      if i<>j then begin
-        //save temporary in tempItem (size is checked) and move block forward
-        tempItem:=PSortData(a+i*psize)^;
-        move((a+j*psize)^, (a+(j+1)*psize)^, psize*(i-j));
-        PSortData(a+j*psize)^:=tempItem;
-      end;
-    end;
-    exit; //it is now sorted with insert sort
-  end;
 
 
-  //use merge sort
-  assert(length<=cardinal(high(tempArray)+1));
-  //rec calls
-  mi:=length div 2;
-  m:=a+mi*psize;   //will stay constant during merge phase
-  n:=a+(mi+1)*psize; //will be moved during merge phase
-  stableSortSDr(a, m, compareFunction, compareFunctionData,tempArray);
-  stableSortSDr(n, b, compareFunction, compareFunctionData,tempArray);
+//\\\------------------modified from FPC sortbase (LGPL)---------------------------------////
+procedure QuickSort_PtrList_Context(ItemPtrs: PPointer; ItemCount: SizeUInt; Comparer: TPointerCompareFunction; Context: TObject);
 
-  //merging
-  oldA:=a;
-  i:=0;
-  while (a <= m) and (n <= b) do begin
-    if compareFunction(compareFunctionData,a,n)<=0 then begin
-      tempArray[i]:=PSortData(a)^;
-      inc(a, psize); //increase by pointer size
-    end else begin
-      tempArray[i]:=PSortData(n)^;
-      inc(n, psize);
-    end;
-    inc(i);
-  end;
-  while a <= m do begin
-    tempArray[i]:=PSortData(a)^;
-    inc(a, psize);
-    inc(i);
-  end;
-  while n <= b do begin
-    tempArray[i]:=PSortData(n)^;
-    inc(n, psize);
-    inc(i);
-  end;
-
-  move(tempArray[0],oldA^,length*sizeof(TSortData));
-end;
-
-//just allocates the memory for the recursive stableSort4r
-//TODO: make it iterative => merge the two functions
-procedure stableSortSD(a,b: PAnsiChar; compareFunction: TPointerCompareFunction; compareFunctionData: TObject);
-const psize = sizeof(TSortData);
-  function isSorted(): boolean;
+  function StableLessThan(P, Q: Pointer): boolean;
   var
-    x: PAnsiChar;
+    temp: longint;
   begin
-    x := a + psize;
-    while x <= b do begin
-      if compareFunction(compareFunctionData, x - psize, x) > 0 then
-        exit(false);
-      x := x + psize;
-    end;
-    result := true;
+    temp := Comparer(context, P, Q);
+    result := (temp < 0) or ( (temp = 0) and  (P < Q) )
+  end;
+  function StableGreaterThan(P, Q: Pointer): boolean;
+  var
+    temp: longint;
+  begin
+    temp := Comparer(context, P, Q);
+    result := (temp > 0) or ( (temp = 0) and  (P > Q) )
   end;
 
-var tempArray: array of TSortData = nil;
-    length:SizeInt;
+  procedure QuickSort(L, R : SizeUInt);
+  var
+    I, J, PivotIdx : SizeUInt;
+    P, Q : Pointer;
+  begin
+    repeat
+      I := L;
+      J := R;
+      PivotIdx := L + ((R - L) shr 1); { same as ((L + R) div 2), but without the possibility of overflow }
+      P := ItemPtrs[PivotIdx];
+      repeat
+        while (I < PivotIdx) and (StableGreaterThan(P, ItemPtrs[I])) do
+          Inc(I);
+        while (J > PivotIdx) and (StableLessThan(P, ItemPtrs[J])) do
+          Dec(J);
+        if I < J then
+        begin
+          Q := ItemPtrs[I];
+          ItemPtrs[I] := ItemPtrs[J];
+          ItemPtrs[J] := Q;
+          if PivotIdx = I then
+          begin
+            PivotIdx := J;
+            Inc(I);
+          end
+          else if PivotIdx = J then
+          begin
+            PivotIdx := I;
+            Dec(J);
+          end
+          else
+          begin
+            Inc(I);
+            Dec(J);
+          end;
+        end;
+      until I >= J;
+      // sort the smaller range recursively
+      // sort the bigger range via the loop
+      // Reasons: memory usage is O(log(n)) instead of O(n) and loop is faster than recursion
+      if (PivotIdx - L) < (R - PivotIdx) then
+      begin
+        if (L + 1) < PivotIdx then
+          QuickSort(L, PivotIdx - 1);
+        L := PivotIdx + 1;
+      end
+      else
+      begin
+        if (PivotIdx + 1) < R then
+          QuickSort(PivotIdx + 1, R);
+        if (L + 1) < PivotIdx then
+          R := PivotIdx - 1
+        else
+          exit;
+      end;
+    until L >= R;
+  end;
+
 begin
-  //calculate length and check if the input (size) is possible
-  length:=(b-a) div psize;
-  if @a[length*psize] <> b then
-    raise Exception.Create('Invalid size for sorting');
-  if b<=a then
-    exit; //no exception, b<a is reasonable input for empty array (and b=a means it is sorted already)
-  if isSorted then exit;
-  inc(length); //add 1 because a=b if there is exactly one element
-  setlength(tempArray,length);
-  stableSortSDr(a,b,compareFunction,compareFunctionData,tempArray);
+  if not Assigned(ItemPtrs) or (ItemCount < 2) then
+    exit;
+  QuickSort(0, ItemCount - 1);
 end;
+///------------------------------------------------------------------\\
+
+
+
 
 type TCompareFunctionWrapperData = record
   realFunction: TPointerCompareFunction;
@@ -5437,44 +5422,52 @@ end;
 
 procedure stableSort(a,b: pointer; size: SizeInt;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
-var tempArray: array of pointer = nil; //assuming sizeof(pointer) = sizeof(TSortData)
-    tempBackArray: array of SizeInt = nil;
-    i, length:SizeInt;
-    data: TCompareFunctionWrapperData;
-    tempData: pansichar;
-begin
-  if size=sizeof(TSortData) then begin
-    stableSortSD(a,b,compareFunction,compareFunctionData);
-    exit;
+  function isSorted(): boolean;
+  var
+    x: PAnsiChar;
+  begin
+    x := PAnsiChar(a) + size;
+    while x <= PAnsiChar(b) do begin
+      if compareFunction(compareFunctionData, x - size, x) > 0 then
+        exit(false);
+      x := x + size;
+    end;
+    result := true;
   end;
-  //use temporary array (merge sort will anyways use additional memory)
+var tempArray: array of pointer = nil;
+    tempBackArray: array of SizeInt = nil;
+    i, length:SizeUInt;
+    tempData, c: pansichar;
+begin
+  if a >= b then exit;
   length:=(PAnsiChar(b)-PAnsiChar(a)) div size;
-  if @PAnsiChar(a)[length*size] <> b then
-    raise Exception.Create('Invalid size for sorting');
+  assert(@PAnsiChar(a)[length*size] = b);
   inc(length);
-  if {$IFNDEF FPC}@{$ENDIF}compareFunction = nil then begin
-    compareFunction:=@compareRawMemory; //todo: use different wrappers for the two if branches
+
+  if compareFunction = nil then begin
+    compareFunction:=@compareRawMemory; //todo: use different wrappers depending on size
     compareFunctionData:=UIntToObj(size);
   end;
-  if size = sizeof(TSortData) then begin
-    stableSortSD(a,b, compareFunction,compareFunctionData);
-  end else if size < sizeof(TSortData) then begin
-    setlength(tempArray,length);
-    //copy the values in the temp array
-    for i:=0 to length-1 do
-      move(PAnsiChar(a)[i*size], tempArray[i], size);
-    stableSortSD(@tempArray[0],@tempArray[length-1], compareFunction,compareFunctionData);
-    for i:=0 to length-1 do
-      move(tempArray[i], PAnsiChar(a)[i*size], size);
+
+  if isSorted() then exit;
+
+  setlength(tempArray,length);
+  for i:=0 to length-1 do
+    tempArray[i]:=@PAnsiChar(a)[i*size];
+  QuickSort_PtrList_Context(@tempArray[0], length, compareFunction, compareFunctionData);
+
+  if size <= sizeof(pointer) then begin
+    c := pansichar(@tempArray[0]);
+    case size of
+       8: for i:=0 to high(tempArray) do PInt64(@c[8*i])^ := PInt64(tempArray[i])^;
+       4: for i:=0 to high(tempArray) do PInt32(@c[4*i])^ := PInt32(tempArray[i])^;
+       2: for i:=0 to high(tempArray) do PInt16(@c[2*i])^ := PInt16(tempArray[i])^;
+       1: for i:=0 to high(tempArray) do PByte(@c[  i])^  := PByte(tempArray[i])^;
+       else for i:=0 to high(tempArray) do
+         move(c[i * size], PPointer(tempArray[i])^, size);
+    end;
+    move(tempArray[0], a^, size * length);
   end else begin
-    setlength(tempArray,length);
-    //fill the temp array with pointer to the values
-    for i:=0 to length-1 do
-      tempArray[i]:=@PAnsiChar(a)[i*size];
-    //and then call with wrapper function
-    data.realFunction:=compareFunction;
-    data.data:=compareFunctionData;
-    stableSortSD(@tempArray[0],@tempArray[length-1], @compareFunctionWrapper,TObject(@data));
     //we now have a sorted pointer list
     //create back map (hashmap pointer => index in tempArray)
     setlength(tempBackArray,length);
