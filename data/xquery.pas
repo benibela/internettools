@@ -3823,7 +3823,7 @@ begin
     'xquery4', 'xquery4.0': result := xqpmXQuery4_0;
     'xpath4', 'xpath4.0': result := xqpmXPath4_0;
 //    '':;
-    else ok := false;
+    else begin ok := false; result := high(TXQParsingModel); end;
   end;
 end;
 
@@ -6153,9 +6153,7 @@ end;
 function TXQJsonParser.decodeNumber: IXQValue;
 var
   temp64: Int64;
-  tempFloat: double;
   tempd: BigDecimal;
-  tempchar: Char;
   tempview: TStringView;
 begin
   if jsoniqMode then begin

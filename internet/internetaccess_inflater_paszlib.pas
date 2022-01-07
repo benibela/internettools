@@ -26,7 +26,7 @@ TTransferContentInflaterZlib = class(TTransferContentInflater)
 end;
 
 implementation
-uses math;
+
 const buffer_block_size=16384;
 var DEBUG_DECOMPRESSION: boolean = false;
 

@@ -1971,7 +1971,7 @@ begin
       header := 'Content-Type: ' + ContentTypeTextPlain;
       result := toTextPlainRequest();
     end;
-    {$if FPC_FULLVERSION <= 30202}else begin result := ''; header := ''; end; {$endif}
+    {$if FPC_FULLVERSION <= 30203}else begin result := ''; header := ''; end; {$endif}
   end;
 end;
 
@@ -8248,7 +8248,7 @@ begin
   result := false;
 end;
 
-function xqFunctionXML_to_JSON(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionXML_to_JSON(argc: SizeInt; args: PIXQValue): IXQValue;
 var n: TTreeNode = nil;
   procedure raiseInvalidXML(reason: string = '');
   begin
@@ -8260,7 +8260,7 @@ var n: TTreeNode = nil;
     case trim(s) of
       'false', '0': result := false;
       'true', '1': result := true;
-      else raiseInvalidXML(s);
+      else raiseInvalidXML(s); result := false;
     end;
   end;
 var currentStringEscaped: boolean;
@@ -8706,15 +8706,8 @@ begin
   result := xqFunctionTransform_Nodes(context, argc, args);
 end;
 
-(*
-x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar, itemStar], '($root as item()*, $nodes as item()*, $replacement as item()* ) as item()*', 'pxp:transform($root, function($i) {' +
-  ' if ($nodes[. is $i]) then if ($replacement instance of function(* )) then $replacement($i) else $replacement else $i'+
-'})');
-x.registerInterpretedFunction('replace-nodes',  [itemStar, itemStar, itemStar], '($nodes as item()*, $replacement as item()*) as item()*', 'x:replace-nodes(($nodes!root())|(), $nodes, $replacement)');
-*)
 function xqFunctionReplace_Nodes(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var roots: array of TTreeNode;
-    transformer: TNodeTransformer;
+var transformer: TNodeTransformer;
     i: SizeInt;
     replacement: PIXQValue;
     nodesToChange: TXQVList;
@@ -9089,7 +9082,7 @@ begin
   fn3_1.registerFunction('load-xquery-module', @xqFunctionLoadXQueryModule, [xqcdContextOther]).setVersionsShared([stringt, map], [stringt, map, map]);
 
   fn3_1.registerFunction('json-to-xml', @xqFunctionJSON_to_XML, [xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty], [stringOrEmpty, map, documentNodeOrEmpty]);
-  fn3_1.registerFunction('xml-to-json', @xqFunctionXML_to_JSON, [xqcdContextOther]).setVersionsShared([nodeOrEmpty, stringOrEmpty], [nodeOrEmpty, map, stringOrEmpty]);
+  fn3_1.registerFunction('xml-to-json', @xqFunctionXML_to_JSON).setVersionsShared([nodeOrEmpty, stringOrEmpty], [nodeOrEmpty, map, stringOrEmpty]);
 
 
   fn4.registerFunction('index-where', @xqFunctionIndex_Where, [itemStar, functionItemBoolean, integerStar], []);
