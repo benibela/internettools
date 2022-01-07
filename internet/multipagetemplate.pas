@@ -868,13 +868,17 @@ end;
 procedure TTemplateActionCallAction.perform(reader: TMultipageTemplateReader);
 var
   act: TTemplateAction;
+  actualaction: String;
 begin
   if test <> '' then
     if not evaluateQuery(reader, test).toBooleanEffective then
       exit;
-  act := reader.findAction(reader.parser.replaceEnclosedExpressions(action));
-  if act = nil then raise ETemplateReader.Create('Could not find action: '+action + ' ('+reader.parser.replaceEnclosedExpressions(action)+')');
+  actualaction := reader.parser.replaceEnclosedExpressions(action);
+  act := reader.findAction(actualaction);
+  if act = nil then raise ETemplateReader.Create('Could not find action: '+action + ' ('+actualaction+')');
+  reader.actionTrace.add(actualaction + ' <call>');
   act.perform(reader);
+  reader.actionTrace.deleteLast();
 end;
 
 function TTemplateActionCallAction.clone: TTemplateAction;
