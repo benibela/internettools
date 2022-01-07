@@ -379,7 +379,7 @@ type  TRaiseXQEvaluationExceptionCallback = procedure (const code, message: stri
 
 var raiseXQEvaluationExceptionCallback: TRaiseXQEvaluationExceptionCallback = nil;
 
-procedure raiseXQEvaluationException(const code, message: string); overload; noreturn;
+procedure raiseXQEvaluationException(const code, message: string); overload;
 
 type xqfloat = double;
      SizeInt64 = Int64; //at least SizeInt and Int64. If there are ever 128 bit systems, it would need to be changed for them.
@@ -1742,7 +1742,7 @@ end;
 {$POP}
 
 
-procedure raiseXQEvaluationException(const code, message: string); noreturn;
+procedure raiseXQEvaluationException(const code, message: string);
 begin
   if Assigned(raiseXQEvaluationExceptionCallback) then raiseXQEvaluationExceptionCallback(code, message)
   else raise exception.Create(code + ': ' + message);

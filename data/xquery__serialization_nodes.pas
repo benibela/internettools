@@ -685,7 +685,9 @@ begin
     'descending': result := xqkoDescending;
     'insertion': result := xqkoInsertion;
     'unordered': result := xqkoUnordered;
-    else raiseXQEvaluationException('SEPM0017', 'Invalid serialization parameter: key-order= ' + s);
+    else
+      raiseXQEvaluationException('SEPM0017', 'Invalid serialization parameter: key-order= ' + s);
+      result := xqkoUnordered;
   end;
 end;
 

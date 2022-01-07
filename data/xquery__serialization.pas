@@ -97,7 +97,9 @@ begin
   case trim(s) of
     'true', 'yes', '1': result := true;
     'false', 'no', '0': result := false;
-    else raiseXQEvaluationException(IfThen(fromMap, 'SEPM0016', 'SEPM0017'), 'Expected boolean, got '+s);
+    else
+      raiseXQEvaluationException(IfThen(fromMap, 'SEPM0016', 'SEPM0017'), 'Expected boolean, got '+s);
+      result := false;
   end;
 end;
 

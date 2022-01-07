@@ -3467,7 +3467,7 @@ const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAt
 type TXQueryInternals = object
 //private
     class var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
-    class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); static; noreturn;
+    class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); static;
     class function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; static; inline;
 end;
 
@@ -6545,7 +6545,7 @@ begin
   if data <> nil then t += ' ; got: ' + data.toXQuery();
   raise EXQEvaluationException.create(code, t);
 end;
-procedure raiseInternalError(const s: string); noreturn;
+procedure raiseInternalError(const s: string);
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error: ' + s);
 end;

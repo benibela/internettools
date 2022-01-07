@@ -1453,7 +1453,7 @@ begin
 end;
 
 function TTreeNode.getDocument(): TTreeDocument;
-  procedure raiseNoDocument; noreturn;
+  procedure raiseNoDocument;
   begin
     raise ETreeParseException.Create('No document for node');
   end;
@@ -1461,7 +1461,7 @@ function TTreeNode.getDocument(): TTreeDocument;
 begin
   if root.typ = tetDocument then result := TTreeDocument(root)
   else if root.root.typ = tetDocument then result := TTreeDocument(root.root)
-  else raiseNoDocument();
+  else begin raiseNoDocument(); result := nil; end
 end;
 
 function TTreeNode.getChildrenCount(types: TTreeNodeTypes): integer;
