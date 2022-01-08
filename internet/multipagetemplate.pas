@@ -869,6 +869,7 @@ procedure TTemplateActionCallAction.perform(reader: TMultipageTemplateReader);
 var
   act: TTemplateAction;
   actualaction: String;
+  actionTraceCount: SizeInt;
 begin
   if test <> '' then
     if not evaluateQuery(reader, test).toBooleanEffective then
@@ -876,9 +877,10 @@ begin
   actualaction := reader.parser.replaceEnclosedExpressions(action);
   act := reader.findAction(actualaction);
   if act = nil then raise ETemplateReader.Create('Could not find action: '+action + ' ('+actualaction+')');
+  actionTraceCount := reader.actionTrace.count;
   reader.actionTrace.add(actualaction + ' <call>');
   act.perform(reader);
-  reader.actionTrace.deleteLast();
+  reader.actionTrace.count := actionTraceCount;
 end;
 
 function TTemplateActionCallAction.clone: TTemplateAction;
@@ -1027,12 +1029,14 @@ begin
         end;
         page := reader.internet.request(curmethod, cururl, post);
       except
-        on e: EInternetException do
+        on e: EInternetException do begin
+          reader.actionTrace.add(self.url);
           if reader.retryOnConnectionFailures and (e.errorCode <= 0) then begin
             if Assigned(reader.onLog) then reader.onLog(reader, 'Retry after error: ' + e.Message);
             Sleep(2500);
             page := reader.internet.request(curmethod, cururl, post);
           end else raise;
+        end;
       end;
       if errorHandling <> '' then reader.internet.OnTransferReact := oldReact;
 
@@ -1415,11 +1419,13 @@ end;
 procedure TMultipageTemplateReader.applyPattern(pattern, name: string);
 begin
   needLoadedData;
+  actionTrace.add(name);
   parser.parseTemplate(pattern, name);
   parser.matchLastTrees;
 
   if Assigned(onPageProcessed) then
     onPageProcessed(self, parser);
+  actionTrace.deleteLast();
 end;
 
 procedure TMultipageTemplateReader.setVariable(name: string; value: IXQValue; namespace: string);
@@ -1503,15 +1509,20 @@ begin
 end;
 
 procedure TMultipageTemplateReader.callAction(const action:TTemplateAction);
+var
+  actionTraceCount: SizeInt;
 begin
   if Assigned(onLog) then onLog(self, 'Enter performAction, finternet:', 5); //TODO: parser log
 
   //OutputDebugString(pchar(lib.defaultVariables.Text));
   Assert(internet<>nil,'Internet nicht initialisiert');
 
-  if action is TTemplateActionMain then actionTrace.add(TTemplateActionMain(action).name);
+  if action is TTemplateActionMain then begin
+    actionTraceCount := actionTrace.count;
+    actionTrace.add(TTemplateActionMain(action).name);
+  end;
   action.perform(self);
-  if action is TTemplateActionMain then actionTrace.deleteLast();
+  if action is TTemplateActionMain then actionTrace.count := actionTraceCount;
 
 
   if Assigned(onLog) then onLog(self, 'Leave performAction', 5);
