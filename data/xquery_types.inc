@@ -611,6 +611,7 @@ procedure TXQValue.jsonSerialize(var serializer: TXQSerializer);
       p, temp: SizeInt;
       prop: TXQProperty;
     begin
+      sortData := default(TJSONKeySortingData);
       SetLength(sortData.entireMap, Size);
       SetLength(sortData.mapMap, length(sortData.entireMap));
       p := 0;

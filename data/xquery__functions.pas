@@ -8658,7 +8658,7 @@ begin
 end;
 
 function TNodeTransformer.transformNodes(const roots: ixqvalue): IXQValue;
-var aroots: array of TTreeNode;
+var aroots: array of TTreeNode = nil;
     i: sizeint;
 begin
   SetLength(aroots, roots.Count);
@@ -8678,7 +8678,7 @@ begin
 end;
 
 function xqFunctionTransform_Nodes(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var roots: array of TTreeNode;
+var roots: array of TTreeNode = nil;
     transformer: TNodeTransformer;
     i: SizeInt;
 begin
