@@ -510,6 +510,8 @@ function fileNameExpandToURI(const rel: string): string;
 //**Moves oldname to newname, replacing newname if it exists
 function fileMoveReplace(const oldname,newname: string): boolean;
 type TFileSaveSafe = procedure (stream: TStream; data: pointer);
+//**Overrides file filename with the data written to the stream in the callback function. @br
+//**If the file already exists, the data is first written to a temporary file to prevent the file from being overriden partially.
 procedure fileSaveSafe(filename: string; callback: TFileSaveSafe; data: pointer);
 
 //**Levenshtein distance between s and t
