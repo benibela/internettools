@@ -4767,10 +4767,9 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         end;
 
     //generate error message
-    if not unresolved then name := 'Q{'+f.name.namespaceURL+'}'
-    else if TXQEQNameUnresolved(f.name).namespacePrefix = '' then name := ''
-    else name := TXQEQNameUnresolved(f.name).namespacePrefix + ':' ;
-    name += f.name.localname;
+    if not unresolved then name := f.name.ToString
+    else if TXQEQNameUnresolved(f.name).namespacePrefix = '' then name := f.name.localname
+    else name := TXQEQNameUnresolved(f.name).namespacePrefix + ':' + f.name.localname;
     raiseParsingError('XPST0017', 'unknown function: ' + name + ' #' + IntToStr(length(f.children)) + suggestions(f.name.localname), f);
   end;
 

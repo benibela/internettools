@@ -3052,6 +3052,8 @@ public
     property LastQuery: IXQuery read FLastQuery;
   //for internal use
     function findNamespace(const nsprefix: string): TNamespace;
+    class function findDefaultNamespaceFromUrl(const nsurl: string): TNamespace;
+    class function debugEQName(const nsurl, local: string): string;
     class function findOperator(const pos: pchar): TXQOperatorInfo;
   end;
 
@@ -4582,8 +4584,7 @@ begin
      if qmDocument in matching then result += 'document-node';
      result += '(';
      if qmCheckNamespaceURL in matching then
-       if namespaceURLOrPrefix = 'http://www.w3.org/2010/xslt-xquery-serialization' then result += 'output:'
-       else result += 'Q{'+namespaceURLOrPrefix+'}';
+       result += TXQueryEngine.debugEQName(namespaceURLOrPrefix, '');
      if qmCheckNamespacePrefix in matching then result += namespaceURLOrPrefix + ':';
      if qmValue in matching then result += value;
      if qmCheckOnSingleChild in matching then result += 'element(*)';
@@ -4682,7 +4683,7 @@ end;
 function TXQTermEQNameToken.debugTermToString: string;
 begin
   result := '';
-  if namespaceurl <> '' then result += 'Q{'+namespaceurl+'}';
+  if namespaceurl <> '' then result += TXQueryEngine.debugEQName(namespaceurl, '');
   if namespaceprefix <> '' then result += namespaceprefix + ':';
   result += localpart;
 end;
@@ -4784,7 +4785,7 @@ end;
 
 function TXQEQName.ToString: ansistring;
 begin
-  result := 'Q{' + namespaceURL + '}' + localname;
+  result := TXQueryEngine.debugEQName(namespaceURL, localname);
 end;
 
 function TXQEQName.isEqual(const ns, local: string): boolean;
@@ -4990,9 +4991,9 @@ begin
   for i := 0 to nativeModules.Count - 1 do begin
     module := TXQNativeModule(nativeModules.Objects[i]);
     for o in module.basicFunctions.getEnumeratorValues do
-      checkAddr( TXQBasicFunctionInfo(o).func, 'Q{' +nativeModules[i] + '}'+ TXQBasicFunctionInfo(o).name);
+      checkAddr( TXQBasicFunctionInfo(o).func, TXQueryEngine.debugEQName(nativeModules[i], TXQBasicFunctionInfo(o).name));
     for o in module.basicFunctions.getEnumeratorValues do
-      checkAddr( TXQComplexFunctionInfo(o).func, 'Q{' +nativeModules[i] + '}'+ TXQComplexFunctionInfo(o).name);
+      checkAddr( TXQComplexFunctionInfo(o).func, TXQueryEngine.debugEQName(nativeModules[i], TXQComplexFunctionInfo(o).name));
   end;
   if delta > 2048 then result := 'perhaps ' + result + ' ? but unlikely';
 end;
@@ -7393,7 +7394,7 @@ var
 begin
   found := hasGlobalVariable(name, result, namespaceURL);
   if not found then
-    raise EXQEvaluationException.Create('XPST0008', 'Variable Q{'+namespaceURL+'}'+name+' not found');
+    raise EXQEvaluationException.Create('XPST0008', 'Variable '+TXQueryEngine.debugEQName(namespaceURL, name) +' not found');
   if result = nil then result := xqvalue();
 end;
 
@@ -9453,6 +9454,38 @@ begin
   end;
 end;
 
+class function TXQueryEngine.debugEQName(const nsurl, local: string): string;
+var
+  ns: TNamespace;
+begin
+  if nsurl = '' then result := ''
+  else begin
+    ns := findDefaultNamespaceFromUrl(nsurl);
+    if ns <> nil then result := ns.prefix + ':'
+    else if nsurl = 'http://www.w3.org/2010/xslt-xquery-serialization' then result := 'output:'
+    else if nsurl = #0'.benibela.de' then result := 'pxpold:'
+    else result := 'Q{'+nsurl+'}'
+  end;
+  result += local; //do not check if valid is NCName, so the function can be called with local='' and the local part can be added later somewhere else
+end;
+
+class function TXQueryEngine.findDefaultNamespaceFromUrl(const nsurl: string): TNamespace;
+begin
+  case nsurl of
+    XMLNamespaceUrl_XML: result := XMLNamespace_XML;
+    XMLNamespaceUrl_XMLSchema: result := XMLNamespace_XMLSchema;
+    XMLNamespaceUrl_XMLSchemaInstance: result := XMLNamespace_XMLSchemaInstance;
+    XMLNamespaceUrl_XPathFunctions: result := XMLNamespace_XPathFunctions;
+    XMLNamespaceUrl_XQueryLocalFunctions: result := XMLNamespace_XQueryLocalFunctions;
+    XMLNamespaceUrl_MyExtensionsMerged: result := XMLNamespace_MyExtensionsMerged;
+    XMLNamespaceUrl_MyExtensionsNew: result := XMLNamespace_MyExtensionsNew;
+    XMLnamespaceUrl_XPathFunctionsArray: result := XMLnamespace_XPathFunctionsArray;
+    XMLnamespaceUrl_XPathFunctionsMap: result := XMLnamespace_XPathFunctionsMap;
+    //'op': result := XMLNamespace_MyExtensionOperators;
+    else result := nil;
+  end;
+end;
+
 class function TXQueryEngine.findNativeModule(const ns: string): TXQNativeModule;
 var
   index: SizeInt;
@@ -10022,10 +10055,11 @@ begin
     if strSimilar(localname, p.key) then
       moduleResult += '    ' + functionName(p.key, TXQComplexFunctionInfo(p.value));
   if moduleResult <> '' then begin
-    result += '  In module ' + namespaceGetURL(namespace);
+    if namespaceGetURL(namespace) = #0'.benibela.de' then result += '  In default extension function module:'
+    else result += '  In module ' + namespace.prefix + ': '#9'(namespace url: "' + namespaceGetURL(namespace) + '")';
 //    if equalNamespaces(namespace, XMLNamespace_XPathFunctions) then
       result += acceptedModels.requiredModelToString;
-    result += ':'+LineEnding+moduleResult+LineEnding;
+    result += LineEnding+moduleResult+LineEnding;
   end;
   for i := 0 to high(parents) do
     result += parents[i].findSimilarFunctionsDebug(searched, localname);

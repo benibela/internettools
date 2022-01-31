@@ -3689,9 +3689,7 @@ end;
 
 function TXQTermVariable.ToString: ansistring;
 begin
-  result := '$';
-  if namespace <> '' then result += 'Q{'+namespace+'}';
-  result += value;
+  result := '$' + TXQueryEngine.debugEQName(namespace, value);
 end;
 
 
