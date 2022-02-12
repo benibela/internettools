@@ -1045,7 +1045,14 @@ begin
       reader.internet.additionalHeaders.Text := oldHeaders;
     end;
     rtFile: begin
-      page := strLoadFromFileUTF8(cururl);
+      try
+        page := strLoadFromFileUTF8(cururl);
+      except
+        on e: Exception do begin
+          reader.actionTrace.add(self.url);
+          raise
+        end;
+      end;
       reader.internet.lastURL:=cururl;
     end;
     rtXML: begin
