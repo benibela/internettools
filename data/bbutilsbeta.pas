@@ -139,7 +139,7 @@ type
     //function beginsWithI(const s: string): boolean; inline;
     function endsWith(const expectedEnd: string): boolean; inline;
 
-
+    //returns nil if not found
     function find(searched: pchar; searchedLength: SizeInt): pchar;
     function find(const s: string): pchar;
     function findLast(searched: pchar; searchedLength: SizeInt): pchar;
@@ -176,6 +176,34 @@ type
     function viewUntil(newEnd: pchar): TCharArrayView; reintroduce;
     function viewFrom(newStart: pchar): TCharArrayView; reintroduce;
     function viewBehind(newStartSkip: pchar): TCharArrayView; reintroduce;
+
+    //** Splits the view at element.
+    //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
+    function splitAt(out before: TCharArrayView; element: PChar; out behind: TCharArrayView): boolean;
+    //** Splits the view at element.
+    //** Everything before element is returned in self, everything behind it in behind.
+    function splitCutBefore(element: PChar; out behind: TCharArrayView): boolean;
+    //** Splits the view at element.
+    //** Everything before element is returned in before, everything behind it in self.
+    function splitMoveAfter(out before: TCharArrayView; element: PChar): boolean;
+    //** Splits the view at the first occurrence of searched.
+    //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
+    function splitAtFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+    //** Splits the view at the first occurrence of searched.
+    //** Everything before searched is returned in self, everything behind (searched+searchedLength) in behind.
+    function splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+    //** Splits the view at the first occurrence of searched.
+    //** Everything before searched is returned in before, everything behind (searched+searchedLength) in self.
+    function splitMoveAfterFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt): boolean;
+    //** Splits the view at the first occurrence of searched.
+    //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
+    function splitAtFind(out before: TCharArrayView; const searched: string; out behind: TCharArrayView): boolean;
+    //** Splits the view at the first occurrence of searched.
+    //** Everything before searched is returned in self, everything behind searched in behind.
+    function splitCutBeforeFind(const searched: string; out behind: TCharArrayView): boolean;
+    //** Splits the view at the first occurrence of searched.
+    //** Everything before searched is returned in before, everything behind searched in self.
+    function splitMoveAfterFind(out before: TCharArrayView; const searched: string): boolean;
   end;
 
   TStringView = TCharArrayView;
@@ -219,6 +247,7 @@ function objInheritsFrom(o: TObject; c: TClass): boolean; inline;
 
 
 implementation
+
 
 function objInheritsFrom(o: TObject; c: TClass): boolean;
 begin
@@ -751,6 +780,71 @@ function TCharArrayView.viewBehind(newStartSkip: pchar): TCharArrayView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
+
+function TCharArrayView.splitAt(out before: TCharArrayView; element: PChar; out behind: TCharArrayView): boolean;
+begin
+  result := isOnBounds(element);
+  before := viewUntil(element);
+  behind := viewBehind(element);
+end;
+
+function TCharArrayView.splitCutBefore(element: PChar; out behind: TCharArrayView): boolean;
+begin
+  behind := viewBehind(element);
+  result := isOnBounds(element);
+  if result then cutBefore(element);
+end;
+
+function TCharArrayView.splitMoveAfter(out before: TCharArrayView; element: PChar): boolean;
+begin
+  before := viewUntil(element);
+  result := isOnBounds(element);
+  if result then moveAfter(element);
+end;
+
+function TCharArrayView.splitAtFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+var
+  target: PChar;
+begin
+  target := find(searched, searchedLength);
+  result := target <> nil;
+  if result then begin
+    before := viewUntil(target);
+    behind := viewFrom(target + searchedLength);
+  end else splitAt(before, nil, behind);
+end;
+
+function TCharArrayView.splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+var
+  temp: TCharArrayView;
+begin
+  result := splitAtFind(temp, searched, searchedLength, behind);
+  if result then self := temp;
+end;
+
+function TCharArrayView.splitMoveAfterFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt): boolean;
+var
+  temp: TCharArrayView;
+begin
+  result := splitAtFind(before, searched, searchedLength, temp);
+  if result then self := temp;
+end;
+
+function TCharArrayView.splitAtFind(out before: TCharArrayView; const searched: string; out behind: TCharArrayView): boolean;
+begin
+  result := splitAtFind(before, pchar(searched), system.length(searched), behind);
+end;
+
+function TCharArrayView.splitCutBeforeFind(const searched: string; out behind: TCharArrayView): boolean;
+begin
+  result := splitCutBeforeFind(pchar(searched), system.length(searched), behind);
+end;
+
+function TCharArrayView.splitMoveAfterFind(out before: TCharArrayView; const searched: string): boolean;
+begin
+  result := splitMoveAfterFind(before, pchar(searched), system.length(searched));
+end;
+
 
 
 

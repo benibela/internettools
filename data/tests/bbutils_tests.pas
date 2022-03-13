@@ -2139,7 +2139,7 @@ procedure testStringViews;
 
 var
   s: String;
-  v: TStringView;
+  v,bv,av,w: TStringView;
   p: PChar;
   i: Integer;
   c: char;
@@ -2148,6 +2148,13 @@ begin
   v.init(s);
   testbounds(v, p, 6);
   test(v.ToString, 'foobar');
+  test(v = 'foobar');
+  test('foobar' = v);
+  test(not(v <> 'foobar'));
+  test(not('foobar' <> v));
+  test(v <> 'foobar'#0);
+  test(v <> 'fooba'#0);
+  test(v <> 'FOOBAR');
   test(v.contains('foobar'));
   test(v.contains('b'));
   test(v.contains('r'));
@@ -2241,6 +2248,9 @@ begin
   test(v.ToString, '');
   v.cutBefore(p);
   test(v.ToString, '');
+  test(v = '');
+  test(not(v <> ''));
+  test(v <> #0);
 
   v := s.unsafeView;
   testbounds(v, p, 6);
@@ -2332,7 +2342,94 @@ begin
   testDecimalParse('18446744073709551616');
   testDecimalParse('99999999999999999999');
   testDecimalParse('-99999999999999999999');
+
+  s := 'xy=abc=def';
+  v.init(s);
+  test(v.splitAt(bv, @s[4], av));
+  test(v = s);
+  test(bv = 'xy=');
+  test(av = 'bc=def');
+  v.init(s);
+  test(v.splitCutBefore(@s[4], w));
+  test(v = 'xy=');
+  test(w = 'bc=def');
+  v.init(s);
+  test(v.splitMoveAfter(w, @s[4]));
+  test(v = 'bc=def');
+  test(w = 'xy=');
+
+  v.init(s);
+  test(v.splitAtFind(bv, '=x', 1, av));
+  test(v = s);
+  test(bv = 'xy');
+  test(av = 'abc=def');
+  v.init(s);
+  test(v.splitCutBeforeFind('=x', 1, w));
+  test(v = 'xy');
+  test(w = 'abc=def');
+  v.init(s);
+  test(v.splitMoveAfterFind(w, '=x', 1));
+  test(v = 'abc=def');
+  test(w = 'xy');
+
+  v.init(s);
+  test(v.splitAtFind(bv, '=a', 2, av));
+  test(v = s);
+  test(bv = 'xy');
+  test(av = 'bc=def');
+  v.init(s);
+  test(v.splitCutBeforeFind('=a', 2, w));
+  test(v = 'xy');
+  test(w = 'bc=def');
+  v.init(s);
+  test(v.splitMoveAfterFind(w, '=a', 2));
+  test(v = 'bc=def');
+  test(w = 'xy');
+
+  v.init(s);
+  test(v.splitAtFind(bv, '=', av));
+  test(v = s);
+  test(bv = 'xy');
+  test(av = 'abc=def');
+  v.init(s);
+  test(v.splitCutBeforeFind('=', w));
+  test(v = 'xy');
+  test(w = 'abc=def');
+  v.init(s);
+  test(v.splitMoveAfterFind(w, '='));
+  test(v = 'abc=def');
+  test(w = 'xy');
+
+  v.init(s);
+  test(v.splitAtFind(bv, '=ab', av));
+  test(v = s);
+  test(bv = 'xy');
+  test(av = 'c=def');
+  v.init(s);
+  test(v.splitCutBeforeFind('=ab', w));
+  test(v = 'xy');
+  test(w = 'c=def');
+  v.init(s);
+  test(v.splitMoveAfterFind(w, '=ab'));
+  test(v = 'c=def');
+  test(w = 'xy');
+
+  v.init(s);
+  test(not v.splitAtFind(bv, '=x', av));
+  test(v = s);
+  test(bv = '');
+  test(av = s);
+  v.init(s);
+  test(not v.splitCutBeforeFind('=x', w));
+  test(v = s);
+  test(w = s);
+  v.init(s);
+  test(not v.splitMoveAfterFind(w, '=x'));
+  test(v = s);
+  test(w = '');
+
 end;
+
 {$endif}
 
 procedure testBeta;
