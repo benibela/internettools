@@ -11,6 +11,9 @@ procedure unitTests();
 
 implementation
 
+type THTTPHeaderListBreaker = class(THTTPHeaderList)
+end;
+
 procedure testcookies;
 var cm: TCookieManager;
   sl: THTTPHeaderList;
@@ -215,6 +218,7 @@ end;
 
 
 procedure unitTests();
+var tempstr: string;
 begin
   //http
   testurl('http://example.org', 'http', '', '', 'example.org', '', '', '', '');
@@ -1263,6 +1267,17 @@ begin
   test(decodeURL('http://example.org').resolved('/redirect.php?target=http://whatwg.com/abc').combined(), 'http://example.org/redirect.php?target=http://whatwg.com/abc');
 
   testcookies;
+
+  test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; filename=xyz; filename*=invalid', tempstr));
+  test(tempstr, 'xyz');
+  test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; filename   =  "xyz2" ; filename*=invalid', tempstr));
+  test(tempstr, 'xyz2');
+  test(not THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; nope', tempstr));
+  //examples of RFC5987
+  test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; filename=xyz; filename*=iso-8859-1''en''%A3%20rates', tempstr));
+  test(tempstr, #$C2#$A3' rates');
+  test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; filename=xyz; filename*=UTF-8''''%c2%a3%20and%20%e2%82%ac%20rates', tempstr));
+  test(tempstr, #$C2#$A3' and € rates');
 end;
 
 end.

@@ -117,14 +117,18 @@ type
     class function HeaderForBoundary(const boundary: string): string; static;
   end;
 
-  THeaderKind = (iahUnknown, iahContentType, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie, iahUserAgent);
+  THeaderKind = (iahUnknown, iahContentType, iahContentDisposition, iahAccept, iahReferer, iahLocation, iahSetCookie, iahCookie, iahUserAgent);
   THTTPHeaderList = class(TStringList)
   public
     constructor Create;
     function getHeaderValue(kind: THeaderKind): string;
     function getHeaderValue(header: string): string; //**< Reads a certain HTTP header received by the last @noAutoLink(request)
+    function getContentDispositionFileNameTry(out filename: string): Boolean;
     procedure add(const name, value: string);
     property headerValues[header: string]: string read GetheaderValue; default;
+  protected
+    class function parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value: TStringView; out utf8: string): Boolean; static;
+    class function parseContentDispositionFileNameTry(const contentDisposition: string; out filename: string): Boolean; static;
   end;
 
   TCookieFlags = set of (cfHostOnly, cfSecure {, cfHttpOnly});
@@ -1368,7 +1372,8 @@ begin
   if line = '' then exit();
   case line[1] of
     'c', 'C': if check('content-type') then exit(iahContentType)
-              else if check('cookie') then exit(iahCookie);
+              else if check('cookie') then exit(iahCookie)
+              else if check('content-disposition') then exit(iahContentDisposition);
     'a', 'A': if check('accept') then exit(iahAccept);
     'l', 'L': if check('location') then exit(iahLocation);
     'r', 'R': if check('referer') then exit(iahReferer);
@@ -1401,6 +1406,7 @@ class function TInternetAccess.makeHeaderName(const kind: THeaderKind): string;
 begin
   case kind of
     iahContentType: result := 'Content-Type';
+    iahContentDisposition: result := 'Content-Disposition';
     iahAccept: result := 'Accept';
     iahReferer: result := 'Referer';
     iahLocation: result := 'Location';
@@ -1418,7 +1424,7 @@ procedure TInternetAccess.enumerateAdditionalHeaders(const atransfer: TTransfer;
   end;
 
 var
-  hadHeader: array[THeaderKind] of Boolean = (false, false, false, false, false, false, false, false);
+  hadHeader: array[THeaderKind] of Boolean = (false, false, false, false, false, false, false, false, false);
   i: Integer;
   kind: THeaderKind;
   temp: String;
@@ -1476,9 +1482,58 @@ begin
   exit('');
 end;
 
+function THTTPHeaderList.getContentDispositionFileNameTry(out filename: string): Boolean;
+begin
+  result := parseContentDispositionFileNameTry(getHeaderValue(iahContentDisposition), filename);
+end;
+
 procedure THTTPHeaderList.add(const name, value: string);
 begin
   add(name + ': '+value);
+end;
+
+class function THTTPHeaderList.parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value: TStringView; out utf8: string): Boolean;
+var
+  enc, country: TStringView;
+  codepage: TSystemCodePage;
+begin
+  result := value.splitMoveAfterFind(enc, '''');
+  result := result and value.splitMoveAfterFind(country, '''');
+  if not result then exit;
+  codepage := strEncodingFromName(enc.ToString);
+  if codepage = CP_NONE then exit(false);
+  utf8 := strConvertToUtf8(strUnescapeHex(value.ToString, '%'), codepage);
+end;
+
+class function THTTPHeaderList.parseContentDispositionFileNameTry(const contentDisposition: string; out filename: string): Boolean;
+var
+  directive, temp: String;
+  directives: sysutils.TStringArray;
+  name, value: TCharArrayView;
+begin
+  result := false;
+  filename := '';
+  if not contentDisposition.StartsWith('attachment') then exit;
+  directives := contentDisposition.Split(';');
+  for directive in directives do begin
+    if not directive.unsafeView.splitAtFind(name, '=', value) then continue;
+    name.trim();
+    value.trim();
+    if name = 'filename*' then begin
+      result := true;
+      if parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value, temp) then begin
+        filename := temp;
+        exit(true);
+      end;
+    end else if name = 'filename' then begin
+      if value.beginsWith('"') and value.endsWith('"') then begin
+        value.moveBy(1);
+        value.cutBy(1);
+      end;
+      filename := value.ToString;
+      result := true;
+    end;
+  end;
 end;
 
 function TInternetAccess.getLastContentType: string;
