@@ -97,6 +97,7 @@ type
     procedure init(firstelement, behindlastelement: PElement);
     function length: SizeInt;
     function isEmpty: boolean; inline;
+    function isEqual(const other: TArrayView): boolean;
     function isInBounds(target: PElement): boolean; inline;
     function isOnBounds(target: PElement): boolean; inline;
     function offsetOf(target: PElement): SizeInt; inline;
@@ -179,6 +180,12 @@ type
 
   TStringView = TCharArrayView;
 
+  operator =(const cav: TCharArrayView; const s: string): boolean;
+  operator <>(const cav: TCharArrayView; const s: string): boolean;
+  operator =(const s: string; const cav: TCharArrayView): boolean;
+  operator <>(const s: string; const cav: TCharArrayView): boolean;
+
+type
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
     function unsafeView: TStringView;
     function unsafeViewTo(newLast: pchar): TStringView;
@@ -308,6 +315,16 @@ end;
 function TArrayView.isEmpty: boolean;
 begin
   result := data >= dataend;
+end;
+
+function TArrayView.isEqual(const other: TArrayView): boolean;
+var byteLength, otherByteLength: SizeUInt;
+begin
+  byteLength := SizeUInt(pchar(dataend) - pchar(data));
+  otherByteLength := SizeUInt(pchar(other.dataend) - pchar(other.data));
+  result := byteLength = otherByteLength;
+  if not result then exit;
+  result := CompareByte(PByte(data)^, pbyte(other.data)^, byteLength) = 0;
 end;
 
 function TArrayView.isInBounds(target: PElement): boolean;
@@ -734,6 +751,37 @@ function TCharArrayView.viewBehind(newStartSkip: pchar): TCharArrayView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
+
+
+
+
+operator=(const cav: TCharArrayView; const s: string): boolean;
+begin
+  result := cav.isEqual(s.unsafeView);
+end;
+
+operator<>(const cav: TCharArrayView; const s: string): boolean;
+begin
+  result := not cav.isEqual(s.unsafeView)
+end;
+
+operator=(const s: string; const cav: TCharArrayView): boolean;
+begin
+  result := cav.isEqual(s.unsafeView);
+end;
+
+operator<>(const s: string; const cav: TCharArrayView): boolean;
+begin
+  result := not cav.isEqual(s.unsafeView)
+end;
+
+
+
+
+
+
+
+
 
 function TBB2StringHelper.unsafeView: TStringView;
 begin
