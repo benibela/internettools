@@ -1506,7 +1506,7 @@ begin
   if not result then exit;
   codepage := strEncodingFromName(enc.ToString);
   if codepage = CP_NONE then exit(false);
-  utf8 := strConvertToUtf8(strUnescapeHex(value.ToString, '%'), codepage);
+  utf8 := strConvert(strUnescapeHex(value.ToString, '%'), codepage, cp_acp);
 end;
 
 class function THTTPHeaderList.parseContentDispositionFileNameTry(const contentDisposition: string; out filename: string): Boolean;
