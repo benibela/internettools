@@ -121,9 +121,9 @@ type
 
   function inputStreamToStringAndDelete(stream: jobject): string;
   private
-  procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite; jmInputStreamRead, jmInputStreamClose: jmethodID);
+  procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWriteNativeInt; jmInputStreamRead, jmInputStreamClose: jmethodID);
   public
-  procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite);
+  procedure inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWriteNativeInt);
 
   function getMapProperty(map: jobject; value: jobject): jobject; deprecated 'I do not use this anymore? So I remove it?';
 
@@ -1229,7 +1229,7 @@ begin
   builder.final;
 end;
 
-procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite; jmInputStreamRead,
+procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWriteNativeInt; jmInputStreamRead,
   jmInputStreamClose: jmethodID);
 const BUFFERLEN = 8192;
 var wrappedBuffer: jvalue;
@@ -1258,7 +1258,7 @@ begin
   DeleteLocalRef(stream);
 end;
 
-procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWrite);
+procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWriteNativeInt );
 begin
   inputStreamReadAllAndDelete(stream, readCallback, jCommonClasses.InputStream.read_B, jCommonClasses.InputStream.close);
 end;

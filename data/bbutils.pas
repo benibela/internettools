@@ -162,7 +162,7 @@ type
 
 //-----------------------Pointer functions------------------------
 type TProcedureOfObject=procedure () of object;
-     TStreamLikeWrite = procedure(const Buffer; Count: Longint) of object;
+     TStreamLikeWriteNativeInt = procedure(const Buffer; Count: NativeInt) of object;
 function procedureToMethod(proc: TProcedure): TMethod;
 function makeMethod(code, data: pointer): TMethod; {$IFDEF HASINLINE} inline; {$ENDIF}
 
@@ -574,7 +574,8 @@ public
   procedure append(const s: RawByteString);
   procedure appendCodePoint(const codepoint: integer);
   procedure append(const p: pchar; const l: SizeInt);
-  procedure appendBuffer(const block; l: LongInt);
+  //this used to be TStream.WriteBuffer compatible with a longint size, but in FPC 3.3.1 TStream was changed to NativeInt
+  procedure appendBuffer(const block; l: NativeInt);
   procedure appendHexNumber(number: integer);
   procedure appendHexNumber(number, digits: integer);
   procedure appendNumber(number: Int64);
@@ -1312,7 +1313,7 @@ begin
   inc(next, l);
 end;
 
-procedure TStrBuilder.appendBuffer(const block; l: LongInt);
+procedure TStrBuilder.appendBuffer(const block; l: NativeInt);
 begin
   if l <= 0 then exit;
   if next + l > bufferend then reserveadd(l);

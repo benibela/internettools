@@ -157,7 +157,7 @@ type
   TProgressEvent=procedure (sender: TObject; progress,maxprogress: longint) of object;
   //**Event to intercept transfers end/start
   TTransferClearEvent = procedure() of object;
-  TTransferBlockWriteEvent = TStreamLikeWrite;
+  TTransferBlockWriteEvent = TStreamLikeWriteNativeInt;
 
   TTransfer = record
     //in
@@ -1009,10 +1009,14 @@ begin
   self.Position := 0;
   self.Size := 0;
 end;
+procedure writeStream(self: TStream; const buffer; size: NativeInt);
+begin
+  self.WriteBuffer(buffer, size);
+end;
 
 procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: string; outStream: TStream);
 begin
-  request(method, url, uploadData.unsafeView, TTransferClearEvent(makeMethod(@clearStream, outStream)), @outStream.WriteBuffer);
+  request(method, url, uploadData.unsafeView, TTransferClearEvent(makeMethod(@clearStream, outStream)), TTransferBlockWriteEvent(makeMethod(@writeStream, outStream)));
 end;
 
 procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: TInternetAccessDataBlock;

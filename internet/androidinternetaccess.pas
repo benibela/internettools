@@ -51,7 +51,7 @@ protected
   jhttpclient: jobject;
   currentTransfer: PTransfer;
   procedure doTransferUnchecked(var transfer: TTransfer);override;
-  procedure transferWriteBlock(const Buffer; Count: Longint);
+  procedure transferWriteBlock(const Buffer; Count: NativeInt);
   function ExceptionCheckAndClear: boolean;
   procedure setConfig(internetConfig: PInternetConfig); override;
 public
@@ -437,7 +437,7 @@ begin
   end;
 end;
 
-procedure TAndroidInternetAccess.transferWriteBlock(const Buffer; Count: Longint);
+procedure TAndroidInternetAccess.transferWriteBlock(const Buffer; Count: NativeInt);
 begin
  currentTransfer^.writeBlock(buffer, count);
 end;

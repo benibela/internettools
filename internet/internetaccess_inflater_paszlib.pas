@@ -18,7 +18,7 @@ TTransferContentInflaterZlib = class(TTransferContentInflater)
   expectGZIP: boolean;
 
   headerBuffer: string;
-  procedure writeCompressedBlock(const abuffer; Count: Longint);
+  procedure writeCompressedBlock(const abuffer; Count: NativeInt);
   procedure endTransfer; override;
   constructor Create;
   destructor Destroy; override;
@@ -80,7 +80,7 @@ begin
   headerLength := skipLength;
 end;
 
-procedure TTransferContentInflaterZlib.writeCompressedBlock(const abuffer; Count: Longint);
+procedure TTransferContentInflaterZlib.writeCompressedBlock(const abuffer; Count: NativeInt);
 var err:smallint;
   headerLength: cardinal;
   header: THeader;

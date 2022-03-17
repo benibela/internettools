@@ -51,7 +51,7 @@ TOKHTTPInternetAccess=class(TInternetAccess)
 protected
   currentTransfer: ^TTransfer;
   procedure doTransferUnchecked(var transfer: TTransfer);override;
-  procedure transferWriteBlock(const Buffer; Count: Longint);
+  procedure transferWriteBlock(const Buffer; Count: NativeInt);
 public
   constructor create();override;
   constructor create(const internetConfig: TInternetConfig);override;
@@ -261,7 +261,7 @@ begin
   end;
 end;
 
-procedure TOKHTTPInternetAccess.transferWriteBlock(const Buffer; Count: Longint);
+procedure TOKHTTPInternetAccess.transferWriteBlock(const Buffer; Count: NativeInt);
 begin
   currentTransfer^.writeBlock(buffer, count);
 end;
