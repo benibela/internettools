@@ -2216,7 +2216,7 @@ begin
   test(v.contains('a'));
   test(v.contains('r'));
   test(not v.contains('b'));
-  test(not v.moveBy(2));
+  test(v.moveBy(2));
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
   test(not v.moveBy(2));
