@@ -121,7 +121,7 @@ type
     //** copy and moveTo
     function viewFrom(newStart: PElement): TArrayView;
     //** copy and moveAfter
-    function viewBehind(newStartSkip: PElement): TArrayView;
+    function viewAfter(newStartSkip: PElement): TArrayView;
   end;
 
   TCharArrayView = object(specialize TArrayView<char>)
@@ -167,15 +167,15 @@ type
     procedure trimLeft(trimChar: char);
     procedure trimRight(trimChar: char);
 
-    function decimalToIntTry(out v: Int64): boolean;
-    function decimalToIntTry(out v: Int32): boolean;
-    function decimalToUIntTry(out v: UInt64): boolean;
-    function decimalToUIntTry(out v: UInt32): boolean;
+    function toIntDecimalTry(out v: Int64): boolean;
+    function toIntDecimalTry(out v: Int32): boolean;
+    function toUIntDecimalTry(out v: UInt64): boolean;
+    function toUIntDecimalTry(out v: UInt32): boolean;
 
     function viewTo(newLast: pchar): TCharArrayView; reintroduce;
     function viewUntil(newEnd: pchar): TCharArrayView; reintroduce;
     function viewFrom(newStart: pchar): TCharArrayView; reintroduce;
-    function viewBehind(newStartSkip: pchar): TCharArrayView; reintroduce;
+    function viewAfter(newStartSkip: pchar): TCharArrayView; reintroduce;
 
     //** Splits the view at element.
     //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
@@ -219,12 +219,12 @@ type
     function unsafeViewTo(newLast: pchar): TStringView;
     function unsafeViewUntil(newEnd: pchar): TStringView;
     function unsafeViewFrom(newStart: pchar): TStringView;
-    function unsafeViewBehind(newStartSkip: pchar): TStringView;
+    function unsafeViewAfter(newStartSkip: pchar): TStringView;
 
-    function decimalToIntTry(out v: Int64): boolean;
-    function decimalToIntTry(out v: Int32): boolean;
-    function decimalToUIntTry(out v: UInt64): boolean;
-    function decimalToUIntTry(out v: UInt32): boolean;
+    function toIntDecimalTry(out v: Int64): boolean;
+    function toIntDecimalTry(out v: Int32): boolean;
+    function toUIntDecimalTry(out v: UInt64): boolean;
+    function toUIntDecimalTry(out v: UInt32): boolean;
   end;
   TBBPcharHelper = type helper for pchar
     function nilMeansInfinity: pchar;
@@ -448,7 +448,7 @@ begin
   result.initStartCapped(data, newStart, dataend);
 end;
 
-function TArrayView.viewBehind(newStartSkip: PElement): TArrayView;
+function TArrayView.viewAfter(newStartSkip: PElement): TArrayView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
@@ -713,7 +713,7 @@ const
       MaxAbsoluteNegativeInt64AsUint = QWord(9223372036854775808);
       MaxAbsoluteNegativeInt32AsUint = DWord(2147483648);
 
-function TCharArrayView.decimalToIntTry(out v: Int64): boolean;
+function TCharArrayView.toIntDecimalTry(out v: Int64): boolean;
 var
   temp: QWord;
 begin
@@ -732,7 +732,7 @@ begin
   result := true;
 end;
 
-function TCharArrayView.decimalToIntTry(out v: Int32): boolean;
+function TCharArrayView.toIntDecimalTry(out v: Int32): boolean;
 var
   temp: UInt32;
 begin
@@ -751,12 +751,12 @@ begin
 end;
 {$pop}
 
-function TCharArrayView.decimalToUIntTry(out v: UInt64): boolean;
+function TCharArrayView.toUIntDecimalTry(out v: UInt64): boolean;
 begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;
 
-function TCharArrayView.decimalToUIntTry(out v: UInt32): boolean;
+function TCharArrayView.toUIntDecimalTry(out v: UInt32): boolean;
 begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;
@@ -776,7 +776,7 @@ begin
   result.initStartCapped(data, newStart, dataend);
 end;
 
-function TCharArrayView.viewBehind(newStartSkip: pchar): TCharArrayView;
+function TCharArrayView.viewAfter(newStartSkip: pchar): TCharArrayView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
@@ -785,12 +785,12 @@ function TCharArrayView.splitAt(out before: TCharArrayView; element: PChar; out 
 begin
   result := isOnBounds(element);
   before := viewUntil(element);
-  behind := viewBehind(element);
+  behind := viewAfter(element);
 end;
 
 function TCharArrayView.splitCutBefore(element: PChar; out behind: TCharArrayView): boolean;
 begin
-  behind := viewBehind(element);
+  behind := viewAfter(element);
   result := isOnBounds(element);
   if result then cutBefore(element);
 end;
@@ -897,27 +897,27 @@ begin
   result := unsafeView.viewFrom(newStart);
 end;
 
-function TBB2StringHelper.unsafeViewBehind(newStartSkip: pchar): TStringView;
+function TBB2StringHelper.unsafeViewAfter(newStartSkip: pchar): TStringView;
 begin
-  result := unsafeView.viewBehind(newStartSkip);
+  result := unsafeView.viewAfter(newStartSkip);
 end;
 
-function TBB2StringHelper.decimalToIntTry(out v: Int64): boolean;
+function TBB2StringHelper.toIntDecimalTry(out v: Int64): boolean;
 begin
-  result := unsafeView.decimalToIntTry(v);
+  result := unsafeView.toIntDecimalTry(v);
 end;
 
-function TBB2StringHelper.decimalToIntTry(out v: Int32): boolean;
+function TBB2StringHelper.toIntDecimalTry(out v: Int32): boolean;
 begin
-  result := unsafeView.decimalToIntTry(v);
+  result := unsafeView.toIntDecimalTry(v);
 end;
 
-function TBB2StringHelper.decimalToUIntTry(out v: UInt64): boolean;
+function TBB2StringHelper.toUIntDecimalTry(out v: UInt64): boolean;
 begin
   result := strDecimalToUIntTry(pchar(self), pchar(self) + length, v);
 end;
 
-function TBB2StringHelper.decimalToUIntTry(out v: UInt32): boolean;
+function TBB2StringHelper.toUIntDecimalTry(out v: UInt32): boolean;
 begin
   result := strDecimalToUIntTry(pchar(self), pchar(self) + length, v);
 end;
