@@ -372,10 +372,15 @@ end;
 
 
 function TPointerView.moveBy(delta: SizeUInt): boolean;
+var
+  olddata: PElement;
+  newdata: PElement;
 begin
-  data := data + delta;
-  result := data < dataend;
-  if not result then data := dataend;
+  olddata := data;
+  newdata := olddata + delta;
+  result := (olddata <= newdata) and (newdata <= dataend);
+  if result then data := newdata
+  else if newdata > dataend then data := dataend;
 end;
 
 
@@ -400,10 +405,15 @@ end;
 
 
 function TPointerView.cutBy(delta: SizeUInt): boolean;
+var
+  olddataend: PElement;
+  newdataend: PElement;
 begin
-  dataend := dataend - delta;
-  result := data < dataend;
-  if not result then dataend := data;
+  olddataend := dataend;
+  newdataend := olddataend - delta;
+  result := (data <= newdataend) and (newdataend <= dataend);
+  if result then dataend := newdataend
+  else if newdataend < data then dataend := data;
 end;
 
 procedure TPointerView.cutBefore(target: PElement);
