@@ -1165,7 +1165,7 @@ procedure TTemplateAction.addChildFromTree(context: TTemplateLoadingContext; t: 
     oldpath := context.path;
     if href.contains('/') or href.contains('\') then begin
       href := href.Replace('\', '/', [rfReplaceAll]);
-      dir := href.unsafeViewTo(href.unsafeView.findLast('/')).ToString;
+      dir := href.pcharViewTo(href.pcharView.findLast('/')).ToString;
       if context.path = '' then context.path := dir
       else context.path := IncludeTrailingPathDelimiter(context.path) + dir;
     end;
