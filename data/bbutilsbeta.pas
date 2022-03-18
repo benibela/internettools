@@ -100,19 +100,19 @@ type
     function isEqual(const other: TPointerView): boolean;
     function isInBounds(target: PElement): boolean; inline;
     function isOnBounds(target: PElement): boolean; inline;
-    function offsetOf(target: PElement): SizeInt; inline;
+    function offsetOf(target: PElement): SizeUInt; inline;
 
     function getEnumerator: TPointerViewEnumerator; inline;
 
-    function moveBy(delta: SizeInt): boolean;
+    function moveBy(delta: SizeUInt): boolean;
     procedure moveTo(target: PElement);
     procedure moveAfter(target: PElement);
 
-    function cutBy(delta: SizeInt): boolean;
+    function cutBy(delta: SizeUInt): boolean;
     procedure cutBefore(target: PElement);
     procedure cutAfter(target: PElement);
 
-    function count(const e: TElement): SizeInt;
+    function count(const e: TElement): SizeUInt;
 
     //** copy and cutAfter
     function viewTo(newLast: PElement): TPointerView;
@@ -365,13 +365,13 @@ begin
   result := (data <= target) and (target <= dataend);
 end;
 
-function TPointerView.offsetOf(target: PElement): SizeInt;
+function TPointerView.offsetOf(target: PElement): SizeUInt;
 begin
   result := target - data;
 end;
 
 
-function TPointerView.moveBy(delta: SizeInt): boolean;
+function TPointerView.moveBy(delta: SizeUInt): boolean;
 begin
   data := data + delta;
   result := data < dataend;
@@ -399,7 +399,7 @@ begin
 end;
 
 
-function TPointerView.cutBy(delta: SizeInt): boolean;
+function TPointerView.cutBy(delta: SizeUInt): boolean;
 begin
   dataend := dataend - delta;
   result := data < dataend;
@@ -418,7 +418,7 @@ begin
   cutBefore(target + 1);
 end;
 
-function TPointerView.count(const e: TElement): SizeInt;
+function TPointerView.count(const e: TElement): SizeUInt;
 var
   p, &end: PElement;
 begin
