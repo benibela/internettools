@@ -6155,7 +6155,7 @@ function TXQJsonParser.decodeNumber: IXQValue;
 var
   temp64: Int64;
   tempd: BigDecimal;
-  tempview: TStringView;
+  tempview: TPCharView;
 begin
   if jsoniqMode then begin
     tempview.init(scanner.CurTokenStart, scanner.CurTokenLength);

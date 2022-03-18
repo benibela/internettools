@@ -2192,7 +2192,7 @@ end;
 
 function takeLoopCounter(var s: string; out minCount, maxCount: string): boolean;
 var
-  view, maxView: TStringView;
+  view, maxView: TPCharView;
   comma: pchar;
   temp: SizeInt;
   closingParen: pChar;
@@ -2209,7 +2209,7 @@ begin
     '{': begin
       //original regex:
       //^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *
-      view := s.unsafeView;
+      view := s.pcharView;
       view.moveBy(1); //strip {
       closingParen := view.find('}');
       if closingParen = nil then exit;
@@ -2227,7 +2227,7 @@ begin
       if result then begin
         minCount := view.ToString;
         maxCount := maxView.ToString;
-        delete(s, 1, s.unsafeViewTo(closingParen).length);
+        delete(s, 1, s.pcharViewTo(closingParen).length);
       end;
     end;
   end;

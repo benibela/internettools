@@ -85,7 +85,7 @@ type
     procedure prepareSelfForRequest(const lastConnectedURL: TDecodedUrl);
   end;
 
-  TInternetAccessDataBlock = TCharArrayView;
+  TInternetAccessDataBlock = TPCharView;
 
   TMIMEMultipartSubData = record
     data: string;
@@ -127,7 +127,7 @@ type
     procedure add(const name, value: string);
     property headerValues[header: string]: string read GetheaderValue; default;
   protected
-    class function parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value: TStringView; out utf8: string): Boolean; static;
+    class function parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value: TPCharView; out utf8: string): Boolean; static;
     class function parseContentDispositionFileNameTry(const contentDisposition: string; out filename: string): Boolean; static;
   end;
 
@@ -164,7 +164,7 @@ type
     method: string;
     url: string;
     decodedUrl: TDecodedUrl;
-    data: TCharArrayView;
+    data: TPCharView;
     ownerAccess: TInternetAccess;
 
     //during transfer
@@ -997,7 +997,7 @@ function TInternetAccess.request(method: string; url: TDecodedUrl; data: string)
 var builder: TStrBuilder;
 begin
   builder.init(@result);
-  request(method, url, data.unsafeView, TTransferClearEvent(@builder.clear), TTransferBlockWriteEvent(@builder.appendBuffer));
+  request(method, url, data.pcharView, TTransferClearEvent(@builder.clear), TTransferBlockWriteEvent(@builder.appendBuffer));
   builder.final;
 
   if fconfig.logToPath<>'' then
@@ -1016,7 +1016,7 @@ end;
 
 procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: string; outStream: TStream);
 begin
-  request(method, url, uploadData.unsafeView, TTransferClearEvent(makeMethod(@clearStream, outStream)), TTransferBlockWriteEvent(makeMethod(@writeStream, outStream)));
+  request(method, url, uploadData.pcharView, TTransferClearEvent(makeMethod(@clearStream, outStream)), TTransferBlockWriteEvent(makeMethod(@writeStream, outStream)));
 end;
 
 procedure TInternetAccess.request(const method: string; const url: TDecodedUrl; const uploadData: TInternetAccessDataBlock;
@@ -1496,9 +1496,9 @@ begin
   add(name + ': '+value);
 end;
 
-class function THTTPHeaderList.parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value: TStringView; out utf8: string): Boolean;
+class function THTTPHeaderList.parseCharacterSetEncodedHeaderRFC5987AsUtf8Try(value: TPCharView; out utf8: string): Boolean;
 var
-  enc, country: TStringView;
+  enc, country: TPCharView;
   codepage: TSystemCodePage;
 begin
   result := value.splitMoveAfterFind(enc, '''');
@@ -1513,14 +1513,14 @@ class function THTTPHeaderList.parseContentDispositionFileNameTry(const contentD
 var
   directive, temp: String;
   directives: sysutils.TStringArray;
-  name, value: TCharArrayView;
+  name, value: TPCharView;
 begin
   result := false;
   filename := '';
   if not contentDisposition.StartsWith('attachment') then exit;
   directives := contentDisposition.Split(';');
   for directive in directives do begin
-    if not directive.unsafeView.splitAtFind(name, '=', value) then continue;
+    if not directive.pcharView.splitAtFind(name, '=', value) then continue;
     name.trim();
     value.trim();
     if name = 'filename*' then begin

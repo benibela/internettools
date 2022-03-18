@@ -639,7 +639,7 @@ begin
 end;
 
 procedure strCountLinesBeforePos(const s: string; pos: pchar; out lines: SizeInt; out lineStart: pchar);
-var view: TStringView;
+var view: TPCharView;
 begin
   view.init(s);
   lines := 0;
@@ -652,15 +652,15 @@ end;
 
 type TLineRange = record
   startLineIndex, lastLineIndex: SizeInt;
-  lines: TCharArrayView; //all lines between start line and end line inclusively
-  lastLine: TStringView;
+  lines: TPCharView; //all lines between start line and end line inclusively
+  lastLine: TPCharView;
 //  startOffset, endOffset: ;
 end;
 
 function strMapPcharRangeToLines(const s: string; startpos, lastpos: pchar): TLineRange;
 var
   startLineStart, endLineStart: pchar;
-  view: TCharArrayView;
+  view: TPCharView;
 begin
   strCountLinesBeforePos(s, lastpos, result.lastLineIndex, endLineStart);
   if startpos < endLineStart then
@@ -669,8 +669,8 @@ begin
     result.startLineIndex := result.lastLineIndex;
     startLineStart := endLineStart;
    end;
-  view := s.unsafeViewFrom(startLineStart);
-  result.lines := view.viewUntil(s.unsafeViewFrom(endLineStart).findLineBreak.nilMeansInfinity);
+  view := s.pcharViewFrom(startLineStart);
+  result.lines := view.viewUntil(s.pcharViewFrom(endLineStart).findLineBreak.nilMeansInfinity);
   result.lastLine := result.lines.viewFrom(endLineStart);
 end;
 
@@ -734,7 +734,7 @@ var i: SizeInt;
     lineRange: TLineRange;
 begin
   result := '';
-  if str.unsafeView.isOnBounds(endAt) then begin
+  if str.pcharView.isOnBounds(endAt) then begin
     if (startAt < pchar(str)) or (startAt > endAt) then begin
       startAt := endAt - 1;
       if startAt < pchar(str) then startAt := endAt;

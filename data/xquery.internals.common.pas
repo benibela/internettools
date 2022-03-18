@@ -853,7 +853,7 @@ end;
 function TryStrToXQFloat(const str: pchar; length: SizeInt; out d: xqfloat): boolean;
   function tryWithTrimming: boolean;
   var
-    v: TStringView;
+    v: TPCharView;
   begin
     v.init(str, length);
     v.trim(bbutils.WHITE_SPACE);

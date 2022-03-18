@@ -70,19 +70,19 @@ type
   |-------------------cutAfter(x)--------------------||-------moveAfter(x)--------|
 
 
-  Function View* return a new view. To and From are inclusive, while Until and Behind are exclusive, i.e.:
+  Function View* return a new view. To and From are inclusive, while Until and After are exclusive, i.e.:
 
   |--------viewUntil(x)--------||-----------------------viewFrom(x)---------------|
   ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
-  |--------------------viewTo(x)---------------------||-------viewBehind(x)-------|
+  |--------------------viewTo(x)---------------------||--------viewAfter(x)-------|
 
   *)
-  generic TArrayView<TElement> = object
+  generic TPointerView<TElement> = object
     type PElement = ^TElement;
   protected
     procedure initStartCapped(oldstart, start, anend: pchar);
     procedure initEndCapped(start, newend, oldend: pchar);
-   type TArrayViewEnumerator = object
+   type TPointerViewEnumerator = object
     protected
       data, dataend: pelement;
       function first: TElement; inline;
@@ -97,12 +97,12 @@ type
     procedure init(firstelement, behindlastelement: PElement);
     function length: SizeInt;
     function isEmpty: boolean; inline;
-    function isEqual(const other: TArrayView): boolean;
+    function isEqual(const other: TPointerView): boolean;
     function isInBounds(target: PElement): boolean; inline;
     function isOnBounds(target: PElement): boolean; inline;
     function offsetOf(target: PElement): SizeInt; inline;
 
-    function getEnumerator: TArrayViewEnumerator; inline;
+    function getEnumerator: TPointerViewEnumerator; inline;
 
     function moveBy(delta: SizeInt): boolean;
     procedure moveTo(target: PElement);
@@ -115,16 +115,16 @@ type
     function count(const e: TElement): SizeInt;
 
     //** copy and cutAfter
-    function viewTo(newLast: PElement): TArrayView;
+    function viewTo(newLast: PElement): TPointerView;
     //** copy and cutBefore
-    function viewUntil(newEnd: PElement): TArrayView;
+    function viewUntil(newEnd: PElement): TPointerView;
     //** copy and moveTo
-    function viewFrom(newStart: PElement): TArrayView;
+    function viewFrom(newStart: PElement): TPointerView;
     //** copy and moveAfter
-    function viewAfter(newStartSkip: PElement): TArrayView;
+    function viewAfter(newStartSkip: PElement): TPointerView;
   end;
 
-  TCharArrayView = object(specialize TArrayView<char>)
+  TPCharView = object(specialize TPointerView<char>)
   private
     function moveToFound(target: pchar): boolean; inline;
   public
@@ -172,54 +172,53 @@ type
     function toUIntDecimalTry(out v: UInt64): boolean;
     function toUIntDecimalTry(out v: UInt32): boolean;
 
-    function viewTo(newLast: pchar): TCharArrayView; reintroduce;
-    function viewUntil(newEnd: pchar): TCharArrayView; reintroduce;
-    function viewFrom(newStart: pchar): TCharArrayView; reintroduce;
-    function viewAfter(newStartSkip: pchar): TCharArrayView; reintroduce;
+    function viewTo(newLast: pchar): TPCharView; reintroduce;
+    function viewUntil(newEnd: pchar): TPCharView; reintroduce;
+    function viewFrom(newStart: pchar): TPCharView; reintroduce;
+    function viewAfter(newStartSkip: pchar): TPCharView; reintroduce;
 
     //** Splits the view at element.
     //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
-    function splitAt(out before: TCharArrayView; element: PChar; out behind: TCharArrayView): boolean;
+    function splitAt(out before: TPCharView; element: PChar; out behind: TPCharView): boolean;
     //** Splits the view at element.
     //** Everything before element is returned in self, everything behind it in behind.
-    function splitCutBefore(element: PChar; out behind: TCharArrayView): boolean;
+    function splitCutBefore(element: PChar; out behind: TPCharView): boolean;
     //** Splits the view at element.
     //** Everything before element is returned in before, everything behind it in self.
-    function splitMoveAfter(out before: TCharArrayView; element: PChar): boolean;
+    function splitMoveAfter(out before: TPCharView; element: PChar): boolean;
     //** Splits the view at the first occurrence of searched.
     //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
-    function splitAtFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+    function splitAtFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
     //** Splits the view at the first occurrence of searched.
     //** Everything before searched is returned in self, everything behind (searched+searchedLength) in behind.
-    function splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+    function splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
     //** Splits the view at the first occurrence of searched.
     //** Everything before searched is returned in before, everything behind (searched+searchedLength) in self.
-    function splitMoveAfterFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt): boolean;
+    function splitMoveAfterFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
     //** Splits the view at the first occurrence of searched.
     //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
-    function splitAtFind(out before: TCharArrayView; const searched: string; out behind: TCharArrayView): boolean;
+    function splitAtFind(out before: TPCharView; const searched: string; out behind: TPCharView): boolean;
     //** Splits the view at the first occurrence of searched.
     //** Everything before searched is returned in self, everything behind searched in behind.
-    function splitCutBeforeFind(const searched: string; out behind: TCharArrayView): boolean;
+    function splitCutBeforeFind(const searched: string; out behind: TPCharView): boolean;
     //** Splits the view at the first occurrence of searched.
     //** Everything before searched is returned in before, everything behind searched in self.
-    function splitMoveAfterFind(out before: TCharArrayView; const searched: string): boolean;
+    function splitMoveAfterFind(out before: TPCharView; const searched: string): boolean;
   end;
 
-  TStringView = TCharArrayView;
 
-  operator =(const cav: TCharArrayView; const s: string): boolean;
-  operator <>(const cav: TCharArrayView; const s: string): boolean;
-  operator =(const s: string; const cav: TCharArrayView): boolean;
-  operator <>(const s: string; const cav: TCharArrayView): boolean;
+  operator =(const cav: TPCharView; const s: string): boolean;
+  operator <>(const cav: TPCharView; const s: string): boolean;
+  operator =(const s: string; const cav: TPCharView): boolean;
+  operator <>(const s: string; const cav: TPCharView): boolean;
 
 type
   TBB2StringHelper = type helper (TBBStringHelper) for ansistring
-    function unsafeView: TStringView;
-    function unsafeViewTo(newLast: pchar): TStringView;
-    function unsafeViewUntil(newEnd: pchar): TStringView;
-    function unsafeViewFrom(newStart: pchar): TStringView;
-    function unsafeViewAfter(newStartSkip: pchar): TStringView;
+    function pcharView: TPCharView;
+    function pcharViewTo(newLast: pchar): TPCharView;
+    function pcharViewUntil(newEnd: pchar): TPCharView;
+    function pcharViewFrom(newStart: pchar): TPCharView;
+    function pcharViewAfter(newStartSkip: pchar): TPCharView;
 
     function toIntDecimalTry(out v: Int64): boolean;
     function toIntDecimalTry(out v: Int32): boolean;
@@ -231,7 +230,7 @@ type
   end;
 
   TBB2BytesHelper = type helper for TBytes
-    function unsafeView: TCharArrayView;
+    function pcharView: TPCharView;
   end;
 
   TCriticalSectionHelper = {$if FPC_FULLVERSION >= 030200}type{$else}record{$endif} helper for TRTLCriticalSection
@@ -293,19 +292,19 @@ end;
 
 {$ifdef HAS_TYPEHELPERS}
 
-function TArrayView.TArrayViewEnumerator.first: TElement;
+function TPointerView.TPointerViewEnumerator.first: TElement;
 begin
   result := data^;
 end;
 
-function TArrayView.TArrayViewEnumerator.moveNext: boolean;
+function TPointerView.TPointerViewEnumerator.moveNext: boolean;
 begin
   inc(data);
   result := data < dataend;
 end;
 
 
-procedure TArrayView.initStartCapped(oldstart, start, anend: pchar);
+procedure TPointerView.initStartCapped(oldstart, start, anend: pchar);
 begin
   dataend := anend;
   if start < oldstart then data := oldstart
@@ -313,7 +312,7 @@ begin
   else data := start;
 end;
 
-procedure TArrayView.initEndCapped(start, newend, oldend: pchar);
+procedure TPointerView.initEndCapped(start, newend, oldend: pchar);
 begin
   data := start;
   if newend > oldend then dataend := oldend
@@ -321,13 +320,13 @@ begin
   else dataend := newend;
 end;
 
-procedure TArrayView.init(firstelement: PElement; length: sizeint);
+procedure TPointerView.init(firstelement: PElement; length: sizeint);
 begin
   data := firstelement;
   dataend := data + length;
 end;
 
-procedure TArrayView.init(firstelement, behindlastelement: PElement);
+procedure TPointerView.init(firstelement, behindlastelement: PElement);
 begin
   data := firstelement;
   dataend := behindlastelement;
@@ -335,18 +334,18 @@ end;
 
 {$PUSH}
 {$R-}
-function TArrayView.length: SizeInt;
+function TPointerView.length: SizeInt;
 begin
   result := SizeUInt(pchar(dataend) - pchar(data)) div SizeUInt(sizeof(TElement));
 end;
 {$POP}
 
-function TArrayView.isEmpty: boolean;
+function TPointerView.isEmpty: boolean;
 begin
   result := data >= dataend;
 end;
 
-function TArrayView.isEqual(const other: TArrayView): boolean;
+function TPointerView.isEqual(const other: TPointerView): boolean;
 var byteLength, otherByteLength: SizeUInt;
 begin
   byteLength := SizeUInt(pchar(dataend) - pchar(data));
@@ -356,23 +355,23 @@ begin
   result := CompareByte(PByte(data)^, pbyte(other.data)^, byteLength) = 0;
 end;
 
-function TArrayView.isInBounds(target: PElement): boolean;
+function TPointerView.isInBounds(target: PElement): boolean;
 begin
   result := (data <= target) and (target < dataend);
 end;
 
-function TArrayView.isOnBounds(target: PElement): boolean;
+function TPointerView.isOnBounds(target: PElement): boolean;
 begin
   result := (data <= target) and (target <= dataend);
 end;
 
-function TArrayView.offsetOf(target: PElement): SizeInt;
+function TPointerView.offsetOf(target: PElement): SizeInt;
 begin
   result := target - data;
 end;
 
 
-function TArrayView.moveBy(delta: SizeInt): boolean;
+function TPointerView.moveBy(delta: SizeInt): boolean;
 begin
   data := data + delta;
   result := data < dataend;
@@ -380,13 +379,13 @@ begin
 end;
 
 
-function TArrayView.getEnumerator: TArrayViewEnumerator;
+function TPointerView.getEnumerator: TPointerViewEnumerator;
 begin
   result.data := data - 1;
   result.dataend := dataend;
 end;
 
-procedure TArrayView.moveTo(target: PElement);
+procedure TPointerView.moveTo(target: PElement);
 begin
   if target <= data then exit;
   if target >= dataend then data := dataend
@@ -394,32 +393,32 @@ begin
 end;
 
 
-procedure TArrayView.moveAfter(target: PElement);
+procedure TPointerView.moveAfter(target: PElement);
 begin
   moveTo(target + 1);
 end;
 
 
-function TArrayView.cutBy(delta: SizeInt): boolean;
+function TPointerView.cutBy(delta: SizeInt): boolean;
 begin
   dataend := dataend - delta;
   result := data < dataend;
   if not result then dataend := data;
 end;
 
-procedure TArrayView.cutBefore(target: PElement);
+procedure TPointerView.cutBefore(target: PElement);
 begin
   if target >= dataend then exit;
   if target <= data then dataend := data
   else dataend := target;
 end;
 
-procedure TArrayView.cutAfter(target: PElement);
+procedure TPointerView.cutAfter(target: PElement);
 begin
   cutBefore(target + 1);
 end;
 
-function TArrayView.count(const e: TElement): SizeInt;
+function TPointerView.count(const e: TElement): SizeInt;
 var
   p, &end: PElement;
 begin
@@ -433,22 +432,22 @@ begin
   end;
 end;
 
-function TArrayView.viewTo(newLast: PElement): TArrayView;
+function TPointerView.viewTo(newLast: PElement): TPointerView;
 begin
   result.initEndCapped(data, newLast + 1, dataend);
 end;
 
-function TArrayView.viewUntil(newEnd: PElement): TArrayView;
+function TPointerView.viewUntil(newEnd: PElement): TPointerView;
 begin
   result.initEndCapped(data, newEnd, dataend);
 end;
 
-function TArrayView.viewFrom(newStart: PElement): TArrayView;
+function TPointerView.viewFrom(newStart: PElement): TPointerView;
 begin
   result.initStartCapped(data, newStart, dataend);
 end;
 
-function TArrayView.viewAfter(newStartSkip: PElement): TArrayView;
+function TPointerView.viewAfter(newStartSkip: PElement): TPointerView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
@@ -457,44 +456,44 @@ end;
 
 
 
-function TCharArrayView.moveToFound(target: pchar): boolean;
+function TPCharView.moveToFound(target: pchar): boolean;
 begin
   result := target <> nil;
   if result then data := target;
 end;
 
-procedure TCharArrayView.init(const buffer: string);
+procedure TPCharView.init(const buffer: string);
 begin
   data := pchar(buffer);
   dataend := data + system.length(buffer);
 end;
 
-procedure TCharArrayView.init(const buffer: TBytes);
+procedure TPCharView.init(const buffer: TBytes);
 begin
-  if system.length(buffer) = 0 then self := default(TCharArrayView)
+  if system.length(buffer) = 0 then self := default(TPCharView)
   else begin
     data := @buffer[0];
     dataend := data + system.length(buffer);
   end;
 end;
 
-function TCharArrayView.ToString: string;
+function TPCharView.ToString: string;
 begin
   result := strFromPchar(data, length);
 end;
 
-function TCharArrayView.length: SizeInt;
+function TPCharView.length: SizeInt;
 begin
   result := dataend - data;
 end;
 
 
-function TCharArrayView.contains(const s: string): boolean;
+function TPCharView.contains(const s: string): boolean;
 begin
   result := find(s) <> nil;
 end;
 
-function TCharArrayView.beginsWith(const s: string): boolean;
+function TPCharView.beginsWith(const s: string): boolean;
 var
   expectedLength: SizeInt;
 begin
@@ -503,7 +502,7 @@ begin
             and ((s = '') or (CompareByte(PByte(data)^, pbyte(s)^, expectedLength ) = 0));
 end;
 
-function TCharArrayView.endsWith(const expectedEnd: string): boolean;
+function TPCharView.endsWith(const expectedEnd: string): boolean;
 var
   strLength, expectedLength: SizeInt;
 begin
@@ -514,7 +513,7 @@ begin
               (CompareByte(data[strLength-expectedLength], PByte(expectedEnd)^, expectedLength) = 0) );
 end;
 
-function TCharArrayView.find(searched: pchar; searchedLength: SizeInt): pchar;
+function TPCharView.find(searched: pchar; searchedLength: SizeInt): pchar;
 var
   last: pchar;
 begin
@@ -531,12 +530,12 @@ begin
   result := nil;
 end;
 
-function TCharArrayView.find(const s: string): pchar;
+function TPCharView.find(const s: string): pchar;
 begin
   result := find(pchar(s), system.length(s));
 end;
 
-function TCharArrayView.findLast(searched: pchar; searchedLength: SizeInt): pchar;
+function TPCharView.findLast(searched: pchar; searchedLength: SizeInt): pchar;
 var
   first: pchar;
 begin
@@ -553,18 +552,18 @@ begin
   result := nil;
 end;
 
-function TCharArrayView.findLast(const s: string): pchar;
+function TPCharView.findLast(const s: string): pchar;
 begin
   result := findLast(pchar(s), system.length(s));
 end;
 
 
-function TCharArrayView.moveToFind(const s: string): boolean;
+function TPCharView.moveToFind(const s: string): boolean;
 begin
   result := moveToFound(find(s));
 end;
 
-function TCharArrayView.moveAfterFind(const s: string): boolean;
+function TPCharView.moveAfterFind(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -574,7 +573,7 @@ begin
     data := target + system.length(s);
 end;
 
-function TCharArrayView.moveToFindLast(const s: string): boolean;
+function TPCharView.moveToFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -584,7 +583,7 @@ begin
     data := target;
 end;
 
-function TCharArrayView.moveAfterFindLast(const s: string): boolean;
+function TPCharView.moveAfterFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -595,7 +594,7 @@ begin
 end;
 
 
-function TCharArrayView.findLineBreak: pchar;
+function TPCharView.findLineBreak: pchar;
 begin
   result := data;
   while result < dataend do begin
@@ -605,12 +604,12 @@ begin
   result := nil;
 end;
 
-function TCharArrayView.moveToLineBreak: boolean;
+function TPCharView.moveToLineBreak: boolean;
 begin
   result := moveToFound(findLineBreak);
 end;
 
-function TCharArrayView.moveAfterLineBreak: boolean;
+function TPCharView.moveAfterLineBreak: boolean;
 var
   target: PChar;
 begin
@@ -623,7 +622,7 @@ begin
   end;
 end;
 
-function TCharArrayView.cutBeforeFind(const s: string): boolean;
+function TPCharView.cutBeforeFind(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -633,7 +632,7 @@ begin
     dataend := target;
 end;
 
-function TCharArrayView.cutAfterFind(const s: string): boolean;
+function TPCharView.cutAfterFind(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -643,7 +642,7 @@ begin
     dataend := target + system.length(s);
 end;
 
-function TCharArrayView.cutBeforeFindLast(const s: string): boolean;
+function TPCharView.cutBeforeFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -653,7 +652,7 @@ begin
     dataend := target;
 end;
 
-function TCharArrayView.cutAfterFindLast(const s: string): boolean;
+function TPCharView.cutAfterFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -663,7 +662,7 @@ begin
     dataend := target + system.length(s);
 end;
 
-procedure TCharArrayView.trim(const trimCharacters: TCharSet = [#0..' ']);
+procedure TPCharView.trim(const trimCharacters: TCharSet = [#0..' ']);
 var
   l: SizeInt;
 begin
@@ -672,7 +671,7 @@ begin
   dataend := data + l;
 end;
 
-procedure TCharArrayView.trimLeft(const trimCharacters: TCharSet);
+procedure TPCharView.trimLeft(const trimCharacters: TCharSet);
 var
   l: SizeInt;
 begin
@@ -681,7 +680,7 @@ begin
   dataend := data + l;
 end;
 
-procedure TCharArrayView.trimRight(const trimCharacters: TCharSet);
+procedure TPCharView.trimRight(const trimCharacters: TCharSet);
 var
   l: SizeInt;
 begin
@@ -690,18 +689,18 @@ begin
   dataend := data + l;
 end;
 
-procedure TCharArrayView.trim(trimChar: char);
+procedure TPCharView.trim(trimChar: char);
 begin
   trimLeft(trimChar);
   trimRight(trimChar);
 end;
 
-procedure TCharArrayView.trimLeft(trimChar: char);
+procedure TPCharView.trimLeft(trimChar: char);
 begin
   trimLeft([trimChar]);
 end;
 
-procedure TCharArrayView.trimRight(trimChar: char);
+procedure TPCharView.trimRight(trimChar: char);
 begin
   trimRight([trimChar]);
 end;
@@ -713,7 +712,7 @@ const
       MaxAbsoluteNegativeInt64AsUint = QWord(9223372036854775808);
       MaxAbsoluteNegativeInt32AsUint = DWord(2147483648);
 
-function TCharArrayView.toIntDecimalTry(out v: Int64): boolean;
+function TPCharView.toIntDecimalTry(out v: Int64): boolean;
 var
   temp: QWord;
 begin
@@ -732,7 +731,7 @@ begin
   result := true;
 end;
 
-function TCharArrayView.toIntDecimalTry(out v: Int32): boolean;
+function TPCharView.toIntDecimalTry(out v: Int32): boolean;
 var
   temp: UInt32;
 begin
@@ -751,58 +750,58 @@ begin
 end;
 {$pop}
 
-function TCharArrayView.toUIntDecimalTry(out v: UInt64): boolean;
+function TPCharView.toUIntDecimalTry(out v: UInt64): boolean;
 begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;
 
-function TCharArrayView.toUIntDecimalTry(out v: UInt32): boolean;
+function TPCharView.toUIntDecimalTry(out v: UInt32): boolean;
 begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;
 
-function TCharArrayView.viewTo(newLast: pchar): TCharArrayView;
+function TPCharView.viewTo(newLast: pchar): TPCharView;
 begin
   result.initEndCapped(data, newLast + 1, dataend);
 end;
 
-function TCharArrayView.viewUntil(newEnd: pchar): TCharArrayView;
+function TPCharView.viewUntil(newEnd: pchar): TPCharView;
 begin
   result.initEndCapped(data, newEnd, dataend);
 end;
 
-function TCharArrayView.viewFrom(newStart: pchar): TCharArrayView;
+function TPCharView.viewFrom(newStart: pchar): TPCharView;
 begin
   result.initStartCapped(data, newStart, dataend);
 end;
 
-function TCharArrayView.viewAfter(newStartSkip: pchar): TCharArrayView;
+function TPCharView.viewAfter(newStartSkip: pchar): TPCharView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
 
-function TCharArrayView.splitAt(out before: TCharArrayView; element: PChar; out behind: TCharArrayView): boolean;
+function TPCharView.splitAt(out before: TPCharView; element: PChar; out behind: TPCharView): boolean;
 begin
   result := isOnBounds(element);
   before := viewUntil(element);
   behind := viewAfter(element);
 end;
 
-function TCharArrayView.splitCutBefore(element: PChar; out behind: TCharArrayView): boolean;
+function TPCharView.splitCutBefore(element: PChar; out behind: TPCharView): boolean;
 begin
   behind := viewAfter(element);
   result := isOnBounds(element);
   if result then cutBefore(element);
 end;
 
-function TCharArrayView.splitMoveAfter(out before: TCharArrayView; element: PChar): boolean;
+function TPCharView.splitMoveAfter(out before: TPCharView; element: PChar): boolean;
 begin
   before := viewUntil(element);
   result := isOnBounds(element);
   if result then moveAfter(element);
 end;
 
-function TCharArrayView.splitAtFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+function TPCharView.splitAtFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
 var
   target: PChar;
 begin
@@ -814,33 +813,33 @@ begin
   end else splitAt(before, nil, behind);
 end;
 
-function TCharArrayView.splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TCharArrayView): boolean;
+function TPCharView.splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
 var
-  temp: TCharArrayView;
+  temp: TPCharView;
 begin
   result := splitAtFind(temp, searched, searchedLength, behind);
   if result then self := temp;
 end;
 
-function TCharArrayView.splitMoveAfterFind(out before: TCharArrayView; searched: pchar; searchedLength: SizeInt): boolean;
+function TPCharView.splitMoveAfterFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
 var
-  temp: TCharArrayView;
+  temp: TPCharView;
 begin
   result := splitAtFind(before, searched, searchedLength, temp);
   if result then self := temp;
 end;
 
-function TCharArrayView.splitAtFind(out before: TCharArrayView; const searched: string; out behind: TCharArrayView): boolean;
+function TPCharView.splitAtFind(out before: TPCharView; const searched: string; out behind: TPCharView): boolean;
 begin
   result := splitAtFind(before, pchar(searched), system.length(searched), behind);
 end;
 
-function TCharArrayView.splitCutBeforeFind(const searched: string; out behind: TCharArrayView): boolean;
+function TPCharView.splitCutBeforeFind(const searched: string; out behind: TPCharView): boolean;
 begin
   result := splitCutBeforeFind(pchar(searched), system.length(searched), behind);
 end;
 
-function TCharArrayView.splitMoveAfterFind(out before: TCharArrayView; const searched: string): boolean;
+function TPCharView.splitMoveAfterFind(out before: TPCharView; const searched: string): boolean;
 begin
   result := splitMoveAfterFind(before, pchar(searched), system.length(searched));
 end;
@@ -849,24 +848,24 @@ end;
 
 
 
-operator=(const cav: TCharArrayView; const s: string): boolean;
+operator=(const cav: TPCharView; const s: string): boolean;
 begin
-  result := cav.isEqual(s.unsafeView);
+  result := cav.isEqual(s.pcharView);
 end;
 
-operator<>(const cav: TCharArrayView; const s: string): boolean;
+operator<>(const cav: TPCharView; const s: string): boolean;
 begin
-  result := not cav.isEqual(s.unsafeView)
+  result := not cav.isEqual(s.pcharView)
 end;
 
-operator=(const s: string; const cav: TCharArrayView): boolean;
+operator=(const s: string; const cav: TPCharView): boolean;
 begin
-  result := cav.isEqual(s.unsafeView);
+  result := cav.isEqual(s.pcharView);
 end;
 
-operator<>(const s: string; const cav: TCharArrayView): boolean;
+operator<>(const s: string; const cav: TPCharView): boolean;
 begin
-  result := not cav.isEqual(s.unsafeView)
+  result := not cav.isEqual(s.pcharView)
 end;
 
 
@@ -877,39 +876,39 @@ end;
 
 
 
-function TBB2StringHelper.unsafeView: TStringView;
+function TBB2StringHelper.pcharView: TPCharView;
 begin
   result.init(self);
 end;
 
-function TBB2StringHelper.unsafeViewTo(newLast: pchar): TStringView;
+function TBB2StringHelper.pcharViewTo(newLast: pchar): TPCharView;
 begin
-  result := unsafeView.viewTo(newLast);
+  result := pcharView.viewTo(newLast);
 end;
 
-function TBB2StringHelper.unsafeViewUntil(newEnd: pchar): TStringView;
+function TBB2StringHelper.pcharViewUntil(newEnd: pchar): TPCharView;
 begin
-  result := unsafeView.viewUntil(newEnd);
+  result := pcharView.viewUntil(newEnd);
 end;
 
-function TBB2StringHelper.unsafeViewFrom(newStart: pchar): TStringView;
+function TBB2StringHelper.pcharViewFrom(newStart: pchar): TPCharView;
 begin
-  result := unsafeView.viewFrom(newStart);
+  result := pcharView.viewFrom(newStart);
 end;
 
-function TBB2StringHelper.unsafeViewAfter(newStartSkip: pchar): TStringView;
+function TBB2StringHelper.pcharViewAfter(newStartSkip: pchar): TPCharView;
 begin
-  result := unsafeView.viewAfter(newStartSkip);
+  result := pcharView.viewAfter(newStartSkip);
 end;
 
 function TBB2StringHelper.toIntDecimalTry(out v: Int64): boolean;
 begin
-  result := unsafeView.toIntDecimalTry(v);
+  result := pcharView.toIntDecimalTry(v);
 end;
 
 function TBB2StringHelper.toIntDecimalTry(out v: Int32): boolean;
 begin
-  result := unsafeView.toIntDecimalTry(v);
+  result := pcharView.toIntDecimalTry(v);
 end;
 
 function TBB2StringHelper.toUIntDecimalTry(out v: UInt64): boolean;
@@ -922,7 +921,7 @@ begin
   result := strDecimalToUIntTry(pchar(self), pchar(self) + length, v);
 end;
 
-function TBB2BytesHelper.unsafeView: TCharArrayView;
+function TBB2BytesHelper.pcharView: TPCharView;
 begin
   result.init(self);
 end;

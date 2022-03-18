@@ -2241,7 +2241,7 @@ var
 
   procedure addBaseRequestUrlEncoded;
   var oldUrl: String;
-      oldUrlView: TStringView;
+      oldUrlView: TPCharView;
       queryStart: PChar;
       hadLinkTarget: Boolean;
       query: string;

@@ -2092,7 +2092,7 @@ end;
 
 
 {$ifdef FPC_HAS_CPSTRING}
-procedure testbounds(const v: TCharArrayView; p: pchar; l: integer);
+procedure testbounds(const v: TPCharView; p: pchar; l: integer);
 begin
   test(v.length, l);
   test(v.isEmpty = (l = 0));
@@ -2110,7 +2110,7 @@ begin
 end;
 procedure testStringViews;
   procedure testDecimalParse(const s: string);
-  var view: TStringView;
+  var view: TPCharView;
       refU: qword;
       refI: Int64;
       codeU, codeI: integer;
@@ -2139,7 +2139,7 @@ procedure testStringViews;
 
 var
   s: String;
-  v,bv,av,w: TStringView;
+  v,bv,av,w: TPCharView;
   p: PChar;
   i: Integer;
   c: char;
@@ -2252,7 +2252,7 @@ begin
   test(not(v <> ''));
   test(v <> #0);
 
-  v := s.unsafeView;
+  v := s.pcharView;
   testbounds(v, p, 6);
   test(v.ToString, 'foobar');
   test(v.cutBy(1));
