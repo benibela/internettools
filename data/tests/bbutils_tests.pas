@@ -15,7 +15,7 @@ var setCodePageCanConvertEncodings: boolean = {$ifdef FPC_HAS_CPSTRING}true{$els
 
 implementation
 
-uses bbutils, bbutilsbeta;
+uses bbutils;
 
 
 
