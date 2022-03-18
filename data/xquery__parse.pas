@@ -2767,7 +2767,7 @@ begin
   skipWhitespaceAndComment();
   case pos^ of
     '0'..'9': begin
-      if not nextToken().decimalToIntTry(result.integerKey) then raiseSyntaxError('Need (integer) key');
+      if not nextToken().toIntDecimalTry(result.integerKey) then raiseSyntaxError('Need (integer) key');
       result.mode := xqtjlmInteger
     end;
     '*': begin

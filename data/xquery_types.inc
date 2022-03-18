@@ -115,7 +115,7 @@ function TXQValue.toInt64: int64;
   function myStrToInt(const s:string):int64;
   var tempf:xqfloat;
   begin
-    if not s.decimalToIntTry(result) then
+    if not s.toIntDecimalTry(result) then
       if TryStrToXQFloat(s, tempf) then result:=trunc(tempf)
       else result:=0;
   end;
@@ -3337,7 +3337,7 @@ var
   resultArray: TXQValueJSONArray;
   resseq: TXQVList;
 begin
-  if (not props^.decimalToIntTry(idx)) or (idx < 0) then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
+  if (not props^.toIntDecimalTry(idx)) or (idx < 0) then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
 
   if (len = 1) then
     newValue := v

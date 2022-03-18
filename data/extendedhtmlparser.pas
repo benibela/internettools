@@ -2217,13 +2217,13 @@ begin
       comma := view.find(',');
       if comma = nil then maxView := view
       else begin
-        maxView := view.viewBehind(comma);
+        maxView := view.viewAfter(comma);
         view.cutBefore(comma);
       end;
       view.trim();
       maxView.trim();
       if view.isEmpty or maxView.isEmpty then exit;
-      result := view.decimalToIntTry(temp) and maxView.decimalToIntTry(temp);
+      result := view.toIntDecimalTry(temp) and maxView.toIntDecimalTry(temp);
       if result then begin
         minCount := view.ToString;
         maxCount := maxView.ToString;

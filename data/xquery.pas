@@ -6159,7 +6159,7 @@ var
 begin
   if jsoniqMode then begin
     tempview.init(scanner.CurTokenStart, scanner.CurTokenLength);
-    if tempview.decimalToIntTry(temp64) then exit(xqvalue(temp64));
+    if tempview.toIntDecimalTry(temp64) then exit(xqvalue(temp64));
     if TryStrToBigDecimal(tempview.data, tempview.length, @tempd) then
       if tempview.contains('E')  or tempview.contains('e')   then exit(baseSchema.double.createValue(tempd))
       else if tempview.contains('.')  then exit(baseSchema.decimal.createValue(tempd))
@@ -6998,11 +6998,11 @@ var ak, bk: TXQValueKind;
   begin
     if ak = pvkInt64 then begin
       s := vtodecimalstr(bk, b);
-      if not s.decimalToIntTry(temp) then exit(compareAsBigDecimals(a, s));
+      if not s.toIntDecimalTry(temp) then exit(compareAsBigDecimals(a, s));
       result := TXQCompareResult.compare( TXQValueInt64(a).value, temp);
     end else if bk = pvkInt64 then begin
       s := vtodecimalstr(ak, a);
-      if not s.decimalToIntTry(temp) then
+      if not s.toIntDecimalTry(temp) then
         if s.Contains('N') then exit(compareCommonFloat())
         else exit(compareAsBigDecimals(b, s).inverted());
       result := TXQCompareResult.compare(temp,  TXQValueInt64(b).value);

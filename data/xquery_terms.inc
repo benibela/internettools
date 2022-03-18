@@ -534,7 +534,7 @@ var varname: string;
           pvkObject: value := value.getProperty(properties[i]);
           pvkArray: begin
             temp := value as TXQValueJSONArray;
-            if not properties[i].decimalToIntTry(j) then j := -1;
+            if not properties[i].toIntDecimalTry(j) then j := -1;
             if j < 0 then raiseEvaluationError('pxp:VAR', 'Negative array elements cannot be assigned to');
             if (j = 0) or (j > temp.seq.Count) then value := xqvalue()
             else value := temp.seq.get(j - 1);

@@ -2123,16 +2123,16 @@ procedure testStringViews;
     val(s, refU, codeU);
     val(s, refI, codeI);
     view.init(s);
-    ok := view.decimalToIntTry(vi64);
+    ok := view.toIntDecimalTry(vi64);
     test(ok, codeI = 0);
     if ok then test(vi64, refI);
-    ok := view.decimalToUIntTry(vu64);
+    ok := view.toUIntDecimalTry(vu64);
     test(ok, codeU = 0);
     if ok then test(vu64 = refU);
-    ok := view.decimalToIntTry(vi32);
+    ok := view.toIntDecimalTry(vi32);
     test(ok, (codeI = 0) and (refI >= low(Int32)) and (refI <= high(int32)));
     if ok then test(vi32, refI);
-    ok := view.decimalToUIntTry(vu32);
+    ok := view.toUIntDecimalTry(vu32);
     test(ok, (codeU = 0) and (refU <= high(Uint32)));
     if ok then test(vu32 = refU);
   end;
@@ -2171,13 +2171,13 @@ begin
   end;
 
   test(v.viewFrom(p).ToString, 'foobar');
-  test(v.viewBehind(p).ToString, 'oobar');
+  test(v.viewAfter(p).ToString, 'oobar');
   test(v.viewFrom(p+4).ToString, 'ar');
-  test(v.viewBehind(p+4).ToString, 'r');
+  test(v.viewAfter(p+4).ToString, 'r');
   test(v.viewFrom(p+5).ToString, 'r');
-  test(v.viewBehind(p+5).ToString, '');
+  test(v.viewAfter(p+5).ToString, '');
   test(v.viewFrom(p+6).ToString, '');
-  test(v.viewBehind(p+6).ToString, '');
+  test(v.viewAfter(p+6).ToString, '');
 
   test(v.viewTo(p).ToString, 'f');
   test(v.viewUntil(p).ToString, '');

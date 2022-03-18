@@ -2264,7 +2264,7 @@ var
         query := '';
       end else begin
         urlencodedGETurlPrefix := oldUrlView.viewTo(queryStart).toString;
-        query := oldUrlView.viewBehind(queryStart).toString;
+        query := oldUrlView.viewAfter(queryStart).toString;
       end;
     end;
 
