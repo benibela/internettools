@@ -2234,7 +2234,7 @@ var
   enctype: THtmlFormEnctype;
   requests: array[0..1] of THttpRequestParams;
 
-  urlencodedIsPOST: boolean;
+  urlencodedIsPOST: boolean = false;
   urlencodedGETurlPrefix: string;
 
   mimeBoundary: string;
@@ -2368,8 +2368,8 @@ var submitIndices: array of integer = nil;
     methodIsPost := method = 'POST';
     oldEncType := enctype;
     encType := getFormEnctypeActual(methodIsPost, originalFormRequest.getProperty('enctype').toString);
+    urlencodedIsPOST := methodIsPost;
     if methodIsPost <> (obj.getProperty('method').toString = 'POST') then begin
-      urlencodedIsPOST := methodIsPost;
       if (not methodIsPost) then begin
         if (enctype = hfetUrlEncoded) then
           if action.contains('?') then urlencodedGETurlPrefix:=action + '&'
