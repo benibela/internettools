@@ -4098,7 +4098,7 @@ end;
 
 procedure strSaveToFileCallback(stream: TStream; data: pointer);
 begin
-  stream.Write(Pstring(data)^[1], length(Pstring(data)^));
+  stream.WriteBuffer(Pstring(data)^[1], length(Pstring(data)^));
 end;
 
 procedure strSaveToFile(filename: string;str:string);
