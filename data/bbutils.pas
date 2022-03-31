@@ -1,11 +1,11 @@
 {
 A collection of often needed functions missing in FPC
 
-Copyright (C) 2008 - 2020  Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2022  Benito van der Zander (BeniBela)
                            benito@benibela.de
                            www.benibela.de
 
-This file is distributed under under the same license as Lazarus and the LCL itself:
+This file is distributed under under the same license as FreePascal and Lazarus itself:
 
 This file is distributed under the Library GNU General Public License
 with the following modification:
@@ -24,23 +24,39 @@ exception statement from your version.
 }
 
 (***
-  @abstract(This unit contains some basic functions missing in fpc)@br
+  @abstract(This unit contains some basic functions missing in FreePascal.)@br
 
-  It uses the following naming convention:@br
-  @br
-  All functions starting with @code(str) are related to strings and work on ansistring or pchar,
-  so you can use them for latin1 and utf-8.@br
-  The prefix @code(strl) means the string length is given, @code(str?i) means the function is case insensitive@br
-  @br@br
-  The prefix @code(array) means the function works with dynamical arrays.@br
+  There are different groups of functions and objects:
+
+  @unorderedList(
+  @item(TPointerView, TPCharView: Stack objects to access a slice of an array or string.)
+  @item(TStrBuilder: Stack object to create a string.)
+  @item(Functions with prefix @code(str), which are functions to compare or manipulate strings and pchars.
+
+  The overloads for pchars are provided, so you can work with slices of strings without copying them.
+  The prefix @code(strl) means the string length is given.
+
+  The prefix @code(str?i) means the function is case-insensitive.
+
+  These functions are rather outdated, since you can use the TPCharView for these tasks.
+  But they will not be removed for backwards compatibility, and because they should be faster than views (because FPC can keep function parameters in registers, but not objects). And not all functions have been implemented for the view so far.
+  )
+  @item(Functions with prefix @code(date) and @code(time) , which are functions to parse and format date/time strings.)
+  @item(Functions with prefix @code(arrays) to work on dynamic arrays.
+
   If the suffix @code(Fast) is given, the length of the array is different of the count of contained elements i.e.
   the standard length is actually a capacity so you can resize it without reallocating the array.@br
   Some array functions have two optional slice parameters: if you give none of them the function will affect the whole
   array; if you give one of them, the function will affect elements in the inclusive interval [0, slice] and if you give both,
   it will affect elements in the inclusive interval [slice1, slice2].
+  )
+  @item(Various math functions like binomial, modPow, intSieveEulerPhi. They were primarily implemented to solve competitive programming tasks. )
+  )
+
 
   @br@br
-  Encodings: @br
+  String Encodings:
+
     Most functions are encoding-agnostic and work on CP_ACP strings, they have @code(string) arguments and return @code(string).@br
     It is recommended to use the LCL mode with CP_ACP = CP_UTF8, but it is not required. @br
     Functions only working on utf-8 take @code(RawByteString) arguments and return @code(UTF8String). They do not take UTF8String arguments as that type behaves weirdly with utf-8 in other string types. @br
@@ -48,7 +64,7 @@ exception statement from your version.
     pchars are assumed to have CP_ACP encoding. @br
 
 
-  @author Benito van der Zander, (http://www.benibela.de)
+  @author Benito van der Zander, (https://www.benibela.de)
 
 *)
 
@@ -106,7 +122,6 @@ type
 //delphi
      float = extended;
      TTime = TDateTime;
-     SizeInt = integer;
      TValueSign = -1..1;
 {$IFDEF  CPU386}
      PtrUInt = DWORD;
@@ -115,6 +130,7 @@ type
      PtrUInt = QWORD;
      PtrInt = int64;
 {$ENDIF}{$ENDIF}
+     SizeInt = PtrInt;
 {$IFNDEF UNICODE}
      UnicodeString = WideString;
      PUnicodeChar = ^WideChar;
@@ -181,24 +197,31 @@ procedure threadedCall(proc: TProcedure; isfinished: TProcedureOfObject);overloa
 
 {$ifdef HASTypeHelpers}
 type
-(**
-An array view represents a subsequence of an array.
+(***
+@abstract(An array view representing a slice (subsequence) of an array.)
 
 The view is read-only and can only shrink.
-All functions work with any pointer, such that pointers outside the view either give an empty view or keep the view unchanged.
+Methods with pointer arguments are safe, such that pointers outside the view either yield an empty view or keep the view unchanged.
 
-Function Move* remove elements from the beginning, functions Cut* remove elements from the end, i.e.:
+Methods Move* remove elements from the beginning, methods Cut* remove elements from the end, i.e.:
 
+@longCode(
 |--------cutBefore(x)--------||-----------------------moveTo(x)-----------------|
 ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
 |-------------------cutAfter(x)--------------------||-------moveAfter(x)--------|
+)
 
+Methods View* return a new view. To and From are inclusive, while Until and After are exclusive, i.e.:
 
-Function View* return a new view. To and From are inclusive, while Until and After are exclusive, i.e.:
-
+@longCode(
 |--------viewUntil(x)--------||-----------------------viewFrom(x)---------------|
 ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
 |--------------------viewTo(x)---------------------||--------viewAfter(x)-------|
+)
+
+To avoid confusion, whether indices should be 0-based or 1-based, signed or unsigned, most methods of this view are specified without refering to indices.
+Rather they use pointers or an amount of elements. E.g. rather than getting a slice of all elements after index k, you use moveBy to remove the first k elements.
+
 
 *)
 generic TPointerView<TElement> = object
@@ -217,43 +240,61 @@ protected
 public
   data: pelement; //first element
   dataend: pelement; //after last element
+  //** Creates a view starting with an element of certain length.
   procedure init(firstelement: PElement; length: sizeint);
+  //** Creates a view starting with an element (inclusive) until another element (exclusive).
   procedure init(firstelement, behindlastelement: PElement);
+  //** Creates a view for a (dynamic) array.
+  procedure init(const a: array of TElement);
+  //** Number of elements in the view.
   function length: SizeInt;
+  //** Tests whether the length zero.
   function isEmpty: boolean; inline;
+  //** Tests whether this view is equal to another view (same length and elements)  (currently undefined if element is a string).
   function isEqual(const other: TPointerView): boolean;
+  //** Tests whether an element is in the view (0 <= index < length).
   function isInBounds(target: PElement): boolean; inline;
+  //** Tests whether an element is on the view (0 <= index <= length).
   function isOnBounds(target: PElement): boolean; inline;
+  //** Index of an element.
   function offsetOf(target: PElement): SizeUInt; inline;
 
+  //** Enumerates all elements, copying each.
   function getEnumerator: TPointerViewEnumerator; inline;
 
+  //** Removes delta many elements from the beginning.
   function moveBy(delta: SizeUInt): boolean;
+  //** Removes all elements before the target element.
   procedure moveTo(target: PElement);
+  //** Removes all elements before the target element and the target element.
   procedure moveAfter(target: PElement);
 
+  //** Removes delta many elements from the end.
   function cutBy(delta: SizeUInt): boolean;
+  //** Removes all elements after the target element and the target element.
   procedure cutBefore(target: PElement);
+  //** Removes all elements after the target element.
   procedure cutAfter(target: PElement);
 
+  //** Count how often an element occurs.
   function count(const e: TElement): SizeUInt;
 
-  //** copy and cutAfter
+  //** copy and cutAfter.
   function viewTo(newLast: PElement): TPointerView;
-  //** copy and cutBefore
+  //** copy and cutBefore.
   function viewUntil(newEnd: PElement): TPointerView;
-  //** copy and moveTo
+  //** copy and moveTo.
   function viewFrom(newStart: PElement): TPointerView;
-  //** copy and moveAfter
+  //** copy and moveAfter.
   function viewAfter(newStartSkip: PElement): TPointerView;
 end;
 
 {$endif}
 
 //------------------------------Charfunctions--------------------------
-//Converts 0..9A..Za..z to a corresponding integer digit
+//Converts 0..9A..Za..z to a corresponding integer digit.
 function charDecodeDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
-//Converts 0..9A..Fa..f to a corresponding integer digit
+//Converts 0..9A..Fa..f to a corresponding integer digit.
 function charDecodeHexDigit(c: char): integer; {$IFDEF HASINLINE} inline; {$ENDIF}
 function charEncodeHexDigitUp(digit: integer): char;
 
@@ -264,15 +305,15 @@ function charEncodeHexDigitUp(digit: integer): char;
 //I: case insensitive
 
 //copy
-//**Copies min(sourceLen, destLen) characters from source to dest and returns dest
+//**Copies min(sourceLen, destLen) characters from source to dest and returns dest.
 function strlmove(dest,source:pansichar;destLen,sourceLen: SizeInt):pansichar;
-//**Copies min(sourceLen, destLen) characters from source to dest and returns dest
+//**Copies min(sourceLen, destLen) characters from source to dest and returns dest.
 function widestrlmove(dest,source:pwidechar;destLen,sourceLen: SizeInt):pwidechar;
-//**Returns the substring of s containing all characters after start (including s[start]
+//**Returns the substring of s containing all characters after start (including s[start]).
 function strCopyFrom(const s: string; start:SizeInt): string; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Returns a string with all characters between first and last (including first, last)
+//**Returns a string with all characters between first and last (including first, last).
 function strSlice(const first,last:pansichar):string; overload;
-//**Returns a string with all characters between start and last (including start, last)
+//**Returns a string with all characters between start and last (including start, last).
 function strSlice(const s: string; start,last:SizeInt): string; overload;
 
 //**Like move: moves count strings from source memory to dest memory. Keeps the reference count intact. Size is count of strings * sizeof(string)!
@@ -284,116 +325,118 @@ procedure strMoveRef(var source: string; var dest: string; const size: SizeInt);
 //all pansichar<->string comparisons are null-terminated iff the string doesn't contain #0 characters
 
 //length limited
-function strlEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload;  //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strliEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (null-terminated, stops comparison when meeting #0 )
-function strlsEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
-function strlsiEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitive equal (same length and same characters) (strict-length, can continue comparison after #0)
+//** Tests if the strings are case-sensitively equal (same length and same characters) (null-terminated, stops comparison when meeting #0 ).
+function strlEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
+//** Tests if the strings are case-sensitively equal (same length and same characters) (null-terminated, stops comparison when meeting #0 ).
+function strlEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
+function strliEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload;  //**< Tests if the strings are case-insensitively equal (same length and same characters) (null-terminated, stops comparison when meeting #0 ).
+function strliEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitively equal (same length and same characters) (null-terminated, stops comparison when meeting #0 ).
+function strlsEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
+function strlsEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
+function strlsiEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
+function strlsiEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
 function strlsequal(p: pansichar; const s: string; l: SizeInt): boolean; overload;
-//equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
+//**equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in p2.
 function strlnsiequal(p1,p2:pansichar;l2: SizeInt):boolean;
-//equal comparison, case sensitive, stopping at #0-bytes in p1, ignoring #0-bytes in l2
+//**equal comparison, case sensitive, stopping at #0-bytes in p1, ignoring #0-bytes in p2.
 function strlnsequal(p1,p2:pansichar;l2: SizeInt):boolean;
 
 
-function strlEqual(p:pansichar;const s:string; l: SizeInt):boolean; overload; //**< Tests if the strings are case-sensitive equal (same length and same characters)
-function strliEqual(p:pansichar;const s:string;l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitive equal (same length and same characters)
-function strlBeginsWith(const p:pansichar; l:SizeInt; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (__STRICT_HELP__, case-sensitive)
-function strliBeginsWith(const p:pansichar;l: SizeInt;const expectedStart:string):boolean; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Test if p begins with expectedStart (__STRICT_HELP__, case-insensitive)
+function strlEqual(p:pansichar;const s:string; l: SizeInt):boolean; overload; //**< Tests if the strings are case-sensitively equal (same length and same characters).
+function strliEqual(p:pansichar;const s:string;l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitively equal (same length and same characters).
+function strlBeginsWith(const p:pansichar; l:SizeInt; const expectedStart:string):boolean; //**< Test if p begins with expectedStart (case-sensitive).
+function strliBeginsWith(const p:pansichar;l: SizeInt;const expectedStart:string):boolean; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Test if p begins with expectedStart (case-insensitive).
 
 
 //not length limited
-function strEqual(const s1,s2:RawByteString):boolean; //**< Tests if the strings are case-insensitive equal (same length and same characters)
-function striEqual(const s1,s2:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}//**< Tests if the strings are case-insensitive equal (same length and same characters)
-function strBeginsWith(const strToBeExaminated,expectedStart:string):boolean; overload; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
-function striBeginsWith(const strToBeExaminated,expectedStart:string):boolean; overload; //**< Tests if the @code(strToBeExaminated) starts with @code(expectedStart)
-function strBeginsWith(const p:pansichar; const expectedStart:string):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
-function striBeginsWith(const p:pansichar; const expectedStart:string):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the @code(p) starts with @code(expectedStart) (p is null-terminated)
-function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
-function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if the @code(strToBeExaminated) ends with @code(expectedEnd)
+function strEqual(const s1,s2:RawByteString):boolean; //**< Tests if the strings are case-insensitively equal (same length and same characters).
+function striEqual(const s1,s2:RawByteString):boolean; {$IFDEF HASINLINE} inline; {$ENDIF}//**< Tests if the strings are case-insensitively equal (same length and same characters).
+function strBeginsWith(const strToBeExaminated,expectedStart:string):boolean; overload; //**< Tests if @code(strToBeExaminated) starts with @code(expectedStart).
+function striBeginsWith(const strToBeExaminated,expectedStart:string):boolean; overload; //**< Tests if @code(strToBeExaminated) starts with @code(expectedStart).
+function strBeginsWith(const p:pansichar; const expectedStart:string):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if @code(p) starts with @code(expectedStart) (p is null-terminated).
+function striBeginsWith(const p:pansichar; const expectedStart:string):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if @code(p) starts with @code(expectedStart) (p is null-terminated).
+function strEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if @code(strToBeExaminated) ends with @code(expectedEnd).
+function striEndsWith(const strToBeExaminated,expectedEnd:string):boolean; //**< Tests if @code(strToBeExaminated) ends with @code(expectedEnd).
 
 
 //**Case sensitive, clever comparison, that basically splits the string into
-//**lexicographical and numerical parts and compares them accordingly
+//**lexicographical and numerical parts and compares them accordingly.
 function strCompareClever(const s1, s2: string): longint;
 //**Case insensitive, clever comparison, that basically splits the string into
-//**lexicographical and numerical parts and compares them accordingly
+//**lexicographical and numerical parts and compares them accordingly.
 function striCompareClever(const s1, s2: string): longint; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //search
-//**Searchs the last index of c in s
+//**Searchs the last index of c in s.
 function strRpos(c:ansichar;const s:string):SizeInt;
-//**Counts all occurrences of searched in searchIn (case sensitive)
+//**Counts all occurrences of searched in searchIn (case sensitive).
 function strCount(const str: string; const searched: ansichar; from: SizeInt = 1): SizeInt; overload;
-//**Counts all occurrences of searched in searchIn (case sensitive)
+//**Counts all occurrences of searched in searchIn (case sensitive).
 function strCount(const str: string; const searched: TCharSet; from: SizeInt = 1): SizeInt; overload;
 
-//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+//**Searchs @code(searched) in @code(str) case-sensitively (Attention: opposite parameter order of Pos) (strict length, this function can find #0-bytes).
 function strlsIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt; overload;
-//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+//**Searchs @code(searched) in @code(str) case-sensitively (Attention: opposite parameter order of Pos) (strict length, this function can find #0-bytes).
 function strlsIndexOf(str:pansichar; const searched: TCharSet; length: SizeInt): SizeInt; overload;
-//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
+//**Searchs @code(searched) in @code(str) case-insensitively (Attention: opposite parameter order of Pos)  (strict length, this function can find #0-bytes).
 function strlsiIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt;
 
-//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Searchs @code(searched) in @code(str) case-sensitively (Attention: opposite parameter order of Pos).
 function strIndexOf(const str,searched:string):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Searchs @code(searched) in @code(str) case-sensitively (Attention: opposite parameter order of Pos).
 function strIndexOf(const str: string; const searched: TCharSet):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
+//**Searchs @code(searched) in @code(str) case-insensitively (Attention: opposite parameter order of Pos).
 function striIndexOf(const str,searched:string):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Searchs @code(searched) in @code(str) case-sensitively (Attention: opposite parameter order of Pos).
 function strIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASPCHARINLINE} inline; {$ENDIF}
-//**Searchs @code(searched) in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Searchs @code(searched) in @code(str) case-sensitively (Attention: opposite parameter order of Pos).
 function strIndexOf(const str: string; const searched: TCharSet; from: SizeInt):SizeInt; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs @code(searched) in @code(str) case-insensitive (Attention: opposite parameter to pos)
+//**Searchs @code(searched) in @code(str) case-insensitively (Attention: opposite parameter order of Pos).
 function striIndexOf(const str,searched:string; from: SizeInt):SizeInt; overload; {$IFDEF HASPCHARINLINE} inline; {$ENDIF}
 
-//**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence  (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+//**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence  (Attention: opposite parameter order of Pos) (strict length, this function can find #0-bytes).
 function strlsLastIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt; overload;
-//**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence (Attention: opposite parameter to pos) (strict length, this function can find #0-bytes)
+//**Searchs @code(searched) in @code(str), case-sensitive, returns -1 on no occurrence (Attention: opposite parameter order of Pos) (strict length, this function can find #0-bytes).
 function strlsLastIndexOf(str:pansichar; const searched: TCharSet; length: SizeInt): SizeInt; overload;
-//**Searchs @code(searched) in @code(str), case-insensitive, returns -1 on no occurrence (Attention: opposite parameter to pos)  (strict length, this function can find #0-bytes)
+//**Searchs @code(searched) in @code(str), case-insensitive, returns -1 on no occurrence (Attention: opposite parameter order of Pos)  (strict length, this function can find #0-bytes).
 function strlsiLastIndexOf(str,searched:pansichar; l1, l2: SizeInt): SizeInt;
 
-//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter order of Pos).
 function strLastIndexOf(const str: string; const searched: string):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter order of Pos).
 function strLastIndexOf(const str: string; const searched: string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter order of Pos).
 function strLastIndexOf(const str: string; const searched: TCharSet):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+//**Searchs the last occurrence of @code(searched) in @code(str), case-sensitive, returns 0 on no occurrence (Attention: opposite parameter order of Pos).
 function strLastIndexOf(const str: string; const searched: TCharSet; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+//**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter order of Pos).
 function striLastIndexOf(const str: string; const searched: string):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter to pos)
+//**Searchs the last occurrence of @code(searched) in @code(str), case-insensitive, returns 0 on no occurrence (Attention: opposite parameter order of Pos).
 function striLastIndexOf(const str: string; const searched: string; from: SizeInt):SizeInt; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
 
 
-//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter order of Pos).
 function strContains(const str,searched:string):boolean;overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter order of Pos).
 function strContains(const str:string; const searched: TCharSet):boolean;overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
+//**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter order of Pos).
 function striContains(const str,searched:string):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter order of Pos).
 function strContains(const str,searched:string; from: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter to pos)
+//**Tests if @code(searched) exists in @code(str) case-sensitive (Attention: opposite parameter order of Pos).
 function strContains(const str:string; const searched: TCharSet; from: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
-//**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter to pos)
+//**Tests if @code(searched) exists in @code(str) case-insensitive (Attention: opposite parameter order of Pos).
 function striContains(const str,searched:string; from: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF}
 
 //more specialized
-//**Removes all occurrences of trimCharacter from the left/right side of the string@br
-//**It will move the pointer and change length, not modifying the memory pointed to
+//**Removes all occurrences of trimCharacter from the left/right side of the string.@br
+//**It will move the pointer and change length, not modifying the memory pointed to.
 procedure strlTrimLeft(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
-//**Removes all occurrences of trimCharacter from the left/right side of the string@br
-//**It will move the pointer and change length, not modifying the memory pointed to
+//**Removes all occurrences of trimCharacter from the left/right side of the string.@br
+//**It will move the pointer and change length, not modifying the memory pointed to.
 procedure strlTrimRight(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
-//**Removes all occurrences of trimCharacter from the left/right side of the string@br
-//**It will move the pointer and change length, not modifying the memory pointed to
+//**Removes all occurrences of trimCharacter from the left/right side of the string.@br
+//**It will move the pointer and change length, not modifying the memory pointed to.
 procedure strlTrim(var p: pansichar; var l: SizeInt; const trimCharacters: TCharSet = [#0..' ']);
 
 //for internal use
@@ -401,96 +444,108 @@ type TStrTrimProcedure = procedure (var p: pansichar; var l: SizeInt; const trim
 function strTrimCommon(const s: string; const trimCharacters: TCharSet; const trimProc: TStrTrimProcedure): string;
 
 
-//**Removes all occurrences of trimCharacter from the left/right side of the string
+//**Removes all occurrences of trimCharacter from the left side of the string.
 function strTrimLeft(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Removes all occurrences of trimCharacter from the right side of the string.
 function strTrimRight(const s:string; const trimCharacters: TCharSet = [#0..' ']):string; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Removes all occurrences of trimCharacter from the left and right side of the string.
 function strTrim(const s: string; const trimCharacters: TCharSet = [#0..' ']):string; {$IFDEF HASINLINE} inline; {$ENDIF}
+//**Replaces any sequence of trimCharacter with a single space, and removes leading/trailing spaces.
 function strTrimAndNormalize(const s: string; const trimCharacters: TCharSet = [#0..' ']):string;
 
-//**<Replaces all #13#10 or #13 by #10
+//** Replaces all #13#10 or #13 by #10.
 function strNormalizeLineEndings(const s: string): string;
-//**<Replaces all #$D#$A, #$D #$85, #$85, #$2028, or #13 by #10. Experimental, behaviour might change in future
+//** Replaces all #$D#$A, #$D #$85, #$85, #$2028, or #13 by #10. Experimental, behaviour might change in future.
 function strNormalizeLineEndingsUTF8(const s: RawByteString): UTF8String;
 
-//**< Prepends expectedStart, if s does not starts with expectedStart
+//** Prepends expectedStart, if s does not starts with expectedStart.
 function strPrependIfMissing(const s: string; const expectedStart: string): string;
-//**< Appends expectedEnd, if s does not end with expectedEnd
+//** Appends expectedEnd, if s does not end with expectedEnd.
 function strAppendIfMissing(const s: string; const expectedEnd: string): string;
 
 //**Splits the string remainingPart into two parts at the first position of separator, the
-//**first part is returned as function result, the second one is again assign to remainingPart
+//**first part is returned as function result, the second one is again assign to remainingPart.
 //**(If remainingPart does not contain separator, it returns remainingPart and sets remainingPart := '')
 function strSplitGet(const separator: string; var remainingPart: string):string;overload;
 //**Splits the string remainingPart into two parts at the first position of separator, the
-//**first is assign to firstPart, the second one is again assign to remainingPart
+//**first is assign to firstPart, the second one is again assign to remainingPart.
 procedure strSplit(out firstPart: string; const separator: string; var remainingPart: string);overload;
-//**Splits the string s into the array splitted at every occurrence of sep
+//**Splits the string s into the array splitted at every occurrence of sep.
 procedure strSplit(out splitted: TStringArray;s: string; sep:string=',';includeEmpty:boolean=true);overload;
-//**Splits the string s into the array splitted at every occurrence of sep
+//**Splits the string s into the array splitted at every occurrence of sep.
 function strSplit(s:string;sep:string=',';includeEmpty:boolean=true):TStringArray;overload;
 
+//**Word wraps a string to a maximum column length.
 function strWrapSplit(const Line: string; MaxCol: SizeInt = 80; const BreakChars: TCharSet = [' ', #9]): TStringArray;
+//**Word wraps a string to a maximum column length.
 function strWrap(Line: string; MaxCol: SizeInt = 80; const BreakChars: TCharSet = [' ', #9]): string;
 
-function strReverse(s: string): string; //**< reverses a string. Assumes the encoding is utf-8
+function strReverse(s: string): string; //**< reverses a string. Assumes the encoding is utf-8.
 
-//Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
-//the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
-//If updateText, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
+//** Given a string like openBracket  .. openBracket  ... closingBracket closingBracket closingBracket closingBracket , this will return everything between
+//** the string start and the second last closingBracket (it assumes one bracket is already opened, so 3 open vs. 4 closing => second last).
+//** If updateText is true, it will replace text with everything after that closingBracket. (always excluding the bracket itself)
 function strSplitGetUntilBracketClosing(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
 function strSplitGetBetweenBrackets(var text: string; const openBracket, closingBracket: string; updateText: boolean): string;
 
-//** If the string s has the form 'STARTsep...' it returns 'START'. E.g. for /foo/bar it returns /foo with AllowDirectorySeparators do
+//** If the string s has the form 'STARTsep...', it returns 'START'. E.g. for /foo/bar, it returns /foo with AllowDirectorySeparators do.
 function strBeforeLast(const s: string; const sep: TCharSet): string; overload;
-//** If the string s has the form '...sepEND' it returns 'END'. E.g. for /foo/bar it returns bar with AllowDirectorySeparators
+//** If the string s has the form '...sepEND', it returns 'END'. E.g. for /foo/bar, it returns bar with AllowDirectorySeparators.
 function strAfterLast(const s: string; const sep: TCharSet): string; overload;
 
 
 //**Joins all string list items to a single string separated by @code(sep).@br
 //**If @code(limit) is set, the string is limited to @code(abs(limit)) items.
-//**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle
+//**if limit is positive, limitStr is appended; if limitStr is negative, limitStr is inserted in the middle.
 function strJoin(const sl: TStrings; const sep: string = ', '; limit: integer=0; const limitStr: string='...'): string;overload;
-//**Joins all string list items to a single string separated by @code(sep).@br
+//**Joins all string list items to a single string separated by @code(sep).
 function strJoin(const sl: TStringArray; const sep: string = ', '; limit: SizeInt=0; const limitStr: string='...'): string;overload;//{$ifdef HASINLINE} inline; {$endif}
 function strJoin(strings: PString; stringsLength: SizeInt; const sep: string = ', '): string;overload;
 
-//**Converts a str to a bool (for fpc versions previous 2.2)
+//**Converts a str to a bool (for fpc versions before 2.2)
 function StrToBoolDef(const S: string;const Def:Boolean): Boolean;
 
-//**Removes a file:// prefix from filename if it is there
+//**Removes a file:// prefix from filename if it is there,
 function strRemoveFileURLPrefix(const filename: string): string;
 
-//**loads a file as string. The filename is directly passed to the fpc rtl and uses the system
-//**encoding @seealso(strLoadFromFileUTF8)
+//**Loads a file as string. The filename is directly passed to the fpc rtl and uses the system
+//**encoding. @seealso(strLoadFromFileUTF8)
 function strLoadFromFile(filename:string):string;
-//**saves a string as file. The filename is directly passed to the fpc rtl and uses the system
-//**encoding @seealso(strSaveToFileUTF8)
+//**Saves a string as file. The filename is directly passed to the fpc rtl and uses the system
+//**encoding. @seealso(strSaveToFileUTF8)
 procedure strSaveToFile(filename: string;str:string);
-//**loads a file as string. The filename should be encoded in utf-8
+//**Loads a file as string. The filename should be encoded in utf-8.
 //**@seealso(strLoadFromFile)
 function strLoadFromFileUTF8(filename:RawByteString): string;
-//**saves a string as file. The filename should be encoded in utf-8
+//**Saves a string as file. The filename should be encoded in utf-8.
 //**@seealso(strSaveToFile)
 procedure strSaveToFileUTF8(filename: RawByteString; str: String);
-//**converts a size (measured in bytes) to a string (e.g. 1025 -> 1 KiB)
+//**converts a size (measured in bytes) to a string (e.g. 1025 -> 1 KiB).
 function strFromSIze(size: int64):string;
 
 
 //encoding things
 //Conversions between UTF-8 and 1-Byte encodings are in strConvert
 //Conversions between UTF-16 and UTF-8/32/1-Byte-encodings in the moveProcs
-//**length of an utf8 string @br
+//**length of an utf8 string.
+//**@param(invalid, number of invalid encodings)
 function strLengthUtf8(const str: RawByteString; out invalid: SizeInt): SizeInt;
+//**length of an utf8 string.
 function strLengthUtf8(const str: RawByteString): SizeInt;
-function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): UTF8String; //**< Returns a utf-8 RawByteString from the string in encoding @code(from)
-function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString; //**< Converts a utf-8 string to the encoding @code(from)
+//**Convert a string to UTF-8 from encoding from @code(from).
+function strConvertToUtf8(str: RawByteString; from: TSystemCodePage): UTF8String;
+//**Convert a string from UTF-8 to the encoding @code(from).
+function strConvertFromUtf8(str: RawByteString; toe: TSystemCodePage): RawByteString;
 //** Converts a string from one encoding to another. @br
 //** It primarily converts between latin-1 and utf-8 without needing a widestring manager.
-//** It performs the conversion directly without converting to UTF-16, which should be much faster than fpc's default conversions. But there are no low-level optimizations @br
-//** For other encodings it falls back to the moveprocs (which allows to store utf-16/32 in RawByteString) and SetCodePage
+//** It performs the conversion directly without converting to UTF-16, which should be much faster than fpc's default conversions. But there are no low-level optimizations. @br
+//** For other encodings it falls back to the moveprocs (which allows to store utf-16/32 in RawByteString) and SetCodePage.
 function strConvert(const str: RawByteString; from, toCP: TSystemCodePage): RawByteString;
+//** deprecated
 function strChangeEncoding(const str: RawByteString; from, toe: TSystemCodePage): RawByteString; {$ifdef HASINLINE} inline; deprecated 'Use strConvert';{$endif}
+//** Decodes an UTF-16 and moves to the next character.
 function strDecodeUTF16Character(var source: PUnicodeChar): integer;
+//** Encodes an UTF-16 surrogate pair.
 procedure utf16EncodeSurrogatePair(codepoint: integer; out surrogate1, surrogate2: word);
 procedure strUnicode2AnsiMoveProc(source:punicodechar;var dest:RawByteString;cp : TSystemCodePage;len:SizeInt); //**<converts utf16 to other unicode pages and latin1. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in chars.
 procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:unicodestring;len:SizeInt);        //**<converts unicode pages and latin1 to utf16. The signature matches the function of fpc's widestringmanager, so this function replaces cwstring. len is in bytes
@@ -498,15 +553,16 @@ procedure strAnsi2UnicodeMoveProc(source:pchar;cp : TSystemCodePage;var dest:uni
 procedure registerFallbackUnicodeConversion; {$ifndef HAS_CPSTRING} deprecated 'Codepage aware extension requires fpc >=3';{$endif}
 function strEncodingFromName(str:string):TSystemCodePage; //**< Gets the encoding from an encoding name (e.g. from http-equiv)
 function strEncodingName(e: TSystemCodePage): string;
-//this can return CP_ACP (perhaps i will change that)
+//this can return CP_ACP (perhaps i will change that).
 function strActualEncoding(const str: RawByteString): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 function strActualEncoding(e: TSystemCodePage): TSystemCodePage; {$ifdef HASINLINE} inline; {$endif}
 {$ENDIF}
 {$ifndef HAS_CPSTRING}
 function StringCodePage(const str: RawByteString): TSystemCodePage;
-procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean=True); //**< no-op function, so not every SetCodePage has to be wrapped in ifdefs
+procedure SetCodePage(var s: RawByteString; CodePage: TSystemCodePage; Convert: Boolean=True); //**< no-op function, so not every SetCodePage has to be wrapped in ifdefs when using FPC 2.x.
 {$endif}
-function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString; //**< Get unicode character @code(character) in a certain encoding
+//** Gets unicode character @code(character) in a certain encoding.
+function strGetUnicodeCharacter(const character: integer; encoding: TSystemCodePage = CP_UTF8): RawByteString;
 function strGetUnicodeCharacterUTFLength(const character: integer): integer;
 procedure strGetUnicodeCharacterUTF(const character: integer; buffer: pansichar);
 function strDecodeUTF8Character(const str: RawByteString; var curpos: SizeInt): integer; overload; deprecated 'Use (pchar,pchar) overload or strIterator.'; //**< Returns the unicode code point of the utf-8 character starting at @code(str[curpos]) and increments @code(curpos) to the next utf-8 character. Returns a negative value if the character is invalid.
@@ -526,15 +582,24 @@ function strUpperCaseSpecialUTF8(codePoint: integer): string;
 //** The function signature is preliminary and likely to change.
 function strLowerCaseSpecialUTF8(codePoint: integer): string;
 
-
+//** Converts a pchar buffer to an unsigned integer. Returns true iff the pchar matches [0-9]+ and does not overflow
 function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
+//** Converts a pchar buffer to an unsigned integer. Returns true iff the pchar matches [0-9]+ and does not overflow
 function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
+//** Converts a pchar buffer to an unsigned integer. Returns true iff the pchar matches [0-9A-Fa-f]+ and does not overflow
 function strHexToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
+//** Converts a pchar buffer to an unsigned integer. Returns true iff the pchar matches [0-9A-Fa-f]+ and does not overflow
 function strHexToUIntTry(pstart, pend: pchar; out unsignedResult: UInt32): boolean;
 
 
-
-type TDecodeHTMLEntitiesFlags = set of (dhefStrict, dhefAttribute, dhefWindows1252Extensions, dhefNormalizeLineEndings, dhefNormalizeLineEndingsAlso85_2028);
+//** Flags for strDecodeHTMLEntities
+type TDecodeHTMLEntitiesFlag = (dhefStrict,    //**< Raises an exception if there are invalid entities.
+                                dhefAttribute, //**< Aborts at =
+                                dhefWindows1252Extensions, //**< Parses some code points as latin-1 rather than utf-8 (required for HTML5).
+                                dhefNormalizeLineEndings,  //**< Replaces line endings with #10.
+                                dhefNormalizeLineEndingsAlso85_2028 //**< Also replace unicode line endings.
+                                );
+     TDecodeHTMLEntitiesFlags = set of TDecodeHTMLEntitiesFlag;
      EDecodeHTMLEntitiesException = class(Exception);
 //**This decodes all html entities to the given encoding. If strict is not set
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
@@ -544,23 +609,23 @@ function strDecodeHTMLEntities(p:pansichar;l:SizeInt;encoding:TSystemCodePage; f
 //**it will ignore wrong entities (so e.g. X&Y will remain X&Y and you can call the function
 //**even if it contains rogue &).
 function strDecodeHTMLEntities(s:string;encoding:TSystemCodePage; flags: TDecodeHTMLEntitiesFlags = []):RawByteString; overload;
-//**Replace all occurences of x \in toEscape with escapeChar + x
+//**Replace all occurrences of x \in toEscape with escapeChar + x.
 function strEscape(s:string; const toEscape: TCharSet; escapeChar: ansichar = '\'): string;
-//**Replace all occurences of x \in toEscape with escape + hex(ord(x))
+//**Replace all occurrences of x \in toEscape with escape + hex(ord(x)).
 function strEscapeToHex(s:string; const toEscape: TCharSet; escape: string = '\x'): string;
-//**Replace all occurences of escape + XX with chr(XX)
+//**Replace all occurrences of escape + XX with chr(XX).
 function strUnescapeHex(s:string; escape: string = '\x'): string;
-//**Returns a regex matching s
+//**Returns a regex matching s.
 function strEscapeRegex(const s:string): string;
-//**Decodes a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strUnescapeHex)
+//**Decodes a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strUnescapeHex).
 function strDecodeHex(s:string):string; {$ifdef HASDeprecated}deprecated;{$endif}
-//**Encodes to a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strEscapeToHex)
+//**Encodes to a binary hex string like 202020 where every pair of hex digits corresponds to one char (deprecated, use strEscapeToHex).
 function strEncodeHex(s:string; const code: string = '0123456789ABCDEF'):string;{$ifdef HASDeprecated}deprecated;{$endif}
-//**Returns the first l bytes of p (copies them so O(n))
+//**Returns the first l bytes of p (copies them so O(n)).
 function strFromPchar(p:pansichar;l:SizeInt):string;
 //function strFromPchar(p:pansichar;l:SizeInt; encoding: TSystemCodePage):RawByteString;
 
-//**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF)
+//**Creates a string to display the value of a pointer (e.g. 0xDEADBEEF).
 function strFromPtr(p: pointer): string;
 //**Creates a string to display an integer. The result will have at least displayLength digits (digits, not characters, so -1 with length 2, will become -02).
 function strFromInt(i: int64; displayLength: longint): string;
@@ -568,26 +633,27 @@ function strFromInt(i: int64; displayLength: longint): string;
 //**Creates count copies of rep
 function strDup(rep: string; const count: SizeInt): string;
 
-//**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix)
+//**Checks if s is an absolute uri (i.e. has a [a-zA-Z][a-zA-Z0-9+-.]:// prefix).
 function strIsAbsoluteURI(const s: string): boolean;
-//**Returns a absolute uri for a uri relative to the uri base.@br
+//**Returns a absolute uri for a uri relative to the uri base.
+//**
 //**E.g. strResolveURI('foo/bar', 'http://example.org/abc/def') returns 'http://example.org/abc/foo/bar'@br
 //**Or.  strResolveURI('foo/bar', 'http://example.org/abc/def/') returns 'http://example.org/abc/def/foo/bar'@br
 //**base may be relative itself (e.g. strResolveURI('foo/bar', 'test/') becomes 'test/foo/bar')
 function strResolveURI(rel, base: string): string;
-//**Expands a path to an absolute path, if it not already is one
+//**Expands a path to an absolute path if it not already is one.
 function fileNameExpand(const rel: string): string;
-//**Expands a path to an absolute path starting with file://
+//**Expands a path to an absolute path starting with file://.
 function fileNameExpandToURI(const rel: string): string;
-//**Moves oldname to newname, replacing newname if it exists
+//**Moves oldname to newname, replacing newname if it exists.
 function fileMoveReplace(const oldname,newname: string): boolean;
 type TFileSaveSafe = procedure (stream: TStream; data: pointer);
-//**Overrides file filename with the data written to the stream in the callback function. @br
+//**Overrides the file filename with the data written to the stream in the callback function. @br
 //**If the file already exists, the data is first written to a temporary file to prevent the file from being overriden partially.
 procedure fileSaveSafe(filename: string; callback: TFileSaveSafe; data: pointer);
 
-//**Levenshtein distance between s and t
-//**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space
+//**Levenshtein distance between s and t.
+//**(i.e. the minimal count of characters to change/add/remove to convert s to t). O(n**2) time, O(n) space.
 function strSimilarity(const s, t: string): SizeInt;
 
 {$ifdef fpc}
@@ -601,9 +667,10 @@ type TStrIterator = record
   function MoveNext: Boolean;
   function GetEnumerator: TStrIterator;
 end;
- //** Str iterator. Preliminary. Interface might change at any time
+ //** Str iterator. Preliminary. Interface might change at any time.
 function strIterator(const s: RawByteString): TStrIterator;
 
+//** @abstract(Enumerator for utf-8 codepoints in a string.)
 type TUTF8StringCodePointBlockEnumerator = record
 private
   FCurrentByteLength: integer;
@@ -624,7 +691,12 @@ public
 end;
 
 
-//** Str builder. Preliminary. Interface might change at any time
+//** @abstract(String builder to create strings)
+//** It is faster than the FPC string builder, because it is on the stack.
+//**
+//** You create it by calling init on a string in which the output is written.
+//** You must call final before accessing the string again.
+//** Preliminary. Interface might change at any time. It might be turned into a managed record.
 type TStrBuilder = object
 protected
   next, bufferend: pchar; //next empty pchar and first pos after the string
@@ -656,57 +728,116 @@ public
 end;
 
 {$ifdef HASTypeHelpers}
+{**@abstract(A string view representing a subsequence of a string or pchar or char array.)
+
+See TPointerView for the general concept. TPCharView extends TPointerView with methods for string inputs.
+
+For example, if you have a string '(123)', and want to convert the number between the parentheses to an integer, you can do:
+
+@longCode(
+var
+  v: TPCharView;
+  number: integer;
+  ok: boolean;
+begin
+  v := '(123)'.pcharView;
+  ok := v.moveAfterFind('(');
+  ok := ok and v.cutBeforeFind(')');
+  ok := ok and v.toIntDecimalTry(number);
+)
+
+The integer is returned in the variable number and the variable ok returns whether the parentheses exist and the conversion was successful.
+
+This is fast (zero allocations) and safe (no out-of-bound access or overflow is possible). @br
+(although you need to make sure the string is not destroyed while using the TPcharView. For truly safe operations, use the upcoming TStringView)
+
+
+}
 TPCharView = object(specialize TPointerView<char>)
 private
   function moveToFound(target: pchar): boolean; inline;
 public
+  //** Creates a view for a string.
   procedure init(const buffer: string); overload;
+  //** Creates a view for a byte array.
   procedure init(const buffer: TBytes); overload;
+  //** Converts the view to a string.
   function ToString: string;
 
+  //** Length of the view in bytes.
   function length: SizeInt; reintroduce;
 
+  //** Tests whether the view contains a string.
   function contains(const s: string): boolean; inline;
+  //** Tests whether the view starts with a string.
   function beginsWith(const s: string): boolean; inline;
   //function beginsWithI(const s: string): boolean; inline;
+  //** Tests whether the view ends with a string.
   function endsWith(const expectedEnd: string): boolean; inline;
 
-  //returns nil if not found
+  //Searches a string in the view. Returns the first occurrence, or nil if not found.
   function find(searched: pchar; searchedLength: SizeInt): pchar;
+  //Searches a string in the view. Returns the first occurrence, or nil if not found.
   function find(const s: string): pchar;
+  //Searches a string in the view. Returns the last occurrence, or nil if not found.
   function findLast(searched: pchar; searchedLength: SizeInt): pchar;
+  //Searches a string in the view. Returns the last occurrence, or nil if not found.
   function findLast(const s: string): pchar;
 
+  //**Removes all characters before the first occurrence of a string s (keeps s itself). Keeps the view unchanged if it does not contain s.
   function moveToFind(const s: string): boolean;
+  //**Removes all characters before the first occurrence of a string s (removes s, too). Keeps the view unchanged if it does not contain s.
   function moveAfterFind(const s: string): boolean;
+  //**Removes all characters before the last occurrence of a string s (keeps s itself). Keeps the view unchanged if it does not contain s.
   function moveToFindLast(const s: string): boolean;
+  //**Removes all characters before the last occurrence of a string s (removes s, too). Keeps the view unchanged if it does not contain s.
   function moveAfterFindLast(const s: string): boolean;
 
-  //finds #13 or #10  (implicit #13#10)
+  //**finds #13 or #10  (implicit #13#10)
   function findLineBreak: pchar;
+  //**Remves everything before the first line break (exclusive).
   function moveToLineBreak: boolean;
+  //**Remves everything before the first line break (inclusive).
   function moveAfterLineBreak: boolean;
 
+  //**Removes all characters after the first occurrence of a string (removes s, too). Keeps the view unchanged if it does not contain s.
   function cutBeforeFind(const s: string): boolean;
+  //**Removes all characters after the first occurrence of a string (keeps s itself). Keeps the view unchanged if it does not contain s.
   function cutAfterFind(const s: string): boolean;
+  //**Removes all characters after the last occurrence of a string (removes s, too). Keeps the view unchanged if it does not contain s.
   function cutBeforeFindLast(const s: string): boolean;
+  //**Removes all characters after the last occurrence of a string (keeps s itself). Keeps the view unchanged if it does not contain s.
   function cutAfterFindLast(const s: string): boolean;
 
+  //**Removes all whitespace characters from the left and right side.
   procedure trim(const trimCharacters: TCharSet = [#0..' ']);
+  //**Removes all whitespace characters from the left side.
   procedure trimLeft(const trimCharacters: TCharSet = [#0..' ']);
+  //**Removes all whitespace characters from the right side.
   procedure trimRight(const trimCharacters: TCharSet = [#0..' ']);
+  //**Removes all whitespace characters trimChar from the left and right side.
   procedure trim(trimChar: char);
+  //**Removes all whitespace characters trimChar from the left side.
   procedure trimLeft(trimChar: char);
+  //**Removes all whitespace characters trimChar from the right side.
   procedure trimRight(trimChar: char);
 
+  //**Converts the view to a signed integer. Returns true if it matches -?[0-9]+ and does not overflow.
   function toIntDecimalTry(out v: Int64): boolean;
+  //**Converts the view to a signed integer. Returns true if it matches -?[0-9]+ and does not overflow.
   function toIntDecimalTry(out v: Int32): boolean;
+  //**Converts the view to an unsigned integer. Returns true if it matches [0-9]+ and does not overflow.
   function toUIntDecimalTry(out v: UInt64): boolean;
+  //**Converts the view to an unsigned integer. Returns true if it matches [0-9]+ and does not overflow.
   function toUIntDecimalTry(out v: UInt32): boolean;
 
+  //** copy and cutAfter.
   function viewTo(newLast: pchar): TPCharView; reintroduce;
+  //** copy and cutBefore.
   function viewUntil(newEnd: pchar): TPCharView; reintroduce;
+  //** copy and moveTo.
   function viewFrom(newStart: pchar): TPCharView; reintroduce;
+  //** copy and moveAfter.
   function viewAfter(newStartSkip: pchar): TPCharView; reintroduce;
 
   //** Splits the view at element.
@@ -947,18 +1078,20 @@ type EDateTimeParsingException = class(Exception);
 type TDateTimeParsingFlag = (dtpfStrict);
      TDateTimeParsingFlags = set of TDateTimeParsingFlag;
      TDateTimeParsingResult = (dtprSuccess, dtprFailureValueTooHigh, dtprFailureValueTooHigh2, dtprFailure);
-//**Reads a date time string given a certain mask (mask is case-sensitive)@br
-//**The uses the same mask types as FormatDate:@br
-//**s or ss for a second  @br
-//**n or nn for a minute  @br
-//**h or hh for a hour  @br
-//**d or dd for a numerical day  @br
-//**m or mm for a numerical month, mmm for a short month name, mmmm for a long month name@br
-//**am/pm or a/p match am/pm or a/p
-//**yy, yyyy or [yy]yy for the year. (if the year is < 90, it will become 20yy, else if it is < 100, it will become 19yy, unless you use uppercase Y instead of y)  @br
-//**YY, YYYY or [YY]YY for the year  @br
-//**z, zz, zzz, zzzz for microseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional µs with up to 6 digit precision)
-//**Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format ansichar (except mmm) matching several characters)
+//**Reads a date time string given a certain mask (mask is case-sensitive)
+//**
+//**The function uses the same mask types as FormatDate: @unorderedList(
+//** @item(s or ss for a second)
+//** @item(n or nn for a minute )
+//** @item(h or hh for a hour )
+//** @item(d or dd for a numerical day )
+//** @item(m or mm for a numerical month, mmm for a short month name, mmmm for a long month name)
+//** @item(am/pm or a/p match am/pm or a/p)
+//** @item(yy, yyyy or [yy]yy for the year. (if the year is < 90, it will become 20yy, else if it is < 100, it will become 19yy, unless you use uppercase Y instead of y)  )
+//** @item(YY, YYYY or [YY]YY for the year, too.)
+//** @item(z, zz, zzz, zzzz for microseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional µs with up to 6 digit precision))
+//** @item(Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format ansichar (except mmm) matching several characters))
+//**)
 //**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
 //**yyyy requires exactly 4 digits, and [yy]yy works with 2 or 4 (there is also [y]yyy for 3 to 4). The year always matches an optional - (e.g. yyyy also matches -0012, but not -012)@br
 //**Generally [x] marks the part x as optional (it tries all possible combinations, so you shouldn't have more than 10 optional parts)@br
@@ -970,9 +1103,9 @@ type TDateTimeParsingFlag = (dtpfStrict);
 //**There are old and new functions, because the signature has changed from double to int. Do not use the OLD functions unless you are porting existing code.@br@br
 //**@return(If input could be matched with mask. It does not check, if the returned values are valid (e.g. month = 13 is allowed, in case you have to match durations))
 function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;
-//**Reads date/time parts from a input matching a given mask (@see dateTimeParsePartsTry)
+//**Reads date/time parts from a input matching a given mask @seealso(dateTimeParsePartsTry)
 procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
-//**Reads date/time from a input matching a given mask (@see dateTimeParsePartsTry)
+//**Reads date/time from a input matching a given mask @seealso(dateTimeParsePartsTry)
 function dateTimeParse(const input,mask:string; outtimezone: PInteger = nil): TDateTime;
 //**Converts a dateTime to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateTimeFormat(const mask: string; y, m,d, h, n, s: Integer; nanoseconds: integer = 0; timezone: integer = high(integer)): string; overload;
@@ -981,23 +1114,23 @@ function dateTimeFormat(const mask: string; const dateTime: TDateTime): string; 
 
 
 
-//**Reads a time string given a certain mask (@see dateTimeParsePartsTry)@br
+//**Reads a time string given a certain mask @seealso(dateTimeParsePartsTry)@br
 procedure timeParseParts(const input,mask:string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
-//**Reads a time string given a certain mask (@see dateTimeParsePartsTry).@br This function checks, if the time is valid.
+//**Reads a time string given a certain mask @seealso(dateTimeParsePartsTry).@br This function checks, if the time is valid.
 function timeParse(const input,mask:string): TTime;
 
 //**Converts a time to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function timeFormat(const mask: string; h, n, s: Integer): string; overload;
 function timeFormatNEW(const mask: string; h, n, s: Integer; nanoseconds: integer; timezone: integer = high(integer)): string; overload;
 
-//**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br
+//**Reads a date string given a certain mask @seealso(dateTimeParsePartsTry)@br
 procedure dateParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outtimezone: PInteger = nil);
-//**Reads a date string given a certain mask (@see dateTimeParsePartsTry)@br This function checks, if the date is valid.
+//**Reads a date string given a certain mask @seealso(dateTimeParsePartsTry).@br This function checks whether the date is valid.
 function dateParse(const input,mask:string): longint;
 //**Converts a date to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
 function dateFormat(const mask: string; const y, m, d: integer): string;
-function dateFormatNew(const mask: string; const y, m, d: integer; timezone: integer): string;
 //**Converts a date to a string corresponding to the given mask (same mask as dateTimeParsePartsTry)
+function dateFormatNew(const mask: string; const y, m, d: integer; timezone: integer): string;
 function dateFormatOld(const mask: string; const y, m, d: integer; const timezone: TDateTime): string; {$ifdef HASDeprecated}deprecated 'use dateFormatNew';{$endif}
 
 //**Encodes a date as datetime (supports negative years)
@@ -1014,11 +1147,13 @@ const WHITE_SPACE=[#9,#10,#13,' '];
 //**The data is an TObject to prevent confusing it with a and b. It is the first parameter,
 //**so the function use the same calling convention as a method
 type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
-//**General stable sort function @br
-//**a is the first element in the array to sort, and b is the last. size is the size of every element@br
-//**compareFunction is a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers). @br
+//**General stable sort function,
+//**@param(a the first element in the array to sort,)
+//**@param(b the last (inclusive!), )
+//**@param(size the size of every elementm)
+//**@param(compareFunction a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers)).
 //**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
-//**Currently it uses a combination of merge and insert sort. Merge requires the allocation of additional memory.
+//**Currently it uses a combination of quick and insert sort with a temporary buffer.
 procedure stableSort(a,b: pointer; size: SizeInt; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
 //**general stable sort functions for arrays (modifying the array inline and returning it)
 function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TLongintArray; overload;
@@ -1035,10 +1170,10 @@ type TBinarySearchAcceptedConditions = set of TBinarySearchAcceptedCondition;
 //**(that is the opposite of what you might expect, but it is logical: the data parameter has to come first to match a method signature. The data parameter is compared to a parameter (to match a standalone comparison function signature))
 type TBinarySearchFunction = function (data: TObject; a: pointer): longint;
 //** General binary search function. It can find an element or a lower/upper bound.
-//** @br @code(a) points to the first element in the (ascending, sorted) array, @code(b) to the last, @code(size) the size of each element
-//** @br @code(compareFunction) is a TBinarySearchFunction comparing the searched element to another element
-//** @br @code(compareFunctionData) is the data passed to the comparison function as first argument (you can think of it as searched element)
-//** @br @code(choosen) is the element that should be returned, if there are multiple matches (bsFirst, bsLast  or bsAny) .
+//** @br @code(a) points to the first element in the (ascending, sorted) array, @code(b) to the last, @code(size) the size of each element.
+//** @br @code(compareFunction) is a TBinarySearchFunction comparing the searched element to another element.
+//** @br @code(compareFunctionData) is the data passed to the comparison function as first argument (you can think of it as searched element).
+//** @br @code(choosen) is the element that should be returned, if there are multiple matches (bsFirst, bsLast  or bsAny).
 //** @br @code(condition) the comparison relation between the returned and searched element (E.g. for [bsGreater, bsEqual] the returned element satisfies @code(compareFunction(reference, returned) <= 0).)
 //** @br returns a pointer to the found match or nil if there is none.
 //** @br (note that you can combine, e.g. bsGreater and bsLast, which will always return the last element, unless all are lower)
@@ -6063,6 +6198,12 @@ procedure TPointerView.init(firstelement, behindlastelement: PElement);
 begin
   data := firstelement;
   dataend := behindlastelement;
+end;
+
+procedure TPointerView.init(const a: array of TElement);
+begin
+  data := @a[0];
+  dataend := data + system.length(a);
 end;
 
 {$PUSH}

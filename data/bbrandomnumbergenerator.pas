@@ -1,3 +1,31 @@
+{
+Copyright (C) 2021 - 2022  Benito van der Zander (BeniBela)
+                           benito@benibela.de
+                           www.benibela.de
+
+This file is distributed under under the same license as Lazarus and the LCL itself:
+
+This file is distributed under the Library GNU General Public License
+with the following modification:
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent modules,
+and to copy and distribute the resulting executable under terms of your choice,
+provided that you also meet, for each linked independent module, the terms
+and conditions of the license of that module. An independent module is a
+module which is not derived from or based on this library. If you modify this
+library, you may extend this exception to your version of the library, but
+you are not obligated to do so. If you do not wish to do so, delete this
+exception statement from your version.
+
+}
+(***
+Random number generators.
+
+Use TRandomNumberGenerator, which is TGenericRandomNumberGenerator specialized with Txoshiro256ss.
+
+*)
 unit bbrandomnumbergenerator;
 
 {$mode objfpc}{$H+}
@@ -9,13 +37,15 @@ unit bbrandomnumbergenerator;
 interface
 
 uses
-  Classes, SysUtils;
+  SysUtils;
 
 type
   //**Random number generator based on xoshiro** by Sebastiano Vigna
   Txoshiro256ss = record
     s: array[0..3] of QWord;
+    //**Initializes the RNG with a seed
     procedure randomize(seed: QWord);
+    //**Returns a random QWord
     function nextQWord: QWord;
   end;
 
@@ -31,14 +61,23 @@ type
   private
     qwordGenerator: TQWordGenerator;
   public
+    //**Initializes the RNG
     procedure randomize;
+    //**Initializes the RNG with a seed
     procedure randomize(seed: QWord);
+    //**Returns a random QWord
     function nextQWord: QWord; inline;
+    //**Returns a random double between 0 and 1
     function nextDouble: Double;
+    //**Returns a random number in [0, l[
     function next(const l: longint): longint;
+    //**Returns a random number in [0, l[
     function next(const l: qword): qword;
+    //**Returns a random number in [0, l[
     function next(const l: int64): int64;
+    //**Orders an array randomly
     procedure shuffle(var a: array of integer);
+    //**Orders an array randomly
     procedure shuffle(var a: array of int64);
   end;
 
