@@ -1501,8 +1501,8 @@ var
   enc, country: TPCharView;
   codepage: TSystemCodePage;
 begin
-  result := value.splitMoveAfterFind(enc, '''');
-  result := result and value.splitMoveAfterFind(country, '''');
+  result := value.splitRightOf(enc, '''');
+  result := result and value.splitRightOf(country, '''');
   if not result then exit;
   codepage := strEncodingFromName(enc.ToString);
   if codepage = CP_NONE then exit(false);
@@ -1531,8 +1531,8 @@ begin
       end;
     end else if name = 'filename' then begin
       if value.beginsWith('"') and value.endsWith('"') then begin
-        value.moveBy(1);
-        value.cutBy(1);
+        value.leftOfLast(1);
+        value.rightOfFirst(1);
       end;
       filename := value.ToString;
       result := true;

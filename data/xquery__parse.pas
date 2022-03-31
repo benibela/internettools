@@ -646,7 +646,7 @@ begin
   while (view.data <= pos) do begin
     lineStart := view.data;
     inc(lines);
-    if not view.moveAfterLineBreak then break;
+    if not view.rightOfLineBreak then break;
   end;
 end;
 
@@ -742,12 +742,12 @@ begin
 
     lineRange := strMapPcharRangeToLines(str, startAt, endAt);
     if lineRange.startLineIndex = lineRange.lastLineIndex then
-      result := 'in line ' + inttostr(linerange.startLineIndex) + ' column ' + inttostr(lineRange.lines.offsetOf(startAt) + 1)
+      result := 'in line ' + inttostr(linerange.startLineIndex) + ' column ' + inttostr(lineRange.lines.offset(startAt) + 1)
     else
       result := 'in lines ' + inttostr(linerange.startLineIndex) + ' to ' + inttostr(linerange.lastLineIndex);
     result += LineEnding + lineRange.lines.ToString + LineEnding;
-    line := copy(lineRange.lastLine.ToString, 1, lineRange.lastLine.offsetOf(endAt) + 1);
-    errorStart := lineRange.lastLine.offsetOf(startAt) + 1;
+    line := copy(lineRange.lastLine.ToString, 1, lineRange.lastLine.offset(endAt) + 1);
+    errorStart := lineRange.lastLine.offset(startAt) + 1;
     for i := 1 to length(line) do
       if line[i] <> #9 then
         if i >= errorStart then line[i] := '^'

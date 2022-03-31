@@ -2210,15 +2210,15 @@ begin
       //original regex:
       //^ *[{] *([0-9]+) *(, *([0-9]+) *)?[}] *
       view := s.pcharView;
-      view.moveBy(1); //strip {
+      view.rightOfFirst(1); //strip {
       closingParen := view.find('}');
       if closingParen = nil then exit;
-      view.cutBefore(closingParen);
+      view.leftOf(closingParen);
       comma := view.find(',');
       if comma = nil then maxView := view
       else begin
         maxView := view.viewAfter(comma);
-        view.cutBefore(comma);
+        view.leftOf(comma);
       end;
       view.trim();
       maxView.trim();

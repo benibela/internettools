@@ -2189,37 +2189,37 @@ begin
   test(v.viewUntil(p+6).ToString, 'foobar');
 
 
-  test(v.moveBy(1));
+  test(v.rightOfFirst(1));
   testbounds(v, p + 1, 5);
   test(v.ToString, 'oobar');
   test(not v.contains('foobar'));
   test(v.contains('b'));
 
-  v.moveTo(@s[4]);
+  v.rightWith(@s[4]);
   testbounds(v, p + 3, 3);
   test(v.ToString, 'bar');
   test(not v.contains('foobar'));
   test(v.contains('b'));
 
-  v.moveTo(@s[3]);
+  v.rightWith(@s[3]);
   testbounds(v, p + 3, 3);
   test(v.ToString, 'bar');
 
-  v.moveTo(@s[4]);
+  v.rightWith(@s[4]);
   testbounds(v, p + 3, 3);
   test(v.ToString, 'bar');
 
 
-  v.moveAfter(@s[4]);
+  v.rightOf(@s[4]);
   testbounds(v, p + 4, 2);
   test(v.ToString, 'ar');
   test(v.contains('a'));
   test(v.contains('r'));
   test(not v.contains('b'));
-  test(v.moveBy(2));
+  test(v.rightOfFirst(2));
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
-  test(not v.moveBy(2));
+  test(not v.rightOfFirst(2));
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
   test(not v.contains('b'));
@@ -2227,26 +2227,26 @@ begin
   for c in v do test(false);
 
   v.init(s);
-  v.moveTo(@s[length(s)]);
+  v.rightWith(@s[length(s)]);
   testbounds(v, p + 5, 1);
   test(v.ToString, 'r');
-  v.moveTo(@s[length(s)] + 1);
+  v.rightWith(@s[length(s)] + 1);
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
   for c in v do test(false);
 
   v.init(s);
-  v.moveAfter(@s[length(s)-1]);
+  v.rightOf(@s[length(s)-1]);
   testbounds(v, p + 5, 1);
   test(v.ToString, 'r');
-  v.moveAfter(@s[length(s)]);
+  v.rightOf(@s[length(s)]);
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
-  v.cutBy(1);
+  v.leftOfLast(1);
   test(v.ToString, '');
-  v.cutAfter(p);
+  v.leftWith(p);
   test(v.ToString, '');
-  v.cutBefore(p);
+  v.leftOf(p);
   test(v.ToString, '');
   test(v = '');
   test(not(v <> ''));
@@ -2255,18 +2255,18 @@ begin
   v := s.pcharView;
   testbounds(v, p, 6);
   test(v.ToString, 'foobar');
-  test(v.cutBy(1));
+  test(v.leftOfLast(1));
   testbounds(v, p, 5);
   test(v.ToString, 'fooba');
-  test(v.moveBy(1));
+  test(v.rightOfFirst(1));
   testbounds(v, p + 1, 4);
   test(v.ToString, 'ooba');
-  v.cutAfter(@s[4]);
+  v.leftWith(@s[4]);
   test(v.ToString, 'oob');
   test(v.contains('b'));
   test(v.contains('o'));
   test(not v.contains(#0));
-  v.cutBefore(@s[4]);
+  v.leftOf(@s[4]);
   test(v.ToString, 'oo');
   test(not v.contains('b'));
   test(v.contains('o'));
@@ -2274,51 +2274,51 @@ begin
 
   v.init(s);
   testbounds(v, p, 6);
-  test(v.moveToFind('f'));
+  test(v.rightWithFind('f'));
   testbounds(v, p, 6);
-  test(v.moveAfterFind('f'));
+  test(v.rightOfFind('f'));
   testbounds(v, p + 1, 5);
-  test(v.moveToFind('o'));
+  test(v.rightWithFind('o'));
   testbounds(v, p + 1, 5);
-  test(v.moveAfterFind('o'));
+  test(v.rightOfFind('o'));
   testbounds(v, p + 2, 4);
-  test(v.moveToFind('o'));
+  test(v.rightWithFind('o'));
   testbounds(v, p + 2, 4);
-  test(v.moveAfterFind('o'));
+  test(v.rightOfFind('o'));
   testbounds(v, p + 3, 3);
-  test(not v.moveToFind('x'));
+  test(not v.rightWithFind('x'));
   testbounds(v, p + 3, 3);
-  test(not v.moveAfterFind('x'));
+  test(not v.rightOfFind('x'));
   testbounds(v, p + 3, 3);
-  test(v.moveToFind(''));
+  test(v.rightWithFind(''));
   testbounds(v, p + 3, 3);
-  test(v.moveAfterFind(''));
+  test(v.rightOfFind(''));
   testbounds(v, p + 3, 3);
-  test(v.moveToFind('r'));
+  test(v.rightWithFind('r'));
   testbounds(v, p + 5, 1);
   test(v.ToString, 'r');
   v.init(s);
-  test(v.moveAfterFind('r'));
+  test(v.rightOfFind('r'));
   testbounds(v, p + 6, 0);
   test(v.ToString, '');
 
   v.init(s);
   testbounds(v, p, 6);
-  test(v.cutAfterFind('r'));
+  test(v.leftWithFind('r'));
   testbounds(v, p, 6);
-  test(v.cutBeforeFind('r'));
+  test(v.leftOfFind('r'));
   testbounds(v, p, 5);
-  test(v.cutAfterFind('b'));
+  test(v.leftWithFind('b'));
   testbounds(v, p, 4);
-  test(v.cutBeforeFind('b'));
+  test(v.leftOfFind('b'));
   testbounds(v, p, 3);
-  test(v.cutAfterFind('o'));
+  test(v.leftWithFind('o'));
   testbounds(v, p, 2);
-  test(v.cutBeforeFind('o'));
+  test(v.leftOfFind('o'));
   testbounds(v, p, 1);
-  test(v.cutAfterFind('f'));
+  test(v.leftWithFind('f'));
   testbounds(v, p, 1);
-  test(v.cutBeforeFind('f'));
+  test(v.leftOfFind('f'));
   testbounds(v, p, 0);
 
 
@@ -2350,11 +2350,11 @@ begin
   test(bv = 'xy=');
   test(av = 'bc=def');
   v.init(s);
-  test(v.splitCutBefore(@s[4], w));
+  test(v.splitleftOf(@s[4], w));
   test(v = 'xy=');
   test(w = 'bc=def');
   v.init(s);
-  test(v.splitMoveAfter(w, @s[4]));
+  test(v.splitrightOf(w, @s[4]));
   test(v = 'bc=def');
   test(w = 'xy=');
 
@@ -2364,11 +2364,11 @@ begin
   test(bv = 'xy');
   test(av = 'abc=def');
   v.init(s);
-  test(v.splitCutBeforeFind('=x', 1, w));
+  test(v.splitleftOfFind('=x', 1, w));
   test(v = 'xy');
   test(w = 'abc=def');
   v.init(s);
-  test(v.splitMoveAfterFind(w, '=x', 1));
+  test(v.splitrightOfFind(w, '=x', 1));
   test(v = 'abc=def');
   test(w = 'xy');
 
@@ -2378,11 +2378,11 @@ begin
   test(bv = 'xy');
   test(av = 'bc=def');
   v.init(s);
-  test(v.splitCutBeforeFind('=a', 2, w));
+  test(v.splitleftOfFind('=a', 2, w));
   test(v = 'xy');
   test(w = 'bc=def');
   v.init(s);
-  test(v.splitMoveAfterFind(w, '=a', 2));
+  test(v.splitrightOfFind(w, '=a', 2));
   test(v = 'bc=def');
   test(w = 'xy');
 
@@ -2392,11 +2392,11 @@ begin
   test(bv = 'xy');
   test(av = 'abc=def');
   v.init(s);
-  test(v.splitCutBeforeFind('=', w));
+  test(v.splitleftOfFind('=', w));
   test(v = 'xy');
   test(w = 'abc=def');
   v.init(s);
-  test(v.splitMoveAfterFind(w, '='));
+  test(v.splitrightOfFind(w, '='));
   test(v = 'abc=def');
   test(w = 'xy');
 
@@ -2406,11 +2406,11 @@ begin
   test(bv = 'xy');
   test(av = 'c=def');
   v.init(s);
-  test(v.splitCutBeforeFind('=ab', w));
+  test(v.splitleftOfFind('=ab', w));
   test(v = 'xy');
   test(w = 'c=def');
   v.init(s);
-  test(v.splitMoveAfterFind(w, '=ab'));
+  test(v.splitrightOfFind(w, '=ab'));
   test(v = 'c=def');
   test(w = 'xy');
 
@@ -2420,11 +2420,11 @@ begin
   test(bv = '');
   test(av = s);
   v.init(s);
-  test(not v.splitCutBeforeFind('=x', w));
+  test(not v.splitleftOfFind('=x', w));
   test(v = s);
   test(w = s);
   v.init(s);
-  test(not v.splitMoveAfterFind(w, '=x'));
+  test(not v.splitrightOfFind(w, '=x'));
   test(v = s);
   test(w = '');
 

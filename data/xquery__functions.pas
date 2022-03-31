@@ -2253,12 +2253,12 @@ var
     end else begin
       oldUrl := obj.getProperty('url').toString;
       oldUrlView.init(oldUrl);
-      hadLinkTarget := oldUrlView.cutBeforeFind('#');
+      hadLinkTarget := oldUrlView.leftOfFind('#');
       queryStart := oldUrlView.find('?');
       if queryStart = nil then begin
         if hadLinkTarget then urlencodedGETurlPrefix := oldUrlView.toString
         else urlencodedGETurlPrefix := oldUrl;
-        oldUrlView.moveBy(length('https://'));
+        oldUrlView.rightOfFirst(length('https://'));
         if strIsAbsoluteURI(oldUrl) and not oldUrlView.contains('/') then urlencodedGETurlPrefix += '/?'
         else urlencodedGETurlPrefix += '?';
         query := '';

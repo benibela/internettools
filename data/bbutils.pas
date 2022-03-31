@@ -206,17 +206,17 @@ Methods with pointer arguments are safe, such that pointers outside the view eit
 Methods Move* remove elements from the beginning, methods Cut* remove elements from the end, i.e.:
 
 @longCode(
-|--------cutBefore(x)--------||-----------------------moveTo(x)-----------------|
+|----------leftOf(x)---------||--------------------rightWith(x)-----------------|
 ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
-|-------------------cutAfter(x)--------------------||-------moveAfter(x)--------|
+|-------------------leftWith(x)--------------------||---------rightOf(x)--------|
 )
 
 Methods View* return a new view. To and From are inclusive, while Until and After are exclusive, i.e.:
 
 @longCode(
-|--------viewUntil(x)--------||-----------------------viewFrom(x)---------------|
+|--------viewLeftOf(x)-------||------------------viewRightWith(x)---------------|
 ppppppppppppppppppppppppppppppxxxxxxxxxxxxxxxxxxxxxxsssssssssssssssssssssssssssss  <- the initial array view
-|--------------------viewTo(x)---------------------||--------viewAfter(x)-------|
+|-------------------viewLeftWith(x)----------------||---------rightOf(x)--------|
 )
 
 To avoid confusion, whether indices should be 0-based or 1-based, signed or unsigned, most methods of this view are specified without refering to indices.
@@ -257,36 +257,36 @@ public
   //** Tests whether an element is on the view (0 <= index <= length).
   function isOnBounds(target: PElement): boolean; inline;
   //** Index of an element.
-  function offsetOf(target: PElement): SizeUInt; inline;
+  function offset(target: PElement): SizeUInt; inline;
 
   //** Enumerates all elements, copying each.
   function getEnumerator: TPointerViewEnumerator; inline;
 
   //** Removes delta many elements from the beginning.
-  function moveBy(delta: SizeUInt): boolean;
+  function rightOfFirst(delta: SizeUInt): boolean;
   //** Removes all elements before the target element.
-  procedure moveTo(target: PElement);
+  procedure rightWith(target: PElement);
   //** Removes all elements before the target element and the target element.
-  procedure moveAfter(target: PElement);
+  procedure rightOf(target: PElement);
 
   //** Removes delta many elements from the end.
-  function cutBy(delta: SizeUInt): boolean;
+  function leftOfLast(delta: SizeUInt): boolean;
   //** Removes all elements after the target element and the target element.
-  procedure cutBefore(target: PElement);
+  procedure leftOf(target: PElement);
   //** Removes all elements after the target element.
-  procedure cutAfter(target: PElement);
+  procedure leftWith(target: PElement);
 
   //** Count how often an element occurs.
   function count(const e: TElement): SizeUInt;
 
-  //** copy and cutAfter.
-  function viewTo(newLast: PElement): TPointerView;
-  //** copy and cutBefore.
-  function viewUntil(newEnd: PElement): TPointerView;
-  //** copy and moveTo.
-  function viewFrom(newStart: PElement): TPointerView;
-  //** copy and moveAfter.
-  function viewAfter(newStartSkip: PElement): TPointerView;
+  //** copy and leftWith.
+  function viewLeftWith(newLast: PElement): TPointerView;
+  //** copy and leftOf.
+  function viewLeftOf(newEnd: PElement): TPointerView;
+  //** copy and rightWith.
+  function viewRightWith(newStart: PElement): TPointerView;
+  //** copy and rightOf.
+  function viewRightOf(newStartSkip: PElement): TPointerView;
 end;
 
 {$endif}
@@ -741,8 +741,8 @@ var
   ok: boolean;
 begin
   v := '(123)'.pcharView;
-  ok := v.moveAfterFind('(');
-  ok := ok and v.cutBeforeFind(')');
+  ok := v.rightOfFind('(');
+  ok := ok and v.leftOfFind(')');
   ok := ok and v.toIntDecimalTry(number);
 )
 
@@ -755,7 +755,7 @@ This is fast (zero allocations) and safe (no out-of-bound access or overflow is 
 }
 TPCharView = object(specialize TPointerView<char>)
 private
-  function moveToFound(target: pchar): boolean; inline;
+  function rightWithFound(target: pchar): boolean; inline;
 public
   //** Creates a view for a string.
   procedure init(const buffer: string); overload;
@@ -785,29 +785,29 @@ public
   function findLast(const s: string): pchar;
 
   //**Removes all characters before the first occurrence of a string s (keeps s itself). Keeps the view unchanged if it does not contain s.
-  function moveToFind(const s: string): boolean;
+  function rightWithFind(const s: string): boolean;
   //**Removes all characters before the first occurrence of a string s (removes s, too). Keeps the view unchanged if it does not contain s.
-  function moveAfterFind(const s: string): boolean;
+  function rightOfFind(const s: string): boolean;
   //**Removes all characters before the last occurrence of a string s (keeps s itself). Keeps the view unchanged if it does not contain s.
-  function moveToFindLast(const s: string): boolean;
+  function rightWithFindLast(const s: string): boolean;
   //**Removes all characters before the last occurrence of a string s (removes s, too). Keeps the view unchanged if it does not contain s.
-  function moveAfterFindLast(const s: string): boolean;
+  function rightOfFindLast(const s: string): boolean;
 
   //**finds #13 or #10  (implicit #13#10)
   function findLineBreak: pchar;
   //**Remves everything before the first line break (exclusive).
-  function moveToLineBreak: boolean;
+  function rightWithLineBreak: boolean;
   //**Remves everything before the first line break (inclusive).
-  function moveAfterLineBreak: boolean;
+  function rightOfLineBreak: boolean;
 
   //**Removes all characters after the first occurrence of a string (removes s, too). Keeps the view unchanged if it does not contain s.
-  function cutBeforeFind(const s: string): boolean;
+  function leftOfFind(const s: string): boolean;
   //**Removes all characters after the first occurrence of a string (keeps s itself). Keeps the view unchanged if it does not contain s.
-  function cutAfterFind(const s: string): boolean;
+  function leftWithFind(const s: string): boolean;
   //**Removes all characters after the last occurrence of a string (removes s, too). Keeps the view unchanged if it does not contain s.
-  function cutBeforeFindLast(const s: string): boolean;
+  function leftOfFindLast(const s: string): boolean;
   //**Removes all characters after the last occurrence of a string (keeps s itself). Keeps the view unchanged if it does not contain s.
-  function cutAfterFindLast(const s: string): boolean;
+  function leftWithFindLast(const s: string): boolean;
 
   //**Removes all whitespace characters from the left and right side.
   procedure trim(const trimCharacters: TCharSet = [#0..' ']);
@@ -831,13 +831,13 @@ public
   //**Converts the view to an unsigned integer. Returns true if it matches [0-9]+ and does not overflow.
   function toUIntDecimalTry(out v: UInt32): boolean;
 
-  //** copy and cutAfter.
+  //** copy and leftWith.
   function viewTo(newLast: pchar): TPCharView; reintroduce;
-  //** copy and cutBefore.
+  //** copy and leftOf.
   function viewUntil(newEnd: pchar): TPCharView; reintroduce;
-  //** copy and moveTo.
+  //** copy and rightWith.
   function viewFrom(newStart: pchar): TPCharView; reintroduce;
-  //** copy and moveAfter.
+  //** copy and rightOf.
   function viewAfter(newStartSkip: pchar): TPCharView; reintroduce;
 
   //** Splits the view at element.
@@ -845,28 +845,28 @@ public
   function splitAt(out before: TPCharView; element: PChar; out behind: TPCharView): boolean;
   //** Splits the view at element.
   //** Everything before element is returned in self, everything behind it in behind.
-  function splitCutBefore(element: PChar; out behind: TPCharView): boolean;
+  function splitLeftOf(element: PChar; out behind: TPCharView): boolean;
   //** Splits the view at element.
   //** Everything before element is returned in before, everything behind it in self.
-  function splitMoveAfter(out before: TPCharView; element: PChar): boolean;
+  function splitRightOf(out before: TPCharView; element: PChar): boolean;
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
   function splitAtFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in self, everything behind (searched+searchedLength) in behind.
-  function splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
+  function splitLeftOfFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in before, everything behind (searched+searchedLength) in self.
-  function splitMoveAfterFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
+  function splitRightOfFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
   function splitAtFind(out before: TPCharView; const searched: string; out behind: TPCharView): boolean;
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in self, everything behind searched in behind.
-  function splitCutBeforeFind(const searched: string; out behind: TPCharView): boolean;
+  function splitLeftOfFind(const searched: string; out behind: TPCharView): boolean;
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in before, everything behind searched in self.
-  function splitMoveAfterFind(out before: TPCharView; const searched: string): boolean;
+  function splitRightOfFind(out before: TPCharView; const searched: string): boolean;
 end;
 
 
@@ -6239,13 +6239,13 @@ begin
   result := (data <= target) and (target <= dataend);
 end;
 
-function TPointerView.offsetOf(target: PElement): SizeUInt;
+function TPointerView.offset(target: PElement): SizeUInt;
 begin
   result := target - data;
 end;
 
 
-function TPointerView.moveBy(delta: SizeUInt): boolean;
+function TPointerView.rightOfFirst(delta: SizeUInt): boolean;
 var
   olddata: PElement;
   newdata: PElement;
@@ -6264,7 +6264,7 @@ begin
   result.dataend := dataend;
 end;
 
-procedure TPointerView.moveTo(target: PElement);
+procedure TPointerView.rightWith(target: PElement);
 begin
   if target <= data then exit;
   if target >= dataend then data := dataend
@@ -6272,13 +6272,13 @@ begin
 end;
 
 
-procedure TPointerView.moveAfter(target: PElement);
+procedure TPointerView.rightOf(target: PElement);
 begin
-  moveTo(target + 1);
+  rightWith(target + 1);
 end;
 
 
-function TPointerView.cutBy(delta: SizeUInt): boolean;
+function TPointerView.leftOfLast(delta: SizeUInt): boolean;
 var
   olddataend: PElement;
   newdataend: PElement;
@@ -6290,16 +6290,16 @@ begin
   else if newdataend < data then dataend := data;
 end;
 
-procedure TPointerView.cutBefore(target: PElement);
+procedure TPointerView.leftOf(target: PElement);
 begin
   if target >= dataend then exit;
   if target <= data then dataend := data
   else dataend := target;
 end;
 
-procedure TPointerView.cutAfter(target: PElement);
+procedure TPointerView.leftWith(target: PElement);
 begin
-  cutBefore(target + 1);
+  leftOf(target + 1);
 end;
 
 function TPointerView.count(const e: TElement): SizeUInt;
@@ -6316,22 +6316,22 @@ begin
   end;
 end;
 
-function TPointerView.viewTo(newLast: PElement): TPointerView;
+function TPointerView.viewLeftWith(newLast: PElement): TPointerView;
 begin
   result.initEndCapped(data, newLast + 1, dataend);
 end;
 
-function TPointerView.viewUntil(newEnd: PElement): TPointerView;
+function TPointerView.viewLeftOf(newEnd: PElement): TPointerView;
 begin
   result.initEndCapped(data, newEnd, dataend);
 end;
 
-function TPointerView.viewFrom(newStart: PElement): TPointerView;
+function TPointerView.viewRightWith(newStart: PElement): TPointerView;
 begin
   result.initStartCapped(data, newStart, dataend);
 end;
 
-function TPointerView.viewAfter(newStartSkip: PElement): TPointerView;
+function TPointerView.viewRightOf(newStartSkip: PElement): TPointerView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
@@ -6340,7 +6340,7 @@ end;
 
 
 
-function TPCharView.moveToFound(target: pchar): boolean;
+function TPCharView.rightWithFound(target: pchar): boolean;
 begin
   result := target <> nil;
   if result then data := target;
@@ -6442,12 +6442,12 @@ begin
 end;
 
 
-function TPCharView.moveToFind(const s: string): boolean;
+function TPCharView.rightWithFind(const s: string): boolean;
 begin
-  result := moveToFound(find(s));
+  result := rightWithFound(find(s));
 end;
 
-function TPCharView.moveAfterFind(const s: string): boolean;
+function TPCharView.rightOfFind(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6457,7 +6457,7 @@ begin
     data := target + system.length(s);
 end;
 
-function TPCharView.moveToFindLast(const s: string): boolean;
+function TPCharView.rightWithFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6467,7 +6467,7 @@ begin
     data := target;
 end;
 
-function TPCharView.moveAfterFindLast(const s: string): boolean;
+function TPCharView.rightOfFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6488,12 +6488,12 @@ begin
   result := nil;
 end;
 
-function TPCharView.moveToLineBreak: boolean;
+function TPCharView.rightWithLineBreak: boolean;
 begin
-  result := moveToFound(findLineBreak);
+  result := rightWithFound(findLineBreak);
 end;
 
-function TPCharView.moveAfterLineBreak: boolean;
+function TPCharView.rightOfLineBreak: boolean;
 var
   target: PChar;
 begin
@@ -6506,7 +6506,7 @@ begin
   end;
 end;
 
-function TPCharView.cutBeforeFind(const s: string): boolean;
+function TPCharView.leftOfFind(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6516,7 +6516,7 @@ begin
     dataend := target;
 end;
 
-function TPCharView.cutAfterFind(const s: string): boolean;
+function TPCharView.leftWithFind(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6526,7 +6526,7 @@ begin
     dataend := target + system.length(s);
 end;
 
-function TPCharView.cutBeforeFindLast(const s: string): boolean;
+function TPCharView.leftOfFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6536,7 +6536,7 @@ begin
     dataend := target;
 end;
 
-function TPCharView.cutAfterFindLast(const s: string): boolean;
+function TPCharView.leftWithFindLast(const s: string): boolean;
 var
   target: PChar;
 begin
@@ -6671,18 +6671,18 @@ begin
   behind := viewAfter(element);
 end;
 
-function TPCharView.splitCutBefore(element: PChar; out behind: TPCharView): boolean;
+function TPCharView.splitLeftOf(element: PChar; out behind: TPCharView): boolean;
 begin
   behind := viewAfter(element);
   result := isOnBounds(element);
-  if result then cutBefore(element);
+  if result then leftOf(element);
 end;
 
-function TPCharView.splitMoveAfter(out before: TPCharView; element: PChar): boolean;
+function TPCharView.splitrightOf(out before: TPCharView; element: PChar): boolean;
 begin
   before := viewUntil(element);
   result := isOnBounds(element);
-  if result then moveAfter(element);
+  if result then rightOf(element);
 end;
 
 function TPCharView.splitAtFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
@@ -6697,7 +6697,7 @@ begin
   end else splitAt(before, nil, behind);
 end;
 
-function TPCharView.splitCutBeforeFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
+function TPCharView.splitleftOfFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
 var
   temp: TPCharView;
 begin
@@ -6705,7 +6705,7 @@ begin
   if result then self := temp;
 end;
 
-function TPCharView.splitMoveAfterFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
+function TPCharView.splitrightOfFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
 var
   temp: TPCharView;
 begin
@@ -6718,14 +6718,14 @@ begin
   result := splitAtFind(before, pchar(searched), system.length(searched), behind);
 end;
 
-function TPCharView.splitCutBeforeFind(const searched: string; out behind: TPCharView): boolean;
+function TPCharView.splitleftOfFind(const searched: string; out behind: TPCharView): boolean;
 begin
-  result := splitCutBeforeFind(pchar(searched), system.length(searched), behind);
+  result := splitleftOfFind(pchar(searched), system.length(searched), behind);
 end;
 
-function TPCharView.splitMoveAfterFind(out before: TPCharView; const searched: string): boolean;
+function TPCharView.splitrightOfFind(out before: TPCharView; const searched: string): boolean;
 begin
-  result := splitMoveAfterFind(before, pchar(searched), system.length(searched));
+  result := splitrightOfFind(before, pchar(searched), system.length(searched));
 end;
 
 
