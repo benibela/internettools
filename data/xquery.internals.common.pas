@@ -430,7 +430,7 @@ var
   );
 
 implementation
-uses math, bbutilsbeta
+uses math
     {$if defined(USE_PASDBLSTRUTILS) or defined(USE_PASDBLSTRUTILS_FOR_JSON)}, PasDblStrUtils{$endif};
 
 function TXQBaseHashmapValuePointerLikeReadOnly.TValueEnumerator.getEnumerator: TValueEnumerator;
