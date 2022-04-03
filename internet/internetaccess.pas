@@ -1501,8 +1501,8 @@ var
   enc, country: TPCharView;
   codepage: TSystemCodePage;
 begin
-  result := value.splitRightOf(enc, '''');
-  result := result and value.splitRightOf(country, '''');
+  result := value.splitRightOfFind(enc, '''');
+  result := result and value.splitRightOfFind(country, '''');
   if not result then exit;
   codepage := strEncodingFromName(enc.ToString);
   if codepage = CP_NONE then exit(false);

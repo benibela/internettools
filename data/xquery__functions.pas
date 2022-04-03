@@ -2263,8 +2263,8 @@ var
         else urlencodedGETurlPrefix += '?';
         query := '';
       end else begin
-        urlencodedGETurlPrefix := oldUrlView.viewTo(queryStart).toString;
-        query := oldUrlView.viewAfter(queryStart).toString;
+        urlencodedGETurlPrefix := oldUrlView.viewLeftWith(queryStart).toString;
+        query := oldUrlView.viewRightOf(queryStart).toString;
       end;
     end;
 

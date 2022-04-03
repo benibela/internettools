@@ -832,13 +832,13 @@ public
   function toUIntDecimalTry(out v: UInt32): boolean;
 
   //** copy and leftWith.
-  function viewTo(newLast: pchar): TPCharView; reintroduce;
+  function viewLeftWith(newLast: pchar): TPCharView; reintroduce;
   //** copy and leftOf.
-  function viewUntil(newEnd: pchar): TPCharView; reintroduce;
+  function viewLeftOf(newEnd: pchar): TPCharView; reintroduce;
   //** copy and rightWith.
-  function viewFrom(newStart: pchar): TPCharView; reintroduce;
+  function viewRightWith(newStart: pchar): TPCharView; reintroduce;
   //** copy and rightOf.
-  function viewAfter(newStartSkip: pchar): TPCharView; reintroduce;
+  function viewRightOf(newStartSkip: pchar): TPCharView; reintroduce;
 
   //** Splits the view at element.
   //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
@@ -906,10 +906,10 @@ type
     function enumerateUtf8CodePoints: TStrIterator;
 
     function pcharView: TPCharView;
-    function pcharViewTo(newLast: pchar): TPCharView;
-    function pcharViewUntil(newEnd: pchar): TPCharView;
-    function pcharViewFrom(newStart: pchar): TPCharView;
-    function pcharViewAfter(newStartSkip: pchar): TPCharView;
+    function pcharViewLeftWith(newLast: pchar): TPCharView;
+    function pcharViewLeftOf(newEnd: pchar): TPCharView;
+    function pcharViewRightWith(newStart: pchar): TPCharView;
+    function pcharViewRightOf(newStartSkip: pchar): TPCharView;
 
     function toIntDecimalTry(out v: Int64): boolean;
     function toIntDecimalTry(out v: Int32): boolean;
@@ -6644,22 +6644,22 @@ begin
   result := strDecimalToUIntTry(data, dataend, v);
 end;
 
-function TPCharView.viewTo(newLast: pchar): TPCharView;
+function TPCharView.viewLeftWith(newLast: pchar): TPCharView;
 begin
   result.initEndCapped(data, newLast + 1, dataend);
 end;
 
-function TPCharView.viewUntil(newEnd: pchar): TPCharView;
+function TPCharView.viewLeftOf(newEnd: pchar): TPCharView;
 begin
   result.initEndCapped(data, newEnd, dataend);
 end;
 
-function TPCharView.viewFrom(newStart: pchar): TPCharView;
+function TPCharView.viewRightWith(newStart: pchar): TPCharView;
 begin
   result.initStartCapped(data, newStart, dataend);
 end;
 
-function TPCharView.viewAfter(newStartSkip: pchar): TPCharView;
+function TPCharView.viewRightOf(newStartSkip: pchar): TPCharView;
 begin
   result.initStartCapped(data, newStartSkip + 1, dataend);
 end;
@@ -6667,20 +6667,20 @@ end;
 function TPCharView.splitAt(out before: TPCharView; element: PChar; out behind: TPCharView): boolean;
 begin
   result := isOnBounds(element);
-  before := viewUntil(element);
-  behind := viewAfter(element);
+  before := viewLeftOf(element);
+  behind := viewRightOf(element);
 end;
 
 function TPCharView.splitLeftOf(element: PChar; out behind: TPCharView): boolean;
 begin
-  behind := viewAfter(element);
+  behind := viewRightOf(element);
   result := isOnBounds(element);
   if result then leftOf(element);
 end;
 
 function TPCharView.splitrightOf(out before: TPCharView; element: PChar): boolean;
 begin
-  before := viewUntil(element);
+  before := viewLeftOf(element);
   result := isOnBounds(element);
   if result then rightOf(element);
 end;
@@ -6692,8 +6692,8 @@ begin
   target := find(searched, searchedLength);
   result := target <> nil;
   if result then begin
-    before := viewUntil(target);
-    behind := viewFrom(target + searchedLength);
+    before := viewLeftOf(target);
+    behind := viewRightWith(target + searchedLength);
   end else splitAt(before, nil, behind);
 end;
 
@@ -6840,24 +6840,24 @@ begin
   result.init(self);
 end;
 
-function TBBStringHelper.pcharViewTo(newLast: pchar): TPCharView;
+function TBBStringHelper.pcharViewLeftWith(newLast: pchar): TPCharView;
 begin
-  result := pcharView.viewTo(newLast);
+  result := pcharView.viewLeftWith(newLast);
 end;
 
-function TBBStringHelper.pcharViewUntil(newEnd: pchar): TPCharView;
+function TBBStringHelper.pcharViewLeftOf(newEnd: pchar): TPCharView;
 begin
-  result := pcharView.viewUntil(newEnd);
+  result := pcharView.viewLeftOf(newEnd);
 end;
 
-function TBBStringHelper.pcharViewFrom(newStart: pchar): TPCharView;
+function TBBStringHelper.pcharViewRightWith(newStart: pchar): TPCharView;
 begin
-  result := pcharView.viewFrom(newStart);
+  result := pcharView.viewRightWith(newStart);
 end;
 
-function TBBStringHelper.pcharViewAfter(newStartSkip: pchar): TPCharView;
+function TBBStringHelper.pcharViewRightOf(newStartSkip: pchar): TPCharView;
 begin
-  result := pcharView.viewAfter(newStartSkip);
+  result := pcharView.viewRightOf(newStartSkip);
 end;
 
 function TBBStringHelper.toIntDecimalTry(out v: Int64): boolean;

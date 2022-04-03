@@ -669,9 +669,9 @@ begin
     result.startLineIndex := result.lastLineIndex;
     startLineStart := endLineStart;
    end;
-  view := s.pcharViewFrom(startLineStart);
-  result.lines := view.viewUntil(s.pcharViewFrom(endLineStart).findLineBreak.nilMeansInfinity);
-  result.lastLine := result.lines.viewFrom(endLineStart);
+  view := s.pcharViewRightWith(startLineStart);
+  result.lines := view.viewLeftOf(s.pcharViewRightWith(endLineStart).findLineBreak.nilMeansInfinity);
+  result.lastLine := result.lines.viewRightWith(endLineStart);
 end;
 
 constructor TXQParsingErrorTracker.Create(const astr: string);

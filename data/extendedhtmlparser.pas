@@ -2217,7 +2217,7 @@ begin
       comma := view.find(',');
       if comma = nil then maxView := view
       else begin
-        maxView := view.viewAfter(comma);
+        maxView := view.viewRightOf(comma);
         view.leftOf(comma);
       end;
       view.trim();
@@ -2227,7 +2227,7 @@ begin
       if result then begin
         minCount := view.ToString;
         maxCount := maxView.ToString;
-        delete(s, 1, s.pcharViewTo(closingParen).length);
+        delete(s, 1, s.pcharViewLeftWith(closingParen).length);
       end;
     end;
   end;

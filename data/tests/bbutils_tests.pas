@@ -2170,23 +2170,23 @@ begin
     inc(i);
   end;
 
-  test(v.viewFrom(p).ToString, 'foobar');
-  test(v.viewAfter(p).ToString, 'oobar');
-  test(v.viewFrom(p+4).ToString, 'ar');
-  test(v.viewAfter(p+4).ToString, 'r');
-  test(v.viewFrom(p+5).ToString, 'r');
-  test(v.viewAfter(p+5).ToString, '');
-  test(v.viewFrom(p+6).ToString, '');
-  test(v.viewAfter(p+6).ToString, '');
+  test(v.viewRightWith(p).ToString, 'foobar');
+  test(v.viewRightOf(p).ToString, 'oobar');
+  test(v.viewRightWith(p+4).ToString, 'ar');
+  test(v.viewRightOf(p+4).ToString, 'r');
+  test(v.viewRightWith(p+5).ToString, 'r');
+  test(v.viewRightOf(p+5).ToString, '');
+  test(v.viewRightWith(p+6).ToString, '');
+  test(v.viewRightOf(p+6).ToString, '');
 
-  test(v.viewTo(p).ToString, 'f');
-  test(v.viewUntil(p).ToString, '');
-  test(v.viewTo(p+4).ToString, 'fooba');
-  test(v.viewUntil(p+4).ToString, 'foob');
-  test(v.viewTo(p+5).ToString, 'foobar');
-  test(v.viewUntil(p+5).ToString, 'fooba');
-  test(v.viewTo(p+6).ToString, 'foobar');
-  test(v.viewUntil(p+6).ToString, 'foobar');
+  test(v.viewLeftWith(p).ToString, 'f');
+  test(v.viewLeftOf(p).ToString, '');
+  test(v.viewLeftWith(p+4).ToString, 'fooba');
+  test(v.viewLeftOf(p+4).ToString, 'foob');
+  test(v.viewLeftWith(p+5).ToString, 'foobar');
+  test(v.viewLeftOf(p+5).ToString, 'fooba');
+  test(v.viewLeftWith(p+6).ToString, 'foobar');
+  test(v.viewLeftOf(p+6).ToString, 'foobar');
 
 
   test(v.rightOfFirst(1));
