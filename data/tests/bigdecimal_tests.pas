@@ -723,7 +723,8 @@ begin
 
 
   //failed fuzzy tests
-  if DIGITS_PER_ELEMENT = 5 then begin
+  if DIGITS_PER_ELEMENT = 5 Then begin
+    tempbf := default(bigdecimal);
     SetLength(tempbf.digits, 5); tempbf.digits[0] := BigDecimalBin(10000); tempbf.digits[1] := BigDecimalBin(72175); tempbf.digits[2] := BigDecimalBin(60243); tempbf.digits[3] := BigDecimalBin(66625); tempbf.digits[4] := BigDecimalBin(2434);
     tempbf.exponent:=-5; tempbf.signed:=false; tempbf.lastDigitHidden:=true;
     test(BigDecimalToStr(tempbf), '0.02434666256024372175');

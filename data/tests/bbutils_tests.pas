@@ -845,7 +845,7 @@ end;
 
 procedure testStrConversions;
 var
-  temp: String;
+  temp: String = '';
   e, f: TSystemCodePage;
   unicodePages: array[1..5] of TSystemCodePage = (CP_UTF8, CP_UTF16, CP_UTF16BE, CP_UTF32, CP_UTF32BE );
   asciiLikeCodePages: array[1..5] of TSystemCodePage = (CP_ACP, CP_ASCII, CP_LATIN1, CP_WINDOWS1252, CP_UTF8 );
@@ -1063,8 +1063,8 @@ var
 var ar8: array[0..100] of shortint;
     ar32: array[0..100] of longint;
     ar64: array[0..100] of int64;
-    ai32: TLongintArray;
-    sa: TStringArray;
+    ai32: TLongintArray = nil;
+    sa: TStringArray = nil;
     order: TBinarySearchChoosen;
     astr: ansistring;
     ustr: UTF8String;

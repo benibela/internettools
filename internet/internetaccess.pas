@@ -24,7 +24,7 @@ unit internetaccess;
 interface
 
 uses
-  Classes, SysUtils, bbutils, bbutilsbeta;
+  Classes, SysUtils, bbutils;
 type
   PInternetConfig=^TInternetConfig;
   {** @abstract(Internet configuration)
