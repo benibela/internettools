@@ -227,8 +227,8 @@ Rather they use pointers or an amount of elements. E.g. rather than getting a sl
 generic TPointerView<TElement> = object
   type PElement = ^TElement;
 protected
-  procedure initStartCapped(oldstart, start, anend: pchar);
-  procedure initEndCapped(start, newend, oldend: pchar);
+  procedure initStartCapped(oldstart, start, anend: PElement);
+  procedure initEndCapped(start, newend, oldend: PElement);
  type TPointerViewEnumerator = object
   protected
     data, dataend: pelement;
@@ -237,6 +237,7 @@ protected
     function moveNext: boolean; inline;
     property current: TElement read first;
   end;
+  function byteLength: SizeUInt;
 public
   data: pelement; //first element
   dataend: pelement; //after last element
@@ -252,6 +253,8 @@ public
   function isEmpty: boolean; inline;
   //** Tests whether this view is equal to another view (same length and elements)  (currently undefined if element is a string).
   function isEqual(const other: TPointerView): boolean;
+  //** Tests whether this view is equal to another view (same length and elements)  (currently undefined if element is a string).
+  function isEqual(const other: array of telement): boolean;
   //** Tests whether an element is in the view (0 <= index < length).
   function isInBounds(target: PElement): boolean; inline;
   //** Tests whether an element is on the view (0 <= index <= length).
@@ -264,6 +267,8 @@ public
 
   //** Removes delta many elements from the beginning.
   function rightOfFirst(delta: SizeUInt): boolean;
+  //** Take the last length elements
+  function rightWithLast(alength: SizeUInt): boolean;
   //** Removes all elements before the target element.
   procedure rightWith(target: PElement);
   //** Removes all elements before the target element and the target element.
@@ -271,6 +276,8 @@ public
 
   //** Removes delta many elements from the end.
   function leftOfLast(delta: SizeUInt): boolean;
+  //** Set the length to length
+  function leftWithFirst(alength: SizeUInt): boolean;
   //** Removes all elements after the target element and the target element.
   procedure leftOf(target: PElement);
   //** Removes all elements after the target element.
@@ -278,6 +285,9 @@ public
 
   //** Count how often an element occurs.
   function count(const e: TElement): SizeUInt;
+
+  type TElementToString = function (const e: TElement): string;
+  function joinToString(elementMap: TElementToString; const sep: string): string;
 
   //** copy and leftWith.
   function viewLeftWith(newLast: PElement): TPointerView;
@@ -6172,7 +6182,7 @@ begin
 end;
 
 
-procedure TPointerView.initStartCapped(oldstart, start, anend: pchar);
+procedure TPointerView.initStartCapped(oldstart, start, anend: PElement);
 begin
   dataend := anend;
   if start < oldstart then data := oldstart
@@ -6180,12 +6190,17 @@ begin
   else data := start;
 end;
 
-procedure TPointerView.initEndCapped(start, newend, oldend: pchar);
+procedure TPointerView.initEndCapped(start, newend, oldend: PElement);
 begin
   data := start;
   if newend > oldend then dataend := oldend
   else if newend < start then dataend := start
   else dataend := newend;
+end;
+
+function TPointerView.byteLength: SizeUInt;
+begin
+  result := SizeUInt(pchar(dataend) - pchar(data));
 end;
 
 procedure TPointerView.init(firstelement: PElement; length: sizeint);
@@ -6220,13 +6235,21 @@ begin
 end;
 
 function TPointerView.isEqual(const other: TPointerView): boolean;
-var byteLength, otherByteLength: SizeUInt;
+var abyteLength, otherByteLength: SizeUInt;
 begin
-  byteLength := SizeUInt(pchar(dataend) - pchar(data));
+  abyteLength := SizeUInt(pchar(dataend) - pchar(data));
   otherByteLength := SizeUInt(pchar(other.dataend) - pchar(other.data));
-  result := byteLength = otherByteLength;
+  result := abyteLength = otherByteLength;
   if not result then exit;
-  result := CompareByte(PByte(data)^, pbyte(other.data)^, byteLength) = 0;
+  result := CompareByte(PByte(data)^, pbyte(other.data)^, abyteLength) = 0;
+end;
+
+function TPointerView.isEqual(const other: array of telement): boolean;
+var v: TPointerView;
+begin
+  if system.length(other) = 0 then exit(isEmpty);
+  v.init(@other[0], system.length(other));
+  result := isEqual(v);
 end;
 
 function TPointerView.isInBounds(target: PElement): boolean;
@@ -6255,6 +6278,17 @@ begin
   result := (olddata <= newdata) and (newdata <= dataend);
   if result then data := newdata
   else if newdata > dataend then data := dataend;
+end;
+
+function TPointerView.rightWithLast(alength: SizeUInt): boolean;
+var
+  abyteLength: SizeUInt;
+begin
+  if alength >= high(alength) div SizeUInt(sizeof(TElement)) then exit(false);
+  abyteLength := alength * SizeUInt(sizeof(TElement));
+  if abyteLength > self.byteLength then exit(false);
+  result := true;
+  data := dataend - aLength;
 end;
 
 
@@ -6290,6 +6324,17 @@ begin
   else if newdataend < data then dataend := data;
 end;
 
+function TPointerView.leftWithFirst(alength: SizeUInt): boolean;
+var
+  abyteLength: SizeUInt;
+begin
+  if alength >= high(alength) div SizeUInt(sizeof(TElement)) then exit(false);
+  abyteLength := alength * SizeUInt(sizeof(TElement));
+  if abyteLength > self.byteLength then exit(false);
+  result := true;
+  dataend := data + aLength;
+end;
+
 procedure TPointerView.leftOf(target: PElement);
 begin
   if target >= dataend then exit;
@@ -6314,6 +6359,20 @@ begin
       inc(result);
     inc(p);
   end;
+end;
+
+function TPointerView.joinToString(elementMap: TElementToString; const sep: string): string;
+var sb: TStrBuilder;
+  d: PElement;
+begin
+  sb.init(@result);
+  d := data;
+  while d < dataend do begin
+    if d <> data then sb.append(sep);
+    sb.append(elementMap(d^));
+    inc(d);
+  end;
+  sb.final;
 end;
 
 function TPointerView.viewLeftWith(newLast: PElement): TPointerView;

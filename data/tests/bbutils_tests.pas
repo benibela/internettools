@@ -70,7 +70,9 @@ procedure testStrBuilder; forward;
 procedure testStrEntities; forward;
 procedure testStrConversions; forward;
 procedure testVariousStuff; forward;
-procedure testBeta; forward;
+procedure testStringViews; forward;
+procedure testInt16Views; forward;
+
 
 {$IFDEF FPC}
 procedure intArrayUnitTests;
@@ -837,7 +839,8 @@ begin
   test(strCompareClever('a00b000c', 'a0b0000c'), 1);
 
   testVariousStuff;
-  testBeta;
+  testStringViews;
+  testInt16Views;
 end;
 
 procedure testStrConversions;
@@ -2170,6 +2173,12 @@ begin
     inc(i);
   end;
 
+  test(v.count('f'), 1);
+  test(v.count('o'), 2);
+  test(v.count(#0), 0);
+  test(v.count('x'), 0);
+  test(v.count('r'), 1);
+
   test(v.viewRightWith(p).ToString, 'foobar');
   test(v.viewRightOf(p).ToString, 'oobar');
   test(v.viewRightWith(p+4).ToString, 'ar');
@@ -2271,6 +2280,26 @@ begin
   test(not v.contains('b'));
   test(v.contains('o'));
   test(not v.contains(#0));
+
+  v.init(s);
+  test(not v.leftWithFirst(high(SizeUInt)));
+  test(not v.leftWithFirst(7));
+  test(v.leftWithFirst(6));
+  test(v = s);
+  test(v.leftWithFirst(5));
+  test(v = 'fooba');
+  test(v.leftWithFirst(0));
+  test(v.isEmpty);
+
+  v.init(s);
+  test(not v.rightWithLast(high(SizeUInt)));
+  test(not v.rightWithLast(7));
+  test(v.rightWithLast(6));
+  test(v = s);
+  test(v.rightWithLast(5));
+  test(v = 'oobar');
+  test(v.rightWithLast(0));
+  test(v.isEmpty);
 
   v.init(s);
   testbounds(v, p, 6);
@@ -2430,14 +2459,167 @@ begin
 
 end;
 
-{$endif}
-
-procedure testBeta;
+type TInt16View = specialize TPointerView<Int16>;
+procedure testbounds(const v: TInt16View; const ref: array of int16);
+var
+  l: Integer;
+  p: PSmallInt;
 begin
-  {$ifdef FPC_HAS_CPSTRING}
-  testStringViews;
-  {$endif}
+  l := length(ref);
+  if l = 0 then p := nil else p := @ref[0];
+  test(v.length, l);
+  test(v.isEmpty = (l = 0));
+  test(not v.isInBounds(p - 1));
+  test(v.isInBounds(p) = (l > 0) );
+  test(v.isInBounds(p + l - 1) = (l > 0) );
+  test(not v.isInBounds(p + l));
+  test(not v.isInBounds(p + l + 1));
+
+  test(not v.isOnBounds(p - 1));
+  test(v.isOnBounds(p));
+  test(v.isOnBounds(p + l - 1) = (l > 0));
+  test(v.isOnBounds(p + l));
+  test(not v.isOnBounds(p + l + 1));
 end;
+procedure testInt16Views;
+var
+  dynarray: array of Int16 = nil;
+  v: TInt16View;
+  p: pint16;
+  i: Integer;
+  e: int16;
+begin
+  setlength(dynarray, 4);
+  dynarray[0] := 7;
+  dynarray[1] := 14;
+  dynarray[2] := 20;
+  dynarray[3] := 21;
+  p := @dynarray[0];
+  v.init(dynarray);
+  testbounds(v, dynarray);
+  test(v.isEqual(dynarray[0..3]));
+  test(v.isEqual([7,14,20,21]));
+  test(v.isEqual(v));
+  i := 0;
+  for e in v do begin
+    test(e = dynarray[i]);
+    inc(i);
+  end;
+
+  for i := 0 to 5 do test(v.offset(@p[i]), i);
+
+
+  test(v.count(7), 1);
+  test(v.count(-7), 0);
+
+  test(v.viewRightWith(p).joinToString(@Int16.ToString, ':'), '7:14:20:21');
+  test(v.viewRightOf(p).joinToString(@Int16.ToString, ':'), '14:20:21');
+  test(v.viewRightWith(p+2).joinToString(@Int16.ToString, ':'), '20:21');
+  test(v.viewRightOf(p+2).joinToString(@Int16.ToString, ':'), '21');
+  test(v.viewRightWith(p+3).joinToString(@Int16.ToString, ':'), '21');
+  test(v.viewRightOf(p+3).joinToString(@Int16.ToString, ':'), '');
+  test(v.viewRightWith(p+5).joinToString(@Int16.ToString, ':'), '');
+  test(v.viewRightOf(p+5).joinToString(@Int16.ToString, ':'), '');
+
+  test(v.viewLeftWith(p-2).joinToString(@Int16.ToString, ':'), '');
+  test(v.viewLeftOf(p-2).joinToString(@Int16.ToString, ':'), '');
+  test(v.viewLeftWith(p).joinToString(@Int16.ToString, ':'), '7');
+  test(v.viewLeftOf(p).joinToString(@Int16.ToString, ':'), '');
+  test(v.viewLeftWith(p+2).joinToString(@Int16.ToString, ':'), '7:14:20');
+  test(v.viewLeftOf(p+2).joinToString(@Int16.ToString, ':'), '7:14');
+  test(v.viewLeftWith(p+3).joinToString(@Int16.ToString, ':'), '7:14:20:21');
+  test(v.viewLeftOf(p+3).joinToString(@Int16.ToString, ':'), '7:14:20');
+  test(v.viewLeftWith(p+5).joinToString(@Int16.ToString, ':'), '7:14:20:21');
+  test(v.viewLeftOf(p+5).joinToString(@Int16.ToString, ':'), '7:14:20:21');
+
+
+  test(v.rightOfFirst(1));
+  testbounds(v, p[1..3]);
+  test(v.joinToString(@Int16.ToString, ':'), '14:20:21');
+  test(v.rightOfFirst(2));
+  testbounds(v, p[3..3]);
+  test(v.joinToString(@Int16.ToString, ':'), '21');
+  test(not v.rightOfFirst(2));
+  test(v.isEmpty);
+  for e in v do test(false);
+
+  v.init(dynarray);
+  v.rightWith(@dynarray[2]);
+  testbounds(v, p[2..3]);
+  test(v.joinToString(@Int16.ToString, ':'), '20:21');
+  v.rightWith(@p[4]);
+  test(v.isEmpty);
+  v.rightWith(@p[10]);
+  test(v.isEmpty);
+
+  v.init(dynarray);
+  v.rightOf(@dynarray[2]);
+  testbounds(v, p[3..3]);
+  test(v.joinToString(@Int16.ToString, ':'), '21');
+
+  v.init(dynarray);
+  v.rightOf(@dynarray[high(dynarray)]);
+  test(v.isEmpty);
+
+
+  v.init(dynarray[0..high(dynarray)]);
+  testbounds(v, dynarray);
+  v.leftOfLast(1);
+  testbounds(v, dynarray[0..2]);
+  test(v.joinToString(@Int16.ToString, ':'), '7:14:20');
+  v.rightOfFirst(1);
+  testbounds(v, dynarray[1..2]);
+  test(v.joinToString(@Int16.ToString, ':'), '14:20');
+  v.leftWith(@dynarray[2]);
+  testbounds(v, dynarray[1..2]);
+  v.leftOf(@dynarray[2]);
+  testbounds(v, dynarray[1..1]);
+  test(v.joinToString(@Int16.ToString, ':'), '14');
+
+  v.init(dynarray[0..high(dynarray)]);
+  v.leftOfLast(3);
+  testbounds(v, dynarray[0..0]);
+
+
+  v.init(dynarray);
+  test(not v.leftWithFirst(high(SizeUInt)));
+  test(not v.leftWithFirst(7));
+  test(v.isEqual(dynarray[0..3]));
+  test(v.leftWithFirst(2));
+  test(v.isEqual(dynarray[0..1]));
+  test(v.leftWithFirst(0));
+  test(v.isEmpty);
+
+  v.init(dynarray);
+  test(not v.rightWithLast(high(SizeUInt)));
+  test(not v.rightWithLast(7));
+  test(v.isEqual(dynarray[0..3]));
+  test(v.rightWithLast(3));
+  test(v.isEqual(dynarray[1..3]));
+  test(v.rightWithLast(1));
+  test(v.isEqual(dynarray[3..3]));
+  test(v.rightWithLast(0));
+  test(v.isEmpty);
+
+  v.init(@dynarray[0], 4);
+  testbounds(v, dynarray);
+  v.leftOf(@dynarray[2]);
+  test(v.joinToString(@Int16.ToString, ':'), '7:14');
+  v.leftOf(PSmallInt(high(SizeInt)));
+  test(v.joinToString(@Int16.ToString, ':'), '7:14');
+  v.leftOf(nil);
+  test(v.isEmpty);
+
+  v.init(@dynarray[0], psmallint(@dynarray[3])+1);
+  testbounds(v, dynarray);
+  v.leftWith(@dynarray[2]);
+  test(v.joinToString(@Int16.ToString, ':'), '7:14:20');
+  v.leftWith(PSmallInt(high(SizeInt)));
+  test(v.joinToString(@Int16.ToString, ':'), '7:14:20');
+  v.leftWith(nil);
+  test(v.isEmpty);
+end;
+{$endif}
 
 end.
 
