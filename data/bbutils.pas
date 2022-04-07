@@ -29,7 +29,7 @@ exception statement from your version.
   There are different groups of functions and objects:
 
   @unorderedList(
-  @item(TPointerView, TPCharView: Stack objects to access a slice of an array or string.)
+  @item(TPointerView, TPCharView, TStringView: Stack objects to access a slice of an array or string.)
   @item(TStrBuilder: Stack object to create a string.)
   @item(Functions with prefix @code(str), which are functions to compare or manipulate strings and pchars.
 
@@ -759,7 +759,7 @@ begin
 The integer is returned in the variable number and the variable ok returns whether the parentheses exist and the conversion was successful.
 
 This is fast (zero allocations) and safe (no out-of-bound access or overflow is possible). @br
-(although you need to make sure the string is not destroyed while using the TPcharView. For truly safe operations, use the upcoming TStringView)
+(although you need to make sure the string is not destroyed while using the TPcharView. For truly safe operations, use TStringView)
 
 
 }
@@ -879,6 +879,70 @@ public
   function splitRightOfFind(out before: TPCharView; const searched: string): boolean;
 end;
 
+{**@abstract(A string view representing a subsequence of a string)
+
+See TPCharView and TPointerView for the general concept. TStringView keeps a reference to the original string, so it is fully memory safe.
+
+For example, if you have a string '(123)', and want to convert the number between the parentheses to an integer, you can do:
+
+@longCode(
+var
+  v: TStringView;
+  number: integer;
+  ok: boolean;
+begin
+  v := '(123)'.view;
+  ok := v.rightOfFind('(');
+  ok := ok and v.leftOfFind(')');
+  ok := ok and v.toIntDecimalTry(number);
+)
+
+
+}
+TStringView = object(TPcharView)
+private
+  guard: string;
+public
+  //** Creates a view for a string.
+  procedure init(const buffer: string); reintroduce;
+
+  //** copy and leftWith.
+  function viewLeftWith(newLast: pchar): TStringView; reintroduce;
+  //** copy and leftOf.
+  function viewLeftOf(newEnd: pchar): TStringView; reintroduce;
+  //** copy and rightWith.
+  function viewRightWith(newStart: pchar): TStringView; reintroduce;
+  //** copy and rightOf.
+  function viewRightOf(newStartSkip: pchar): TStringView; reintroduce;
+
+  //** Splits the view at element.
+  //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
+  function splitAt(out before: TStringView; element: PChar; out behind: TStringView): boolean;
+  //** Splits the view at element.
+  //** Everything before element is returned in self, everything behind it in behind.
+  function splitLeftOf(element: PChar; out behind: TStringView): boolean;
+  //** Splits the view at element.
+  //** Everything before element is returned in before, everything behind it in self.
+  function splitRightOf(out before: TStringView; element: PChar): boolean;
+  //** Splits the view at the first occurrence of searched.
+  //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
+  function splitAtFind(out before: TStringView; searched: pchar; searchedLength: SizeInt; out behind: TStringView): boolean;
+  //** Splits the view at the first occurrence of searched.
+  //** Everything before searched is returned in self, everything behind (searched+searchedLength) in behind.
+  function splitLeftOfFind(searched: pchar; searchedLength: SizeInt; out behind: TStringView): boolean;
+  //** Splits the view at the first occurrence of searched.
+  //** Everything before searched is returned in before, everything behind (searched+searchedLength) in self.
+  function splitRightOfFind(out before: TStringView; searched: pchar; searchedLength: SizeInt): boolean;
+  //** Splits the view at the first occurrence of searched.
+  //** Everything before searched is returned in before, everything behind (searched+searchedLength) in behind. Self is unchanged.
+  function splitAtFind(out before: TStringView; const searched: string; out behind: TStringView): boolean;
+  //** Splits the view at the first occurrence of searched.
+  //** Everything before searched is returned in self, everything behind searched in behind.
+  function splitLeftOfFind(const searched: string; out behind: TStringView): boolean;
+  //** Splits the view at the first occurrence of searched.
+  //** Everything before searched is returned in before, everything behind searched in self.
+  function splitRightOfFind(out before: TStringView; const searched: string): boolean;
+end;
 
 operator =(const cav: TPCharView; const s: string): boolean;
 operator <>(const cav: TPCharView; const s: string): boolean;
@@ -920,6 +984,12 @@ type
     function pcharViewLeftOf(newEnd: pchar): TPCharView;
     function pcharViewRightWith(newStart: pchar): TPCharView;
     function pcharViewRightOf(newStartSkip: pchar): TPCharView;
+
+    function view: TStringView;
+    function viewLeftWith(newLast: pchar): TStringView;
+    function viewLeftOf(newEnd: pchar): TStringView;
+    function viewRightWith(newStart: pchar): TStringView;
+    function viewRightOf(newStartSkip: pchar): TStringView;
 
     function toIntDecimalTry(out v: Int64): boolean;
     function toIntDecimalTry(out v: Int32): boolean;
@@ -6791,6 +6861,96 @@ end;
 
 
 
+procedure TStringView.init(const buffer: string);
+begin
+  inherited;
+  guard := buffer;
+end;
+
+function TStringView.viewLeftWith(newLast: pchar): TStringView;
+begin
+  result := self;
+  result.leftWith(newLast);
+end;
+
+function TStringView.viewLeftOf(newEnd: pchar): TStringView;
+begin
+  result := self;
+  result.leftOf(newEnd);
+end;
+
+function TStringView.viewRightWith(newStart: pchar): TStringView;
+begin
+  result := self;
+  result.rightWith(newStart);
+end;
+
+function TStringView.viewRightOf(newStartSkip: pchar): TStringView;
+begin
+  result := self;
+  result.rightOf(newStartSkip);
+end;
+
+function TStringView.splitAt(out before: TStringView; element: PChar; out behind: TStringView): boolean;
+begin
+  result := inherited splitAt(before, element, behind);
+  before.guard := guard;
+  behind.guard := guard;
+end;
+
+function TStringView.splitLeftOf(element: PChar; out behind: TStringView): boolean;
+begin
+  result := inherited splitLeftOf(element, behind);
+  behind.guard := guard;
+end;
+
+function TStringView.splitRightOf(out before: TStringView; element: PChar): boolean;
+begin
+  result := inherited splitRightOf(before, element);
+  before.guard := guard;
+end;
+
+function TStringView.splitAtFind(out before: TStringView; searched: pchar; searchedLength: SizeInt; out behind: TStringView): boolean;
+begin
+  result := inherited splitAtFind(before, searched, searchedLength, behind);
+  before.guard := guard;
+  behind.guard := guard;
+end;
+
+function TStringView.splitLeftOfFind(searched: pchar; searchedLength: SizeInt; out behind: TStringView): boolean;
+begin
+  result := inherited splitLeftOfFind(searched, searchedLength, behind);
+  behind.guard := guard;
+end;
+
+function TStringView.splitRightOfFind(out before: TStringView; searched: pchar; searchedLength: SizeInt): boolean;
+begin
+  result := inherited splitRightOfFind(before, searched, searchedLength);
+  before.guard := guard;
+end;
+
+function TStringView.splitAtFind(out before: TStringView; const searched: string; out behind: TStringView): boolean;
+begin
+  result := inherited splitAtFind(before, searched, behind);
+  before.guard := guard;
+  behind.guard := guard;
+end;
+
+function TStringView.splitLeftOfFind(const searched: string; out behind: TStringView): boolean;
+begin
+  result := inherited splitLeftOfFind(searched, behind);
+  behind.guard := guard;
+end;
+
+function TStringView.splitRightOfFind(out before: TStringView; const searched: string): boolean;
+begin
+  result := inherited splitRightOfFind(before, searched);
+  before.guard := guard;
+end;
+
+
+
+
 operator=(const cav: TPCharView; const s: string): boolean;
 begin
   result := cav.isEqual(s.pcharView);
@@ -6917,6 +7077,35 @@ end;
 function TBBStringHelper.pcharViewRightOf(newStartSkip: pchar): TPCharView;
 begin
   result := pcharView.viewRightOf(newStartSkip);
+end;
+
+function TBBStringHelper.view: TStringView;
+begin
+  result.init(self);
+end;
+
+function TBBStringHelper.viewLeftWith(newLast: pchar): TStringView;
+begin
+  result.init(self);
+  result.leftWith(newLast);
+end;
+
+function TBBStringHelper.viewLeftOf(newEnd: pchar): TStringView;
+begin
+  result.init(self);
+  result.leftOf(newEnd);
+end;
+
+function TBBStringHelper.viewRightWith(newStart: pchar): TStringView;
+begin
+  result.init(self);
+  result.rightWith(newStart);
+end;
+
+function TBBStringHelper.viewRightOf(newStartSkip: pchar): TStringView;
+begin
+  result.init(self);
+  result.rightOf(newStartSkip);
 end;
 
 function TBBStringHelper.toIntDecimalTry(out v: Int64): boolean;
