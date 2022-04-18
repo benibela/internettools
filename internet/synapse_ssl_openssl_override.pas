@@ -857,6 +857,7 @@ type
   TSslCtxSetMinProtoVersion = function(ctx: PSSL_CTX; version: integer): integer; cdecl;
   TSslCtxSetMaxProtoVersion = function(ctx: PSSL_CTX; version: integer): integer; cdecl;
   TSslMethodTLS = function:PSSL_METHOD; cdecl;
+  TSSLSetTlsextHostName = function(ctx: PSSL_CTX; name: pchar): integer; cdecl;
 
 const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS = 4;
 var _SSL_get0_param: TSSL_get0_param = nil;
@@ -865,6 +866,8 @@ var _SSL_get0_param: TSSL_get0_param = nil;
    _OpenSSL_version: TOpenSSL_version = nil;
    _SslCtxSetMinProtoVersion: TSslCtxSetMinProtoVersion = nil;
    _SslCtxSetMaxProtoVersion: TSslCtxSetMaxProtoVersion = nil;
+   _SSLsetTLSextHostName: TSSLSetTlsextHostName = nil;
+
 
    SslMethodTLSV11: TSslMethodTLS = nil;
    SslMethodTLSV12: TSslMethodTLS = nil;
@@ -885,6 +888,8 @@ begin
     _SslCtxSetMaxProtoVersion := TSslCtxSetMaxProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_CTX_set_max_proto_version'));
     if not assigned(_SslCtxSetMaxProtoVersion) then
       _SslCtxSetMaxProtoVersion := TSslCtxSetMinProtoVersion(GetProcedureAddress(SSLLibHandle, 'SSL_set_max_proto_version'));
+    if not assigned(_SSLsetTLSextHostName) then
+      _SSLsetTLSextHostName := TSSLSetTlsextHostName(GetProcedureAddress(SSLLibHandle, 'SSL_set_tlsext_host_name'));
 
     SslMethodTLSV11 := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLSv1_1_method'));
     SslMethodTLSV12 := TSslMethodTLS(GetProcedureAddress(SSLLibHandle, 'TLSv1_2_method'));
@@ -1073,7 +1078,10 @@ begin
       Exit;
     end;
     if SNIHost<>'' then
-      SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
+      if assigned(_SSLsetTLSextHostName) then
+        _SSLsetTLSextHostName(Fssl, PAnsiChar(AnsiString(SNIHost)))
+       else
+        SSLCtrl(Fssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, PAnsiChar(AnsiString(SNIHost)));
     //if  (FSocket.ConnectionTimeout <= 0) then //do blocking call of SSL_Connect {!!override!!}
     begin
       x := sslconnect(FSsl);
