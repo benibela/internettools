@@ -1274,10 +1274,10 @@ begin
 
   //test merging
   for i:=0 to 100 do //backward sorted
-    ar64[i]:=int64(1000 - i*10);
+    ar64[i]:=1000 - int64(i)*10;
   stableSort(@ar64[0],@ar64[100],sizeof(int64),@int64CompareFunction,nil);
   for i:=0 to 100 do
-    if ar64[i]<>i*10 then
+    if ar64[i]<>int64(i)*10 then
       raise exception.create('Unit Test C:'+inttostr(i)+' für stableSort  in Unit bbutils fehlgeschlagen');
 
 

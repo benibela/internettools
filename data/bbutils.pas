@@ -1234,7 +1234,7 @@ type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**@param(compareFunction a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers)).
 //**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
 //**Currently it uses a combination of quick and insert sort with a temporary buffer.
-procedure stableSort(a,b: pointer; size: SizeInt; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
+procedure stableSort(a,b: pointer; sizei: SizeInt; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
 //**general stable sort functions for arrays (modifying the array inline and returning it)
 function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TLongintArray; overload;
 function stableSort(strArray: TStringArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TStringArray; overload;
@@ -3905,6 +3905,7 @@ const
   MaxDigits32          = 10; //4294967295
   FirstInvalidDigit    = '5';
   MinWithMaxDigits     = Uint32(1000000000);
+  BASE = uint32(10);
 var
   length: SizeUInt;
   temp8: UInt64;
@@ -3926,7 +3927,7 @@ begin
       temp8 := temp8 - decimalZeros8;
       if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
       bytes := @temp8;
-      unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
+      unsigned := unsigned * uint32(100000000) + (((((((bytes[0] * BASE) + bytes[1])* BASE + bytes[2])* BASE + bytes[3])* BASE + bytes[4])* BASE + bytes[5])* BASE + bytes[6])* BASE + bytes[7];
       inc(pstart, 8);
     end;
     if pstart + 4 <= pend then begin
@@ -3935,7 +3936,7 @@ begin
       temp4 := temp4 - decimalZeros4;
       if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
       bytes := @temp4;
-      unsigned := unsigned * 10000 + ((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3]);
+      unsigned := unsigned * 10000 + ((((bytes[0] * BASE) + bytes[1])* BASE + bytes[2])* BASE + bytes[3]);
       inc(pstart, 4);
     end;
   end;
@@ -3988,9 +3989,9 @@ begin
   temp := 0;
   while pstart < pend do begin
     case pstart^ of
-       '0'..'9': temp := (temp shl 4) or (ord(pstart^) - ord('0'));
-       'A'..'F': temp := (temp shl 4) or (ord(pstart^) - ord('A')) + 10;
-       'a'..'f': temp := (temp shl 4) or (ord(pstart^) - ord('a')) + 10;
+       '0'..'9': temp := (temp shl 4) or UInt32(ord(pstart^) - ord('0'));
+       'A'..'F': temp := (temp shl 4) or UInt32(ord(pstart^) - ord('A')) + 10;
+       'a'..'f': temp := (temp shl 4) or UInt32(ord(pstart^) - ord('a')) + 10;
        else exit;
     end;
     inc(pstart);
@@ -4980,7 +4981,7 @@ begin
       e := 1;
       j := p;
       while j <= n do begin
-        totient[j] := totient[j div powers[e]] * (powers[e-1]) * (p - 1);
+        totient[j] := totient[j div powers[e]] * (powers[e-1]) * longword(p - 1);
 
         inc(j, p);
 
@@ -5681,7 +5682,7 @@ begin
     {$ifdef ALLOWYEARZERO}inc(year^);{$endif}
     //year is correct, but days are inverted
     leap := dateIsLeapYear(year^);
-    datei := datei +   DateMonthDaysCumSum[leap, 12] + 1 - 2 * (DateMonthDaysCumSum[leap,month^-1] + day^);
+    datei := datei +   DateMonthDaysCumSum[leap, 12] + 1 - 2 * int64(DateMonthDaysCumSum[leap,month^-1] + int64(day^));
     DecodeDate(datei, temp, PWord(month)^, PWord(day)^);
   end else DecodeDate(date, PWord(year)^, PWord(month)^, PWord(day)^);
                       {todo: implement own conversion?
@@ -5813,17 +5814,18 @@ begin
   {$endif}
 end;
 
-procedure stableSort(a,b: pointer; size: SizeInt;
+procedure stableSort(a,b: pointer; sizei: SizeInt;
   compareFunction: TPointerCompareFunction; compareFunctionData: TObject );
+var sizeu:SizeUInt;
   function isSorted(): boolean;
   var
     x: PAnsiChar;
   begin
-    x := PAnsiChar(a) + size;
+    x := PAnsiChar(a) + sizeu;
     while x <= PAnsiChar(b) do begin
-      if compareFunction(compareFunctionData, x - size, x) > 0 then
+      if compareFunction(compareFunctionData, x - sizeu, x) > 0 then
         exit(false);
-      x := x + size;
+      x := x + sizeu;
     end;
     result := true;
   end;
@@ -5833,49 +5835,51 @@ var tempArray: array of pointer = nil;
     tempData, c: pansichar;
 begin
   if a >= b then exit;
-  length:=(PAnsiChar(b)-PAnsiChar(a)) div size;
-  assert(@PAnsiChar(a)[length*size] = b);
+  assert(sizei > 0);
+  sizeu := SizeUInt(sizei);
+  length:=SizeUInt(PAnsiChar(b)-PAnsiChar(a)) div sizeu;
+  assert(@PAnsiChar(a)[length*sizeu] = b);
   inc(length);
 
   if compareFunction = nil then begin
     compareFunction:=@compareRawMemory; //todo: use different wrappers depending on size
-    compareFunctionData:=UIntToObj(size);
+    compareFunctionData:=UIntToObj(sizeu);
   end;
 
   if isSorted() then exit;
 
   setlength(tempArray,length);
   for i:=0 to length-1 do
-    tempArray[i]:=@PAnsiChar(a)[i*size];
+    tempArray[i]:=@PAnsiChar(a)[i*sizeu];
   QuickSort_PtrList_Context(@tempArray[0], length, compareFunction, compareFunctionData);
 
-  if size <= sizeof(pointer) then begin
+  if sizeu <= sizeof(pointer) then begin
     c := pansichar(@tempArray[0]);
-    case size of
+    case sizeu of
        8: for i:=0 to high(tempArray) do PInt64(@c[8*i])^ := PInt64(tempArray[i])^;
        4: for i:=0 to high(tempArray) do PInt32(@c[4*i])^ := PInt32(tempArray[i])^;
        2: for i:=0 to high(tempArray) do PInt16(@c[2*i])^ := PInt16(tempArray[i])^;
        1: for i:=0 to high(tempArray) do PByte(@c[  i])^  := PByte(tempArray[i])^;
        else for i:=0 to high(tempArray) do
-         move(c[i * size], PPointer(tempArray[i])^, size);
+         move(c[i * sizeu], PPointer(tempArray[i])^, sizeu);
     end;
-    move(tempArray[0], a^, size * length);
+    move(tempArray[0], a^, sizeu * length);
   end else begin
     //we now have a sorted pointer list
     //create back map (hashmap pointer => index in tempArray)
     setlength(tempBackArray,length);
     for i:=0 to length-1 do
-      tempBackArray[(pansichar(tempArray[i])-pansichar(a)) div size]:=i;
+      tempBackArray[sizeuint(pansichar(tempArray[i])-pansichar(a)) div sizeu]:=i;
     //move to every position the correct object and update pointer so they not point to garbage after every change
-    getMem(tempData, size); //temporary object
+    getMem(tempData, sizeu); //temporary object
     for i:=0 to length-1 do begin
       //swap
-      move(PAnsiChar(a)[i*size], tempData^, size);
-      move(tempArray[i]^,PAnsiChar(a)[i*size],size);
-      move(tempData^, tempArray[i]^, size);
+      move(PAnsiChar(a)[i*sizeu], tempData^, sizeu);
+      move(tempArray[i]^,PAnsiChar(a)[i*sizeu],sizeu);
+      move(tempData^, tempArray[i]^, sizeu);
       //search pointer pointing to PBYTE(a)[i*size] and set to tempArray[i]
       tempArray[tempBackArray[i]]:=tempArray[i];
-      tempBackArray[(PAnsiChar(tempArray[tempBackArray[i]])-PAnsiChar(a)) div size]:=tempBackArray[i];
+      tempBackArray[sizeuint(PAnsiChar(tempArray[tempBackArray[i]])-PAnsiChar(a)) div sizeu]:=tempBackArray[i];
     end;
 
     FreeMem(tempData);
