@@ -6377,8 +6377,14 @@ end;
 
 
 procedure TPointerView.rightOf(target: PElement);
+var
+  newdata: PElement;
 begin
-  rightWith(target + 1);
+  newdata := target + 1;
+  if isOnBounds(newdata) then
+    data := newdata
+  else if target >= dataend then
+    data := dataend;
 end;
 
 
@@ -6413,8 +6419,14 @@ begin
 end;
 
 procedure TPointerView.leftWith(target: PElement);
+var
+  newdataend: PElement;
 begin
-  leftOf(target + 1);
+  newdataend := target + 1;
+  if isOnBounds(newdataend) then
+    dataend := newdataend
+  else if target < data then
+    dataend := data;
 end;
 
 function TPointerView.count(const e: TElement): SizeUInt;
@@ -6447,7 +6459,8 @@ end;
 
 function TPointerView.viewLeftWith(newLast: PElement): TPointerView;
 begin
-  result.initEndCapped(data, newLast + 1, dataend);
+  result := self;
+  result.leftWith(newLast);
 end;
 
 function TPointerView.viewLeftOf(newEnd: PElement): TPointerView;
@@ -6462,7 +6475,8 @@ end;
 
 function TPointerView.viewRightOf(newStartSkip: PElement): TPointerView;
 begin
-  result.initStartCapped(data, newStartSkip + 1, dataend);
+  result := self;
+  result.rightOf(newStartSkip);
 end;
 
 
@@ -6775,7 +6789,8 @@ end;
 
 function TPCharView.viewLeftWith(newLast: pchar): TPCharView;
 begin
-  result.initEndCapped(data, newLast + 1, dataend);
+  result := self;
+  result.leftWith(newLast);
 end;
 
 function TPCharView.viewLeftOf(newEnd: pchar): TPCharView;
@@ -6790,7 +6805,8 @@ end;
 
 function TPCharView.viewRightOf(newStartSkip: pchar): TPCharView;
 begin
-  result.initStartCapped(data, newStartSkip + 1, dataend);
+  result := self;
+  result.rightOf(newStartSkip);
 end;
 
 function TPCharView.splitAt(out before: TPCharView; element: PChar; out behind: TPCharView): boolean;
