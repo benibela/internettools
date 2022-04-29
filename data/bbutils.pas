@@ -259,8 +259,6 @@ public
   function isInBounds(target: PElement): boolean; inline;
   //** Tests whether an element is on the view (0 <= index <= length).
   function isOnBounds(target: PElement): boolean; inline;
-  //** Index of an element.
-  function offset(target: PElement): SizeUInt; inline;
 
   //** Enumerates all elements, copying each.
   function getEnumerator: TPointerViewEnumerator; inline;
@@ -6336,10 +6334,6 @@ begin
   result := (data <= target) and (target <= dataend);
 end;
 
-function TPointerView.offset(target: PElement): SizeUInt;
-begin
-  result := target - data;
-end;
 
 
 function TPointerView.rightOfFirst(delta: SizeUInt): boolean;

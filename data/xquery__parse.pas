@@ -742,12 +742,12 @@ begin
 
     lineRange := strMapPcharRangeToLines(str, startAt, endAt);
     if lineRange.startLineIndex = lineRange.lastLineIndex then
-      result := 'in line ' + inttostr(linerange.startLineIndex) + ' column ' + inttostr(lineRange.lines.offset(startAt) + 1)
+      result := 'in line ' + inttostr(linerange.startLineIndex) + ' column ' + inttostr(startAt - lineRange.lines.data + 1)
     else
       result := 'in lines ' + inttostr(linerange.startLineIndex) + ' to ' + inttostr(linerange.lastLineIndex);
     result += LineEnding + lineRange.lines.ToString + LineEnding;
-    line := copy(lineRange.lastLine.ToString, 1, lineRange.lastLine.offset(endAt) + 1);
-    errorStart := lineRange.lastLine.offset(startAt) + 1;
+    line := copy(lineRange.lastLine.ToString, 1, endAt - lineRange.lastLine.data + 1);
+    errorStart := startAt - lineRange.lastLine.data + 1;
     for i := 1 to length(line) do
       if line[i] <> #9 then
         if i >= errorStart then line[i] := '^'
