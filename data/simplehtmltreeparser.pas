@@ -35,7 +35,6 @@ uses
 type
 //**The type of a tree element. <Open>, text, or </close>
 TTreeNodeType = (tetOpen, tetClose, tetText, tetComment, tetProcessingInstruction, tetAttribute, tetDocument,
-                 //tetInternalDoNotUseCDATAText, //tetInternalDoNotUseCDATAText is only used temporarily during parsing to mark elements in which entities should not be replaced.
                  tetNamespace); //not used here, only for XQuery
 TTreeNodeTypes = set of TTreeNodeType;
 //**Controls the search for a tree element.@br
@@ -644,6 +643,8 @@ begin
           basicAxis := tneabFollowing;
         end;
       end;
+
+      tneaDocumentRoot, tneaFunctionSpecialCase: assert(false);
     end;
 
   if start = nil then basicAxis := tneabNoAxis;
@@ -1323,7 +1324,7 @@ begin
     tetAttribute, tetNamespace: result := TTreeAttribute(self).realvalue;
     tetText, tetComment: result := value;
     tetProcessingInstruction: if attributes = nil then result := '' else result := attributes.getStringValue;
-    else{tetClose, tetInternalDoNotUseCDATAText:} begin assert(false); result := ''; end;
+    tetClose: begin assert(false); result := ''; end;
   end;
 end;
 
@@ -1401,8 +1402,9 @@ begin
   result := previous;
   if result = nil then exit;
   case result.typ of
-    tetOpen, tetDocument: result := nil;
+    tetOpen, tetDocument, tetAttribute, tetNamespace: result := nil;
     tetClose: result := result.reverse;
+    tetText, tetComment, tetProcessingInstruction: ;
   end;
 end;
 
@@ -1906,7 +1908,7 @@ begin
     end;
     tetDocument: exit( TTreeDocument(self).clone() );
     tetClose: raise ETreeParseException.Create('Cannot clone closing tag');
-    else raise ETreeParseException.Create('Unknown tag');
+    //else raise ETreeParseException.Create('Unknown tag');
   end;
   result.previous := nil;
   if result.reverse <> nil then begin
@@ -2414,6 +2416,7 @@ begin
       else if striEqual(tag, 'frameset') then FBasicParsingState:=bpmInFrameset;
     bpmInBody: if repairMissingStartTags and (striEqual(tag, 'body') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
     bpmInFrameset: if repairMissingStartTags and (striEqual(tag, 'frameset') or striEqual(tag, 'html') or striEqual(tag, 'head')) then exit; //skip
+    bpmAfterBody, bpmAfterAfterBody: ;
   end;
   FAutoCloseTag:=htmlElementIsChildless(hash, tag);
   if striEqual(tag, 'table') and (FTreeBuilder.elementStack.Count > 0) and striEqual(TTreeNode(FTreeBuilder.elementStack.Last).value, 'table') then
@@ -2516,6 +2519,7 @@ begin
         bpmAfterBody: begin
           FBasicParsingState:=bpmAfterAfterBody;
         end;
+        bpmBeforeHtml, bpmInBody, bpmInFrameset,  bpmAfterAfterBody: ;
       end;
       if tagNameLen > 0 then exit;
     end else if strliEqual(tagname, 'body', tagNameLen) then begin

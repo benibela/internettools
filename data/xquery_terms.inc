@@ -588,6 +588,7 @@ begin
         xqtjlmInteger: arrayPrepend(properties, TXQTermJSONLookup(v).integerKey.ToString);
         xqtjlmName: arrayPrepend(properties, TXQTermJSONLookup(v).propname);
         xqtjlmParenthesized: arrayPrepend(properties, TXQTermJSONLookup(v).children[1].evaluate(context).toString);
+        xqtjlmWild: {gives an exception during parsing};
       end;
       v := TXQTermJSONLookup(v).children[0];
     end else raiseEvaluationError('pxp:VAR', 'Unexpected term. Expected variable/object-property name, got '+v.debugTermToString);
@@ -2288,6 +2289,7 @@ var
         case clausekind of
           xqtfcLetPattern: log := log.condensedCollected;
           xqtfcForPattern: log := log.condensed;
+          else assert(false);
         end;
         oldLog.Free;
         if (patternClause.sequenceTyp <> nil) then
@@ -2539,7 +2541,6 @@ var i: SizeInt;
     sortingData: TFlowerSortingData;
     j: SizeInt;
     oldSortingCache: TFPList;
-    isJoinClause: Boolean;
     joinVar: SizeInt;
     k, stackSize: SizeInt;
 
@@ -2572,41 +2573,42 @@ begin
     evaluateForLoop(0);
     if needFullTuple then
     for i := 0 to high(children) - 1 do begin
-      isJoinClause := TXQTermFlowerSubClause(children[i]).kind in [xqtfcCount, xqtfcGroup];
-      if not isJoinClause then begin
-        case TXQTermFlowerSubClause(children[i]).kind of
-          xqtfcOrder: sortingData.maxOrderIndex := clauseIndex[i];
-        end;
-      end else begin
-        if (sortingData.maxOrderIndex >= sortingData.minOrderIndex) and (sortingCache.Count > 0) then begin
-          stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
-          sortingData.minOrderIndex := sortingData.maxOrderIndex + 1;
-        end;
-        joinVar := clauseIndex[i];
-        case TXQTermFlowerSubClause(children[i]).kind of
-          xqtfcCount: begin
-            for j := 0 to sortingCache.Count-1 do
-              TOrderedTuple(sortingCache[j]).vars[joinVar] := xqvalue(j+1);
+      case TXQTermFlowerSubClause(children[i]).kind of
+        xqtfcOrder: sortingData.maxOrderIndex := clauseIndex[i];
+        xqtfcCount, xqtfcGroup: begin
+          //is join clause
+          if (sortingData.maxOrderIndex >= sortingData.minOrderIndex) and (sortingCache.Count > 0) then begin
+            stableSort(ppointer(sortingCache.List^), ppointer(sortingCache.List^) + (sortingCache.Count-1) , sizeof(pointer), @flowerTupleCompareFunction, TObject(@sortingData));
+            sortingData.minOrderIndex := sortingData.maxOrderIndex + 1;
           end;
-          xqtfcGroup: begin
-            joinVar -= 1;
-            //joinVar += high(TXQTermFlowerGroup(children[i]).specs);
-            groupTuple(i);
+          joinVar := clauseIndex[i];
+          case TXQTermFlowerSubClause(children[i]).kind of
+            xqtfcCount: begin
+              for j := 0 to sortingCache.Count-1 do
+                TOrderedTuple(sortingCache[j]).vars[joinVar] := xqvalue(j+1);
+            end;
+            xqtfcGroup: begin
+              joinVar -= 1;
+              //joinVar += high(TXQTermFlowerGroup(children[i]).specs);
+              groupTuple(i);
+            end;
+            else {impossible};
           end;
+          oldSortingCache := sortingCache;
+          sortingCache := TFPList.Create;
+          for j := 0 to oldSortingCache.Count-1 do begin
+            stackSize := context.temporaryVariables.Count;
+            currentTuple.free;
+            currentTuple := TOrderedTuple(oldSortingCache[j]);
+            for k := 0 to joinVar do
+              context.temporaryVariables.push(variables[k], currentTuple.vars[k]);
+            evaluateForLoop(i+1);
+            context.temporaryVariables.popTo(stackSize);
+          end;
+          oldSortingCache.free;
         end;
-        oldSortingCache := sortingCache;
-        sortingCache := TFPList.Create;
-        for j := 0 to oldSortingCache.Count-1 do begin
-          stackSize := context.temporaryVariables.Count;
-          currentTuple.free;
-          currentTuple := TOrderedTuple(oldSortingCache[j]);
-          for k := 0 to joinVar do
-            context.temporaryVariables.push(variables[k], currentTuple.vars[k]);
-          evaluateForLoop(i+1);
-          context.temporaryVariables.popTo(stackSize);
-        end;
-        oldSortingCache.free;
-      end
+        else {??};
+      end;
     end;
     if sortingCache <> nil then begin
       sortingData.maxOrderIndex := orderCount - 1;
@@ -2700,12 +2702,10 @@ begin
     SetLength(orders, orderCount);
     orderCount := 0;
     for i := 0 to high(children) - 1 do
-      case TXQTermFlowerSubClause(children[i]).kind of
-        xqtfcOrder: begin
-          orders[orderCount] := TXQTermFlowerOrder(children[i]);
-          clauseIndex[i] := orderCount;
-          inc(orderCount);
-        end;
+      if TXQTermFlowerSubClause(children[i]).kind = xqtfcOrder then begin
+        orders[orderCount] := TXQTermFlowerOrder(children[i]);
+        clauseIndex[i] := orderCount;
+        inc(orderCount);
       end;
   end;
   if needFullTuple then begin
@@ -2731,8 +2731,7 @@ begin
             variables[varCount + j] := vars[j];
           inc(varCount, length(vars));
         end;
-        //xqtfcWhere: ;
-        //xqtfcOrder: inc(orderCount);
+        xqtfcWhere, xqtfcOrder: {see above};
         xqtfcCount: begin
           clauseIndex[i] := varCount;
           initialAddVariable(TXQTermFlowerCount(children[i]).countvar);
@@ -2742,11 +2741,9 @@ begin
   end else if countCount > 0 then begin
     countCount := 0;
     for i := 0 to high(children) - 1 do
-      case TXQTermFlowerSubClause(children[i]).kind of
-        xqtfcCount: begin
-          clauseIndex[i] := countCount;
-          inc(countCount);
-        end;
+      if TXQTermFlowerSubClause(children[i]).kind = xqtfcCount then begin
+        clauseIndex[i] := countCount;
+        inc(countCount);
       end;
   end;
 end;
@@ -4561,6 +4558,7 @@ begin
           if striEqual(tree.value, 'XML') then raiseEvaluationError('XQDY0064', '"XML" cannot be used as PI name');
           setTreeHash;
         end;
+        tetOpen, tetAttribute, tetNamespace, tetDocument {handled above}, tetClose: ;
       end;
     end;
   end;
@@ -4588,6 +4586,7 @@ begin
           raiseEvaluationError('XQDY0026', '?> in PI content');
       end;
     end;
+    else {??};
   end;
 
   result := tree;

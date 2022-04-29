@@ -1359,6 +1359,7 @@ begin
           case inputKind of
             ietHidden: if striEqual(name, '_charset_') and not node.hasAttribute('value', cmp) then result.kind := hrhfCharsetSpecial;
             ietTextOrSearch: checkForDirname();
+            ieNotAnInputElement, ietOther, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile: ;
           end;
         end;
       end;
@@ -1947,6 +1948,7 @@ begin
           end;
         end;
       hrhfCharsetSpecial: if length(formData.values) > 0 then formData.values[0] := strEncodingName(charset);
+      hrhfDefault, hrhfNoValue: ;
     end;
     if not formData.hasData then
       continue;
@@ -3070,6 +3072,7 @@ begin
   form := unicodeNormalizationForm(method);
   case form of
     unfNone, unfUnknown: raise EXQEvaluationException.Create('FOCH0003', 'Unknown normalization method: '+method);
+    else ;
   end;
   result := xqvalue(normalizeString(args[0].toString, form))
 end;
@@ -4197,6 +4200,7 @@ begin
             tempd += pv^.toDecimal;
           result := baseType.createValue(tempd);
         end;
+        else {impossible};
       end;
     end;
     pvkFloat: begin
@@ -4511,6 +4515,7 @@ begin
       tetOpen: exit(baseSchema.anyURI.createValue(node.getNamespaceURL()));
       tetAttribute: if not (node as TTreeAttribute).isNamespaceNode then
         exit(baseSchema.anyURI.createValue(node.getNamespaceURL()));
+      else ;
     end;
   result := baseSchema.anyURI.createValue('')
 end;
@@ -5192,7 +5197,7 @@ begin
   case mode of
     xqtrngmNext: result := makeRandomNumberGenerator(context, state);
     xqtrngmPermute: result := permute(context.temporaryVariables.topptr(0)^);
-    else result := nil;
+    {$IF FPC_FULLVERSION < 30300} else result := nil;{$endif}
   end;
 end;
 
@@ -6186,6 +6191,15 @@ begin
   result := xqFunctionFormat_DateTimeC(context, argc, args, false, true);
 end;
 
+//Position in picture
+//E.g.
+//abc     prefix
+//0000    integer
+//.
+//0000    fraction
+//e       exponentSeparator
+//-12     exponent
+//def     suffix
 type TXQSubPosition = (spInPrefix, spInInteger, spInFraction, spExponentSeparator, spInExponent, spInSuffix);
 
 function xqFunctionFormat_Number(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -6291,7 +6305,8 @@ begin
       checkDuplicate(xqdfpDecimalSeparator);
       case subPosition of
         spInPrefix, spInInteger: subPosition := spInFraction;
-        spInExponent, spExponentSeparator: raiseInvalidPicture;
+        spInExponent, spExponentSeparator, spInSuffix: raiseInvalidPicture;
+        spInFraction {duplicate error}: ;
       end;
     end else if c = data^.chars[xqdfpGroupingSeparator] then begin
       case subPosition of
@@ -6306,7 +6321,7 @@ begin
           if (i = 0) {<- adjacent to decimal sep} or (arrayLast(fractionGroups, -1) = i) then raiseInvalidPicture;
           arrayAdd(fractionGroups, i);
         end;
-        spInExponent, spExponentSeparator: raiseInvalidPicture;
+        spInExponent, spExponentSeparator, spInSuffix: raiseInvalidPicture;
       end;
     end {else if c = data^.chars[xqdfpMinusSign] then begin it is just a passive character
     end }else if (c = data^.chars[xqdfpPercent]) or (c = data^.chars[xqdfpPerMille]) then begin
@@ -6325,6 +6340,7 @@ begin
           inc(exponentMandatory);
           subPosition := spInExponent
         end;
+        spInSuffix: {error below};
       end;
     end else if (c = data^.chars[xqdfpDigit]) then begin//optional digit
       foundChar[xqdfpDigit]:=true;
@@ -6338,6 +6354,7 @@ begin
           inc(exponentOptional);
           subPosition := spInExponent
         end;
+        spInSuffix: {error below};
       end;
     end else if c = data^.chars[xqdfpPatternSeparator] then begin
       checkPictureFinal;
@@ -6881,6 +6898,7 @@ begin
         pvkObject, pvkFunction: errorFOTY0013(list[i].toValue);
         pvkArray: for w in list[i].GetEnumeratorArrayTransparentUnsafe do
           if w.kind in [pvkObject, pvkFunction] then errorFOTY0013(w);
+        pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkNull: ;
       end;
     list.sort(@compareDirect, TObject(@sortContext));
   end else begin
@@ -7719,7 +7737,7 @@ begin
   case argv[0].getPropertyKeyKind of
     xqmpkkStringKeys: result := removeFromStringMap;
     xqmpkkStandardKeys: result := removeFromStandardMap;
-    else result := nil;
+    {$IF FPC_FULLVERSION < 30300} else result := nil; {$endif}
   end;
 end;
 
@@ -7872,6 +7890,7 @@ begin
       xqpmXPath3_0: context.staticContext.model := xqpmXQuery3_0;
       xqpmXPath3_1: context.staticContext.model := xqpmXQuery3_1;
       xqpmXPath4_0: context.staticContext.model := xqpmXQuery4_0;
+      xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1, xqpmXQuery4_0: ;
     end;
   try
     try
@@ -8244,6 +8263,7 @@ begin
         end;
         exit(true);
       end;
+    else ;
   end;
   result := false;
 end;
@@ -8285,7 +8305,7 @@ var currentStringEscaped: boolean;
         tetClose: exit;
         tetOpen: raiseInvalidXML();
         tetText: if forbidText and (trim(n.value) <> '') then raiseInvalidXML();
-        tetComment, tetProcessingInstruction: ;
+        tetComment, tetProcessingInstruction, tetAttribute, tetNamespace, tetDocument: ;
       end;
       n := n.next;
     end;
@@ -8411,6 +8431,7 @@ begin
               end;
             end;
           end;
+          else {??};
         end;
         if n = nlast then break;
         n := n.next;

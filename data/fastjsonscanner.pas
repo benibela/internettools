@@ -428,6 +428,7 @@ begin
       tkCurlyBraceClose: dec(nesting);
       tkSquaredBraceOpen: inc(nesting);
       tkSquaredBraceClose: dec(nesting);
+      else ;
     end;
   until nesting <= 0;
 end;

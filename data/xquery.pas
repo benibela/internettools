@@ -6359,6 +6359,7 @@ begin
       xqmdrCombine: raiseInvalidParam('FOJS0005');
       xqmdrRetain: if not forJSONToXML then raiseInvalidParam('FOJS0005');
       xqmdrUseLast: if forJSONToXML then raiseInvalidParam('FOJS0005');
+      xqmdrReject, xqmdrUseFirst: ;
     end;
   end;
   if map.hasProperty('escape', @vo) then begin
@@ -9304,6 +9305,7 @@ begin
                   jsoniqDescendants(n^.toValue, command.value);
                 tneaSameNode:
                   newList.add(n^);
+                else {gives exception above};
               end;
 
             end;

@@ -237,6 +237,7 @@ var
             'false': exit(false);
             'true': exit(true);
           end;
+      else ;
     end;
 
     result := false;
@@ -377,6 +378,7 @@ begin
   normalizationForm := unicodeNormalizationForm(s);
   case normalizationForm of
     unfEmpty, unfUnknown: raise EXQEvaluationException.Create('SESU0011', 'Unknown normalization method: '+s);
+    else {ok};
   end;
 end;
 

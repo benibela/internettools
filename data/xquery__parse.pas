@@ -1276,6 +1276,7 @@ procedure TXQParsingContext.parseKindTest(const word: string; var kindTest: TXQP
   begin
     temp := nextTokenEQName(namespaceUrl, namespacePrefix, local);
     case temp of
+      xqnmNone: ;
       xqnmPrefix: begin
         kindTest.namespaceURLOrPrefix := namespacePrefix;
         kindTest.matching += [qmCheckNamespacePrefix];
@@ -4947,24 +4948,6 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
 
-  procedure visitFlower(f: TXQTermFlower);
-  var
-    i: SizeInt;
-  begin
-    for i := 0 to high(f.children) - 1 do
-      case TXQTermFlowerSubClause(f.children[i]).kind of
-        xqtfcLet: ;
-        xqtfcFor: ;
-        xqtfcWindow: ;
-        xqtfcForPattern, xqtfcLetPattern: ;
-        xqtfcWhere: ;
-        xqtfcOrder: ;
-        xqtfcCount: ;
-        xqtfcGroup: ;
-      end;
-  end;
-
-
   procedure visitConstructor(c: TXQTermConstructor);
   begin
     if (c.implicitNamespaces <> nil) then begin
@@ -4996,7 +4979,6 @@ begin
       else if tempClass = TXQTermNamedFunction then t^ := visitNamedFunction(TXQTermNamedFunction(t^))
       else if tempClass = TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(t^))
       else if tempClass = TXQTermBinaryOp then t^ := visitBinaryOp(TXQTermBinaryOp(t^))
-      else if tempClass = TXQTermFlower then visitFlower(TXQTermFlower(t^))
       else if tempClass = TXQTermNodeMatcher then visitNodeMatcher(TXQTermNodeMatcher(t^))
       else if tempClass = TXQTermConstructor then visitConstructor(TXQTermConstructor(t^))
       else if tempClass = TXQTermDefineVariable then visitDefineVariable(TXQTermDefineVariable(t^))
