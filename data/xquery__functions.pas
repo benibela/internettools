@@ -7526,6 +7526,7 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
               tempseq.add(pprop.Value);
               resobj.setMutable(pprop.key, tempseq);
             end;
+            xqmdrRetain, xqmdrUseAny: assert(false);
           end;
         end else resobj.setMutable(pprop.key, pprop.Value);
       end;
@@ -7554,6 +7555,7 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
               tempseq.add(pprop.Value);
               resmap.setMutable(pprop.key, tempseq);
             end;
+            xqmdrRetain, xqmdrUseAny: assert(false);
           end;
         end else resmap.setMutable(pprop.key, pprop.Value);
       end;
@@ -7567,7 +7569,7 @@ var
 begin
   if argc >= 2 then begin
     if argv[1].hasProperty('duplicates', @value) then
-      duplicates.setFromString(value.toString);
+      duplicates.setFromString(value.toString, [xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine, xqmdrUseAny]);
   end;
   if argv[0].getSequenceCount = 1 then exit(argv[0]);
 

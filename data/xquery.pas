@@ -403,9 +403,10 @@ type
   end;
 
   type
-    TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine, xqmdrRetain);
+    TXQMapDuplicateResolve = (xqmdrReject, xqmdrUseFirst, xqmdrUseLast, xqmdrCombine, xqmdrRetain, xqmdrUseAny);
+    TXQMapDuplicateResolveSet = set of TXQMapDuplicateResolve;
     TXQMapDuplicateResolveHelper = type helper for TXQMapDuplicateResolve
-      procedure setFromString(const s: string);
+      procedure setFromString(const s: string; allowed: TXQMapDuplicateResolveSet);
     end;
 
     PXQBatchFunctionCall = ^TXQBatchFunctionCall;
@@ -6111,16 +6112,19 @@ begin
 end;
 
 
-procedure TXQMapDuplicateResolveHelper.setFromString(const s: string);
+procedure TXQMapDuplicateResolveHelper.setFromString(const s: string; allowed: TXQMapDuplicateResolveSet);
 begin
   case s of
     'reject': self := xqmdrReject;
-    'use-any', 'use-first': self := xqmdrUseFirst;
+    'use-any': self := xqmdrUseAny;
+    'use-first': self := xqmdrUseFirst;
     'use-last': self := xqmdrUseLast;
     'combine': self := xqmdrCombine;
     'retain': self := xqmdrRetain;
     else raise EXQEvaluationException.create('FOJS0005', 'Invalid duplicates option: ' + s, nil, nil);
   end;
+  if not (self in allowed) then raise EXQEvaluationException.create('FOJS0005', 'Duplicates option cannot be used here: ' + s , nil, nil);
+  if self = xqmdrUseAny then self := xqmdrUseFirst;
 end;
 
 procedure TXQJsonParser.appendEscapedString(var sb: TStrBuilder; p: pchar; l: integer);
@@ -6354,13 +6358,8 @@ begin
   end;
   if map.hasProperty('duplicates', @vo) then begin
     checkType(vo, baseSchema.string_);
-    duplicateResolve.setFromString(vo.toString);
-    case duplicateResolve of
-      xqmdrCombine: raiseInvalidParam('FOJS0005');
-      xqmdrRetain: if not forJSONToXML then raiseInvalidParam('FOJS0005');
-      xqmdrUseLast: if forJSONToXML then raiseInvalidParam('FOJS0005');
-      xqmdrReject, xqmdrUseFirst: ;
-    end;
+    if not forJSONToXML then duplicateResolve.setFromString(vo.toString, [xqmdrReject, xqmdrUseFirst, xqmdrUseLast])
+    else duplicateResolve.setFromString(vo.toString, [xqmdrReject, xqmdrUseFirst, xqmdrRetain]);
   end;
   if map.hasProperty('escape', @vo) then begin
     checkType(vo, baseSchema.boolean);
