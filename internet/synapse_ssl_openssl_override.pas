@@ -117,6 +117,7 @@ type
     FOldVerifyCert: boolean;
     function customCertificateHandling: boolean; virtual;
     function customQuickClientPrepare: boolean; virtual;
+    procedure customNormalizeSNIHost;
     procedure setCustomError(msg: string; id: integer = -3);
   public
     CAFile, CAPath, outErrorMessage: string;
@@ -954,6 +955,12 @@ begin
   end;
 end;
 
+procedure TSSLOpenSSLOverride.customNormalizeSNIHost;
+begin
+  while FSNIHost.EndsWith('.') do delete(FSNIHost, FSNIHost.Length, 1);
+  FSNIHost := LowerCase(FSNIHost);
+end;
+
 procedure TSSLOpenSSLOverride.setCustomError(msg: string; id: integer);
 begin
   outErrorCode := id;
@@ -1064,6 +1071,7 @@ begin
   if FSocket.Socket = INVALID_SOCKET then
     Exit;
   FServer := False;
+  customNormalizeSNIHost;
   if customQuickClientPrepare() {!!override!!} then
   begin
     if not customCertificateHandling {!!override!!}  then
