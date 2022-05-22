@@ -150,6 +150,7 @@ end;
 
 
 procedure TW32InternetAccess.doTransferUnchecked(var transfer: TTransfer);
+const tempBufferSize: cardinal = 64*1024;
 const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtml+xml', 'application/xml', 'text/*', '*/*', ''); //just as default. it will be overriden
 
     procedure newConnection;
@@ -190,7 +191,7 @@ const defaultAccept: array[1..6] of ansistring = ('text/html', 'application/xhtm
     end;
 
 var
-  databuffer : array[0..4095] of char;
+  tempbuffer : array of byte = nil;
   hfile: hInternet;
   dwindex,dwcodelen,dwRead,dwNumber,temp: cardinal;
   dwcode : array[1..20] of char;
@@ -252,6 +253,8 @@ begin
     exit;
   end;
 
+  SetLength(tempbuffer, tempBufferSize + { additional bytes to protect against overflows (probably have no effect at all)} 8 );
+
   dwIndex  := 0;
   dwCodeLen := 10;
   if not HttpQueryInfoA(hfile, HTTP_QUERY_STATUS_CODE, @dwcode, @dwcodeLen, @dwIndex) then
@@ -261,7 +264,7 @@ begin
   transfer.HTTPResultCode := StrToIntDef(res, -4);
   transfer.receivedHTTPHeaders.Clear;
   dwNumber := 0;
-  if not HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @databuffer, @i, nil) then
+  if not HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @tempbuffer[0], @i, nil) then
     if (GetLastError = ERROR_INSUFFICIENT_BUFFER) and (i > 0) then begin
       setlength(headerOut, i+1);
       HttpQueryInfoA(hfile, HTTP_QUERY_RAW_HEADERS_CRLF, @headerOut[1], @i, nil);
@@ -272,10 +275,10 @@ begin
     dwRead:=0;
     SetLastError(0);
     while true do begin
-      if InternetReadfile(hfile,@databuffer,sizeof(databuffer)-1,@DwRead) then begin
+      if InternetReadfile(hfile,@tempbuffer[0], tempBufferSize,@DwRead) then begin
         if dwRead = 0 then
           break; //this is end-of-file condition according to MSDN (InternetReadFile must return true)
-        transfer.writeBlock(databuffer[0], dwRead);
+        transfer.writeBlock(tempbuffer[0], dwRead);
       end else if InternetQueryDataAvailable(hfile, @dwRead, 0, 0) then begin
         if dwRead = 0 then //the above condition never occurs (at least on WINE). So explicitly check for more data. (this is supposed to prevent problems with chunked transfers)
           break;
