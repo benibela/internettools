@@ -2461,18 +2461,18 @@ begin
   sva:=''.view.splitFindToArray(',');
   test(length(sva), 1);
   test(sva[0].isEmpty);
-  sva:=''.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  sva:=''.view.splitFindToArray(',', soExcludeEmpty);
   test(length(sva), 0);
-  sva:=''.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  sva:=''.view.splitFindToArray(',', soExcludeLastEmpty);
   test(length(sva), 0);
 
   sva:='hallo'.view.splitFindToArray(',');
   test(length(sva), 1);
   test(sva[0] = 'hallo');
-  sva:='hallo'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  sva:='hallo'.view.splitFindToArray(',', soExcludeEmpty);
   test(length(sva), 1);
   test(sva[0] = 'hallo');
-  sva:='hallo'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  sva:='hallo'.view.splitFindToArray(',', soExcludeLastEmpty);
   test(length(sva), 1);
   test(sva[0] = 'hallo');
 
@@ -2480,10 +2480,10 @@ begin
   test(length(sva), 2);
   test(sva[0] = 'hallo');
   test(sva[1].isEmpty);
-  sva:='hallo,'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  sva:='hallo,'.view.splitFindToArray(',', soExcludeEmpty);
   test(length(sva), 1);
   test(sva[0] = 'hallo');
-  sva:='hallo,'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  sva:='hallo,'.view.splitFindToArray(',', soExcludeLastEmpty);
   test(length(sva), 1);
   test(sva[0] = 'hallo');
 
@@ -2491,11 +2491,11 @@ begin
   test(length(sva), 2);
   test(sva[0] = 'hallo');
   test(sva[1] = 'welt');
-  sva:='hallo,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  sva:='hallo,welt'.view.splitFindToArray(',', soExcludeEmpty);
   test(length(sva), 2);
   test(sva[0] = 'hallo');
   test(sva[1] = 'welt');
-  sva:='hallo,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  sva:='hallo,welt'.view.splitFindToArray(',', soExcludeLastEmpty);
   test(length(sva), 2);
   test(sva[0] = 'hallo');
   test(sva[1] = 'welt');
@@ -2506,11 +2506,11 @@ begin
   test(sva[1] = 'hallo');
   test(sva[2].isEmpty);
   test(sva[3] = 'welt');
-  sva:=',hallo,,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  sva:=',hallo,,welt'.view.splitFindToArray(',', soExcludeEmpty);
   test(length(sva) = 2);
   test(sva[0] = 'hallo');
   test(sva[1] = 'welt');
-  sva:=',hallo,,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  sva:=',hallo,,welt'.view.splitFindToArray(',', soExcludeLastEmpty);
   test(length(sva), 4);
   test(sva[0].isEmpty);
   test(sva[1] = 'hallo');
@@ -2524,11 +2524,11 @@ begin
   test(sva[2].isEmpty);
   test(sva[3] = 'welt');
   test(sva[4].isEmpty);
-  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0, TStringSplitOptions.ExcludeEmpty);
+  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0, soExcludeEmpty);
   test(length(sva) = 2);
   test(sva[0] = 'hallo');
   test(sva[1] = 'welt');
-  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0, TStringSplitOptions.ExcludeLastEmpty);
+  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0, soExcludeLastEmpty);
   test(length(sva), 4);
   test(sva[0].isEmpty);
   test(sva[1] = 'hallo');

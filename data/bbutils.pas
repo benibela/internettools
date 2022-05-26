@@ -877,6 +877,7 @@ public
   function splitRightOfFind(out before: TPCharView; const searched: string): boolean;
 end;
 
+
 {**@abstract(A string view representing a subsequence of a string)
 
 See TPCharView and TPointerView for the general concept. TStringView keeps a reference to the original string, so it is fully memory safe.
@@ -942,7 +943,8 @@ public
   //** Everything before searched is returned in before, everything behind searched in self.
   function splitRightOfFind(out before: TStringView; const searched: string): boolean;
 
-  function splitFindToArray(const c: char; options: TStringSplitOptions = TStringSplitOptions.None): TStringViewArray;
+  type TSplitOptions = (soNone, soExcludeEmpty, soExcludeLastEmpty);
+  function splitFindToArray(const c: char; options: TSplitOptions = soNone): TStringViewArray;
 end;
 TStringViewArray = TStringView.TStringViewArray;
 
@@ -6968,7 +6970,7 @@ end;
 
 type TStringViewArrayList = specialize TRecordArrayList<TStringView>;
 
-function TStringView.splitFindToArray(const c: char; options: TStringSplitOptions): TStringViewArray;
+function TStringView.splitFindToArray(const c: char; options: TSplitOptions): TStringViewArray;
 var temp, leftSide: TStringView;
     resList: TStringViewArrayList;
 
@@ -6976,10 +6978,10 @@ begin
   temp := self;
   resList.init;
   while temp.splitRightOfFind(leftSide, c) do begin
-    if (not leftSide.isEmpty) or (options <> TStringSplitOptions.ExcludeEmpty) then
+    if (not leftSide.isEmpty) or (options <> soExcludeEmpty) then
       resList.add(leftSide);
   end;
-  if (not temp.isEmpty) or ((options <> TStringSplitOptions.ExcludeEmpty) and (options <> TStringSplitOptions.ExcludeLastEmpty)) then
+  if (not temp.isEmpty) or ((options <> soExcludeEmpty) and (options <> soExcludeLastEmpty)) then
     resList.add(temp);
   result := resList.toSharedArray;
 end;
