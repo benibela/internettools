@@ -290,13 +290,16 @@ begin
                  if textEvent(marker,pos-marker, [tfCDATA]) = prStop then exit;
                pos += 3;
              end else begin
-              marker := pos;
-              if (pos^ = '-') and ((pos+1)^ = '-') then marker+=2; //don't pass -- at begin, but also pass <![endif]--> as comment
-              while (pos<=htmlEnd) and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>')) do
-                inc(pos);
-              if assigned(commentEvent) and (commentEvent(marker, pos-marker) = prStop) then
-                exit;
-              inc(pos,3);
+               marker := pos;
+               if (pos^ = '-') and ((pos+1)^ = '-') then begin
+                 marker+=2;
+                 while (pos<=htmlEnd) and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>')) do
+                   inc(pos);
+               end;
+               if assigned(commentEvent) and (commentEvent(marker, pos-marker) = prStop) then
+                 exit;
+               while (pos <= htmlEnd) and (pos^ <> '>') do inc(pos);
+               inc(pos);
              end;
              marker:=pos;
           end;

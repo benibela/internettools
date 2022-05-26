@@ -132,6 +132,9 @@ begin
 
   t('<html><svg xmlns="http://www.w3.org/2000/svg"></svg><script>"a < b"</script></html>', '<html><svg xmlns="http://www.w3.org/2000/svg"/><script>&quot;a &lt; b&quot;</script></html>');
 
+  t('<html><![if !supportLineBreakNewLine]>xyz<![endif]><b>x</html>', '<html>xyz<b>x</b></html>');
+  t('<html><![if !supportLineBreakNewLine]>xyz<![endif]><b>x<!--uvw--></html>', '<html>xyz<b>x<!--uvw--></b></html>');
+
 
   tp.repairMissingStartTags := true;
   tp.repairMissingEndTags := true;
