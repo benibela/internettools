@@ -898,6 +898,7 @@ begin
 
 }
 TStringView = object(TPcharView)
+  type TStringViewArray = array of TStringView;
 private
   guard: string;
 public
@@ -940,7 +941,10 @@ public
   //** Splits the view at the first occurrence of searched.
   //** Everything before searched is returned in before, everything behind searched in self.
   function splitRightOfFind(out before: TStringView; const searched: string): boolean;
+
+  function splitFindToArray(const c: char; options: TStringSplitOptions = TStringSplitOptions.None): TStringViewArray;
 end;
+TStringViewArray = TStringView.TStringViewArray;
 
 operator =(const cav: TPCharView; const s: string): boolean;
 operator <>(const cav: TPCharView; const s: string): boolean;
@@ -6960,6 +6964,24 @@ function TStringView.splitRightOfFind(out before: TStringView; const searched: s
 begin
   result := inherited splitRightOfFind(before, searched);
   before.guard := guard;
+end;
+
+type TStringViewArrayList = specialize TRecordArrayList<TStringView>;
+
+function TStringView.splitFindToArray(const c: char; options: TStringSplitOptions): TStringViewArray;
+var temp, leftSide: TStringView;
+    resList: TStringViewArrayList;
+
+begin
+  temp := self;
+  resList.init;
+  while temp.splitRightOfFind(leftSide, c) do begin
+    if (not leftSide.isEmpty) or (options <> TStringSplitOptions.ExcludeEmpty) then
+      resList.add(leftSide);
+  end;
+  if (not temp.isEmpty) or ((options <> TStringSplitOptions.ExcludeEmpty) and (options <> TStringSplitOptions.ExcludeLastEmpty)) then
+    resList.add(temp);
+  result := resList.toSharedArray;
 end;
 
 

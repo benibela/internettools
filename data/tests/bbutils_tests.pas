@@ -2146,6 +2146,7 @@ var
   p: PChar;
   i: Integer;
   c: char;
+  sva: TStringView.TStringViewArray;
 begin
   s := 'foobar'; p := pchar(s);
   v.init(s);
@@ -2456,6 +2457,83 @@ begin
   test(not v.splitrightOfFind(w, '=x'));
   test(v = s);
   test(w = '');
+
+  sva:=''.view.splitFindToArray(',');
+  test(length(sva), 1);
+  test(sva[0].isEmpty);
+  sva:=''.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  test(length(sva), 0);
+  sva:=''.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  test(length(sva), 0);
+
+  sva:='hallo'.view.splitFindToArray(',');
+  test(length(sva), 1);
+  test(sva[0] = 'hallo');
+  sva:='hallo'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  test(length(sva), 1);
+  test(sva[0] = 'hallo');
+  sva:='hallo'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  test(length(sva), 1);
+  test(sva[0] = 'hallo');
+
+  sva:='hallo,'.view.splitFindToArray(',');
+  test(length(sva), 2);
+  test(sva[0] = 'hallo');
+  test(sva[1].isEmpty);
+  sva:='hallo,'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  test(length(sva), 1);
+  test(sva[0] = 'hallo');
+  sva:='hallo,'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  test(length(sva), 1);
+  test(sva[0] = 'hallo');
+
+  sva:='hallo,welt'.view.splitFindToArray(',');
+  test(length(sva), 2);
+  test(sva[0] = 'hallo');
+  test(sva[1] = 'welt');
+  sva:='hallo,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  test(length(sva), 2);
+  test(sva[0] = 'hallo');
+  test(sva[1] = 'welt');
+  sva:='hallo,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  test(length(sva), 2);
+  test(sva[0] = 'hallo');
+  test(sva[1] = 'welt');
+
+  sva:=',hallo,,welt'.view.splitFindToArray(',');
+  test(length(sva), 4);
+  test(sva[0].isEmpty);
+  test(sva[1] = 'hallo');
+  test(sva[2].isEmpty);
+  test(sva[3] = 'welt');
+  sva:=',hallo,,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeEmpty);
+  test(length(sva) = 2);
+  test(sva[0] = 'hallo');
+  test(sva[1] = 'welt');
+  sva:=',hallo,,welt'.view.splitFindToArray(',', TStringSplitOptions.ExcludeLastEmpty);
+  test(length(sva), 4);
+  test(sva[0].isEmpty);
+  test(sva[1] = 'hallo');
+  test(sva[2].isEmpty);
+  test(sva[3] = 'welt');
+
+  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0);
+  test(length(sva), 5);
+  test(sva[0].isEmpty);
+  test(sva[1] = 'hallo');
+  test(sva[2].isEmpty);
+  test(sva[3] = 'welt');
+  test(sva[4].isEmpty);
+  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0, TStringSplitOptions.ExcludeEmpty);
+  test(length(sva) = 2);
+  test(sva[0] = 'hallo');
+  test(sva[1] = 'welt');
+  sva:=#0'hallo'#0#0'welt'#0.view.splitFindToArray(#0, TStringSplitOptions.ExcludeLastEmpty);
+  test(length(sva), 4);
+  test(sva[0].isEmpty);
+  test(sva[1] = 'hallo');
+  test(sva[2].isEmpty);
+  test(sva[3] = 'welt');
 
 end;
 
