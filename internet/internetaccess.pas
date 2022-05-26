@@ -824,23 +824,55 @@ end;
 
 { TInternetConfig }
 
+type TProxyOptionKind = (pkHTTPorHTTPS, pkHTTP, pkHTTPS, pkSocks);
 procedure TInternetConfig.setProxy(proxy: string);
+var
+  url: TDecodedUrl;
+  view, v, viewKind: TStringView;
+  kind: TProxyOptionKind;
 begin
-  proxy:=trim(proxy);;
-  if proxy='' then begin
+  view := proxy.view;
+  view.trim();
+  if view.IsEmpty then begin
     useProxy:=false;
     exit;
   end;
-  with decodeURL(proxy) do begin
-    proxyHTTPName := host;
-    proxyHTTPSName := host;
-    if port = '' then port := '8080';
-    proxyHTTPPort := port;
-    proxyHTTPSPort := port;
-    proxyUsername:=strUnescapeHex(username, '%');
-    proxyPassword:=strUnescapeHex(password, '%');
+  proxyUsername:='';
+  proxyPassword:='';
+  for v in view.splitFindToArray(' ') do begin
+    kind := pkHTTPorHTTPS;
+    if v.splitRightOfFind(viewKind, '=') then begin
+      if viewKind = 'socks' then kind := pkSocks
+      else if viewKind = 'http' then kind := pkHTTP
+      else if viewKind = 'https' then kind := pkHTTPS;
+    end;
+    url := decodeURL(v.ToString);
+    with url do begin
+      if ( (username <> '') or (password <> '') ) and (proxyUsername = '') and (proxyPassword = '') then begin
+        proxyUsername:=strUnescapeHex(username, '%');
+        proxyPassword:=strUnescapeHex(password, '%');
+      end;
+      if kind in [pkHTTP, pkHTTPS, pkHTTPorHTTPS] then begin
+        if port = '' then port := '8080';
+        if kind in [pkHTTP, pkHTTPorHTTPS] then begin
+          proxyHTTPName := host;
+          proxyHTTPPort := port;
+        end;
+        if kind in [pkHTTPS, pkHTTPorHTTPS] then begin
+          proxyHTTPSName := host;
+          proxyHTTPSPort := port;
+        end;
+      end;
+      if kind = pkSocks then begin
+        proxySOCKSName := host;
+        proxySOCKSPort := port;
+      end;
+    end;
   end;
   useProxy:=true;
+{  writeln('h:' ,proxyHTTPName,' ',proxyHTTPPort);
+  writeln('t:' ,proxyHTTPSName,' ',proxyHTTPSPort);
+  writeln('s:' ,proxySocksName,' ',proxySocksPort);}
 end;
 
 procedure TInternetConfig.searchCertificates;
