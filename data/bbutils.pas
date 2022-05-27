@@ -944,7 +944,7 @@ public
   function splitRightOfFind(out before: TStringView; const searched: string): boolean;
 
   type TSplitOptions = (soNone, soExcludeEmpty, soExcludeLastEmpty);
-  function splitFindToArray(const c: char; options: TSplitOptions = soNone): TStringViewArray;
+  function splitFindToArray(const sep: string; options: TSplitOptions = soNone): TStringViewArray;
 end;
 TStringViewArray = TStringView.TStringViewArray;
 
@@ -6970,21 +6970,26 @@ end;
 
 type TStringViewArrayList = specialize TRecordArrayList<TStringView>;
 
-function TStringView.splitFindToArray(const c: char; options: TSplitOptions): TStringViewArray;
-var temp, leftSide: TStringView;
+function TStringView.splitFindToArray(const sep: string; options: TSplitOptions): TStringViewArray;
+var temp: TPcharView;
+    leftSide: TStringView;
     resList: TStringViewArrayList;
-
 begin
   temp := self;
   resList.init;
-  while temp.splitRightOfFind(leftSide, c) do begin
+  leftSide := self;
+  while temp.splitRightOfFind(leftSide, sep) do begin
     if (not leftSide.isEmpty) or (options <> soExcludeEmpty) then
       resList.add(leftSide);
   end;
-  if (not temp.isEmpty) or ((options <> soExcludeEmpty) and (options <> soExcludeLastEmpty)) then
-    resList.add(temp);
+  if (not temp.isEmpty) or ((options <> soExcludeEmpty) and (options <> soExcludeLastEmpty)) then begin
+    leftSide := self;
+    leftSide.rightWith(temp.data);
+    resList.add(leftSide);
+  end;
   result := resList.toSharedArray;
 end;
+
 
 
 
