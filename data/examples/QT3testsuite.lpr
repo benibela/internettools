@@ -1236,8 +1236,11 @@ begin
         else accepted := [xqpmXPath4_0, xqpmXQuery4_0]
       end;
     end;
-    if lang = 'Q' then accepted := accepted * PARSING_MODEL_XQUERY
-    else if lang = 'P' then accepted := accepted * (PARSING_MODEL_XPATHXQUERY - PARSING_MODEL_XQUERY);
+    case lang of
+      'Q': accepted := accepted * PARSING_MODEL_XQUERY;
+      'P': accepted := accepted * (PARSING_MODEL_XPATHXQUERY - PARSING_MODEL_XQUERY);
+      'T': accepted := accepted - [xqpmXPath3_0, xqpmXQuery3_0];
+    end;
     if config.version in accepted then exit(true);
   end;
   result := false
