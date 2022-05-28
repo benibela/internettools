@@ -579,16 +579,17 @@ function strDecodeUTF8Character(var currentpos: pchar; afterlast: PChar): intege
 function strEncodingFromBOMRemove(var str:RawByteString):TSystemCodePage; //**< Gets the encoding from an unicode bom and removes it
 {$ifdef HAS_CPSTRING}function strEncodingFromBOMRemove(var str:string):TSystemCodePage; inline;{$endif}
 
+type ShortStringForCaseConversion = String[7]; //this has size 8
 //** This function converts codePoint to the corresponding uppercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
 //** It cannot be used to convert a character to uppercase, as SpecialCasing.txt is not a map from normal characters to their uppercase variants.
 //** It is a collection of special characters that do not have an ordinary uppercase variant and are converted to something else. (e.g. ß -> SS) @br
 //** The function signature is preliminary and likely to change.
-function strUpperCaseSpecialUTF8(codePoint: integer): string;
+function strUpperCaseSpecialUTF8(codePoint: integer; out converted: ShortStringForCaseConversion): boolean;
 //** This function converts codePoint to the corresponding lowercase codepoint according to the unconditional cases of SpecialCasing.txt of Unicode 8. @br
 //** It cannot be used to convert a character to lowercase, as SpecialCasing.txt is not a map from normal characters to their lowercase variants.
 //** It is a collection of special characters that do not have an ordinary lowercase variant and are converted to something else. @br
 //** The function signature is preliminary and likely to change.
-function strLowerCaseSpecialUTF8(codePoint: integer): string;
+function strLowerCaseSpecialUTF8(codePoint: integer; out converted: ShortStringForCaseConversion): boolean;
 
 //** Converts a pchar buffer to an unsigned integer. Returns true iff the pchar matches [0-9]+ and does not overflow
 function strDecimalToUIntTry(pstart, pend: pchar; out unsignedResult: UInt64): boolean;
@@ -3688,7 +3689,7 @@ begin
 end;
 
 {$endif}
-function strUpperCaseSpecialUTF8(codePoint: integer): string;
+function strUpperCaseSpecialUTF8(codePoint: integer; out converted: ShortStringForCaseConversion): boolean;
 const block: array[0..465] of byte = ( $53, $53, $46, $46, $46, $49, $46, $4C, $46, $46, $49, $46, $46, $4C, $53, $54, $53, $54, $D4, $B5, $D5, $92, $D5, $84, $D5, $86, $D5, $84, $D4, $B5, $D5, $84, $D4, $BB, $D5, $8E, $D5, $86, $D5, $84, $D4, $BD, $CA, $BC, $4E, $CE, $99, $CC, $88, $CC, $81, $CE, $A5, $CC, $88, $CC, $81, $4A, $CC, $8C, $48, $CC, $B1, $54, $CC, $88,
 $57, $CC, $8A, $59, $CC, $8A, $41, $CA, $BE, $CE, $A5, $CC, $93, $CE, $A5, $CC, $93, $CC, $80, $CE, $A5, $CC, $93, $CC, $81, $CE, $A5, $CC, $93, $CD, $82, $CE, $91, $CD, $82, $CE, $97, $CD, $82, $CE, $99, $CC, $88, $CC, $80, $CE, $99, $CC, $88, $CC, $81, $CE, $99, $CD, $82, $CE, $99, $CC, $88, $CD, $82, $CE, $A5, $CC, $88, $CC, $80, $CE, $A5, $CC, $88, $CC, $81, $CE,
 $A1, $CC, $93, $CE, $A5, $CD, $82, $CE, $A5, $CC, $88, $CD, $82, $CE, $A9, $CD, $82, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC, $8B, $CE, $99, $E1, $BC, $8C, $CE, $99, $E1, $BC, $8D, $CE, $99, $E1, $BC, $8E, $CE, $99, $E1, $BC, $8F, $CE, $99, $E1, $BC, $88, $CE, $99, $E1, $BC, $89, $CE, $99, $E1, $BC, $8A, $CE, $99, $E1, $BC,
@@ -3803,11 +3804,14 @@ begin
     $1FC7: special := $01C60006; //ῇ 1FC7; 1FC7; 0397 0342 0345; 0397 0342 0399;
     $1FF7: special := $01CC0006; //ῷ 1FF7; 1FF7; 03A9 0342 0345; 03A9 0342 0399;
   end;
-  if special <> 0 then begin result := ''; setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
-  else result := strGetUnicodeCharacter(CodePoint);
+  if special = 0 then exit(false);
+  result := true;
+  converted := '';
+  SetLength(converted, special and $FFFF);
+  move(block[special shr 16], converted[1], length(converted));
 end;
 
-function strLowerCaseSpecialUTF8(codePoint: integer): string;
+function strLowerCaseSpecialUTF8(codePoint: integer; out converted: ShortStringForCaseConversion): boolean;
 const block: array[0..83] of byte = ( $69, $CC, $87, $E1, $BE, $80, $E1, $BE, $81, $E1, $BE, $82, $E1, $BE, $83, $E1, $BE, $84, $E1, $BE, $85, $E1, $BE, $86, $E1, $BE, $87, $E1, $BE, $90, $E1, $BE, $91, $E1, $BE, $92, $E1, $BE, $93, $E1, $BE, $94, $E1, $BE, $95, $E1, $BE, $96, $E1, $BE, $97, $E1, $BE, $A0, $E1, $BE, $A1, $E1, $BE, $A2, $E1, $BE, $A3, $E1, $BE, $A4, $E1, $BE, $A5, $E1, $BE, $A6, $E1, $BE, $A7, $E1, $BE, $B3, $E1, $BF, $83, $E1, $BF, $B3);
 var special: integer;
 begin
@@ -3842,8 +3846,11 @@ begin
     $1FCC: special := $004E0003; //ῌ 1FCC; 1FC3; 1FCC; 0397 0399;
     $1FFC: special := $00510003; //ῼ 1FFC; 1FF3; 1FFC; 03A9 0399;
   end;
-  if special <> 0 then begin result := ''; setlength(result, special and $FFFF); move(block[special shr 16], result[1], length(result)); end
-  else result := strGetUnicodeCharacter(CodePoint);
+  if special = 0 then exit(false);
+  result := true;
+  converted := '';
+  SetLength(converted, special and $FFFF);
+  move(block[special shr 16], converted[1], length(converted));
 end;
 
 {$Push}{$OverflowChecks off}{$RangeChecks off}
