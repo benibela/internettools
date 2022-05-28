@@ -36,7 +36,6 @@ procedure initializeFunctions;
 procedure finalizeFunctions;
 
 
-
 implementation
 
 uses xquery, xquery.internals.protectionbreakers, xquery.internals.common, xquery.internals.floathelpers, xquery.internals.collations, xquery.namespaces, bigdecimalmath, math,
@@ -2866,28 +2865,55 @@ end;
 
 function strUpperUtf8(const s: RawByteString): string;
 var
-  cpup: LongInt;
   cp: Integer;
+  sb: TStrBuilder;
+  specialCase: ShortStringForCaseConversion;
 begin
   result := '';
-  for cp in strIterator(s) do begin
-    cpup := cpToUppercase(cp);
-    if cpup = cp then result += strUpperCaseSpecialUTF8(cp)
-    else result += strGetUnicodeCharacter(cpup);
-  end;
+  sb.init(@result,length(s));
+  for cp in strIterator(s) do
+    case cp of
+      0..(ord('a') - 1),(ord('z')+1)..$7F: sb.append(chr(cp));
+      //80..($B4 {magic number} ): two byte utf8, unchanged
+      ord('a')..ord('z'): sb.append(chr(cp - ord('a') + ord('A')));
+      else case cp of
+        {superrange of strupperCaseSpecialUTF8}
+        $00DF,
+        $FB00..$FB17,
+        $0587,
+        $0149,
+        $0390,
+        $03B0,
+        $01F0,
+        $1E96..$1FFF:
+          if strupperCaseSpecialUTF8(cp, specialCase) then begin
+            sb.appendBuffer(specialCase[1], length(specialCase));
+            continue;
+          end
+        end;
+        sb.appendCodePoint(cpToUppercase(cp));
+    end;
+  sb.final;
 end;
 
 function strLowerUtf8(const s: RawByteString): string;
 var
-  cplow: LongInt;
   cp: Integer;
+  sb: TStrBuilder;
+  specialCase: ShortStringForCaseConversion;
 begin
   result := '';
-  for cp in strIterator(s) do begin
-    cplow := cpToLowercase(cp);
-    if cplow = cp then result += strLowerCaseSpecialUTF8(cp)
-    else result += strGetUnicodeCharacter(cplow);
-  end;
+  sb.init(@result,length(s));
+  for cp in strIterator(s) do
+    case cp of
+      0..(ord('A') - 1),(ord('Z')+1)..$7F: sb.append(chr(cp));
+      //80..($C0 {magic number} -1): two byte utf8, unchanged
+      ord('A')..ord('Z'): sb.append(chr(cp - ord('A') + ord('a')));
+      else
+        if ((cp = $0130) or (cp shr 8 = $1F) {range of strLowerCaseSpecialUTF8}) and strLowerCaseSpecialUTF8(cp, specialCase) then sb.appendBuffer(specialCase[1], length(specialCase))
+        else sb.appendCodePoint(cpToLowercase(cp));
+      end;
+  sb.final;
 end;
 
 function xqFunctionUpper_Case({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
