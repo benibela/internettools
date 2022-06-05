@@ -2,6 +2,7 @@
 <CONFIG>
   <Package Version="5">
     <Name Value="internettools"/>
+    <Type Value="RunAndDesignTime"/>
     <Author Value="Benito van der Zander"/>
     <CompilerOptions>
       <Version Value="11"/>
