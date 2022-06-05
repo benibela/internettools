@@ -226,7 +226,6 @@ protected
 
 public
   function toString(): string; reintroduce; //**< converts the element to a string (not recursive)
-  function toString(includeText: boolean; includeAttributes: array of string): string; reintroduce; //**< converts the element to a string (not recursive)
 
   constructor Create;
   procedure FreeInstance; override;
@@ -1995,28 +1994,6 @@ begin
   end;
 end;
 
-function TTreeNode.toString(includeText: boolean; includeAttributes: array  of string): string;
-var
-  attrib: TTreeAttribute;
-begin
-  result := '';
-  if self = nil then exit();
-  case typ of
-    tetText: if includeText then result := value;
-    tetClose: result := '</'+value+'>';
-    tetOpen: begin
-      result := '<'+value;
-      if attributes <> nil then
-        for attrib in getEnumeratorAttributes do
-          if arrayContainsI(includeAttributes, attrib.value) then
-            result += ' '+attrib.value + '="'+attrib.realvalue+'"';
-      result+='>';
-    end;
-    tetDocument: if getFirstChild() <> nil then result := getFirstChild().toString(includeText, includeAttributes);
-    tetComment: if includeText then result := '<!--'+value+'-->';
-    else result := '??';
-  end;
-end;
 
 constructor TTreeNode.Create;
 begin

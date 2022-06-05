@@ -710,8 +710,11 @@ THtmlTemplateParser=class
     //**This treats str as extended string and evaluates the pxquery expression x"str"
     function replaceEnclosedExpressions(str:string):string;
 
-    function debugMatchings(const width: integer): string;
-    function debugMatchings(const width: integer; includeText: boolean; includeElements, includeAttributes: array of string): string;
+    type TDebugMatchingPrintNode = function (node: TTreeNode): string of object;
+    private
+      function debugMatchingPrintNodeDefault(node: TTreeNode): string;
+    public
+    function debugMatchings(const width: integer; htmlToString: TDebugMatchingPrintNode = nil ): string;
     function parseQuery(const expression: string): IXQuery; //**< Returns a IXQuery that accesses the variable storage of the template engine. Mostly intended for internal use, but you might find it useful to evaluate external XPath expressions which are not part of the template
 
     property variables: TXQVariableChangeLog read GetVariables;//**<List of all variables (variableChangeLog is usually faster)
@@ -2363,12 +2366,12 @@ begin
   result := fQueryEngine.parserEnclosedExpressionsString(str).evaluate().toString; //todo: somehow cache the parsed xquery
 end;
 
-function THtmlTemplateParser.debugMatchings(const width: integer): string;
+function THtmlTemplateParser.debugMatchingPrintNodeDefault(node: TTreeNode): string;
 begin
-  result := debugMatchings(width, true, ['th'], ['*']);
+  result := node.toString();
 end;
 
-function THtmlTemplateParser.debugMatchings(const width: integer; includeText: boolean; includeElements, includeAttributes: array of string): string;
+function THtmlTemplateParser.debugMatchings(const width: integer; htmlToString: TDebugMatchingPrintNode): string;
 var res: TStringArray;
     template: TTemplateElement;
     html: TTreeNode;
@@ -2376,7 +2379,6 @@ var res: TStringArray;
     tsl, hsl: TStringArray;
     templateIndent, htmlIndent: integer;
     tempTemplateIndent, tempHTMLIndent: String;
-    inIncludeOverrideElement: integer = 0;
 
   procedure updateIndentation(element: TTreeNode; var count: integer; var cache: string);
   begin
@@ -2385,23 +2387,29 @@ var res: TStringArray;
     cache := strDup(' ', min(width div 2, count));
   end;
 
-  function htmlToString(): string;
-  begin
-    if (html.typ in [tetOpen, tetClose]) and arrayContains(includeElements, html.value) then
-      if html.typ = tetOpen then inc(inIncludeOverrideElement)
-      else dec(inIncludeOverrideElement);
-    if (inIncludeOverrideElement > 0) or ( (length(includeAttributes) = 1) and (includeAttributes[0] = '*') ) then result := html.toString
-    else result := html.toString(includeText, includeAttributes);
-  end;
-
   procedure printHTMLUntil(endElement: TTreeNode);
   var
     i: Integer;
+    htmlStr: string;
+    isEmptyOrTextOnly: Boolean;
   begin
     while (html <> nil) and (html <> endElement) do begin
-      hsl := strWrapSplit(htmlToString(), width - length(tempHTMLIndent));
+      htmlStr := htmlToString(html);
+      isEmptyOrTextOnly := (html.typ = tetOpen) and (
+                              (html.next = html.reverse)
+                              or ((html.next <> nil) and (html.next.next = html.reverse) and (html.next.typ = tetText) )
+                           );
+      if isEmptyOrTextOnly then begin
+        html := html.next;
+        htmlStr += htmlToString(html);
+        if html.typ = tetText then begin
+          html := html.next;
+          htmlStr += htmlToString(html);
+        end;
+      end;
+      hsl := strWrapSplit(htmlStr, width - length(tempHTMLIndent));
       for i:=0 to high(hsl) do arrayAdd(res, tempHTMLIndent + hsl[i]);
-      updateIndentation(html, htmlIndent, tempHTMLIndent);
+      if not isEmptyOrTextOnly then updateIndentation(html, htmlIndent, tempHTMLIndent);
       html := html.next;
     end;
   end;
@@ -2409,6 +2417,7 @@ var res: TStringArray;
 var i: Integer;
 
 begin
+  if htmlToString = nil then htmlToString := @debugMatchingPrintNodeDefault;
   LINK :=   ' <---- ';
   NOLINK := '       ';
   EMPTY := strDup(' ', width) + NOLINK;
@@ -2428,7 +2437,7 @@ begin
       if (html <> nil) and (template.match.offset > html.offset) then
         printHTMLUntil(template.match);
       if html = template.match then begin
-        hsl := strWrapSplit(htmlToString(), width - length(tempHTMLIndent));
+        hsl := strWrapSplit(htmlToString(html), width - length(tempHTMLIndent));
         for i:=0 to min(high(hsl), high(tsl)) do arrayAdd(res, tempHTMLIndent + hsl[i] + strDup(' ', width - length(hsl[i]) - length(tempHTMLIndent) ) + LINK + tempTemplateIndent + tsl[i]);
         for i:=length(hsl) to high(tsl) do arrayAdd(res, EMPTY + tempTemplateIndent + tsl[i]);
         for i:=length(tsl) to high(hsl) do arrayAdd(res, tempHTMLIndent + hsl[i]);
