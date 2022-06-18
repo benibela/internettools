@@ -3275,14 +3275,15 @@ function xqFunctionParse_datetime({%H-}argc: SizeInt; args: PIXQValue): IXQValue
 begin
   result := TXQValueDateTime.create(baseSchema.dateTime, args[0].toString, args[1].toString);
 end;
-function guessDateFormat(const d: string): string;
+function guessDateFormatTry(const d: string; out fmt: string): boolean;
 var state: (gdfsFirstDigits, gdfsFirstSeparator, gdfsMiddleDigits, gdfsMiddleLetters, gdfsSecondSeparator);
   i, start: SizeInt;
   builder: TStrBuilder;
   direction: (gdfsYMD, gdfsDMY) = gdfsYMD;
 begin
   state := gdfsFirstDigits;
-  builder.init(@result, 10);
+  result := false;
+  builder.init(@fmt, 10);
   i := 1;
   while (i <= length(d)) and (d[i] <= ' ') do inc(i);
   start := i;
@@ -3306,6 +3307,7 @@ begin
         gdfsSecondSeparator: if d[i] in ['0'..'9'] then begin
           if direction = gdfsYMD then append('d')
           else append('y+');
+          result := true;
           break;
         end else append(d[i]);
       end;
@@ -3317,7 +3319,8 @@ var d, fmt: string;
 begin
   d := args[0].toString;
   if argc = 2 then fmt := args[1].toString
-  else fmt := guessDateFormat(d);
+  else if not guessDateFormatTry(d, fmt) then
+    raiseXQEvaluationException('pxp:parse-date', 'Failed to parse date: '+d);
   result := TXQValueDateTime.create(baseSchema.date, d, fmt);
 end;
 function xqFunctionParse_time({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
