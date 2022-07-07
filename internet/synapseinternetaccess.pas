@@ -116,7 +116,7 @@ begin
 end;
 {$else}
 var resolvConfFileAge: longint = 0;
-    resolvConfCS: TRTLCriticalSection;
+    resolvConfSynchronizer: TMultiReadExclusiveWriteSynchronizer;
 function checkEtcResolv(): boolean;
 var resolvConf: string;
   newAge: LongInt;
@@ -129,7 +129,7 @@ begin
   newAge := FileAge(resolvConf);
   result := false;
   if newAge > resolvConfFileAge then begin
-    EnterCriticalsection(resolvConfCS);
+    resolvConfSynchronizer.Beginwrite;
     try
       if newAge > resolvConfFileAge then begin
         SetLength(DNSServers, 0);
@@ -137,7 +137,7 @@ begin
         resolvConfFileAge := newAge;
       end;
     finally
-      LeaveCriticalsection(resolvConfCS);
+      resolvConfSynchronizer.Endwrite;
     end;
   end;
 end;
@@ -238,7 +238,16 @@ var openSSLError: string = '';
   function InitAndHTTPMethod: boolean;
   begin
     initConnection;
-    result := connection.HTTPMethod(transfer.method, transfer.url);
+    {$if not (defined(WINDOWS) or defined(android))}
+    try
+      resolvConfSynchronizer.Beginread;
+    {$endif}
+      result := connection.HTTPMethod(transfer.method, transfer.url);
+    {$if not (defined(WINDOWS) or defined(android))}
+    finally
+      resolvConfSynchronizer.Endread;
+    end;
+    {$endif}
     if (not result) and (connection.Sock.SSL is TSSLOpenSSLOverride) then begin
       with connection.Sock.SSL as TSSLOpenSSLOverride do begin
         if openSSLError.contains(outErrorMessage) then exit;
@@ -381,7 +390,7 @@ defaultInternetConfiguration.searchCertificates;
 //{$endif}
 
 {$if not (defined(WINDOWS) or defined(android))}
-InitCriticalSection(resolvConfCS{%H-});
+resolvConfSynchronizer := TMultiReadExclusiveWriteSynchronizer.Create;
 
 disableSIGPIPECrash;
 
@@ -391,7 +400,7 @@ finalization
 freeThreadVars; //otherwise ssl_openssl_lib.finalization calls SSLCS.Free; causing the TSynapseInternetAccess.free to crash, if another unit calls freeThreadVars later;
 
 {$if not (defined(WINDOWS) or defined(android))}
-DoneCriticalsection(resolvConfCS);
+resolvConfSynchronizer.free;
 {$endif}
 
 {$ENDIF}
