@@ -274,7 +274,8 @@ public
   currentRoot: TTreeNode;
   baseoffset: TTreeNodeIntOffset;
 
-  procedure initDocument(creator: TTreeParser);
+  procedure initDocument(aNodeClass: TTreeNodeClass = nil);
+  procedure initDocument(aparser: TTreeParser);
   procedure done;
 
   function appendElement(const localname: string): TTreeNode;
@@ -291,18 +292,16 @@ protected
   FRefCount: Integer;
   FEncoding, FBaseEncoding: TSystemCodePage;
   FBaseURI, FDocumentURI: string;
-  FCreator: TTreeParser;
   FNodeClass: TTreeNodeClass;
   FBlocks: TBlockAllocator;
   FNamespaces: TNamespaceList;
   function isHidden: boolean; virtual;
 public
-  constructor create(creator: TTreeParser); reintroduce;
+  constructor create(aNodeClass: TTreeNodeClass); reintroduce;
   property baseURI: string read FBaseURI write FBaseURI;
   property documentURI: string read FDocumentURI write FDocumentURI;
   property baseEncoding: TSystemCodePage read FBaseEncoding write FBaseEncoding;
 
-  function getCreator: TTreeParser;
 
   function createNode: TTreeNode;
   function createNode(atyp: TTreeNodeType; avalue: string = ''): TTreeNode;
@@ -771,11 +770,17 @@ begin
   baseoffset := 1;
 end;
 
-procedure TTreeBuilder.initDocument(creator: TTreeParser);
+procedure TTreeBuilder.initDocument(aNodeClass: TTreeNodeClass);
 begin
-  currentDocument := TTreeDocument.create(creator);
+  currentDocument := TTreeDocument.create(aNodeClass);
   initInternal(currentDocument, currentDocument);
   elementStack.Add(currentDocument);
+end;
+
+procedure TTreeBuilder.initDocument(aparser: TTreeParser);
+begin
+  if aparser = nil then initDocument(TTreeNode)
+  else initDocument(aparser.treeNodeClass);
 end;
 
 procedure TTreeBuilder.done;
@@ -892,21 +897,16 @@ begin
   result := false;
 end;
 
-constructor TTreeDocument.create(creator: TTreeParser);
+constructor TTreeDocument.create(aNodeClass: TTreeNodeClass);
 begin
   typ := tetDocument;
-  FCreator := creator;
   root := self;
   FBlocks.init(TTreeNode.InstanceSize * 200);
-  if creator <> nil then FNodeClass := creator.treeNodeClass;
-  if FNodeClass = nil then FNodeClass:=TTreeNode;
+  if aNodeClass = nil then aNodeClass := TTreeNode;
+  FNodeClass:=aNodeClass;
   FNamespaces := TNamespaceList.create();
 end;
 
-function TTreeDocument.getCreator: TTreeParser;
-begin
-  result := FCreator;
-end;
 
 function TTreeDocument.createNode: TTreeNode;
 begin
@@ -954,7 +954,7 @@ function TTreeDocument.clone: TTreeDocument;
 var c: TTreeNode;
   newOffset: TTreeNodeIntOffset;
 begin
-  result := TTreeDocument.create(FCreator);
+  result := TTreeDocument.create(FNodeClass);
   result.FEncoding:=FEncoding;
   result.FBaseEncoding:=FBaseEncoding;
   result.FBaseURI:=FBaseURI;
@@ -2873,7 +2873,7 @@ begin
 
 
   //initialize document node
-  FTreeBuilder.initDocument(self);
+  FTreeBuilder.initDocument(treeNodeClass);
   FTreeBuilder.currentDocument.FBaseURI:=uri;
   FTreeBuilder.currentDocument.FDocumentURI:=uri;
   FTreeBuilder.currentDocument.FBaseEncoding := CP_NONE;

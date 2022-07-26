@@ -7435,9 +7435,7 @@ begin
       onParseDoc(StaticContext.sender, data, url, contenttype, result);
     end else begin
       tempnode := contextNode(false);
-      parser := nil;
-      if (tempnode <> nil) then parser := tempnode.getDocument().getCreator;
-      if parser = nil then parser := defaultParser;
+      parser := defaultParser;
       if parser = nil then begin
         defaultParser := TTreeParser.Create;
         defaultParser.readComments:=true;

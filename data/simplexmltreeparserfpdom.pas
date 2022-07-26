@@ -160,7 +160,7 @@ begin
   encoding := strActualEncoding(TargetEncoding);
 
   namespaces:= TNamespaceList.Create;
-  doc := TTreeDocument.create(self);
+  doc := TTreeDocument.create(self.treeNodeClass);
   doc.baseURI:=dom{%H-}.baseURI;
   doc.documentURI:=dom{%H-}.baseURI;
   doc.root := doc;

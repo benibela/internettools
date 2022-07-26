@@ -4156,7 +4156,7 @@ end;
 procedure TXQTreeBuilder.initDocument(acontext: PXQEvaluationContext);
 begin
   fillchar(self, sizeof(self), 0);
-  inherited initDocument(nil);
+  inherited initDocument();
   initFromContext(acontext);
 end;
 
