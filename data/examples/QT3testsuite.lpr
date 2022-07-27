@@ -479,7 +479,7 @@ begin
   bufferOverview.add(formatResultHTML('<a href="#'+ts.name+'">'+ts.name+'</a>', r, true));
   bufferBody.add('<h3><a name="'+ts.name+'">'+ts.name+'</a></h3>');
   bufferBody.add('<a href="https://github.com/w3c/qt3tests/blob/master/'+ts.fileName+'" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
-  bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failed: '+ inttostr(r[tcrFail])+ '  Wrong error: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Skipped: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
+  bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failures: '+ inttostr(r[tcrFail])+ '  Wrong errors: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Skipped: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
   for i := 0 to bufferTestSet.Count - 1 do
     bufferBody.add(bufferTestSet[i]);
   bufferBody.Add('</table>');
