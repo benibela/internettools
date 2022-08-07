@@ -1270,6 +1270,8 @@ begin
 
   test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; filename=xyz; filename*=invalid', tempstr));
   test(tempstr, 'xyz');
+  test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('inline; filename=xyz; filename*=invalid', tempstr));
+  test(tempstr, 'xyz');
   test(THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; filename   =  "xyz2" ; filename*=invalid', tempstr));
   test(tempstr, 'xyz2');
   test(not THTTPHeaderListBreaker.parseContentDispositionFileNameTry('attachment; nope', tempstr));

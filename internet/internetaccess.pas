@@ -1549,7 +1549,8 @@ var
 begin
   result := false;
   filename := '';
-  if not contentDisposition.StartsWith('attachment') then exit;
+  if contentDisposition.IsEmpty then exit;
+  if not (contentDisposition[1] in ['a'..'z','A'..'Z']) then exit; //should be attachment or inline; but allow unknown, future types
   directives := contentDisposition.Split(';');
   for directive in directives do begin
     if not directive.pcharView.splitAtFind(name, '=', value) then continue;
