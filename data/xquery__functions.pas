@@ -8692,7 +8692,7 @@ begin
           else node := node.next;
         end else begin
           treeBuilder.appendClonedTagAsChildUncheckedNoAttributes(node);
-          if node.attributes <> nil then transformAttributes(node);
+          if (node.typ = tetOpen) and (node.attributes <> nil) then transformAttributes(node);
           node := node.next;
         end;
       end;

@@ -1867,11 +1867,15 @@ begin
 end;
 
 function TTreeNode.cloneShallowNoAttributes(targetDocument: TTreeDocument; newRoot: TTreeNode; var newBaseOffset: TTreeNodeIntOffset): TTreeNode;
+var
+  thetyp: TTreeNodeType;
 begin
-  if typ in [tetAttribute, tetNamespace] then result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue)
+  thetyp := typ;
+  if thetyp in [tetAttribute, tetNamespace] then result := targetDocument.createAttribute(value, TTreeAttribute(self).realvalue)
   else result := targetDocument.createNode;
   result.assignNoAttributes(self);
   if namespace <> nil then targetDocument.addNamespace(namespace);
+  if (thetyp = tetProcessingInstruction) and (attributes <> nil) then result.attributes := TTreeAttribute(attributes.clone(targetDocument, newRoot, newBaseOffset));;
   result.root := newRoot;
   result.offset := newBaseOffset;
   inc(newBaseOffset);
@@ -1903,7 +1907,6 @@ begin
       result := cloneShallowNoAttributes(targetDocument, newRoot, newBaseOffset);
     tetProcessingInstruction: begin
       result := cloneShallowNoAttributes(targetDocument, newRoot, newBaseOffset);
-      if attributes <> nil then result.attributes := TTreeAttribute(attributes.clone(targetDocument, newRoot, newBaseOffset));
     end;
     tetDocument: exit( TTreeDocument(self).clone() );
     tetClose: raise ETreeParseException.Create('Cannot clone closing tag');
