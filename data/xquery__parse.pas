@@ -4679,6 +4679,8 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
              else errCode := 'XPST0051';
            raiseParsingError(errCode, 'Unknown type: Q{'+pending.namespaceurl+'}'+pending.localpart, pending);
          end;
+      if (not (xqstIsCast in flags)) and (st.atomicTypeInfo <> nil) and (st.atomicTypeInfo is TXSListType) then
+        raiseParsingError('XPST0051', 'Sequence type is list, should be atomic or union: Q{'+pending.namespaceurl+'}'+pending.localpart, pending);
       pending.free;
       SetLength(st.children, 0);
     end;
