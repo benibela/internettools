@@ -107,8 +107,6 @@ uses
 
 
 //-------------------------Array functions-----------------------------
-
-
 type
 {$IFDEF FPC}
 {$ifdef FPC_HAS_CPSTRING}{$define HAS_CPSTRING}{$endif}
@@ -690,7 +688,7 @@ public
   property currentPos: pchar read p;
   property current: integer read getCurrentCodepoint;
   property currentByteLength: integer read FcurrentByteLength;
-  function MoveNext: Boolean;
+  function MoveNext: Boolean; //todo: make this inline; (when fpc can stably inline)
   function GetEnumerator: TUTF8StringCodePointBlockEnumerator;
 public
   markedPos: pchar;
@@ -1238,7 +1236,7 @@ type TPointerCompareFunction = function (data: TObject; a, b: pointer): longint;
 //**@param(size the size of every elementm)
 //**@param(compareFunction a function which compares two pointer to elements of the array, if it is nil, it will compare the raw bytes (which will correspond to an ascending sorting of positive integers)).
 //**Only the > 0 and <= 0 return values are discerned. (i.e. you can safely use a comparison function that e.g. only returns +7 and 0)  @br
-//**Currently it uses a combination of quick and insert sort with a temporary buffer.
+//**Currently it uses a quick sort with a temporary buffer (quick sort taken from FPC. It used to use merge+insert sort, but that was too slow).
 procedure stableSort(a,b: pointer; sizei: SizeInt; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil); overload;
 //**general stable sort functions for arrays (modifying the array inline and returning it)
 function stableSort(intArray: TLongintArray; compareFunction: TPointerCompareFunction = nil; compareFunctionData: TObject=nil): TLongintArray; overload;
