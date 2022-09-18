@@ -41,6 +41,8 @@ interface
 uses
   Classes, SysUtils, math;
 
+const PACKAGE_VERSION = '0.9.0.repo';
+
 {$DEFINE USE_9_DIGITS}
 
 {$IF defined(USE_1_DIGIT) or defined(USE_1_DIGITS)}
