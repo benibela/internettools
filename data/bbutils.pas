@@ -105,6 +105,8 @@ uses
   , windows
   {$ENDIF};
 
+const PACKAGE_VERSION = '0.9.0.repo';
+
 
 //-------------------------Array functions-----------------------------
 type
