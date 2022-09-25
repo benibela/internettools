@@ -355,11 +355,13 @@ end;
 
 constructor TSynapseInternetAccess.create();
 begin
+  SSLImplementation := TSSLOpenSSLOverride;
   inherited create();
 end;
 
 constructor TSynapseInternetAccess.create(const internetConfig: TInternetConfig);
 begin
+ SSLImplementation := TSSLOpenSSLOverride;
   connection:=THTTPSendWithFakeStream.Create;
   (connection.Document as TSynapseSplitStream).internetAccess := self;
   inherited;
