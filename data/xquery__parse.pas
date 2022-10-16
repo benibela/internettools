@@ -4878,8 +4878,10 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         move(tcall.children[insertAt], tcall.children[insertAt + 1], sizeof(tcall.children[0]) * (length(tcall.children) - insertAt - 1));
       tcall.children[insertAt] := b.children[0];
       b.children := nil; //complicated memory tracking here. the below functions can throw, so all nodes need to be exactly once in the ast
-      if result is TXQTermNamedFunction then result := visitNamedFunction(TXQTermNamedFunction(result))
-      else if result is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(result));
+      if result is TXQTermNamedFunction then begin
+        result := visitNamedFunction(TXQTermNamedFunction(result));
+        tcall := result as TXQTermNamedFunction //result might have been changed (in case of type constructors)
+      end else if result is TXQTermDefineFunction then visitDefineFunction(TXQTermDefineFunction(result));
       b.free;
       if thin then begin
         result := TXQTermSimpleMap.Create(tcall[insertAt], result);
