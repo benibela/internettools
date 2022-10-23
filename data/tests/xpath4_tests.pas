@@ -42,6 +42,7 @@ begin
   t('("xyz", "abc") -> (upper-case#1)()', 'XYZ ABC');
   t(' ("$" => concat(?))("abc") ', '$abc');
   t(' ("$" -> concat(?))("abc") ', '$abc');
+  t(' ("2" -> xs:integer())', '2');
   t('( ("x,y,z", "a,b,c") -> (tokenize#2)(?) ) ! (.(","))', 'x y z a b c');
   t(' 1 to 3 -> { . * 2 } ', '1 2 3 4 5 6' );
   t(' (1 to 3) -> { . * 2 } ', '2 4 6' );
