@@ -58,11 +58,37 @@ begin
   t('all((true(), true()), identity#1)', 'true');
   t('all((true(), false()), identity#1)', 'false');
   t('some((true(), false()), identity#1)', 'true');
+  t('all((true(), true()), not#1)', 'false');
+  t('all((true(), false()), not#1)', 'false');
+  t('some((true(), false()), not#1)', 'true');
+  t('all((true(), true()))', 'true');
+  t('all((true(), false()))', 'false');
+  t('some((true(), false()))', 'true');
+
 
   t('for member $m in [10,20,30] return $m', '10 20 30');
   t('for member $m at $i in [10,20,30] return $m + $i', '11 22 33');
   t('for member $m in [1,2], member $n in [40,50] return $m + $n', '41 51 42 52');
   t('for member $m in [1,2], $n in (40,50) return $m + $n', '41 51 42 52');
+
+  t('highest(1 to 3)', '3');
+  t('highest(1 to 3, ())', '3');
+  t('highest(1 to 3, (), ->{-.})', '1');
+  t('highest(("red", "green", "blue"), (), map{"red": xs:hexBinary("FF0000"), "green": xs:hexBinary("008000"), "blue": xs:hexBinary("0000FF")})', 'red');
+  t('lowest(1 to 3)', '1');
+  t('lowest(1 to 3, ())', '1');
+  t('lowest(1 to 3, (), ->{-.})', '3');
+  t('lowest(("red", "green", "blue"), (), map{"red": xs:hexBinary("FF0000"), "green": xs:hexBinary("008000"), "blue": xs:hexBinary("0000FF")})', 'blue');
+
+  t('intersperse(1 to 3, "-")', '1 - 2 - 3');
+  t('intersperse("-", 1 to 3)', '-');
+  t('intersperse(("-",":"), 1 to 3)', '- 1 2 3 :');
+
+  t('all-equal(1 to 3)', 'false');
+  t('all-different(1 to 3)', 'true');
+  t('all-equal((1,1,1,1,1.0))', 'true');
+  t('all-different((1 to 3, 1))', 'false');
+
 
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
