@@ -1776,6 +1776,7 @@ type
     procedure setVersionsShared(const v: array of TXQFunctionParameterTypes);
     procedure setVersionsShared(const v: array of TXQTermSequenceType);
     procedure setVersionsShared(const v,w: array of TXQTermSequenceType);
+    procedure setVersionsShared(const v,w,x: array of TXQTermSequenceType);
     procedure setVersionsShared(i: integer; const v: array of TXQTermSequenceType);
     procedure setVersionsShared(count: integer);
     function checkOrConvertTypes(values: PIXQValue; count: integer; const context:TXQEvaluationContext; term: TXQTerm): integer;
@@ -7928,6 +7929,17 @@ begin
   maxArgCount:=maxArgCount;
   setVersionsShared(0, v);
   setVersionsShared(1, w);
+end;
+
+procedure TXQAbstractFunctionInfo.setVersionsShared(const v, w, x: array of TXQTermSequenceType);
+begin
+  sharedVersions := true;
+  SetLength(versions, 3);
+  minArgCount:=length(v) - 1;
+  maxArgCount:=maxArgCount;
+  setVersionsShared(0, v);
+  setVersionsShared(1, w);
+  setVersionsShared(2, x);
 end;
 
 procedure TXQAbstractFunctionInfo.setVersionsShared(i: integer; const v: array of TXQTermSequenceType);

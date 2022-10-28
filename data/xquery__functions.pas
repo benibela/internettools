@@ -8586,6 +8586,89 @@ begin
   xqvalueSeqSqueeze(result);
 end;
 
+function xqFunctionLowestHighest(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; const aslowest: boolean): IXQValue;
+var input: TXQValue;
+    collation: TXQCollation;
+    haskeyfunction: Boolean;
+    keyfunction: TXQBatchFunctionCall;
+    key: IXQValue;
+    bestkey: IXQValue = nil;
+    reslist: TXQVList;
+    cmp: TXQCompareResult;
+    pv: PIXQValue;
+begin
+  if args[0].isUndefined then exit(args[0]);
+  input := args[0].toValue;
+  if (argc = 2) and not (args[1].isUndefined) then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
+  else collation := context.staticContext.collation;
+
+  reslist := TXQVList.create();
+  haskeyfunction := argc = 3;
+  if haskeyfunction then keyfunction.init(context, args[2]);
+  for pv in input.GetEnumeratorPtrUnsafe do begin
+    key := pv^;
+    if haskeyfunction then key := keyfunction.call1(pv^);
+    if key.instanceOf(baseSchema.untypedAtomic) then key := baseSchema.double.createValue(key);
+    if bestkey = nil then bestkey := key;
+    cmp := context.staticContext.compareAtomic(key, bestkey, collation); //todo: type check
+    if cmp = xqcrEqual  then reslist.add(pv^)
+    else if ((cmp = xqcrLessThan) and (aslowest)) or ((cmp = xqcrGreaterThan) and (not aslowest))  then begin
+      reslist.clear;
+      reslist.add(pv^);
+      bestkey := key;
+    end else if (cmp <> xqcrLessThan) and (cmp <> xqcrGreaterThan) then raise EXQEvaluationException.create('XPTY0004', 'Key comparison failed in lowest/highest');
+  end;
+  if haskeyfunction then keyfunction.done;
+
+  xqvalueSeqSqueezed(result, reslist);
+end;
+
+function xqFunctionLowest(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  result := xqFunctionLowestHighest(context, argc, args, true);
+end;
+
+function xqFunctionHighest(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+begin
+  result := xqFunctionLowestHighest(context, argc, args, false);
+end;
+
+function xqFunctionIntersperse({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  n: SizeInt;
+  reslist: TXQVList;
+  first: Boolean;
+  pv: PIXQValue;
+begin
+  n := args[0].getSequenceCount;
+  if (n < 2) or (args[1].isUndefined) then exit(args[0]);
+  reslist := TXQVList.create( n + (n - 1) * args[1].getSequenceCount );
+  first := true;
+  for pv in args[0].GetEnumeratorPtrUnsafe do begin
+    if not first then reslist.add(args[1])
+    else first := false;
+    reslist.add(pv^);
+  end;
+  xqvalueSeqSqueezed(result, reslist);
+end;
+
+function xqFunctionAllEqual(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  v, previous: TXQValue;
+  collation: TXQCollation;
+begin
+  if argc = 2 then collation := TXQueryEngine.getCollation(args[1].toString, context.staticContext.baseURI)
+  else collation := nil;
+  result := xqvalueTrue;
+  previous := nil;
+  for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
+    if previous <> nil then
+      if not context.staticContext.equalDeepAtomic(previous, v, collation) then
+        exit(xqvalueFalse);
+    previous := v
+  end;
+end;
+
 type TNodeTransformFlags = set of (ntfOnlyTransformSomeNodes, ntfAlwaysRecurse);
      TNodeTransformer = record
        context: PXQEvaluationContext;
@@ -9137,6 +9220,7 @@ begin
   fn3_1.registerFunction('xml-to-json', @xqFunctionXML_to_JSON).setVersionsShared([nodeOrEmpty, stringOrEmpty], [nodeOrEmpty, map, stringOrEmpty]);
 
 
+  fn4.reserveFunctionMemory(3,4,5);
   fn4.registerFunction('index-where', @xqFunctionIndex_Where, [itemStar, functionItemBoolean, integerStar], []);
   fn4.registerFunction('is-NaN', @xqFunctionIsNan).setVersionsShared([atomic, boolean]);
   fn4.registerFunction('characters', @xqFunctionCharacters).setVersionsShared([stringOrEmpty, stringStar]);
@@ -9144,7 +9228,14 @@ begin
   fn4.registerInterpretedFunction('replicate', [itemStar, integer{something wrong with: nonNegativeInteger ?!}, itemStar], '($input as item()*, $count as xs:integer) as item()*', '(1 to $count) ! $input', []);
   fn4.registerInterpretedFunction('all', [itemStar, functionItemBoolean, boolean], '($input as item()*, $predicate as function(*)) as boolean', 'every $i in $input satisfies $predicate($i)', []);
   fn4.registerInterpretedFunction('some', [itemStar, functionItemBoolean, boolean], '($input as item()*, $predicate as function(*)) as boolean', 'some $i in $input satisfies $predicate($i)', []);
-
+  fn4.registerInterpretedFunction('all', [itemStar, boolean], '($input as item()*) as boolean', 'every $i as xs:boolean in $input satisfies $i', []);
+  fn4.registerInterpretedFunction('some', [itemStar, boolean], '($input as item()*) as boolean', 'some $i as xs:boolean in $input satisfies $i', []);
+  fn4.registerFunction('highest', @xqFunctionHighest, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([itemStar, itemStar],  [itemStar, stringOrEmpty, itemStar],  [itemStar, stringOrEmpty, functionItemAtomicStar,  itemStar]);
+  fn4.registerFunction('lowest', @xqFunctionLowest, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([itemStar, itemStar],  [itemStar, stringOrEmpty, itemStar],  [itemStar, stringOrEmpty, functionItemAtomicStar,  itemStar]);
+  fn4.registerFunction('intersperse', @xqFunctionIntersperse).setVersionsShared([itemStar, itemStar, itemStar]);
+  fn4.registerFunction('all-equal', @xqFunctionAllEqual, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, boolean],  [atomicStar, stringt, boolean]);
+  fn4.registerInterpretedFunction('all-different', [atomicStar, boolean], '($input as anyAtomicType*) as boolean', 'count(distinct-values($input)) = count($input)', [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
+  fn4.registerInterpretedFunction('all-different', [atomicStar, stringt, boolean], '($input as anyAtomicType*, $collation as xs:string) as boolean', 'count(distinct-values($input, $collation)) = count($input)', [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
 
 
   fnarray4 := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
