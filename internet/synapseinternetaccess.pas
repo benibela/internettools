@@ -194,6 +194,7 @@ begin
   if headersSet then exit;
   currentTransfer.receivedHTTPHeaders.assign(connection.Headers);
   currentTransfer.HTTPResultCode := connection.ResultCode;
+  currentTransfer.HTTPErrorDetails := connection.ResultString;
   headersSet := true;
 end;
 
