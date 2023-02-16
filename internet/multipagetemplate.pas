@@ -338,7 +338,7 @@ type
   end;
 
   TTemplateActionPage = class(TTemplateAction)
-    url:string;
+    url, data:string;
     headers, postparams:array of TProperty;
     condition, method: string;
     inputFormat: TInternetToolsFormat;
@@ -895,6 +895,8 @@ end;
 procedure TTemplateActionPage.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
 begin
   SetLength(postparams, 0);
+  data := t.getAttribute('data', data);
+  if data <> '' then url := '#data:' + StringReplace( StringReplace( data, '}', '}}', [rfReplaceAll]), '{', '{{', [rfReplaceAll]);
   url := t.getAttribute('url', url);
   condition := t['test'];
   method:='';
@@ -972,100 +974,107 @@ begin
   reader.dataLoaded := false;
   reader.lastData := '';
 
-  cururl := url;
-  curmethod := method;
-  post := '';
+  if data <> '' then begin
+    page := reader.parser.replaceEnclosedExpressions(data);
+    if url <> '' then
+      reader.internet.lastUrl := strResolveURI(reader.parser.replaceEnclosedExpressions(url), reader.internet.lastUrl);
 
-  oldHeaders := reader.internet.additionalHeaders.Text;
+  end else if url <> '' then begin
+    cururl := url;
+    curmethod := method;
+    post := '';
 
-  if cururl <> '' then begin
-    if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
-    else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
-      reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), tempvalue) then begin
-      with reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1).tovalue do
-        if kind = pvkObject then prepareInternetRequest(curmethod, cururl, post, reader.internet)
-        else cururl := toString;
-    end else cururl := reader.parser.replaceEnclosedExpressions(url);
-    if cururl = '' then exit;
-  end else begin
-    //allow pages without url to set variables.
-    reader.parser.parseHTML('<html></html>'); //apply template to empty "page"
-    if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
-    exit;
-  end;
+    oldHeaders := reader.internet.additionalHeaders.Text;
 
-  for j:=0 to high(postparams) do begin
-    if post <> '' then post += '&';
-    tempname := reader.parser.replaceEnclosedExpressions(postparams[j].name);
-    if tempname = '' then
-      post += reader.parser.replaceEnclosedExpressions(postparams[j].value) //no urlencode! parameter passes multiple values
-     else
-      post += TInternetAccess.urlEncodeData(tempname)+'='+ TInternetAccess.urlEncodeData(reader.parser.replaceEnclosedExpressions(postparams[j].value));
-  end;
-
-  if curmethod = '' then begin
-    if (Length(postparams) = 0) and (post = '') then curmethod:='GET'
-    else curmethod:='POST';
-  end;
-
-  if Assigned(reader.onLog) then reader.onLog(reader, curmethod+' internet page '+cururl+#13#10'Post: '+post);
-
-  if guessType(cururl) = rtFile then  begin
-    if (reader.internet.lastUrl = '') then
-      reader.internet.lastUrl := IncludeTrailingPathDelimiter( 'file://' + strPrependIfMissing(GetCurrentDir, '/') );
-    cururl := strResolveURI(cururl, reader.internet.lastUrl);
-  end;
-
-
-  reader.lastContentType := '';
-  case guessType(cururl) of
-    rtRemoteURL: begin
-      for j := 0 to high(headers) do
-        reader.internet.additionalHeaders.Values[trim(headers[j].name)] := trim (reader.parser.replaceEnclosedExpressions(headers[j].value));
-      try
-        if errorHandling <> '' then begin
-          oldReact := reader.internet.OnTransferReact;
-          reader.internet.OnTransferReact:=@onTransferReact;
-        end;
-        page := reader.internet.request(curmethod, cururl, post);
-      except
-        on e: EInternetException do begin
-          reader.actionTrace.add(self.url);
-          if reader.retryOnConnectionFailures and (e.errorCode <= 0) then begin
-            if Assigned(reader.onLog) then reader.onLog(reader, 'Retry after error: ' + e.Message);
-            Sleep(2500);
-            page := reader.internet.request(curmethod, cururl, post);
-          end else raise;
-        end;
-      end;
-      if errorHandling <> '' then reader.internet.OnTransferReact := oldReact;
-
-      reader.lastContentType := reader.internet.getLastContentType;
-
-      reader.internet.additionalHeaders.Text := oldHeaders;
+    if cururl <> '' then begin
+      if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
+      else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
+        reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), tempvalue) then begin
+        with reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1).tovalue do
+          if kind = pvkObject then prepareInternetRequest(curmethod, cururl, post, reader.internet)
+          else cururl := toString;
+      end else cururl := reader.parser.replaceEnclosedExpressions(url);
+      if cururl = '' then exit;
+    end else begin
+      //allow pages without url to set variables.
+      reader.parser.parseHTML('<html></html>'); //apply template to empty "page"
+      if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
+      exit;
     end;
-    rtFile: begin
-      try
-        page := strLoadFromFileUTF8(cururl);
-      except
-        on e: Exception do begin
-          reader.actionTrace.add(self.url);
-          raise
-        end;
-      end;
-      reader.internet.lastURL:=cururl;
+
+    for j:=0 to high(postparams) do begin
+      if post <> '' then post += '&';
+      tempname := reader.parser.replaceEnclosedExpressions(postparams[j].name);
+      if tempname = '' then
+        post += reader.parser.replaceEnclosedExpressions(postparams[j].value) //no urlencode! parameter passes multiple values
+       else
+        post += TInternetAccess.urlEncodeData(tempname)+'='+ TInternetAccess.urlEncodeData(reader.parser.replaceEnclosedExpressions(postparams[j].value));
     end;
-    rtXML: begin
-      page := cururl;
-      cururl:='';
-      reader.internet.lastURL:=cururl;
-    end
-    else raise ETemplateReader.create('Unknown url type: '+cururl);
+
+    if curmethod = '' then begin
+      if (Length(postparams) = 0) and (post = '') then curmethod:='GET'
+      else curmethod:='POST';
+    end;
+
+    if Assigned(reader.onLog) then reader.onLog(reader, curmethod+' internet page '+cururl+#13#10'Post: '+post);
+
+    if guessType(cururl) = rtFile then  begin
+      if (reader.internet.lastUrl = '') then
+        reader.internet.lastUrl := IncludeTrailingPathDelimiter( 'file://' + strPrependIfMissing(GetCurrentDir, '/') );
+      cururl := strResolveURI(cururl, reader.internet.lastUrl);
+    end;
+
+
+    reader.lastContentType := '';
+    case guessType(cururl) of
+      rtRemoteURL: begin
+        for j := 0 to high(headers) do
+          reader.internet.additionalHeaders.Values[trim(headers[j].name)] := trim (reader.parser.replaceEnclosedExpressions(headers[j].value));
+        try
+          if errorHandling <> '' then begin
+            oldReact := reader.internet.OnTransferReact;
+            reader.internet.OnTransferReact:=@onTransferReact;
+          end;
+          page := reader.internet.request(curmethod, cururl, post);
+        except
+          on e: EInternetException do begin
+            reader.actionTrace.add(self.url);
+            if reader.retryOnConnectionFailures and (e.errorCode <= 0) then begin
+              if Assigned(reader.onLog) then reader.onLog(reader, 'Retry after error: ' + e.Message);
+              Sleep(2500);
+              page := reader.internet.request(curmethod, cururl, post);
+            end else raise;
+          end;
+        end;
+        if errorHandling <> '' then reader.internet.OnTransferReact := oldReact;
+
+        reader.lastContentType := reader.internet.getLastContentType;
+
+        reader.internet.additionalHeaders.Text := oldHeaders;
+      end;
+      rtFile: begin
+        try
+          page := strLoadFromFileUTF8(cururl);
+        except
+          on e: Exception do begin
+            reader.actionTrace.add(self.url);
+            raise
+          end;
+        end;
+        reader.internet.lastURL:=cururl;
+      end;
+      rtXML: begin
+        page := cururl;
+        cururl:='';
+        reader.internet.lastURL:=cururl;
+      end
+      else raise ETemplateReader.create('Unknown url type: '+cururl);
+    end;
+
+    if Assigned(reader.onLog) then reader.onLog(reader, 'downloaded: '+inttostr(length(page))+' bytes', 1);
+
+    if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
   end;
-
-  if Assigned(reader.onLog) then reader.onLog(reader, 'downloaded: '+inttostr(length(page))+' bytes', 1);
-
-  if page='' then raise EInternetException.Create(url +' konnte nicht geladen werden');
 
   reader.lastData := page;
   reader.lastDataFormat := inputFormat;
@@ -1079,6 +1088,7 @@ function TTemplateActionPage.clone: TTemplateAction;
 begin
   Result:=cloneChildren(TTemplateActionPage.Create);
   TTemplateActionPage(result).url := url;
+  TTemplateActionPage(result).data := data;
   TTemplateActionPage(result).headers := headers;
   SetLength(TTemplateActionPage(result).headers, length(headers));
   TTemplateActionPage(result).postparams := postparams;
