@@ -6,7 +6,7 @@
 {$endif}
 
 //here you can choose which string to double converter to use
-{$DEFINE USE_PASDBLSTRUTILS_FOR_JSON}
+//{$DEFINE USE_PASDBLSTRUTILS_FOR_JSON}
 
 //{$define USE_PASDBLSTRUTILS}
 
