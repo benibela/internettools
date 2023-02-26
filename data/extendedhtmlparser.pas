@@ -1710,8 +1710,9 @@ var xpathText: TTreeNode;
         if curChild.templateType in [tetHTMLOpen,tetHTMLClose,tetMatchElementOpen,tetMatchElementClose] then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
         if curChild.templateType = tetCommandSwitchOpen then raise ETemplateParseException.Create('A switch command may not be a direct child of another switch command');
         if elementFit(curChild) then begin
+          templateStart.match := htmlStart;
           templateStart := curChild;
-          switchCommandAccepted:=true;
+          switchCommandAccepted:=true; //todo: understand and document how this all works
           exit;
         end else curChild := TTemplateElement(curChild.getNextSibling());
       end;
@@ -1728,12 +1729,16 @@ var xpathText: TTreeNode;
       while curChild <> nil do begin //enumerate all child tags
         if tefOptional in curChild.flags then raise ETemplateParseException.Create('A direct child of the template:switch construct may not have the attribute template:optional (it is optional anyways)');
         if curChild.templateType >= firstRealNoHTMLMatchTemplateType then raise ETemplateParseException.Create('A switch command must consist entirely of only template commands or only html tags');
-        if templateElementFitHTMLOpen(htmlStart, curChild) and
-            matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
-          //found match
-          htmlStart := htmlStart.reverse.next;
-          templateStart := templateStart.templateReverse.templateNext;
-          exit;
+        if templateElementFitHTMLOpen(htmlStart, curChild) then begin
+          //found potential match
+          curChild.match := htmlStart;
+          if matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
+            //found match
+            templateStart.match := htmlStart;
+            htmlStart := htmlStart.reverse.next;
+            templateStart := templateStart.templateReverse.templateNext;
+            exit;
+          end;
         end;
         //no match, try other matches
         curChild := TTemplateElement(curChild.getNextSibling());
@@ -1761,6 +1766,7 @@ var xpathText: TTreeNode;
             if templateElementFitHTMLOpen(htmlStart, curChild) and
               matchTemplateTree(htmlStart, htmlStart.next, htmlStart.reverse, curChild.templateNext, curChild.templateReverse) then begin
               //found match
+              templateStart.match := htmlStart;
               htmlStart := htmlStart.reverse.next;
               templateStart := templateStart.templateReverse.templateNext;
               exit;
@@ -1778,7 +1784,6 @@ var xpathText: TTreeNode;
     end;
 
   begin
-    templateStart.match := htmlStart;
     curChild:=TTemplateElement(templateStart.getFirstChild());
     if curChild = nil then  begin
       templateStart:=templateStart.templateReverse;
@@ -2044,14 +2049,31 @@ function THtmlTemplateParser.matchLastTrees: Boolean;
     case node.typ of
       tetOpen: result += textNodeInfo(node.next);
       tetClose: result := textNodeInfo(node.previous) + result;
+      else;
     end;
   end;
+  procedure raiseMatchingExceptionForNotMatched(notMatched,realLast,last: TTreeNode);
+  var
+    err: String;
+  begin
+    err := format(rsPatternMatchingFailedS, [ftemplate.getLastTree.baseURI]) + LineEnding +
+           format(rsPatternMatchingFailedDebugAtS, [nodeInfo(notMatched)]) + LineEnding;
+    if realLast <> nil then err += format(rsPatternMatchingFailedDebugPreviousElementS, [nodeInfo(reallast)]) + LineEnding;
+    if last <> nil then err += format(rsPatternMatchingFailedDebugLastMatchSS, [nodeInfo(last), nodeInfo(TTemplateElement(last).match)]);
+    raiseMatchingException(err);
+  end;
 
-var cur,last,realLast:TTemplateElement;
+
+var cur,last,realLast, next:TTemplateElement;
+    errCur:TTemplateElement = nil;
+    errLast:TTemplateElement = nil;
+    errRealLast:TTemplateElement = nil;
+    errDepth: integer = 0;
     temp: TTreeNode;
     err: String;
     i: Integer;
-    oldFunctionCount: Integer;
+    oldFunctionCount: integer;
+    depth: Integer = 0;
 begin
   FreeAndNil(FVariables);
   if FKeepOldVariables = kpvForget then
@@ -2097,26 +2119,38 @@ begin
     realLast := nil;
     last := nil;
     while cur <> nil do begin
+      next := cur.templateNext;
       case cur.templateType of
-        tetHTMLOpen, tetHTMLText, tetMatchElementOpen: begin
+        tetHTMLOpen, tetHTMLText, tetMatchElementOpen, tetMatchText: begin
           if (cur.match = nil) then begin
-            err := format(rsPatternMatchingFailedS, [ftemplate.getLastTree.baseURI]) + LineEnding +
-                   format(rsPatternMatchingFailedDebugAtS, [nodeInfo(cur)]) + LineEnding;
-            if realLast <> nil then err += format(rsPatternMatchingFailedDebugPreviousElementS, [nodeInfo(reallast)]) + LineEnding;
-            if last <> nil then err += format(rsPatternMatchingFailedDebugLastMatchSS, [nodeInfo(last), nodeInfo(TTemplateElement(last).match)]);
-            raiseMatchingException(err);
-          end;
+            if ( (errCur = nil) or (depth > errDepth)  ) then begin
+              errCur := cur;
+              errLast := last;
+              errRealLast := realLast;
+              errDepth := depth;
+            end;
+            if cur.templateType in [tetHTMLOpen, tetMatchElementOpen] then begin
+              inc(depth); //inc here, so the close can immediate dec it again.
+              next := cur.templateReverse;
+            end;
+          end else if cur.typ = tetOpen then inc(depth);
           last:=cur;
         end;
+        tetHTMLClose, tetMatchElementClose: dec(depth);
         tetCommandIfOpen: begin
-          if cur.match = nil then cur := cur.templateReverse;
+          if cur.match = nil then next := cur.templateReverse; //skip IFs, if they were not used
           last:=cur;
         end;
+        tetCommandSwitchOpen, tetCommandSwitchPrioritizedOpen: begin
+          if cur.match <> nil then next := cur.templateReverse;//skip switches, if they were used
+        end;
+        else;
       end;
-
       realLast := cur;
-      cur := cur.templateNext;
+      cur := next;
     end;
+    if errCur <> nil then
+      raiseMatchingExceptionForNotMatched(errCur, errRealLast, errlast);
     err := format(rsPatternMatchingFailedS, [ftemplate.getLastTree.baseURI]) + LineEnding + rsPatternMatchingFailedDebugAllMatched;
     if last <> nil then err += format(rsPatternMatchingFailedDebugLastMatchSS, [nodeInfo(last), nodeInfo(TTemplateElement(last).match)]);
     raiseMatchingException(err);
