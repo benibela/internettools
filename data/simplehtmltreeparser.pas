@@ -1984,9 +1984,9 @@ begin
   if self = nil then exit('');
   case typ of
     tetText: exit(value);
-    tetClose: exit('</'+value+'>');
+    tetClose: exit('</'+getNodeName()+'>');
     tetOpen: begin
-      result := '<'+value;
+      result := '<'+getNodeName();
       for attrib in getEnumeratorAttributes do
         result += ' '+attrib.value + '="'+attrib.realvalue+'"';
       result+='>';
