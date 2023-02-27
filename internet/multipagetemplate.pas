@@ -44,6 +44,7 @@ type
   TTemplateLoadingContext = class
     path: string;
     loadFileCallback: TLoadTemplateFile;
+    preferredLanguage: string;
     function createParser: TTreeParser;
   end;
 
@@ -226,7 +227,7 @@ type
   *)
   TMultiPageTemplate=class
   protected
-    procedure readTemplateFromString(template: string; loadFileCallback: TLoadTemplateFile; path: string);
+    procedure readTemplateFromString(template: string; loadFileCallback: TLoadTemplateFile; path: string; preferredLanguage: string);
     procedure readTree(context: TTemplateLoadingContext; t: TTreeNode);
   public
     //**The primary <actions> element (or the first <action> element, if only one exists)
@@ -242,7 +243,7 @@ type
     //**If the template loads additional files like include files, you need to give a path.
     procedure loadTemplateFromString(template: string; aname: string = 'unknown'; path: string = '');
     //**Loads a template using a callback function. The callback function is called with different files names to load the corresponding file.
-    procedure loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string = 'unknown');
+    procedure loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string = 'unknown'; preferredLanguage: string = '');
     destructor destroy;override;
 
     //**Returns the <action> element with the given id.
@@ -705,23 +706,50 @@ end;
 
 { TTemplateActionMeta }
 
+type TLanguageScore = (lsBest = 0, lsEmpty = 1, lsEnglish, lsOther, lsUnitialized);
 procedure TTemplateActionMeta.initFromTree(context: TTemplateLoadingContext; t: TTreeNode);
-var
-  e: TTreeNode;
+procedure updateADescription(var desc: string; var oldScore: TLanguageScore; e: TTreeNode); //choose the best language
+var score: TLanguageScore;
+    lang: string;
 begin
+  if oldScore = lsBest then exit;
+  lang := e['lang'];
+  if lang = context.preferredLanguage then score := lsBest
+  else if lang = '' then score := lsEmpty
+  else if lang = 'en' then score := lsEnglish
+  else score := lsOther;
+  writeln(lang,  score, ' ', oldScore);
+  if score >= oldScore then exit;
+  writeln('  ', lang,  score, '<', oldScore);
+  oldScore := score;
+  desc := e.deepNodeText();
+end;
+
+var
+  e, f: TTreeNode;
+  templateDescriptionLanguageScore: TLanguageScore = lsUnitialized;
+  variableDescriptionLanguageScore: TLanguageScore;
+begin
+  writeln('PL: ',context.preferredLanguage);
   ignore(context);
   e := t.next;
   while e <> nil do begin
     if (e.typ = tetOpen) then
       case e.value of
-        'description': description:=e.deepNodeText();
+        'description': updateADescription(description, templateDescriptionLanguageScore, e);
         'variable': begin
           SetLength(variables, length(variables)+1);
           with variables[high(variables)] do begin
             name := e['name'];
             hasDef:= e.hasAttribute('default');
             if hasDef then def := e['default'];
-            description := e.findChild(tetOpen, 'description',  []).deepNodeText();;
+            variableDescriptionLanguageScore := lsUnitialized;
+            f := e.findChild(tetOpen, 'description',  []);
+            while f <> nil do begin
+              if (f.typ = tetOpen) and (f.value = 'description') then
+                updateADescription(description, variableDescriptionLanguageScore, f);
+              f := f.getNextSibling();
+            end;
           end;
         end;
       end;
@@ -1297,7 +1325,7 @@ begin
     setPatternNames(a.children[i], baseName);
 end;
 
-procedure TMultiPageTemplate.readTemplateFromString(template: string; loadFileCallback: TLoadTemplateFile; path: string);
+procedure TMultiPageTemplate.readTemplateFromString(template: string; loadFileCallback: TLoadTemplateFile; path: string; preferredLanguage: string);
 var
   context: TTemplateLoadingContext;
   tree: TTreeParser;
@@ -1306,6 +1334,7 @@ begin
   if path <> '' then path := IncludeTrailingPathDelimiter(path);
   context.path := path;
   context.loadFileCallback := loadFileCallback;
+  context.preferredLanguage := preferredLanguage;
   tree := context.createParser;
   try
     readTree(context, tree.parseTree(template));
@@ -1346,13 +1375,13 @@ end;
 procedure TMultiPageTemplate.loadTemplateFromString(template: string; aname: string; path: string = '');
 begin
   self.name:=aname;
-  readTemplateFromString(template, @strLoadFromFileUTF8, path );
+  readTemplateFromString(template, @strLoadFromFileUTF8, path, '' );
 end;
 
-procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string);
+procedure TMultiPageTemplate.loadTemplateWithCallback(loadSomething: TLoadTemplateFile; _dataPath: string; aname: string; preferredLanguage: string = '');
 begin
   self.name:=aname;
-  readTemplateFromString(loadSomething(_dataPath+'template'), loadSomething, _dataPath);
+  readTemplateFromString(loadSomething(_dataPath+'template'), loadSomething, _dataPath, preferredLanguage);
 end;
 
 
