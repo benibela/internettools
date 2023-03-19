@@ -6834,7 +6834,7 @@ begin
   if result then leftOf(element);
 end;
 
-function TPCharView.splitrightOf(out before: TPCharView; element: PChar): boolean;
+function TPCharView.splitRightOf(out before: TPCharView; element: PChar): boolean;
 begin
   before := viewLeftOf(element);
   result := isOnBounds(element);
@@ -6853,7 +6853,7 @@ begin
   end else splitAt(before, nil, behind);
 end;
 
-function TPCharView.splitleftOfFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
+function TPCharView.splitLeftOfFind(searched: pchar; searchedLength: SizeInt; out behind: TPCharView): boolean;
 var
   temp: TPCharView;
 begin
@@ -6861,7 +6861,7 @@ begin
   if result then self := temp;
 end;
 
-function TPCharView.splitrightOfFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
+function TPCharView.splitRightOfFind(out before: TPCharView; searched: pchar; searchedLength: SizeInt): boolean;
 var
   temp: TPCharView;
 begin
@@ -6874,12 +6874,12 @@ begin
   result := splitAtFind(before, pchar(searched), system.length(searched), behind);
 end;
 
-function TPCharView.splitleftOfFind(const searched: string; out behind: TPCharView): boolean;
+function TPCharView.splitLeftOfFind(const searched: string; out behind: TPCharView): boolean;
 begin
   result := splitleftOfFind(pchar(searched), system.length(searched), behind);
 end;
 
-function TPCharView.splitrightOfFind(out before: TPCharView; const searched: string): boolean;
+function TPCharView.splitRightOfFind(out before: TPCharView; const searched: string): boolean;
 begin
   result := splitrightOfFind(before, pchar(searched), system.length(searched));
 end;
