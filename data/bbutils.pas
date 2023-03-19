@@ -780,9 +780,14 @@ public
   function contains(const s: string): boolean; inline;
   //** Tests whether the view starts with a string.
   function beginsWith(const s: string): boolean; inline;
-  //function beginsWithI(const s: string): boolean; inline;
   //** Tests whether the view ends with a string.
   function endsWith(const expectedEnd: string): boolean; inline;
+
+  //** Tests whether the view starts with a string, case-insensitively
+  function beginsWithCaseInsensitively(const s: string): boolean;
+  //** Tests whether the view ends with a string, case-insensitively
+  function endsWithCaseInsensitively(const expectedEnd: string): boolean;
+
 
   //Searches a string in the view. Returns the first occurrence, or nil if not found.
   function find(searched: pchar; searchedLength: SizeInt): pchar;
@@ -848,6 +853,8 @@ public
   function viewRightWith(newStart: pchar): TPCharView; reintroduce;
   //** copy and rightOf.
   function viewRightOf(newStartSkip: pchar): TPCharView; reintroduce;
+  //** copy and take the first count characters.
+  function viewFirst(acount: SizeInt): TPCharView;
 
   //** Splits the view at element.
   //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
@@ -915,6 +922,7 @@ public
   function viewRightWith(newStart: pchar): TStringView; reintroduce;
   //** copy and rightOf.
   function viewRightOf(newStartSkip: pchar): TStringView; reintroduce;
+  function viewFirst(acount: SizeInt): TStringView; reintroduce;
 
   //** Splits the view at element.
   //** Everything before element is returned in before, everything behind it in behind. self is unchanged.
@@ -6546,10 +6554,27 @@ var
 begin
   expectedLength := system.length(expectedEnd);
   strLength := length;
-  result := ( length >= expectedLength ) and
+  result := ( strLength >= expectedLength ) and
             ( (expectedEnd='') or
               (CompareByte(data[strLength-expectedLength], PByte(expectedEnd)^, expectedLength) = 0) );
 end;
+
+function TPCharView.beginsWithCaseInsensitively(const s: string): boolean;
+begin
+  result := strlibeginswith(data, length, s);
+end;
+
+function TPCharView.endsWithCaseInsensitively(const expectedEnd: string): boolean;
+var
+  strLength, expectedLength: SizeInt;
+begin
+  expectedLength := system.length(expectedEnd);
+  strLength := length;
+  result := ( strLength >= expectedLength ) and
+            ( (expectedEnd='') or
+              strliequal(@data[strLength-expectedLength], pointer(expectedEnd), expectedLength) );
+end;
+
 
 function TPCharView.find(searched: pchar; searchedLength: SizeInt): pchar;
 var
@@ -6820,6 +6845,11 @@ begin
   result.rightOf(newStartSkip);
 end;
 
+function TPCharView.viewFirst(acount: SizeInt): TPCharView;
+begin
+  result.initEndCapped(data, data + acount, dataend);
+end;
+
 function TPCharView.splitAt(out before: TPCharView; element: PChar; out behind: TPCharView): boolean;
 begin
   result := isOnBounds(element);
@@ -6916,6 +6946,12 @@ function TStringView.viewRightOf(newStartSkip: pchar): TStringView;
 begin
   result := self;
   result.rightOf(newStartSkip);
+end;
+
+function TStringView.viewFirst(acount: SizeInt): TStringView;
+begin
+  result.initEndCapped(data, data + acount, dataend);
+  result.guard := guard;
 end;
 
 function TStringView.splitAt(out before: TStringView; element: PChar; out behind: TStringView): boolean;

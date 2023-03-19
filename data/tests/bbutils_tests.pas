@@ -2174,6 +2174,38 @@ begin
     inc(i);
   end;
 
+  test(v.beginsWith(''));
+  test(v.beginsWith('f'));
+  test(not v.beginsWith('F'));
+  test(v.beginsWith('foo'));
+  test(v.beginsWith('foobar'));
+  test(not v.beginsWith('foobarx'));
+  test(not v.beginsWith('bar'));
+
+  test(v.endsWith(''));
+  test(v.endsWith('r'));
+  test(not v.endsWith('R'));
+  test(v.endsWith('bar'));
+  test(not v.endsWith('xfoobar'));
+  test(not v.endsWith('foo'));
+
+  test(v.beginsWithCaseInsensitively(''));
+  test(v.beginsWithCaseInsensitively('f'));
+  test(v.beginsWithCaseInsensitively('F'));
+  test(v.beginsWithCaseInsensitively('foo'));
+  test(v.beginsWithCaseInsensitively('FOOBAR'));
+  test(not v.beginsWithCaseInsensitively('foobarx'));
+  test(not v.beginsWithCaseInsensitively('bar'));
+
+  test(v.endsWithCaseInsensitively(''));
+  test(v.endsWithCaseInsensitively('r'));
+  test(v.endsWithCaseInsensitively('R'));
+  test(v.endsWithCaseInsensitively('BAR'));
+  test(v.endsWithCaseInsensitively('FOObar'));
+  test(not v.endsWithCaseInsensitively('xfoobar'));
+  test(not v.endsWithCaseInsensitively('foo'));
+
+
   test(v.count('f'), 1);
   test(v.count('o'), 2);
   test(v.count(#0), 0);
@@ -2197,6 +2229,11 @@ begin
   test(v.viewLeftOf(p+5).ToString, 'fooba');
   test(v.viewLeftWith(p+6).ToString, 'foobar');
   test(v.viewLeftOf(p+6).ToString, 'foobar');
+
+  test(v.viewFirst(0).ToString, '');
+  test(v.viewFirst(3).ToString, 'foo');
+  test(v.viewFirst(6).ToString, 'foobar');
+  test(v.viewFirst(maxint).ToString, 'foobar');
 
 
   test(v.rightOfFirst(1));
