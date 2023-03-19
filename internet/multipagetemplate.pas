@@ -718,9 +718,7 @@ begin
   else if lang = '' then score := lsEmpty
   else if lang = 'en' then score := lsEnglish
   else score := lsOther;
-  writeln(lang,  score, ' ', oldScore);
   if score >= oldScore then exit;
-  writeln('  ', lang,  score, '<', oldScore);
   oldScore := score;
   desc := e.deepNodeText();
 end;
@@ -730,7 +728,6 @@ var
   templateDescriptionLanguageScore: TLanguageScore = lsUnitialized;
   variableDescriptionLanguageScore: TLanguageScore;
 begin
-  writeln('PL: ',context.preferredLanguage);
   ignore(context);
   e := t.next;
   while e <> nil do begin
