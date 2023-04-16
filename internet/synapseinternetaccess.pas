@@ -117,15 +117,20 @@ end;
 {$else}
 var resolvConfFileAge: longint = 0;
     resolvConfSynchronizer: TMultiReadExclusiveWriteSynchronizer;
+function resolvConfFile: string;
+begin
+ {$if FPC_FULlVERSION >= 020600}
+ result := netdb.EtcPath + netdb.SResolveFile;
+ {$else}
+ result := netdb.SResolveFile;
+ {$endif}
+end;
+
 function checkEtcResolv(): boolean;
 var resolvConf: string;
   newAge: LongInt;
 begin
-  {$if FPC_FULlVERSION >= 020600}
-  resolvConf := netdb.EtcPath + netdb.SResolveFile;
-  {$else}
-  resolvConf:=netdb.SResolveFile;
-  {$endif}
+  resolvConf := resolvConfFile;
   newAge := FileAge(resolvConf);
   result := false;
   if newAge > resolvConfFileAge then begin
@@ -394,7 +399,7 @@ defaultInternetConfiguration.searchCertificates;
 
 {$if not (defined(WINDOWS) or defined(android))}
 resolvConfSynchronizer := TMultiReadExclusiveWriteSynchronizer.Create;
-
+if FileExists(resolvConfFile) then resolvConfFileAge := FileAge(resolvConfFile);
 disableSIGPIPECrash;
 
 {$endif}
