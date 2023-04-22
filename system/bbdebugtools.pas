@@ -16,7 +16,7 @@ uses
   procedure log(const s: string);
 
   procedure startTiming(const title:string='global');
-  procedure stopTiming(const title:string='global');
+  procedure stopTiming(const title:string = '');
 
   procedure stoplogging();
 
@@ -109,12 +109,19 @@ end;
 
   procedure stopTiming(const title: string);
   var time,oldtime:cardinal;
+    i: Integer;
   begin
 {    if ThreadID<>MainThreadID then
       exit; //timing isn't thread save }
     time:=trunc(frac(now)*MSecsPerDay);
-    oldtime:=cardinal(pointer(timing.Objects[timing.IndexOf(title)]));
-    log('stopped timing of '+title+' run-time: '+IntToStr(time-oldtime)+' ms');
+    if (timing.count = 1) and (title = '') then i := 0
+    else i := timing.IndexOf(title);
+    oldtime:=cardinal(pointer(timing.Objects[i]));
+    if (timing.count > 1) or (title <> '') then
+      log('stopped timing of '+title+' run-time: '+IntToStr(time-oldtime)+' ms')
+     else
+      log('run-time: '+IntToStr(time-oldtime)+' ms');
+    timing.Delete(i);
   end;
 
 
