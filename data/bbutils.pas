@@ -341,7 +341,7 @@ function strliEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload;  
 function strliEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitively equal (same length and same characters) (null-terminated, stops comparison when meeting #0 ).
 function strlsEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
 function strlsEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload;  {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-sensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
-function strlsiEqual(const p1,p2:pansichar;const l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
+function strlsiEqual(p1,p2:pansichar;const l: SizeInt):boolean; overload; //**< Tests if the strings are case-insensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
 function strlsiEqual(const p1,p2:pansichar;const l1,l2: SizeInt):boolean; overload; {$IFDEF HASINLINE} inline; {$ENDIF} //**< Tests if the strings are case-insensitively equal (same length and same characters) (strict-length, can continue comparison after #0).
 function strlsequal(p: pansichar; const s: string; l: SizeInt): boolean; overload;
 //**equal comparison, case insensitive, stopping at #0-bytes in p1, ignoring #0-bytes in p2.
@@ -2092,15 +2092,29 @@ begin
   result:= (l1=l2) and (CompareByte(p1^, p2^, l1) = 0);
 end;
 
-function strlsiEqual(const p1, p2: pansichar; const l: SizeInt): boolean;
-var i: SizeInt;
-    c1, c2:integer;
+function strlsiEqual(p1, p2: pansichar; const l: SizeInt): boolean;
+var c1, c2: byte;
+    block1, block2: QWord;
+    p1end, p1alignedend, p1charbycharblockend: pansichar;
 begin
-  result := true;
-  for i := 0 to l-1 do
-      if p1[i] <> p2[i] then begin
-        c1 := ord(p1[i]);
-        c2 := ord(p2[i]);
+  result := false;
+  p1end := p1 + l;
+  p1alignedend :=  p1 + (l and not 7);
+  while p1 < p1end do begin
+    while p1 < p1alignedend do begin
+      block1 := unaligned(PQWord(p1)^);
+      block2 := unaligned(PQWord(p2)^);
+      if block1 = block2 then begin
+        inc(p1, 8);
+        inc(p2, 8);
+      end else break;
+    end;
+    p1charbycharblockend := p1 + 512;
+    if p1charbycharblockend > p1end then p1charbycharblockend := p1end;
+    while p1 < p1charbycharblockend do begin
+      c1 := ord(p1^);
+      c2 := ord(p2^);
+      if c1 <> c2 then begin
         if c1 in [97..122] then dec(c1, 32);
         if c2 in [97..122] then dec(c2, 32);
         if c1 <> c2 then begin result := false; exit; end;
