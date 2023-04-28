@@ -22,8 +22,11 @@ begin
 end;
 
 begin
-  tester := TXQTester.create(xqpmXQuery4_0, testerrors);
+  tester := TXQTester.create(xqpmXPath4_0, testerrors);
   tester.testerrors:=testerrors;
+
+  t('`{{}}}}{{ {1 to 3} ``abc&gt;`', '{}}{ 1 2 3 `abc&gt;');
+
 
   t('let $a := 2 return [4,5,6]?$a', '5');
   t('map {"x y": "z"}?"x y"', 'z');
@@ -67,7 +70,6 @@ begin
 
 
   t('for member $m in [10,20,30] return $m', '10 20 30');
-  t('for member $m at $i in [10,20,30] return $m + $i', '11 22 33');
   t('for member $m in [1,2], member $n in [40,50] return $m + $n', '41 51 42 52');
   t('for member $m in [1,2], $n in (40,50) return $m + $n', '41 51 42 52');
 

@@ -133,7 +133,7 @@ protected
   function parseString(const w: string): string;
   function parseNamespaceURI(const errXmlAlias, errEmpty: string): string;
   function parseXString(nullTerminatedString: boolean = false): TXQTerm; //**< parses an extended string like @code(x"foo""bar"), @code(x"foo{$varref}ba{1+2+3}r")
-  function parseX31String(): TXQTerm;
+  function parseX31StringConstructor(): TXQTerm;
   function parseJSONLikeObjectConstructor(standard: boolean): TXQTerm; //**< parses an json object constructor { "name": value, .. } or {| ... |}
   function parseJSONLikeArray(term: TXQTermWithChildren; closingParen: char = ']'): TXQTerm;
   function parseJSONLookup(expr: TXQTerm): TXQTermJSONLookup;
@@ -2584,12 +2584,16 @@ function TXQParsingContext.parseXString(nullTerminatedString: boolean): TXQTerm;
      result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'concat', [result, t]);
   end;
 
+var
+  allowEntityReplacement: Boolean;
+
   procedure pushRaw(from, too: pchar);
   var
     v: String;
   begin
     if too < from then exit;
-    v := replaceEntitiesIfNeeded(normalizeLineEnding(strFromPchar(from, too - from + 1)));
+    v := normalizeLineEnding(strFromPchar(from, too - from + 1));
+    if allowEntityReplacement then v := replaceEntitiesIfNeeded(v);
     if result <> nil then begin
       if result.InheritsFrom(TXQTermConstant) and (TXQTermConstant(result).value is TXQValueString) then
         (TXQTermConstant(result).value as TXQValueString).str += v
@@ -2607,11 +2611,11 @@ var
 begin
   result := nil;
   if nullterminatedString then strsymb := #0
-  else begin
+  else if (pos^ in ['''', '"']) or ((pos^ = '`') and (parsingModel in PARSING_MODEL4 )) then begin
     strsymb := pos^;
     pos+=1;
-    if not (strsymb in ['''', '"']) then raiseParsingError('pxp:XPST0003', 'Expected string start');
-  end;
+  end else raiseSyntaxError('Expected string start');
+  allowEntityReplacement := strsymb <> '`';
   mark := pos;
   try
     while pos^ <> #0 do begin
@@ -2645,7 +2649,7 @@ begin
     result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'string', [result]);
 end;
 
-function TXQParsingContext.parseX31String(): TXQTerm;
+function TXQParsingContext.parseX31StringConstructor(): TXQTerm;
 var
   marker: PChar;
   temp: TXQTerm;
@@ -3000,7 +3004,8 @@ begin
       exit(parseXString());
     end;
     '?': exit(parseJSONLookup(nil));
-    '`': if strBeginsWith(pos, '``[') then exit(parseX31String());
+    '`': if strBeginsWith(pos, '``[') then exit(parseX31StringConstructor())
+         else exit(parseXString());
   end;
 
   try

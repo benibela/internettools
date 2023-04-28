@@ -24,6 +24,10 @@ end;
 begin
   tester := TXQTester.create(xqpmXQuery4_0, testerrors);
 
+  t('`{{}}}}{{ {1 to 3} ``abc&gt;`', '{}}{ 1 2 3 `abc&gt;');
+
+  t('for member $m at $i in [10,20,30] return $m + $i', '11 22 33');
+
   writeln('XQuery 4.0 ', tester.count, ' completed');
   tester.free
 end;
