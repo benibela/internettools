@@ -71,7 +71,9 @@ begin
 
   t('for member $m in [10,20,30] return $m', '10 20 30');
   t('for member $m in [1,2], member $n in [40,50] return $m + $n', '41 51 42 52');
+  t('for member $m in [1,2] for member $n in [40,50] return $m + $n', '41 51 42 52');
   t('for member $m in [1,2], $n in (40,50) return $m + $n', '41 51 42 52');
+  t('for member $m in [1,2] for $n in (40,50) return $m + $n', '41 51 42 52');
 
   t('highest(1 to 3)', '3');
   t('highest(1 to 3, ())', '3');

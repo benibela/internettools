@@ -1777,7 +1777,7 @@ begin
     while token <> 'return' do begin
       case token of
         'let', 'for': begin
-          if Length(Result.children) > 0 then requireXQuery();
+          if (Length(Result.children) > 0) and not (parsingModel in PARSING_MODEL4) then requireXQuery('XQuery or XPath 4.0');
           parseInitialClauseAndNextToken;
         end;
         'where': begin
