@@ -25,6 +25,10 @@ begin
   tester := TXQTester.create(xqpmXPath4_0, testerrors);
   tester.testerrors:=testerrors;
 
+  t('12__3___4', '1234');
+  t('0b1_000_0', '16');
+  t('0x_f_F_', '255');
+
   t('`{{}}}}{{ {1 to 3} ``abc&gt;`', '{}}{ 1 2 3 `abc&gt;');
 
 

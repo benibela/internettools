@@ -3546,6 +3546,30 @@ end;
 
 { TXQTermNumber }
 
+function BigDecimalFromBase(const n: string; base: integer; negative: boolean): bigdecimal;
+var cur, bdbase: bigdecimal;
+  c: Char;
+  offset: Integer;
+  i: SizeInt;
+begin
+  bdbase := base;
+  result.setZero();
+  cur.setOne();
+  for i := length(n) downto 1 do begin
+    c := n[i];
+    case c of
+      '0'..'9': offset := ord(c) - ord('0');
+      'A'..'Z': offset := ord(c) - ord('A') + 10;
+      'a'..'z': offset := ord(c) - ord('a') + 10;
+      else raise EXQEvaluationException.create('pxp:INT', 'Invalid digit in '+n);
+    end;
+    if offset >= base then raise EXQEvaluationException.create('pxp:INT', 'Invalid digit in '+n);
+    result := result + offset * cur;
+    cur := cur * bdbase;
+  end;
+  if not result.isZero() then result.signed := negative;
+end;
+
 constructor TXQTermConstant.createNumber(const avalue: string);
 begin
   if strContains(avalue,'e') or strContains(avalue,'E') then value := baseSchema.double.createValue(avalue)

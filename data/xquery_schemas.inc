@@ -692,6 +692,13 @@ begin
   create(aname, aparent, aparent.subType)
 end;
 
+function TXSNumericType.createIntegerValueWithBase(s: string; basis: integer; negative: boolean): IXQValue;
+begin
+  if (basis = 16) and (length(s) < 16) then exit(xqvalue(StrToInt64(ifthen(negative, '-$', '$') + s)))
+  else if basis = 10 then result := baseSchema.integer.createValue(ifthen(negative, '-', '') + s)
+  else result := baseSchema.integer.createValue(BigDecimalFromBase(s, basis, negative))
+end;
+
 function TXSNumericType.constraintsSatisfied(const v: BigDecimal): boolean;
 var
   i: SizeInt;

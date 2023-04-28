@@ -1010,22 +1010,32 @@ begin
         pos += 1; //not a number
         if pos^ = '.' then pos += 1; //..
       end else begin
-        numberE:=false;
-        repeat
-          pos+=1;
-          if pos^ = '.' then begin
-            if numberPoint then error('Double . in number');
-            numberPoint:=true;
-            pos+=1;
+        if (pos^ = '0') and ((pos+1)^ in ['x','b']) and (parsingModel in PARSING_MODEL4) then begin
+          if (pos+1)^ = 'b' then begin
+            pos += 2;
+            while pos^ in ['0'..'1','_'] do pos+=1;
+          end else if (pos+1)^ = 'x' then begin
+            pos += 2;
+            while pos^ in ['0'..'9','a'..'f','A'..'F','_'] do pos+=1;
           end;
-          if pos^ in ['e','E'] then begin
-            if numberE then error('Double e in number');
+        end else begin
+          numberE:=false;
+          repeat
             pos+=1;
-            numberE:=true;
-            if not (pos^ in ['0'..'9','+','-']) then error('Invalid character after e in number')
-            else pos+=1;
-          end;
-        until not (pos^ in ['0'..'9']);
+            if pos^ = '.' then begin
+              if numberPoint then error('Double . in number');
+              numberPoint:=true;
+              pos+=1;
+            end;
+            if pos^ in ['e','E'] then begin
+              if numberE then error('Double e in number');
+              pos+=1;
+              numberE:=true;
+              if not (pos^ in ['0'..'9','+','-'])  and ((pos^ <> '_') or not (parsingModel in PARSING_MODEL4)) then error('Invalid character after e in number')
+              else pos+=1;
+            end;
+          until not (pos^ in ['0'..'9']) and ((pos^ <> '_') or not (parsingModel in PARSING_MODEL4));
+        end;
         if (pos^ in ['a'..'z','A'..'Z']) then error('Space needed between number and non-symbolic operator');
       end;
     end;
@@ -2923,6 +2933,18 @@ var
     end;
   end;
 
+  function parseNumber(const s: string): TXQTermConstant;
+  begin
+    if (parsingModel in PARSING_MODEL4) then begin
+      if s.contains('_') then exit(parseNumber(StringReplace(s, '_', '', [rfReplaceAll])));
+      if s.beginsWith('0') then begin
+        if s.beginsWith('0b') then exit(TXQTermConstant.create(baseSchema.integer.createIntegerValueWithBase(copy(s, 3, length(s)), 2)))
+        else if s.beginsWith('0x') then exit(TXQTermConstant.create(baseSchema.integer.createIntegerValueWithBase(copy(s, 3, length(s)), 16)));
+      end;
+    end;
+    result := TXQTermConstant.createNumber(s);
+  end;
+
 begin
   result := nil;
   skipWhitespaceAndComment();
@@ -2959,13 +2981,13 @@ begin
       exit(TXQTermBinaryOp.Create(word, TXQTermNodeMatcher.Create(xqnmdRoot), parseValue()));
     end;
 
-    '0'..'9': exit(TXQTermConstant.createNumber(nextToken()));
+    '0'..'9': exit(parseNumber(nextToken()));
     '.': begin
       word := nextToken();
       case word of
         '.': exit(TXQTermContextItem.Create);
         '..': exit(TXQTermNodeMatcher.Create(xqnmdParent));
-        else if word[2] in ['0'..'9', 'e', 'E'] then exit(TXQTermConstant.createNumber(word))
+        else if word[2] in ['0'..'9', 'e', 'E'] then exit(parseNumber(word))
         else raiseSyntaxError('Unknown term: '+word);
       end;
     end;
