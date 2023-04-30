@@ -1547,6 +1547,8 @@ type
     function constraintsSatisfied(const v: BigDecimal): boolean;
     constructor create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
     constructor create(const aname: string; aparent: TXSNumericType);
+
+    function createIntegerValueWithBase(s: string; basis: integer; negative: boolean = false): IXQValue;
   end;
 
   { TXSBooleanType }
