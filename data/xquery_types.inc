@@ -1917,6 +1917,9 @@ var
 const componentMax: array[1..6] of integer = (high(integer), 13, 32, 25, 60, 60);
 const componentFiller: array[1..6] of integer = (1972, 12, 31, 0, 0, 0);
 const componentChars: string = 'ymdhns';
+var parsedMask: TDateTimeMask;
+  tempRes: TDateTimeParts;
+  optionsRecord: TDateTimeParsingOptions;
 begin
   result := dtprFailure;
   if data = nil then data := @tempData;
@@ -1924,21 +1927,26 @@ begin
   if duration and ((length(s) <= 2) or strEndsWith(s, 'T')) then exit;
   formats := strSplit(format, '|');
   if length(formats) = 0 then exit;
+  optionsRecord.flags := [dtpfStrict];
   for i:=0 to high(formats) do begin
     usedFormat:=formats[i];
-    result := dateTimeParsePartsTry(s, usedFormat, @data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone, [dtpfStrict]);
-    if result = dtprSuccess then begin
-      if ( (not duration) and (
-             ((data^.year = 0) and (baseSchema.version = xsd10))
-            or (((abs(data^.year) < 10000) and strBeginsWith(usedFormat, 'y')
-                  and not strBeginsWith(s, strFromInt(data^.year, 4))
-                  and not ((data^.year = 0) and strBeginsWith(s, '-0000'))  ))))
-         or ((data^.hour = 24) and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs)))
-         or ((data^.timezone <> high(Integer)) and ((data^.timezone < -14 * 60) or (data^.timezone > 14 * 60)))
-         then
-        result := dtprFailure;
-    end;
+    if not parsedMask.parseMask(usedFormat) then continue;
+    result := parsedMask.parseDateTime(s.pcharView, optionsRecord, tempRes);
     if result <> dtprSuccess then continue;
+    tempRes.toIntPointers(@data^.year, @data^.month, @data^.day, @data^.hour, @data^.min, @data^.seconds, @data^.microsecs, @data^.timezone);
+    if ( (not duration) and (
+           ((data^.year = 0) and (baseSchema.version = xsd10))
+          or (((abs(data^.year) < 10000) and strBeginsWith(usedFormat, 'y')
+                and not strBeginsWith(s, strFromInt(data^.year, 4))
+                and not ((data^.year = 0) and strBeginsWith(s, '-0000'))  ))))
+       or ((data^.hour = 24)
+             and ((tempRes.amPM = tempres.INVALID))
+             and (componentNonZero(data^.min) or componentNonZero(data^.seconds) or componentNonZero(data^.microsecs)))
+       or ((data^.timezone <> high(Integer)) and ((data^.timezone < -14 * 60) or (data^.timezone > 14 * 60)))
+       then begin
+      result := dtprFailure;
+      continue;
+    end;
     if data^.microsecs = high(data^.microsecs) then data^.microsecs := 0
     else if data^.microsecs <> 0 then data^.microsecs := (data^.microsecs + 500) div 1000;
     if duration and strBeginsWith(s, '-') then begin

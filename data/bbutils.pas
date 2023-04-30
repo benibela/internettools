@@ -814,6 +814,11 @@ public
   //**Remves everything before the first line break (inclusive).
   function rightOfLineBreak: boolean;
 
+  function rightOfFirst(expectedStart: string): boolean; overload;
+  function rightOfFirst(expectedStart: char): boolean; overload;
+  function rightOfFirstCaseInsensitively(expectedStart: string): boolean;
+
+
   //**Removes all characters after the first occurrence of a string (removes s, too). Keeps the view unchanged if it does not contain s.
   function leftOfFind(const s: string): boolean;
   //**Removes all characters after the first occurrence of a string (keeps s itself). Keeps the view unchanged if it does not contain s.
@@ -1171,6 +1176,53 @@ type EDateTimeParsingException = class(Exception);
 type TDateTimeParsingFlag = (dtpfStrict);
      TDateTimeParsingFlags = set of TDateTimeParsingFlag;
      TDateTimeParsingResult = (dtprSuccess, dtprFailureValueTooHigh, dtprFailureValueTooHigh2, dtprFailure);
+     TDateTimePartInt = integer;
+     //**Represents a parsed date time
+     TDateTimeParts = record
+       const INVALID = high(TDateTimePartInt);
+       procedure toIntPointers(outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outNanoSeconds: PInteger;
+         outTimeZone: PInteger);
+     var
+     case boolean of
+       true: ( year, month, day, hour, minute, second, nanosecond, timezone, amPM: TDateTimePartInt);
+       false: ( parts: array[1..9] of TDateTimePartInt; )
+     end;
+     //** Options for date time parsing (internally used)
+     TDateTimeParsingOptions = record
+       flags: TDateTimeParsingFlags;
+     end;
+     TDateTimeMaskPartKind = (
+       pkSecond,
+       pkMinute,
+       pkHour,
+       pkDay,
+       pkMonth,
+       pkYearFixed, pkYear2000Adjust,
+       pkFractionOfSecond,
+       pkAMPM,
+       pkTimezone,
+       pkWhitespace,
+       pkEndOfInput,
+       pkOptionalStart,
+       pkVerbatim
+     );
+     //** Part in a date time mask (internally used)
+     TDateTimeMaskPart = record
+       kind: TDateTimeMaskPartKind;
+       mincount, maxcount: integer;
+       verbatim: string;
+     end;
+     PDateTimeMaskPart = ^TDateTimeMaskPart;
+     //** A date time mask (internally used)
+     TDateTimeMask = record
+       parts: array of TDateTimeMaskPart;
+       function parseMask(mask: string): boolean;
+       function parseDateTime(input: TPCharView; const options: TDateTimeParsingOptions; out res: TDateTimeParts): TDateTimeParsingResult;
+     private
+       function parseDateTime(input: TPCharView; const options: TDateTimeParsingOptions; var res: TDateTimeParts; startPart: SizeInt): TDateTimeParsingResult;
+     end;
+
+
 //**Reads a date time string given a certain mask (mask is case-sensitive)
 //**
 //**The function uses the same mask types as FormatDate: @unorderedList(
@@ -1182,7 +1234,7 @@ type TDateTimeParsingFlag = (dtpfStrict);
 //** @item(am/pm or a/p match am/pm or a/p)
 //** @item(yy, yyyy or [yy]yy for the year. (if the year is < 90, it will become 20yy, else if it is < 100, it will become 19yy, unless you use uppercase Y instead of y)  )
 //** @item(YY, YYYY or [YY]YY for the year, too.)
-//** @item(z, zz, zzz, zzzz for microseconds (e.g. use [.zzzzzz] for optional ms with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional µs with up to 6 digit precision))
+//** @item(z, zz, zzz, zzzz for fractions of seconds (e.g. use [.zzzzzz] for optional microseconds with exactly 6 digit precision, use [.z[z[z[z[z[z]]]]]] for optional µs with up to 6 digit precision))
 //** @item(Z for the ISO time zone (written as regular expressions, it matches 'Z | [+-]hh(:?mm)?'. Z is the only format ansichar (except mmm) matching several characters))
 //**)
 //**The letter formats d/y/h/n/s matches one or two digits, the dd/mm/yy formats require exactly two.@br
@@ -1226,9 +1278,11 @@ function dateFormat(const mask: string; const y, m, d: integer): string;
 function dateFormatNew(const mask: string; const y, m, d: integer; timezone: integer): string;
 function dateFormatOld(const mask: string; const y, m, d: integer; const timezone: TDateTime): string; {$ifdef HASDeprecated}deprecated 'use dateFormatNew';{$endif}
 
-//**Encodes a date as datetime (supports negative years)
+//**Encodes a date as datetime.
+//**It is identical to sysutils.EncodeDateTry in the year range 1..9999, but supports further years
 function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
-//**Encodes a date as datetime (supports negative years)
+//**Encodes a date as datetime.
+//**It is identical to sysutils.EncodeDate in the year range 1..9999, but supports further years
 function dateEncode(year, month, day: integer): TDateTime;
 //**Encodes a date as datetime (supports negative years)
 procedure dateDecode(date: TDateTime; year, month, day: PInteger);
@@ -2117,9 +2171,14 @@ begin
       if c1 <> c2 then begin
         if c1 in [97..122] then dec(c1, 32);
         if c2 in [97..122] then dec(c2, 32);
-        if c1 <> c2 then begin result := false; exit; end;
+        if c1 <> c2 then exit;
       end;
+      inc(p1); inc(p2);
+    end;
+  end;
+  result := true;
 end;
+
 
 //equal comparison, case insensitive, ignoring #0-bytes
 function strlsiequal(const p1, p2: pansichar; const l1, l2: SizeInt): boolean;
@@ -5057,682 +5116,6 @@ begin
   end;
 end;
 
-function dateIsLeapYear(const year: integer): boolean;
-begin
-  result := (year mod 4 = 0) and ((year mod 100 <> 0) or (year mod 400 = 0))
-end;
-
-function dateWeekOfYear(const date:TDateTime):word; overload;
-var month, day, year: word;
-begin
-  DecodeDate(date,year,month,day);
-  result := dateWeekOfYear(year,month,day);
-end;
-
-function dateWeekOfYear(year, month, day: integer): word;overload;
-//ISO Week after Claus T�ndering  http://www.tondering.dk/claus/cal/week.php#weekno
-var a,b,c,s,e,f,g,d,n: longint;
-    startOfYear: boolean;
-begin
-  dec(month);
-  dec(day);
-  startOfYear:=month in [0,1];
-  a:=year;
-  if startOfYear then dec(a);
-  b:=a div 4 - a div 100 + a div 400;
-  c:=(a-1) div 4 - (a-1) div 100 + (a-1) div 400;
-  s:=b-c;
-  if startOfYear then begin
-    e:=0;
-    f:=day + 31*month;
-  end else begin
-    e:=s+1;
-    f:=day+(153*(month-2)+2)div 5 + 59 + s;
-  end;
-
-  g:=(a+b) mod 7;
-  d:=(f+g-e) mod 7;
-  n:=f+3-d;
-  if n<0 then result:=53-(g-s) div 5
-  else if n>364+s then result:=1
-  else result:=n div 7+1;
-end;
-
-//const DATETIME_PARSING_FORMAT_CHARS = ['h','n','s','d','y','Z','z'];
-
-
-type T9Ints = array[1..9] of integer;
-
-function dateTimeParsePartsTryInternal(input,mask:string; var parts: T9Ints; options: TDateTimeParsingFlags): TDateTimeParsingResult;
-type THumanReadableName = record
-  n: string;
-  v: integer;
-end;
-const DefaultShortMonths: array[1..17] of THumanReadableName = (
-   //english
-   (n:'jan'; v:1), (n:'feb'; v:2), (n:'mar'; v: 3), (n:'apr'; v:4), (n:'may'; v:5), (n:'jun'; v:6)
-  ,(n:'jul'; v:7), (n:'aug'; v:8), (n:'sep'; v: 9), (n:'oct'; v:10), (n:'nov'; v:11), (n:'dec'; v:12),
-   //german (latin1)
-   (n:'m'#$E4'r'; v:3), (n:'mai'; v:5), (n:'okt'; v:10), (n:'dez'; v:12),
-   //german (utf8)
-   (n:'m'#$C3#$A4'r'; v:3)
-  );
-const DefaultLongMonths: array[1..21] of THumanReadableName = (
-  //english
-  (n:'january';v:1), (n:'february';v:2), (n:'march';v:3), (n:'april';v: 4), (n:'may';v: 5), (n:'june';v:6),
-  (n:'july';v:7), (n:'august';v:8), (n:'september';v:9), (n:'october';v:10), (n:'november';v:11), (n:'december';v:12),
-  //german
-  (n:'januar';v:1), (n:'februar';v:2), (n:'m'#$E4'rz';v:3), (n:'mai';v: 5), (n:'juni';v:6),
-  (n:'juli';v:7), (n:'oktober';v:10), (n:'dezember';v:12),
-  (n:'m'#$C3#$A4'rz';v:3));
-
-function readNumber(const s:string; var ip: integer; const count: integer): integer;
-var temp: Cardinal;
-begin
-  if (dtpfStrict in options) and ((ip > length(s)) or not (s[ip] in ['0'..'9'])) then begin
-    result := -1;
-    exit;
-  end;
-  if strDecimalToUIntTry(@s[ip], @s[ip] + count, temp) then result := temp
-  else result := -1;
-  inc(ip,  count);
-end;
-
-var
-  i: Integer;
-
-  prefix, mid, suffix: string;
-  p: Integer;
-
-  count: integer;
-  base: ansichar;
-  index: Integer;
-
-  mp, ip: integer;
-  positive: Boolean;
-  backup: T9Ints;
-  truecount: Integer;
-  newres: TDateTimeParsingResult;
-
-
-begin
-  truecount := 0; //hide warning
-  p := pos('[', mask);
-  if p > 0 then begin
-    suffix := mask;
-    prefix := copy(mask, 1, p - 1);
-    mid := strSplitGetBetweenBrackets(suffix, '[', ']', true);
-
-    backup := parts;
-    result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts, options);
-    if result <> dtprSuccess then parts := backup
-    else  exit;
-    {if pos('[', mid) = 0 then begin
-      formatChars:=0;
-      for i:=1 to length(mid) do
-        if (mid[i] in DATETIME_PARSING_FORMAT_CHARS) then inc(formatChars);  //todo: check for ", but really, whotf cares?
-      for i:=1 to formatChars-1 do begin
-        for j:=1 to length(mid) do
-          if (mid[j] in DATETIME_PARSING_FORMAT_CHARS) then begin //mmm <> mm??
-            delete(mid, j, 1);
-            break;
-          end;
-        backup := parts;
-        result := dateTimeParsePartsTryInternal(input, prefix+mid+suffix, parts);
-        if result then exit
-        else parts := backup;
-      end;
-    end;}
-    newres := dateTimeParsePartsTryInternal(input, prefix+suffix, parts, options);
-    if newres <> dtprSuccess then begin
-      parts := backup;
-      if result = dtprFailure then result := newres;
-    end else result := newres;
-    exit;
-  end;
-
-
-  result := dtprSuccess;
-  mp:=1;
-  ip:=1;
-  while mp<=length(mask) do begin
-    case mask[mp] of
-      'h','n','s','d', 'm', 'y', 'Y', 'Z', 'z', 'a': begin
-        count := 0;
-        base := mask[mp];
-        if mask[mp] <> 'a' then begin
-          while (mp <= length(mask)) and (mask[mp] = base) do begin inc(mp); inc(count); end;
-          truecount:=count;
-          if (mp <= length(mask)) and (mask[mp] = '+') then begin
-            if (base = 'm') and (truecount >= 3) then begin inc(count); inc(mp); end
-            else begin
-              while (ip + count <= length(input)) and (input[ip+count] in ['0'..'9']) do inc(count);
-              inc(mp);
-              if count > 9 then begin
-                result := dtprFailureValueTooHigh; //input is invalid, but continue parsing, so we do not report value-too-high on input with completely invalid format, just because there is a large number at the beginning
-                inc(ip, count-4); //jump ahead, so there are no problems with invalid integers
-                count := 4;
-              end else if (ip <= length(input)) and (input[ip] = '-') and (base = 'y') then dec(count);
-            end;
-          end;
-        end else begin //am/pm special case
-          if (mp + 4 <= length(mask)) and (strliequal(@mask[mp], 'am/pm', 5)) then inc(mp, 5)
-          else if (mp + 2 <= length(mask)) and (strliequal(@mask[mp], 'a/p', 3)) then inc(mp, 3)
-          else if (ip > length(input)) or (input[ip] <> 'a') then begin result := dtprFailure; exit; end
-          else begin inc(mp); inc(ip); continue; end;
-        end;
-
-        index := -1;
-        case base of
-          'y', 'Y': index := 1; 'm': index := 2; 'd': index := 3;
-          'h': index := 4; 'n': index := 5; 's': index := 6;
-          'z': index := 7;
-          'Z': index := 8;
-          'a': index := 9;
-          else assert(false);
-        end;
-
-        if (ip+count-1 > length(input)) then begin result := dtprFailure; exit; end;
-
-        case base of
-          'y': if (input[ip] = '-') then begin //special case: allow negative years
-            inc(ip);
-            parts[index] := - readNumber(input,ip,count);
-            if parts[index] = --1 then begin result := dtprFailure; exit; end;
-            continue;
-          end;
-          'm': case truecount of
-            3, 4: begin //special case verbose month names
-              parts[2] := high(parts[2]);
-              if count >= 4 then begin
-                //special month name handling
-                for i:=low(DefaultLongMonths) to high(DefaultLongMonths) do
-                  if strliequal(@input[ip], DefaultLongMonths[i].n, length(DefaultLongMonths[i].n)) then begin
-                     inc(ip,  length(DefaultLongMonths[i].n));
-                     parts[2] := DefaultLongMonths[i].v;
-                     break;
-                   end;
-                if parts[2] <> high(parts[2]) then continue;
-                {$IFDEF HASDefaultFormatSettings}
-                for i:=1 to 12 do
-                  if strliequal(@input[ip], DefaultFormatSettings.LongMonthNames[i], length(DefaultFormatSettings.LongMonthNames[i])) then begin
-                    inc(ip,  length(DefaultFormatSettings.LongMonthNames[i]));
-                    parts[2] := i;
-                    break;
-                  end;
-                if parts[2] <> high(parts[2]) then continue;
-                {$ENDIF}
-              end;
-              if truecount = 3 then begin
-                //special month name handling
-                mid:=LowerCase(input[ip]+input[ip+1]+input[ip+2]);
-                for i:=low(DefaultShortMonths) to high(DefaultShortMonths) do
-                  if ((length(DefaultShortMonths[i].n) = 3) and (mid = DefaultShortMonths[i].n)) or
-                     ((length(DefaultShortMonths[i].n) <> 3) and strliequal(@input[ip], DefaultShortMonths[i].n, length(DefaultShortMonths[i].n))) then begin
-                       inc(ip,  length(DefaultShortMonths[i].n));
-                       parts[2] := DefaultShortMonths[i].v;
-                       break;
-                     end;
-                if parts[2] <> high(parts[2]) then continue;
-                {$IFDEF HASDefaultFormatSettings}
-                for i:=1 to 12 do
-                  if ((length(DefaultFormatSettings.ShortMonthNames[i]) = 3) and (DefaultFormatSettings.ShortMonthNames[i] = mid)) or
-                     (strliequal(@input[ip], DefaultFormatSettings.ShortMonthNames[i], length(DefaultFormatSettings.ShortMonthNames[i]))) then begin
-                       inc(ip,  length(DefaultFormatSettings.ShortMonthNames[i]));
-                       parts[2] := i;
-                       break;
-                     end;
-                if parts[2] <> high(parts[2]) then continue;
-                {$ENDIF}
-              end;
-              result := dtprFailure;
-              exit;
-            end;
-          end;
-          'Z': begin //timezone
-            if ip > length(input) then begin result := dtprFailure; exit; end;
-            if input[ip] = 'Z' then begin parts[index] := 0; inc(ip); end //timezone = utc
-            else if (input[ip] in ['-','+']) then begin
-              parts[index]  := 0;
-              positive := input[ip] = '+';
-              inc(ip);
-              parts[index] := 60 * readNumber(input, ip, 2);
-              if parts[index] = -1 then begin result := dtprFailure; exit; end;
-              if ip <= length(input) then begin
-                if input[ip] = ':' then inc(ip)
-                else if dtpfStrict in options then begin result := dtprFailure; exit; end;
-                if input[ip] in ['0'..'9'] then begin
-                  i := readNumber(input, ip, 2);
-                  if (i = -1) or (i > 59) then begin result := dtprFailure; exit; end;
-                  parts[index] := parts[index] +  i;
-                end;
-              end else if dtpfStrict in options then begin result := dtprFailure; exit; end;
-              if not positive then parts[index] := - parts[index];
-            end else begin result := dtprFailure; exit; end;
-            continue;
-          end;
-          'a': begin //am/pm or a/p
-            if (input[ip] in ['a', 'A']) then parts[index] := 0
-            else if (input[ip] in ['p', 'P']) then parts[index] := 12
-            else begin result := dtprFailure; exit; end;
-            inc(ip);
-            if mask[mp-1] = 'm' then begin
-              if not (input[ip] in ['m', 'M']) then begin result := dtprFailure; exit; end;
-              inc(ip);
-            end;
-            continue;
-          end;
-        end;
-
-        parts[index] := readNumber(input, ip, count);
-        if parts[index] = -1 then begin result := dtprFailure; exit; end;
-
-        if base = 'z' then
-          for i:=count + 1 to 9 do
-            parts[index] := parts[index] *  10; //fixed length ms
-        if (base = 'y') and (count <= 2) then
-          if (parts[index] >= 0) and (parts[index] < 100) then
-            if parts[index] < 90 then parts[index] := parts[index] + 2000
-            else parts[index] := parts[index] + 1900;
-      end;
-      ']': raise EDateTimeParsingException.Create('Invalid mask: missing [, you can use \] to escape ]');
-      '"': begin   //verbatim
-        inc(mp);
-        while (mp <= length(mask)) and (ip <= length(input)) and (mask[mp] <> '"') and  (mask[mp] = input[ip]) do begin
-          inc(ip);
-          inc(mp);
-        end;
-        if (mp > length(mask)) or (mask[mp] <> '"') then begin result := dtprFailure; exit; end;
-        inc(mp);
-      end;
-      ' ',#9: begin //skip whitespace
-        if ip > length(input) then begin result := dtprFailure; exit; end;
-        while (mp <= length(mask)) and (mask[mp] in [' ',#9]) do inc(mp);
-        if not (input[ip] in [' ',#9]) then begin result := dtprFailure; exit; end;
-        while (ip <= length(input)) and (input[ip] in [' ',#9]) do inc(ip);
-      end
-      else if (mask[mp] = '$') and (mp  = length(mask)) then begin
-        if ip <> length(input) + 1 then result := dtprFailure;
-        exit;
-      end else if (ip > length(input)) or (mask[mp]<>input[ip]) then begin result := dtprFailure; exit; end
-      else begin
-        inc(mp);
-        inc(ip);
-      end;
-    end;
-  end;
-end;
-
-
-function dateTimeEncode(const y, m, d, h, n, s: integer; nanoseconds: integer): TDateTime;
-begin
-  result := dateEncode(y,m,d) + EncodeTime(h,n,s,0) + nanoseconds * (1e-9 / SecsPerDay);
-end;
-
-function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;
-var parts: T9Ints;
-  i: Integer;
-  mask2: string;
-const singleletters: string = 'mdhns';
-begin
-  for i:=low(parts) to high(parts) do parts[i] := high(parts[i]);
-  mask2 := trim(mask);
-  for i:=1 to length(singleletters) do begin//single m,d,h,n,s doesn't make sense, so replace x by [x]x
-    if strlcount(singleletters[i], pansichar(mask2), length(mask2)) <> 1 then continue;
-    mask2 := StringReplace(mask2, singleletters[i], '['+singleletters[i]+']'+singleletters[i],[]);
-  end;
-  result := dateTimeParsePartsTryInternal(trim(input), mask2, parts, options);
-  if result <> dtprSuccess then exit;
-  if assigned(outYear) then outYear^:=parts[1];
-  if assigned(outMonth) then outMonth^:=parts[2];
-  if assigned(outDay) then outDay^:=parts[3];
-  if assigned(outHour) then begin
-    outHour^:=parts[4];
-    if parts[9] = 12 then inc(outHour^, 12);
-  end;
-  if assigned(outMinutes) then outMinutes^:=parts[5];
-  if assigned(outSeconds) then outSeconds^:=parts[6];
-  if assigned(outSecondFraction) then outSecondFraction^:= parts[7];
-  if assigned(outTimeZone) then outtimezone^:= parts[8];
-end;
-
-procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
-begin
-  if dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone) <> dtprSuccess then
-    raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
-end;
-
-function timeZoneOldToNew(const tz: Double): integer;
-begin
-  if IsNan(tz) then result := high(integer)
-  else result := round(tz * MinsPerDay);
-end;
-
-function timeZoneNewToOld(const tz: integer): double;
-begin
-  if tz = high(integer) then result := NaN
-  else result := tz / MinsPerDay;
-end;
-
-const TryAgainWithRoundedSeconds: string = '<TryAgainWithRoundedSeconds>';
-
-
-function dateTimeFormatInternal(const mask: string; const y, m, d, h, n, s, nanoseconds, timezone: integer): string;
-var mp: integer;
-  function nextMaskPart: string;
-  function isValid(const c: ansichar): boolean;
-  begin
-    case c of
-      'y','Y': result := (y <> 0) and (y <> high(integer));
-      'm': result := (m <> 0) and (m <> high(integer));
-      'd': result := (d <> 0) and (d <> high(integer));
-      'h': result := (h <> 0) and (h <> high(integer));
-      'n': result := (n <> 0) and (n <> high(integer));
-      's': result := (s <> 0) and (s <> high(integer));
-      'z': result := (nanoseconds <> 0) and (nanoseconds <> high(integer));
-      'Z': result := (timezone <> high(Integer));
-      else raise exception.Create('impossible');
-    end;
-  end;
-
-  const SPECIAL_MASK_CHARS = ['y','Y','m','d','h','n','s','z','Z'];
-  var
-    oldpos: Integer;
-    okc: ansichar;
-    i: Integer;
-  begin
-    while (mp <= length(mask)) and (mask[mp] = '[') do begin
-      oldpos := mp;
-      result := strcopyfrom(mask, mp);
-      result := strSplitGetBetweenBrackets(result, '[', ']', false);
-      mp := mp +  length(result) + 2;
-      okc := #0;
-      for i:=1 to length(result) do
-        if (result[i] in SPECIAL_MASK_CHARS) and isValid(result[i]) then begin
-          okc := result[i];
-          break;
-        end;
-      if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then begin
-        result := dateTimeFormatInternal(result, y, m, d, h, n, s, nanoseconds, timezone);
-        if pointer(result) = pointer(TryAgainWithRoundedSeconds) then exit;
-        result := '"' + result + '"';
-        exit;
-      end;
-      result:='';
-    end;
-    while (mp <= length(mask)) and (mask[mp] = '"') do begin
-      oldpos := mp;
-      inc(mp);
-      while (mp <= length(mask)) and (mask[mp] <> '"') do
-        inc(mp);
-      inc(mp);
-      result := copy(mask, oldpos, mp - oldpos);
-      exit;
-    end;
-    if mp > length(mask) then exit;
-    if mask[mp] = '$' then begin inc(mp); begin result := ''; exit; end; end;
-    oldpos := mp;
-    if mask[mp] in SPECIAL_MASK_CHARS then begin
-      while (mp <= length(mask)) and (mask[mp] = mask[oldpos]) do inc(mp);
-      result := copy(mask, oldpos, mp - oldpos);
-      if (mp <= length(mask)) and (mask[mp] = '+') then inc(mp);
-    end else begin
-      while (mp <= length(mask)) and not (mask[mp] in (SPECIAL_MASK_CHARS + ['$','"','['])) do inc(mp);
-      result := copy(mask, oldpos, mp - oldpos);
-    end;
-  end;
-
-var part: string;
-  temp: Int64;
-  scale: Integer;
-  toadd: string;
-  len: Integer;
-begin
-  mp := 1;
-  result := '';
-  while mp <= length(mask) do begin
-    part := nextMaskPart;
-    if pointer(part) = pointer(TryAgainWithRoundedSeconds) then begin result := TryAgainWithRoundedSeconds; exit; end;
-    if length(part) = 0 then continue;
-    case part[1] of
-      'y','Y': result := result +  strFromInt(y, length(part));
-      'm': result := result +  strFromInt(m, length(part));
-      'd': result := result +  strFromInt(d, length(part));
-      'h': result := result +  strFromInt(h, length(part));
-      'n': result := result +  strFromInt(n, length(part));
-      's': result := result +  strFromInt(s, length(part));
-      'z': begin
-        if (mask[mp-1] = '+') and (length(part) < 6) then len := 6
-        else len := length(part);
-        if len < 9 then begin
-          scale := powersOf10[9 - len];
-          temp := nanoseconds div scale;
-          if nanoseconds mod scale >= scale div 2 then inc(temp); //round
-        end else begin
-          temp := nanoseconds;
-          if len > 9 then len := 9 //we do not have those digits
-        end;
-        if temp >= powersOf10[len] then begin result := TryAgainWithRoundedSeconds; exit; end; //rounding overflowed
-        toadd := strTrimRight(strFromInt(temp, len), ['0']);
-        result := result +  toadd;
-        if length(toadd) < length(part) then result := result +  strDup('0', length(part) - length(toadd));
-      end;
-      'Z': if timezone <> high(Integer) then begin; //no timezone
-        if timezone = 0 then result := result + 'Z'
-        else
-          if timezone > 0 then result := result +  '+' + strFromInt(timezone div 60, 2) + ':' + strFromInt(timezone  mod 60, 2)
-          else                 result := result +  '-' + strFromInt(-timezone div 60, 2) + ':' + strFromInt(-timezone mod 60, 2);
-      end;
-      '"': result := result +  copy(part, 2, length(part) - 2);
-      else result := result +  part;
-    end;
-  end;
-end;
-
-
-function dateTimeParse(const input, mask: string; outtimezone: PInteger): TDateTime;
-var y,m,d: integer;
-    hour, minutes, seconds: integer;
-    nanoseconds: integer;
-    timeZone: integer;
-begin
-  dateTimeParseParts(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, @timeZone);
-
-  if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
-  if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
-  if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
-  if hour=high(hour) then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
-  if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
-  if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
-
-  result := trunc(EncodeDate(y,m,d)) + EncodeTime(hour,minutes,seconds,0);
-  if nanoseconds <> high(nanoseconds) then result := result +  nanoseconds / (1000000000.0 * SecsPerDay);
-  if outtimezone <> nil then outtimezone^ := timeZone
-  else if timeZone <> high(Integer) then result := result -  timeZone * 60 / SecsPerDay;
-end;
-
-
-function dateTimeFormat(const mask: string; y, m, d, h, n, s: Integer; nanoseconds: integer; timezone: integer): string;
-const invalid = high(integer);
-begin
-  Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,nanoseconds,timezone);
-  if pointer(Result) = Pointer(TryAgainWithRoundedSeconds) then begin
-    inc(s);
-    //handle overflow
-    if s >= 60 then begin
-      s := 0;
-      if n <> invalid then begin
-        inc(n);
-        if n >= 60 then begin
-          n := 0;
-          if h <> invalid then begin
-            inc(h);
-            if h >= 24 then begin
-              h := 0;
-              if d <> invalid then begin
-                inc(d);
-                if (y <> invalid) and (m <> invalid) and (d > MonthDays[dateIsLeapYear(y), m]) then begin
-                   d := 1;
-                   inc(m);
-                   if m > 12 then begin
-                     m := 1;
-                     inc(y);
-                     if y = 0 then inc(y);
-                   end;
-                end;
-              end;
-            end;
-          end;
-        end;
-      end;
-    end;
-    Result := dateTimeFormatInternal(mask, y,m,d,h,n,s, 0, timezone);
-  end;
-end;
-
-
-
-
-function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
-var
-  y,m,d: Integer;
-  h,n,s,ms: word;
-begin
-  dateDecode(dateTime, @y, @m, @d);
-  DecodeTime(dateTime, h, n, s, ms);
-  result := dateTimeFormat(mask, y, m, d, h, n, s, ms*1000000);
-end;
-
-
-procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger; outtimezone: PInteger);
-begin
-  dateTimeParseParts(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone);
-end;
-
-function timeParse(const input, mask: string): TTime;
-var
-  hour, minutes, seconds: integer;
-  nanoseconds, timezone: integer;
-begin
-  timeParseParts(input,mask,@hour,@minutes,@seconds,@nanoseconds,@timeZone);
-  if hour=high(hour) then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
-  if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
-  if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
-  result := EncodeTime(hour,minutes,seconds,0);
-  if nanoseconds <> high(nanoseconds) then result := result + nanoseconds / 1000000000.0 / SecsPerDay;
-  if timezone <> high(timezone) then result := result -  timeZone * 60 / SecsPerDay;
-end;
-
-function timeFormat(const mask: string; h, n, s: Integer): string;
-begin
-  result := dateTimeFormat(mask, high(integer), high(integer), high(integer), h, n, s, high(integer), high(integer));
-end;
-
-function timeFormatNEW(const mask: string; h, n, s: Integer; nanoseconds: integer; timezone: integer): string;
-begin
-  result := dateTimeFormat(mask, high(integer), high(integer), high(integer), h, n, s, nanoseconds, timezone);
-end;
-
-procedure dateParseParts(const input, mask: string; outYear, outMonth, outDay: PInteger; outtimezone: PInteger);
-begin
-  dateTimeParseParts(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
-end;
-
-function dateParse(const input, mask: string): longint;
-var y,m,d: integer;
-begin
-  dateParseParts(input, mask, @y, @m, @d);
-  if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
-  if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
-  if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
-  result := trunc(EncodeDate(y,m,d));
-end;
-
-
-function dateFormat(const mask: string; const y, m, d: integer): string;
-begin
-  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), high(integer));
-end;
-
-function dateFormatNew(const mask: string; const y, m, d: integer; timezone: integer): string;
-begin
-  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), timezone);
-end;
-
-function dateFormatOld(const mask: string; const y, m, d: integer; const timezone: TDateTime): string;
-begin
-  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), timeZoneOldToNew(timezone));
-end;
-
-function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
-var leap: boolean;
-    century, yearincent: int64;
-begin
-  {$ifdef ALLOWYEARZERO} if year <= 0 then dec(year);{$endif}
-  leap := dateIsLeapYear(year);
-  result := (year <> 0) and
-            (month >= 1) and (month <= 12) and (day >= 1) and (day<=MonthDays[leap,month]);
-  if not result then exit;
-  dt := - DateDelta; // -693594
-  if year > 0 then dec(year);
-  //end else begin
-  //  dt := -  DateDelta; //not sure if this is correct, but it fits at the borders
-  //end;
-  century := year div 100;
-  yearincent := year - 100*century;
-  dt := dt +  (146097*century) div 4  + (1461* yearincent) div 4 +  DateMonthDaysCumSum[leap, month-1] + day;
-end;
-
-function dateEncode(year, month, day: integer): TDateTime;
-begin
-  if not dateEncodeTry(year, month, day, result) then
-    raise EDateTimeParsingException.Create('Invalid date: '+inttostr(year)+'-'+inttostr(month)+'-'+inttostr(day));
-end;
-
-procedure dateDecode(date: TDateTime; year, month, day: PInteger);
-var
-  datei: int64;
-  //century, yearincent: int64;
-  tempyear, tempmonth, tempday: integer;
-  temp: word;
-  leap: Boolean;
-begin
-  if year = nil then year := @tempyear;
-  if month = nil then month := @tempmonth;
-  if day = nil then day := @tempday;
-
-  year^ := 0;
-  month^ := 0;
-  day^ := 0;
-  datei := trunc(date) + DateDelta;
-  if datei > 146097 then begin // decode years over 65535?, 146097 days = 400 years so it is tested
-    DecodeDate(((146097 + datei - 365) mod 146097) - DateDelta + 365, PWord(year)^, PWord(month)^, PWord(day)^);
-    year^ := year^ + ((datei - 365) div 146097) * 400;
-  end else if datei  <= 0 then begin
-    datei := -DateDelta - datei + 1;
-    DecodeDate(datei, PWord(year)^, PWord(month)^, PWord(day)^);
-    year^ := -year^;
-    {$ifdef ALLOWYEARZERO}inc(year^);{$endif}
-    //year is correct, but days are inverted
-    leap := dateIsLeapYear(year^);
-    datei := datei +   DateMonthDaysCumSum[leap, 12] + 1 - 2 * int64(DateMonthDaysCumSum[leap,month^-1] + int64(day^));
-    DecodeDate(datei, temp, PWord(month)^, PWord(day)^);
-  end else DecodeDate(date, PWord(year)^, PWord(month)^, PWord(day)^);
-                      {todo: implement own conversion?
-  datei := trunc(date);
-  if datei <= -DateDelta then begin
-
-  end else begin
-    datei := (datei + DateDelta) * 4;
-    century    := datei div 146097;  datei := datei - century    * 146097;
-    yearincent := datei div   1461 ; datei := datei - yearincent *   1461;
-    datei := datei div 4;
-
-    year^ := century * 100 + yearincent + 1;
-    leap := (year^ mod 4 = 0) and ((year^ mod 100 <> 0) or (year^ mod 400 = 0));
-    month^ := (datei - 5) div 30;
-  end;                   }
-end;
 
 
 //================================Others===================================
@@ -6699,6 +6082,26 @@ begin
   end;
 end;
 
+function TPCharView.rightOfFirst(expectedStart: string): boolean;
+begin
+  result := beginsWith(expectedStart);
+  if result then inc(data, system.length(expectedStart))
+end;
+
+function TPCharView.rightOfFirst(expectedStart: char): boolean;
+begin
+  result := (data < dataend) and (data^ = expectedStart);
+  if result then inc(data);
+end;
+
+
+function TPCharView.rightOfFirstCaseInsensitively(expectedStart: string): boolean;
+begin
+  result := beginsWithCaseInsensitively(expectedStart);
+  if result then inc(data, system.length(expectedStart))
+end;
+
+
 function TPCharView.leftOfFind(const s: string): boolean;
 var
   target: PChar;
@@ -7258,6 +6661,720 @@ end;}
 {$endif}
 
 
+function dateIsLeapYear(const year: integer): boolean;
+begin
+  result := (year mod 4 = 0) and ((year mod 100 <> 0) or (year mod 400 = 0))
+end;
+
+function dateWeekOfYear(const date:TDateTime):word; overload;
+var month, day, year: word;
+begin
+  DecodeDate(date,year,month,day);
+  result := dateWeekOfYear(year,month,day);
+end;
+
+function dateWeekOfYear(year, month, day: integer): word;overload;
+//ISO Week after Claus T�ndering  http://www.tondering.dk/claus/cal/week.php#weekno
+var a,b,c,s,e,f,g,d,n: longint;
+    startOfYear: boolean;
+begin
+  dec(month);
+  dec(day);
+  startOfYear:=month in [0,1];
+  a:=year;
+  if startOfYear then dec(a);
+  b:=a div 4 - a div 100 + a div 400;
+  c:=(a-1) div 4 - (a-1) div 100 + (a-1) div 400;
+  s:=b-c;
+  if startOfYear then begin
+    e:=0;
+    f:=day + 31*month;
+  end else begin
+    e:=s+1;
+    f:=day+(153*(month-2)+2)div 5 + 59 + s;
+  end;
+
+  g:=(a+b) mod 7;
+  d:=(f+g-e) mod 7;
+  n:=f+3-d;
+  if n<0 then result:=53-(g-s) div 5
+  else if n>364+s then result:=1
+  else result:=n div 7+1;
+end;
+
+
+procedure TDateTimeParts.toIntPointers(outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger;
+  outNanoSeconds: PInteger; outTimeZone: PInteger);
+begin
+  if assigned(outYear) then outYear^:=year;
+  if assigned(outMonth) then outMonth^:=month;
+  if assigned(outDay) then outDay^:=day;
+  if assigned(outHour) then outHour^:=hour;
+  if assigned(outMinutes) then outMinutes^:=Minute;
+  if assigned(outSeconds) then outSeconds^:=second;
+  if assigned(outNanoSeconds) then outNanoSeconds^:= nanosecond;
+  if assigned(outTimeZone) then outtimezone^:= timezone;
+end;
+
+
+function dateTimeEncode(const y, m, d, h, n, s: integer; nanoseconds: integer): TDateTime;
+begin
+  result := dateEncode(y,m,d) + EncodeTime(h,n,s,0) + nanoseconds * (1e-9 / SecsPerDay);
+end;
+
+
+function TDateTimeMask.parseMask(mask: string): boolean;
+const PLUS_DIGIT_COUNT = 1000;
+var partCount: sizeint = 0;
+  maskview, temp: TPCharView;
+  c: char;
+  i, len: SizeInt;
+  optionals: TSizeIntArrayList;
+  lastMaskKind: TDateTimeMaskPartKind = pkOptionalStart;
+  function newMaskPart(kind: TDateTimeMaskPartKind): PDateTimeMaskPart;
+  begin
+    result := @parts[partCount];
+    result^.kind := kind;
+    lastMaskKind := kind;
+    inc(partCount);
+  end;
+  function newOrReusedMaskPart(kind: TDateTimeMaskPartKind): PDateTimeMaskPart;
+  begin
+    if (lastMaskKind = kind) then exit(@parts[partCount - 1]);
+    result := newMaskPart(kind);
+  end;
+
+begin
+  optionals.init;
+  SetLength(parts, length(mask));
+  maskview := mask.pcharView;
+  maskview.trim([' ',#9,#10,#13]);
+  while not maskview.isEmpty do begin
+    c := maskview.data^;
+    inc(maskview.data);
+    case  c of
+      'h','n','s','d', 'm', 'y', 'Y', 'z': begin
+        len := 1;
+        while maskview.rightOfFirst(c) do inc(len);
+        with newMaskPart(pkEndOfInput)^ do begin
+          case c of
+            'Y': kind := pkYearFixed;  'y': kind := pkYear2000Adjust; 'm': kind := pkMonth; 'd': kind := pkDay;
+            'h': kind := pkHour; 'n': kind := pkMinute; 's': kind := pkSecond;
+            'z': kind := pkFractionOfSecond;
+          end;
+          lastMaskKind := kind;
+          mincount := len;
+          maxcount := len;
+          if maskview.rightOfFirst('+') then maxcount := PLUS_DIGIT_COUNT;
+          if (maxcount = 1) and (kind in [pkSecond, pkMinute, pkHour, pkDay, pkMonth]) then
+            maxcount := 2; //single m,d,h,n,s doesn't make sense, so allow two digits
+        end;
+      end;
+      'a': with newMaskPart(pkAMPM)^ do begin
+        if maskview.rightOfFirst('m/pm') then begin
+          mincount := 2;
+          maxcount := 2;
+        end else if maskview.rightOfFirst('/p') then begin
+          mincount := 1;
+          maxcount := 1;
+        end;
+      end;
+      'Z': newMaskPart(pkTimezone);
+      '[': begin //optional
+        optionals.add(partcount);
+        newMaskPart(pkOptionalStart);
+      end;
+      ']': begin
+        if optionals.count = 0 then raise EDateTimeParsingException.Create('Invalid mask: missing [, you can use "]" to escape ]');
+        i := optionals[optionals.count - 1];
+        optionals.deleteLast();
+        parts[i].mincount := partCount - i ;
+        parts[i].maxcount := parts[i].mincount;
+        lastMaskKind := pkOptionalStart; //prevent merging of verbatim parts through separate optional parts
+      end;
+      '$': newMaskPart(pkEndOfInput);
+      '"': begin
+        maskview.splitRightOfFind(temp, '"');
+        newOrReusedMaskPart(pkVerbatim)^.verbatim := newOrReusedMaskPart(pkVerbatim)^.verbatim + temp.toString;
+      end;
+      ' ',#9: newOrReusedMaskPart(pkWhitespace);
+      else newOrReusedMaskPart(pkVerbatim)^.verbatim := newOrReusedMaskPart(pkVerbatim)^.verbatim + c;
+    end;
+  end;
+  SetLength(parts, partcount);
+  result := true;
+end;
+
+function TDateTimeMask.parseDateTime(input: TPCharView; const options: TDateTimeParsingOptions; out res: TDateTimeParts
+  ): TDateTimeParsingResult;
+var
+  i: Integer;
+begin
+  for i:=low(res.parts) to high(res.parts) do res.parts[i] := res.INVALID;
+  input.trimLeft();
+  result := parseDateTime(input, options, res, 0);
+  if res.amPM <> TDateTimeParts.INVALID then
+    case res.hour of
+      1..11: inc(res.hour, res.amPM);
+      12: if res.amPM = 0 then res.hour := 0;
+      else if dtpfStrict in options.flags then result := dtprFailureValueTooHigh;
+    end;
+end;
+
+
+function TDateTimeMask.parseDateTime(input: TPCharView; const options: TDateTimeParsingOptions; var res: TDateTimeParts; startPart: SizeInt
+  ): TDateTimeParsingResult;
+  function combinedPart: TDateTimeMaskPart;
+  begin
+    result := parts[startPart];
+    inc(startPart);
+    while (startPart <= high(parts)) do begin
+      if parts[startPart].kind = result.kind then begin
+        inc(result.mincount, parts[startPart].mincount);
+        inc(result.maxcount, parts[startPart].maxcount);
+      end else if (parts[startPart].kind = pkOptionalStart) then begin
+        {skip}
+      end else break;
+      inc(startPart);
+    end;
+    while parts[startPart - 1].kind = pkOptionalStart do dec(startPart);
+  end;
+
+  function takeMonthName(long: boolean; out value: integer): boolean;
+    type THumanReadableName = record
+      n: string;
+      v: integer;
+    end;
+    PHumanReadableName = ^THumanReadableName;
+    {$IFDEF HASDefaultFormatSettings}PMonthNameArray = ^TMonthNameArray;{$endif}
+    const DefaultShortMonths: array[1..17] of THumanReadableName = (
+       //english
+       (n:'jan'; v:1), (n:'feb'; v:2), (n:'mar'; v: 3), (n:'apr'; v:4), (n:'may'; v:5), (n:'jun'; v:6)
+      ,(n:'jul'; v:7), (n:'aug'; v:8), (n:'sep'; v: 9), (n:'oct'; v:10), (n:'nov'; v:11), (n:'dec'; v:12),
+       //german (latin1)
+       (n:'m'#$E4'r'; v:3), (n:'mai'; v:5), (n:'okt'; v:10), (n:'dez'; v:12),
+       //german (utf8)
+       (n:'m'#$C3#$A4'r'; v:3)
+      );
+    const DefaultLongMonths: array[1..21] of THumanReadableName = (
+      //english
+      (n:'january';v:1), (n:'february';v:2), (n:'march';v:3), (n:'april';v: 4), (n:'may';v: 5), (n:'june';v:6),
+      (n:'july';v:7), (n:'august';v:8), (n:'september';v:9), (n:'october';v:10), (n:'november';v:11), (n:'december';v:12),
+      //german
+      (n:'januar';v:1), (n:'februar';v:2), (n:'m'#$E4'rz';v:3), (n:'mai';v: 5), (n:'juni';v:6),
+      (n:'juli';v:7), (n:'oktober';v:10), (n:'dezember';v:12),
+      (n:'m'#$C3#$A4'rz';v:3));
+    var months: PHumanReadableName;
+        monthCount: integer;
+        i: Integer;
+        {$IFDEF HASDefaultFormatSettings}formatSettingsMonths: PMonthNameArray;{$endif}
+  begin
+    if long then begin
+      months := @DefaultLongMonths[low(DefaultLongMonths)];
+      monthCount := length(DefaultLongMonths);
+      {$IFDEF HASDefaultFormatSettings}formatSettingsMonths := @DefaultFormatSettings.LongMonthNames;{$endif}
+    end else begin
+      months := @DefaultShortMonths[low(DefaultShortMonths)];
+      monthCount := length(DefaultShortMonths);
+      {$IFDEF HASDefaultFormatSettings}formatSettingsMonths := @DefaultFormatSettings.ShortMonthNames;{$endif}
+    end;
+
+    //special month name handling
+    for i:= 0 to monthCount - 1 do
+      if input.beginsWithCaseInsensitively(months[i].n) then begin
+         input.rightOfFirst(length(months[i].n));
+         value := months[i].v;
+         exit(true);
+       end;
+    {$IFDEF HASDefaultFormatSettings}
+    for i:=1 to 12 do
+      if input.beginsWithCaseInsensitively(formatSettingsMonths^[i]) then begin
+        input.rightOfFirst(length(formatSettingsMonths^[i]));
+        value := i;
+        exit(true);
+      end;
+    {$ENDIF}
+    result := false;
+  end;
+
+var part: TDateTimeMaskPart;
+  i, count: Integer;
+  signed: Boolean;
+  value: integer;
+  tempres: TDateTimeParts;
+  valueUnsigned: UInt32;
+  resultA, resultB: TDateTimeParsingResult;
+begin
+  result := dtprSuccess;
+  while startPart <= high(parts) do begin
+    case parts[startPart].kind of
+      pkSecond,
+      pkMinute,
+      pkHour,
+      pkDay,
+      pkMonth,
+      pkYearFixed, pkYear2000Adjust,
+      pkFractionOfSecond: begin
+        part := combinedPart;
+        if (part.kind = pkMonth) then begin
+          if   ((part.mincount <= 4) and (part.maxcount >= 4) and takeMonthName(true, value))
+            or ((part.mincount <= 3) and (part.maxcount >= 3) and takeMonthName(false, value)) then begin
+            res.month := value;
+            continue;
+          end;
+                        if part.mincount > 2 then exit(dtprFailure);
+        end;
+        signed := input.rightOfFirst('-');
+        if signed and (part.kind <> pkYear2000Adjust) and (part.kind <> pkYearFixed) then exit(dtprFailure);
+
+        count := 0;
+        for i := 0 to min(part.maxcount, input.length) - 1 do
+          if input.data[i] in ['0'..'9'] then
+            inc(count)
+           else
+            break;
+
+        if (count < part.mincount) and (dtpfStrict in options.flags) then exit(dtprFailure);
+        if not input.viewFirst(count).toIntDecimalTry(value) then begin
+          result := dtprFailureValueTooHigh; //record a parsing failure, but keep parsing in case it gets worse (dtprFailure)
+          value := 1;
+        end;
+
+
+        input.rightOfFirst(count);
+
+        case part.kind of
+          pkSecond: res.second := value;
+          pkMinute: res.minute := value;
+          pkHour: res.hour := value;
+          pkDay: res.day := value;
+          pkMonth: res.month := value;
+          pkYearFixed, pkYear2000Adjust: begin
+            if signed then value := -value;
+            if (count <= 2) and (part.kind = pkYear2000Adjust) then
+              if (value >= 0) and (value < 100) then
+                if value < 90 then value := value + 2000
+                else value := value + 1900;
+            res.year := value;
+          end;
+          pkFractionOfSecond: begin
+            for i:=count + 1 to 9 do
+              value := value *  10; //fixed length ns
+            res.nanosecond := value;
+          end;
+        end;
+        continue;
+      end;
+      pkAMPM: begin //am/pm special case
+        if input.rightOfFirstCaseInsensitively('a') then res.amPM := 0
+        else if input.rightOfFirstCaseInsensitively('p') then res.amPM := 12
+        else exit(dtprFailure);
+        if (parts[startPart].mincount = 2) and not input.rightOfFirstCaseInsensitively('m') then
+          exit(dtprFailure);
+      end;
+      pkTimezone: begin //timezone
+        if input.rightOfFirst('Z') then res.timezone := 0 //timezone = utc
+        else begin
+          signed := input.rightOfFirst('-');
+          if (not signed) and not input.rightOfFirst('+') then exit(dtprFailure);
+          if not input.viewFirst(2).toUIntDecimalTry(valueUnsigned) then exit(dtprFailure);
+          if valueUnsigned > 24 then exit(dtprFailure); //or > 12?
+          value := valueUnsigned;
+          input.rightOfFirst(2);
+          if not input.rightOfFirst(':') then
+            if dtpfStrict in options.flags then exit(dtprFailure);
+          if not input.viewFirst(2).toUIntDecimalTry(valueUnsigned) then begin
+            valueUnsigned := 0;
+            if dtpfStrict in options.flags then exit(dtprFailure);
+          end else if valueUnsigned > 59 then exit(dtprFailure);
+          input.rightOfFirst(2);
+          res.timezone := value * 60 + valueUnsigned;
+          if signed then res.timezone := -res.timezone;
+        end
+      end;
+      pkWhitespace: begin
+        input.trimLeft([' ',#9,#10,#13]);
+      end;
+      pkEndOfInput: begin
+        if not input.isEmpty then exit(dtprFailure);
+      end;
+      pkOptionalStart: begin
+        tempres := res;
+        resultA := parseDateTime(input, options, res, startPart + 1);
+        if resultA = dtprSuccess then break; //do not change result. If it is not already dtprSuccess, it is dtprFailureValueTooHigh which should be returned
+        res := tempres;
+        resultB := parseDateTime(input, options, res, startPart + parts[startPart].mincount);
+        if resultB = dtprSuccess then break;
+
+        //neither is dtprSuccess, so report an error
+        if resultA < resultB then result := resultA
+        else result := resultB;
+        break;
+      end;
+      pkVerbatim: begin
+        if not input.rightOfFirst(parts[startPart].verbatim) then exit(dtprFailure);
+      end;
+    end;
+    inc(startPart);
+  end;
+
+end;
+
+
+
+function dateTimeParsePartsTry(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil; options: TDateTimeParsingFlags = []): TDateTimeParsingResult;
+var
+  parsedMask: TDateTimeMask;
+  res: TDateTimeParts;
+  optionsRecord: TDateTimeParsingOptions;
+begin
+  if not parsedMask.parseMask(mask) then
+    exit(dtprFailure);
+  optionsRecord.flags := options;
+  if parsedMask.parseDateTime(input.pcharView, optionsRecord, res) = dtprFailure then
+    exit(dtprFailure);
+  result := dtprSuccess;
+  if result <> dtprSuccess then exit;
+  res.toIntPointers(outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outTimeZone);
+end;
+
+procedure dateTimeParseParts(const input,mask:string; outYear, outMonth, outDay: PInteger; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger = nil; outtimezone: PInteger = nil);
+begin
+  if dateTimeParsePartsTry(input, mask, outYear, outMonth, outDay, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone) <> dtprSuccess then
+    raise Exception.Create('The date time ' + input + ' does not correspond to the date time format ' + mask);
+end;
+
+function timeZoneOldToNew(const tz: Double): integer;
+begin
+  if IsNan(tz) then result := high(integer)
+  else result := round(tz * MinsPerDay);
+end;
+
+function timeZoneNewToOld(const tz: integer): double;
+begin
+  if tz = high(integer) then result := NaN
+  else result := tz / MinsPerDay;
+end;
+
+const TryAgainWithRoundedSeconds: string = '<TryAgainWithRoundedSeconds>';
+
+
+function dateTimeFormatInternal(const mask: string; const y, m, d, h, n, s, nanoseconds, timezone: integer): string;
+var mp: integer;
+  function nextMaskPart: string;
+  function isValid(const c: ansichar): boolean;
+  begin
+    case c of
+      'y','Y': result := (y <> 0) and (y <> high(integer));
+      'm': result := (m <> 0) and (m <> high(integer));
+      'd': result := (d <> 0) and (d <> high(integer));
+      'h': result := (h <> 0) and (h <> high(integer));
+      'n': result := (n <> 0) and (n <> high(integer));
+      's': result := (s <> 0) and (s <> high(integer));
+      'z': result := (nanoseconds <> 0) and (nanoseconds <> high(integer));
+      'Z': result := (timezone <> high(Integer));
+      else raise exception.Create('impossible');
+    end;
+  end;
+
+  const SPECIAL_MASK_CHARS = ['y','Y','m','d','h','n','s','z','Z'];
+  var
+    oldpos: Integer;
+    okc: ansichar;
+    i: Integer;
+  begin
+    while (mp <= length(mask)) and (mask[mp] = '[') do begin
+      oldpos := mp;
+      result := strcopyfrom(mask, mp);
+      result := strSplitGetBetweenBrackets(result, '[', ']', false);
+      mp := mp +  length(result) + 2;
+      okc := #0;
+      for i:=1 to length(result) do
+        if (result[i] in SPECIAL_MASK_CHARS) and isValid(result[i]) then begin
+          okc := result[i];
+          break;
+        end;
+      if (okc <> #0) and ((oldpos = 1) or (mask[oldpos-1] <> okc)) and ((mp > length(mask)) or (mask[mp] <> okc)) then begin
+        result := dateTimeFormatInternal(result, y, m, d, h, n, s, nanoseconds, timezone);
+        if pointer(result) = pointer(TryAgainWithRoundedSeconds) then exit;
+        result := '"' + result + '"';
+        exit;
+      end;
+      result:='';
+    end;
+    while (mp <= length(mask)) and (mask[mp] = '"') do begin
+      oldpos := mp;
+      inc(mp);
+      while (mp <= length(mask)) and (mask[mp] <> '"') do
+        inc(mp);
+      inc(mp);
+      result := copy(mask, oldpos, mp - oldpos);
+      exit;
+    end;
+    if mp > length(mask) then exit;
+    if mask[mp] = '$' then begin inc(mp); begin result := ''; exit; end; end;
+    oldpos := mp;
+    if mask[mp] in SPECIAL_MASK_CHARS then begin
+      while (mp <= length(mask)) and (mask[mp] = mask[oldpos]) do inc(mp);
+      result := copy(mask, oldpos, mp - oldpos);
+      if (mp <= length(mask)) and (mask[mp] = '+') then inc(mp);
+    end else begin
+      while (mp <= length(mask)) and not (mask[mp] in (SPECIAL_MASK_CHARS + ['$','"','['])) do inc(mp);
+      result := copy(mask, oldpos, mp - oldpos);
+    end;
+  end;
+
+var part: string;
+  temp: Int64;
+  scale: Integer;
+  toadd: string;
+  len: Integer;
+begin
+  mp := 1;
+  result := '';
+  while mp <= length(mask) do begin
+    part := nextMaskPart;
+    if pointer(part) = pointer(TryAgainWithRoundedSeconds) then begin result := TryAgainWithRoundedSeconds; exit; end;
+    if length(part) = 0 then continue;
+    case part[1] of
+      'y','Y': result := result +  strFromInt(y, length(part));
+      'm': result := result +  strFromInt(m, length(part));
+      'd': result := result +  strFromInt(d, length(part));
+      'h': result := result +  strFromInt(h, length(part));
+      'n': result := result +  strFromInt(n, length(part));
+      's': result := result +  strFromInt(s, length(part));
+      'z': begin
+        if (mask[mp-1] = '+') and (length(part) < 6) then len := 6
+        else len := length(part);
+        if len < 9 then begin
+          scale := powersOf10[9 - len];
+          temp := nanoseconds div scale;
+          if nanoseconds mod scale >= scale div 2 then inc(temp); //round
+        end else begin
+          temp := nanoseconds;
+          if len > 9 then len := 9 //we do not have those digits
+        end;
+        if temp >= powersOf10[len] then begin result := TryAgainWithRoundedSeconds; exit; end; //rounding overflowed
+        toadd := strTrimRight(strFromInt(temp, len), ['0']);
+        result := result +  toadd;
+        if length(toadd) < length(part) then result := result +  strDup('0', length(part) - length(toadd));
+      end;
+      'Z': if timezone <> high(Integer) then begin; //no timezone
+        if timezone = 0 then result := result + 'Z'
+        else
+          if timezone > 0 then result := result +  '+' + strFromInt(timezone div 60, 2) + ':' + strFromInt(timezone  mod 60, 2)
+          else                 result := result +  '-' + strFromInt(-timezone div 60, 2) + ':' + strFromInt(-timezone mod 60, 2);
+      end;
+      '"': result := result +  copy(part, 2, length(part) - 2);
+      else result := result +  part;
+    end;
+  end;
+end;
+
+
+function dateTimeParse(const input, mask: string; outtimezone: PInteger): TDateTime;
+var y,m,d: integer;
+    hour, minutes, seconds: integer;
+    nanoseconds: integer;
+    timeZone: integer;
+begin
+  dateTimeParseParts(input, mask, @y, @m, @d, @hour, @minutes, @seconds, @nanoseconds, @timeZone);
+
+  if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
+  if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
+  if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
+  if hour=high(hour) then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
+  if minutes=high(minutes) then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
+  if seconds=high(seconds) then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
+
+  result := trunc(dateEncode(y,m,d)) + EncodeTime(hour,minutes,seconds,0);
+  if nanoseconds <> high(nanoseconds) then result := result +  nanoseconds / (1000000000.0 * SecsPerDay);
+  if outtimezone <> nil then outtimezone^ := timeZone
+  else if timeZone <> high(Integer) then result := result -  timeZone * 60 / SecsPerDay;
+end;
+
+
+function dateTimeFormat(const mask: string; y, m, d, h, n, s: Integer; nanoseconds: integer; timezone: integer): string;
+const invalid = high(integer);
+begin
+  Result := dateTimeFormatInternal(mask,y,m,d,h,n,s,nanoseconds,timezone);
+  if pointer(Result) = Pointer(TryAgainWithRoundedSeconds) then begin
+    inc(s);
+    //handle overflow
+    if s >= 60 then begin
+      s := 0;
+      if n <> invalid then begin
+        inc(n);
+        if n >= 60 then begin
+          n := 0;
+          if h <> invalid then begin
+            inc(h);
+            if h >= 24 then begin
+              h := 0;
+              if d <> invalid then begin
+                inc(d);
+                if (y <> invalid) and (m <> invalid) and (d > MonthDays[dateIsLeapYear(y), m]) then begin
+                   d := 1;
+                   inc(m);
+                   if m > 12 then begin
+                     m := 1;
+                     inc(y);
+                     if y = 0 then inc(y);
+                   end;
+                end;
+              end;
+            end;
+          end;
+        end;
+      end;
+    end;
+    Result := dateTimeFormatInternal(mask, y,m,d,h,n,s, 0, timezone);
+  end;
+end;
+
+
+
+
+function dateTimeFormat(const mask: string; const dateTime: TDateTime): string;
+var
+  y,m,d: Integer;
+  h,n,s,ms: word;
+begin
+  dateDecode(dateTime, @y, @m, @d);
+  DecodeTime(dateTime, h, n, s, ms);
+  result := dateTimeFormat(mask, y, m, d, h, n, s, ms*1000000);
+end;
+
+
+procedure timeParseParts(const input, mask: string; outHour, outMinutes, outSeconds: PInteger; outSecondFraction: PInteger; outtimezone: PInteger);
+begin
+  dateTimeParseParts(input, mask, nil, nil, nil, outHour, outMinutes, outSeconds, outSecondFraction, outtimezone);
+end;
+
+function timeParse(const input, mask: string): TTime;
+var
+  hour, minutes, seconds: integer;
+  nanoseconds, timezone: integer;
+begin
+  timeParseParts(input,mask,@hour,@minutes,@seconds,@nanoseconds,@timeZone);
+  if hour=TDateTimeParts.INVALID then raise EDateTimeParsingException.Create('No hour contained in '+input+' with format '+mask+'');
+  if minutes=TDateTimeParts.INVALID then raise EDateTimeParsingException.Create('No minute contained in '+input+' with format '+mask+'');
+  if seconds=TDateTimeParts.INVALID then raise EDateTimeParsingException.Create('No second contained '+input+' with format '+mask+'');
+  result := EncodeTime(hour,minutes,seconds,0);
+  if nanoseconds <> TDateTimeParts.INVALID then result := result + nanoseconds / 1000000000.0 / SecsPerDay;
+  if timezone <> TDateTimeParts.INVALID then result := result -  timeZone * 60 / SecsPerDay;
+end;
+
+function timeFormat(const mask: string; h, n, s: Integer): string;
+begin
+  result := dateTimeFormat(mask, high(integer), high(integer), high(integer), h, n, s, high(integer), high(integer));
+end;
+
+function timeFormatNEW(const mask: string; h, n, s: Integer; nanoseconds: integer; timezone: integer): string;
+begin
+  result := dateTimeFormat(mask, high(integer), high(integer), high(integer), h, n, s, nanoseconds, timezone);
+end;
+
+procedure dateParseParts(const input, mask: string; outYear, outMonth, outDay: PInteger; outtimezone: PInteger);
+begin
+  dateTimeParseParts(input, mask, outYear, outMonth, outDay, nil, nil, nil, nil, outtimezone);
+end;
+
+function dateParse(const input, mask: string): longint;
+var y,m,d: integer;
+begin
+  dateParseParts(input, mask, @y, @m, @d);
+  if d=high(d) then raise EDateTimeParsingException.Create('No day contained in '+input+' with format '+mask+'');
+  if m=high(m) then raise EDateTimeParsingException.Create('No month contained in '+input+' with format '+mask+'');
+  if y=high(y) then raise EDateTimeParsingException.Create('No year contained in '+input+' with format '+mask+'');
+  result := trunc(dateEncode(y,m,d));
+end;
+
+
+function dateFormat(const mask: string; const y, m, d: integer): string;
+begin
+  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), high(integer));
+end;
+
+function dateFormatNew(const mask: string; const y, m, d: integer; timezone: integer): string;
+begin
+  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), timezone);
+end;
+
+function dateFormatOld(const mask: string; const y, m, d: integer; const timezone: TDateTime): string;
+begin
+  result := dateTimeFormat(mask, y, m, d, high(integer), high(integer), high(integer), timeZoneOldToNew(timezone));
+end;
+
+function dateEncodeTry(year, month, day: integer; out dt: TDateTime): boolean;
+var leap: boolean;
+    century, yearincent: int64;
+begin
+  {$ifdef ALLOWYEARZERO} if year <= 0 then dec(year);{$endif}
+  leap := dateIsLeapYear(year);
+  result := (year <> 0) and
+            (month >= 1) and (month <= 12) and (day >= 1) and (day<=MonthDays[leap,month]);
+  if not result then exit;
+  dt := - DateDelta; // -693594
+  if year > 0 then dec(year);
+  //end else begin
+  //  dt := -  DateDelta; //not sure if this is correct, but it fits at the borders
+  //end;
+  century := year div 100;
+  yearincent := year - 100*century;
+  dt := dt +  (146097*century) div 4  + (1461* yearincent) div 4 +  DateMonthDaysCumSum[leap, month-1] + day;
+end;
+
+function dateEncode(year, month, day: integer): TDateTime;
+begin
+  if not dateEncodeTry(year, month, day, result) then
+    raise EDateTimeParsingException.Create('Invalid date: '+inttostr(year)+'-'+inttostr(month)+'-'+inttostr(day));
+end;
+
+procedure dateDecode(date: TDateTime; year, month, day: PInteger);
+var
+  datei: int64;
+  //century, yearincent: int64;
+  tempyear, tempmonth, tempday: integer;
+  temp: word;
+  leap: Boolean;
+begin
+  if year = nil then year := @tempyear;
+  if month = nil then month := @tempmonth;
+  if day = nil then day := @tempday;
+
+  year^ := 0;
+  month^ := 0;
+  day^ := 0;
+  datei := trunc(date) + DateDelta;
+  if datei > 146097 then begin // decode years over 65535?, 146097 days = 400 years so it is tested
+    DecodeDate(((146097 + datei - 365) mod 146097) - DateDelta + 365, PWord(year)^, PWord(month)^, PWord(day)^);
+    year^ := year^ + ((datei - 365) div 146097) * 400;
+  end else if datei  <= 0 then begin
+    datei := -DateDelta - datei + 1;
+    DecodeDate(datei, PWord(year)^, PWord(month)^, PWord(day)^);
+    year^ := -year^;
+    {$ifdef ALLOWYEARZERO}inc(year^);{$endif}
+    //year is correct, but days are inverted
+    leap := dateIsLeapYear(year^);
+    datei := datei +   DateMonthDaysCumSum[leap, 12] + 1 - 2 * int64(DateMonthDaysCumSum[leap,month^-1] + int64(day^));
+    DecodeDate(datei, temp, PWord(month)^, PWord(day)^);
+  end else DecodeDate(date, PWord(year)^, PWord(month)^, PWord(day)^);
+                      {todo: implement own conversion?
+  datei := trunc(date);
+  if datei <= -DateDelta then begin
+
+  end else begin
+    datei := (datei + DateDelta) * 4;
+    century    := datei div 146097;  datei := datei - century    * 146097;
+    yearincent := datei div   1461 ; datei := datei - yearincent *   1461;
+    datei := datei div 4;
+
+    year^ := century * 100 + yearincent + 1;
+    leap := (year^ mod 4 = 0) and ((year^ mod 100 <> 0) or (year^ mod 400 = 0));
+    month^ := (datei - 5) div 30;
+  end;                   }
+end;
 
 
 
