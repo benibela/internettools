@@ -323,7 +323,11 @@ end;
 procedure stringUnitTests( );
 var
  sa: TStringArray;
+ c1024, s: string;
+ i: Integer;
 begin
+  SetLength(c1024, 1024);
+  for i := 1 to length(c1024) do c1024[i] := chr((i - 1) and $FF);
   test(strlequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);
   test(strlequal(pchar('abcd'),pchar('abc'), 3, 2) = false);
   test(strlequal(pchar('abc'),pchar('abc'), 3, 3) = true);
@@ -351,10 +355,18 @@ begin
   test(strlsiequal(pchar('abc'),pchar('abc'), 3, 3) = true);
 
   test(strlsiequal(pchar('aBCd'),pchar('abcx'), 3, 3) = true);
+  test(strlsiequal(pchar('aBCd'),pchar('abcx'), 4, 4) = false);
   test(strlsiequal(pchar('aBCd'),pchar('abc'), 3, 2) = false);
   test(strlsiequal(pchar('aBc'),pchar('abc'), 3, 3) = true);
   test(strlsiequal(pchar('xy'#0'XY'),pchar('XY'#0'xy'), 5, 5) = true);
   test(strlsiequal(pchar('xy'#0'XZ'),pchar('XY'#0'xy'), 5, 5) = false);
+
+  for i := 0 to 8 do begin
+    test(strlsiequal(pchar(c1024)+i, pchar(c1024)+i, 1000, 1000) = true);
+    test(strlsiequal(pchar(c1024)+i, pchar(c1024)+i+256, 1000-256, 1000-256) = true);
+    test(strlsiequal(pchar(c1024)+i, pchar(c1024)+i+255, 1000-256, 1000-256) = false);
+    test(strlsiequal(pchar(c1024)+i, pchar(c1024)+i+257, 1000-256, 1000-256) = false);
+  end;
 
 
   test(strlequal(pchar('abc'), 'ab', 2) =  true);
@@ -668,10 +680,12 @@ begin
   dateParseParts('2010-05-06+01','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 06); test(tz, 60);
   dateParseParts('2010-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, 2010); test(m, 05); test(d, 07); if tz <> high(integer) then test(false, 'tz <> nan: ' + FloatToStr(tz));
   dateParseParts('-0753-05-07','yyyy-mm-dd[Z]', @y, @m, @d, @tz); test(y, -753); test(m, 05); test(d, 07); if tz <> high(integer) then test(false, 'tz <> nan');
-  dateParseParts('-0123-05-07','y+-mm-dd[Z]', @y, @m, @d, @tz); test(y, -123);
+  dateParseParts('-0123-05-07','y+-mm-dd[Z]', @y, @m, @d, @tz); test(y, -123); test(m, 05); test(d, 07);
+  dateParseParts('09.02.2018','d.m.y+', @y, @m, @d, @tz); test(y, 2018); test(m, 02); test(d, 09);
   dateParseParts('---07','---dd', @y, @m, @d, @tz); test(d, 7);
   dateParseParts('---08','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
   dateParseParts('---08Z','---dd[Z]', @y, @m, @d, @tz); test(d, 8);
+  //here it is using ymd for time rather than hms
   timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d); test(y, 14); test(m, 30); test(d, 21);
   timeParseParts('12:13:14','hh:nn:ss[.z[z[z]]]', @y, @m, @d); test(y, 12); test(m, 13); test(d, 14);
   timeParseParts('14:30:21','hh:nn:ss', @y, @m, @d, @ns); test(y, 14); test(m, 30); test(d, 21);
@@ -688,7 +702,10 @@ begin
   timeParseParts('pm5','am/pmh', @y, @m, @d, @ns); test(y, 17);
   timeParseParts('a4','a/ph', @y, @m, @d, @ns); test(y, 4);
   timeParseParts('p6','a/ph', @y, @m, @d, @ns); test(y, 18);
-  timeParseParts('a12','ah', @y, @m, @d, @ns); test(y, 12);
+  timeParseParts('a12','ah', @y, @m, @d, @ns); test(y, 0);
+  timeParseParts('p12','ah', @y, @m, @d, @ns); test(y, 12);
+  timeParseParts('12:13:14 am','hh:nn:ss am/pm', @y, @m, @d, @ns); test(y, 0); test(m, 13); test(d, 14);
+  timeParseParts('12:13:14 pm','hh:nn:ss am/pm', @y, @m, @d, @ns); test(y, 12); test(m, 13); test(d, 14);
   dateParseParts('12M10D', '[mmM][ddD]', @y, @m, @d, @ns); test(m, 12); test(d, 10);
   dateParseParts('08M', '[mmM][ddD]', @y, @m, @d, @ns); test(m, 08); test(d, high(integer));
   dateParseParts('09D', '[ddD]', @y, @m, @d, @ns); test(m, high(integer)); test(d, 9);
