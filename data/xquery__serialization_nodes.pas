@@ -376,6 +376,7 @@ procedure serializeNodes(base: TTreeNode; var builder: TIndentingJSONXHTMLStrBui
 type TIncludeContentType = (ictIgnore, ictSearchingForHead, ictRemoveOld);
 var known: TNamespaceList;
     deadPrefixes: TNamespaceList;
+    unicodeEncoding: boolean;
     indentationAllowed, inCDATAElement, undeclarePrefixes: boolean;
     xhtml, representsHTML, isHTML5: boolean;
 
@@ -452,6 +453,31 @@ var known: TNamespaceList;
     includeContentType := ictRemoveOld;
   end;
 
+  procedure appendReEncodedText(const text: string; html, attrib: boolean);
+  var subserializer: TXHTMLStrBuilder;
+      buffer: string;
+      cp: Integer;
+      isLatin1: Boolean;
+  begin
+    subserializer.init(@buffer, length(text));
+    if html then begin
+      if attrib then subserializer.appendHTMLAttrib(text)
+      else subserializer.appendHTMLText(text);
+    end else begin
+      if attrib then subserializer.appendXMLAttrib(text)
+      else subserializer.appendXMLText(text);
+    end;
+    subserializer.final;
+    builder.reserveadd(length(buffer));
+    //like xquery__serialization..appendReEncoded for JSON
+    //todo: make it faster
+    isLatin1 := (params.encodingCP = CP_LATIN1) or (params.encodingCP = CP_WINDOWS1252);
+    for cp in buffer.enumerateUtf8CodePoints do begin
+      if (cp <= $7F) or (isLatin1 and (cp <= $FF) and (cp > $9F)) then builder.append(chr(cp))
+      else builder.appendHexEntity(cp);
+    end;
+  end;
+
   procedure inner(n: TTreeNode; insideHTMLElement: boolean); forward;
 
   procedure outer(n: TTreeNode; parentIsHTMLElement: boolean);
@@ -487,9 +513,12 @@ var known: TNamespaceList;
       tetText: begin
         if assigned(builder.onInterceptAppendXMLHTMLText) and builder.onInterceptAppendXMLHTMLText(n, parentIsHTMLElement) then begin
           //empty
-        end else if not parentIsHTMLElement then appendXMLText(value)
-        else if inCDATAElement then append(value)
-        else appendHTMLText(value);
+        end else if not parentIsHTMLElement then begin
+          if unicodeEncoding or strIsAscii(value) then appendXMLText(value)
+          else appendReEncodedText(value, false, false);
+        end else if inCDATAElement then append(value)
+        else if unicodeEncoding or strIsAscii(value) then appendHTMLText(value)
+        else appendReEncodedText(value, true, false);
       end;
       tetClose: appendXMLElementEndTag2(n);
       tetComment: begin
@@ -558,10 +587,12 @@ var known: TNamespaceList;
                 //skip
               end else begin
                 append('="');
-                if inCDATAElement then append(attrib.realvalue)
+                if inCDATAElement then append(attrib.realvalue) //for attributes of nodes nested in html elements like <script>
                 else if assigned(builder.onInterceptAppendXMLHTMLAttribute) then builder.onInterceptAppendXMLHTMLAttribute(attrib, isHTMLElement)
-                else if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
-                else appendXMLAttrib(attrib.realvalue);
+                else if unicodeEncoding or strIsAscii(attrib.realvalue) then begin
+                  if isHTMLElement then appendHTMLAttrib(attrib.realvalue)
+                  else appendXMLAttrib(attrib.realvalue);
+                end else appendReEncodedText(attrib.realvalue, isHTMLElement, true);
                 append('"');
               end;
             end;
@@ -663,6 +694,7 @@ begin
   if builder.insertWhitespace = xqsiwIndent then indentationAllowed := true and (base.typ <> tetText)
   else indentationAllowed := false;
   inCDATAElement := false;
+  unicodeEncoding := not assigned(params) or isUnicodeEncoding(params.encodingCP);
   xhtml := assigned(params) and (params.method = xqsmXHTML);
   representsHTML := html or xhtml;
   isHTML5 := representsHTML and (not assigned(params) or params.isHTML5);
