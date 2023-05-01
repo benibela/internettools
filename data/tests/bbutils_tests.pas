@@ -582,6 +582,12 @@ begin
   test(strReverse('𐍈y'), 'y𐍈');
 
 
+  s := '012345670123456701234567'#$ff'0123456780123456701234567801234567';
+  for i := 1 to 25 do test(strIsAscii(@s[i], length(s) - i), false);
+
+  test(strIsAscii(pchar(s), 24), true);
+  test(strIsAscii(pchar(s), 25), false);
+
  (* procedure roundtrip(cp: TSystemCodePage);
 var
   dest: RawByteString;
