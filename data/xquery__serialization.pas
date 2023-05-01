@@ -898,6 +898,7 @@ begin
     exit;
   end;
   serializer.standard := serializationParams.standardMode;
+  serializer.encodingForEntitying := serializationParams.encodingCP;
   case serializationParams.method of
     xqsmJSON: serializeJSON(serializer, value, serializationParams);
     xqsmAdaptive: serializeAdaptive(serializer, value, serializationParams);

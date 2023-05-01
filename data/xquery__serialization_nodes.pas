@@ -50,6 +50,7 @@ TIndentingJSONXHTMLStrBuilder = object(TJSONXHTMLStrBuilder)
   onInterceptAppendJSONString: TXQSerializerOnString;
   onInterceptAppendXMLHTMLText: TXQSerializerOnNode;
   onInterceptAppendXMLHTMLAttribute: TXQSerializerOnAttribute;
+  encodingForEntitying: TSystemCodePage; //if not unicode, replace non-ascii/non-latin1 with entities when serializing XML/HTML
   procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
   procedure indent;
   procedure appendIndent;
@@ -277,6 +278,8 @@ begin
 
   //this is basically a custom VMT on the stack
   onInterceptAppendJSONString := @appendJSONStringWithoutQuotes;
+
+  encodingForEntitying := CP_UTF8;
 end;
 
 procedure TIndentingJSONXHTMLStrBuilder.indent;
@@ -458,6 +461,7 @@ var known: TNamespaceList;
       buffer: string;
       cp: Integer;
       isLatin1: Boolean;
+      ecp: TSystemCodePage;
   begin
     subserializer.init(@buffer, length(text));
     if html then begin
@@ -471,7 +475,8 @@ var known: TNamespaceList;
     builder.reserveadd(length(buffer));
     //like xquery__serialization..appendReEncoded for JSON
     //todo: make it faster
-    isLatin1 := (params.encodingCP = CP_LATIN1) or (params.encodingCP = CP_WINDOWS1252);
+    ecp := builder.encodingForEntitying;
+    isLatin1 := (ecp = CP_LATIN1) or (ecp = CP_WINDOWS1252);
     for cp in buffer.enumerateUtf8CodePoints do begin
       if (cp <= $7F) or (isLatin1 and (cp <= $FF) and (cp > $9F)) then builder.append(chr(cp))
       else builder.appendHexEntity(cp);
@@ -694,7 +699,8 @@ begin
   if builder.insertWhitespace = xqsiwIndent then indentationAllowed := true and (base.typ <> tetText)
   else indentationAllowed := false;
   inCDATAElement := false;
-  unicodeEncoding := not assigned(params) or isUnicodeEncoding(params.encodingCP);
+
+  unicodeEncoding := isUnicodeEncoding(builder.encodingForEntitying);
   xhtml := assigned(params) and (params.method = xqsmXHTML);
   representsHTML := html or xhtml;
   isHTML5 := representsHTML and (not assigned(params) or params.isHTML5);
