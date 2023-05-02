@@ -3072,6 +3072,7 @@ begin
     end;
     'x': if ((pos+1)^ in ['"', '''']) then begin
       if not options.AllowExtendedStrings then raiseSyntaxError('Extended string syntax was disabled');
+      if Assigned(staticContext.sender.OnWarningDeprecated) then staticContext.sender.OnWarningDeprecated(staticContext.sender, 'x"" syntax is deprecated. Use `` from XPath 4');
       inc(pos);
       exit(parseXString());
     end;
