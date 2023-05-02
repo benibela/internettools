@@ -2652,6 +2652,7 @@ var
 var
   strsymb: Char;
   mark: PChar;
+  closedcorrectly: Boolean;
 begin
   result := nil;
   if nullterminatedString then strsymb := #0
@@ -2660,6 +2661,7 @@ begin
     pos+=1;
   end else raiseSyntaxError('Expected string start');
   allowEntityReplacement := strsymb <> '`';
+  closedcorrectly := strsymb <> '`';
   mark := pos;
   try
     while pos^ <> #0 do begin
@@ -2671,20 +2673,21 @@ begin
         mark := pos;
         pos+=1;
       end else case pos^ of
-        '}': raiseParsingError('pxp:XPST0003',  'Single closing } not allowed in extended strings (use }})');
+        '}': raiseSyntaxError('Single closing } not allowed in extended strings (use }})');
         '{': begin
           pos+=1;
-          pushTerm(parsePrimaryLevel);
-          expect('}');
+          pushTerm(parseOptionalExpr31);
           mark := pos;
         end;
         else begin //string closed
           expect(strsymb);
+          closedcorrectly := true;
           break;
         end;
       end;
     end;
     if nullterminatedString then pushRaw(mark, pos - 1);
+    if not closedcorrectly then raiseSyntaxError('unclosed ` string');
   except
     on EXQParsingException do begin result.free; raise; end;
   end;
