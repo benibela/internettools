@@ -2493,8 +2493,7 @@ var
   local: string;
   lastException: EXQParsingException;
 begin
-  expect('{');
-  result := TXQTermTryCatch.Create(parseOptionalExpr31);
+  result := TXQTermTryCatch.Create(parseEnclosedExpr);
   lastException := errorTracking.pendingException;
   try
     while nextTokenIs('catch') do begin
@@ -3129,7 +3128,7 @@ begin
       '{': case word of
         'unordered', 'ordered': begin //TODO: actually use that
            requireXQuery();
-           expect('{'); result := parseOptionalExpr31;
+           result := parseEnclosedExpr;
            exit;
          end;
         'array': if parsingModel in PARSING_MODEL3_1 then begin
