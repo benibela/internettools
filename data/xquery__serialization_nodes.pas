@@ -476,7 +476,7 @@ var known: TNamespaceList;
     //like xquery__serialization..appendReEncoded for JSON
     //todo: make it faster
     ecp := builder.encodingForEntitying;
-    isLatin1 := (ecp = CP_LATIN1) or (ecp = CP_WINDOWS1252);
+    isLatin1 := (ecp = CP_LATIN1) or (ecp = CP_WINDOWS1252) or (ecp = CP_DOS850);
     for cp in buffer.enumerateUtf8CodePoints do begin
       if (cp <= $7F) or (isLatin1 and (cp <= $FF) and (cp > $9F)) then builder.append(chr(cp))
       else builder.appendHexEntity(cp);
