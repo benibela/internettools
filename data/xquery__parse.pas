@@ -152,6 +152,7 @@ protected
   function parseAnnotations: TXQAnnotations;
   function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
   function parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
+  function parseIf: TXQTermIf;
   function parseTryCatch: TXQTermTryCatch;
 
   //**Parses the next complete value@br
@@ -162,7 +163,8 @@ protected
   function parseOrExpr: TXQTerm;       //OrExpr
   function parse: TXQTerm;             //ExprSingle
   function parsePrimaryLevel: TXQTerm; //Expr
-  function parseOptionalExpr31: TXQTerm; //Expr?
+  function parseOptionalExpr31: TXQTerm; //Expr? }
+  function parseEnclosedExpr: TXQTerm; // { Expr? }
   function parseModuleInternal(): TXQTerm;
 
 
@@ -2451,6 +2453,38 @@ begin
 
 end;
 
+function TXQParsingContext.parseIf: TXQTermIf;
+var
+  ifexpr: TXQTermIf;
+begin
+  result := TXQTermIf.Create();
+  with TXQTermIf(result) do begin
+    push(parsePrimaryLevel);
+    expect(')');
+    skipWhitespaceAndComment();
+    if (pos^ = '{') and (parsingModel in PARSING_MODEL4) then begin
+      push(parseEnclosedExpr);
+      ifexpr := result;
+      while nextTokenIs('else') and (length(ifexpr.children) < 3) do begin
+        if nextTokenIs('if') then begin
+          ifexpr.push(TXQTermIf.create);
+          ifexpr := TXQTermIf(ifexpr.children[high(ifexpr.children)]);
+          expect('(');
+          ifexpr.push(parsePrimaryLevel);
+          expect(')');
+        end;
+        ifexpr.push(parseEnclosedExpr);
+      end;
+      if length(ifexpr.children) = 2 then ifexpr.push(TXQTermSequence.Create);
+      exit;
+    end;
+    expect('then');
+    push(parse());
+    expect('else');
+    push(parse());
+  end;
+end;
+
 function TXQParsingContext.parseTryCatch: TXQTermTryCatch;
 var
   kind: TXQNamespaceMode;
@@ -2876,8 +2910,7 @@ function StrToIntWithError(const s: string): integer;
 var
   i: Integer;
 begin
-  result := StrToIntDef(s, -1);
-  if result = -1 then begin
+  if not s.toIntDecimalTry(result) then begin
     for i := 1 to length(s) do if not (s[i] in ['0'..'9']) then raise EXQEvaluationException.create('XPST0003', 'Invalid number: '+s);
     raise EXQEvaluationException.create('FOAR0002', 'Invalid number: '+s);
   end;
@@ -2934,12 +2967,26 @@ var
   end;
 
   function parseNumber(const s: string): TXQTermConstant;
+  var
+    base: Integer;
   begin
     if (parsingModel in PARSING_MODEL4) then begin
-      if s.contains('_') then exit(parseNumber(StringReplace(s, '_', '', [rfReplaceAll])));
+      if s.contains('_') then begin
+        if s.beginsWith('0b_') or s.beginsWith('0x_')
+           or s.endsWith('_')
+           or s.contains('._') or s.contains('_.')
+           or (not s.beginsWith('0x') and s.ContainsI('e_'))
+           then raiseSyntaxError('Misplaced _');
+        exit(parseNumber(StringReplace(s, '_', '', [rfReplaceAll])));
+      end;
       if s.beginsWith('0') then begin
-        if s.beginsWith('0b') then exit(TXQTermConstant.create(baseSchema.integer.createIntegerValueWithBase(copy(s, 3, length(s)), 2)))
-        else if s.beginsWith('0x') then exit(TXQTermConstant.create(baseSchema.integer.createIntegerValueWithBase(copy(s, 3, length(s)), 16)));
+        if s.beginsWith('0b') then base := 2
+        else if s.beginsWith('0x') then base := 16
+        else base := 0;
+        if base <> 0 then begin
+          if length(s) = 2 then raiseSyntaxErrorFatal('No digits after '+s);
+          exit(TXQTermConstant.create(baseSchema.integer.createIntegerValueWithBase(copy(s, 3, length(s)), base)))
+        end;
       end;
     end;
     result := TXQTermConstant.createNumber(s);
@@ -3195,17 +3242,8 @@ begin
       exit(parseSwitch);
     'typeswitch': if parsingModel in PARSING_MODEL_XQUERY then
       exit(parseTypeSwitch);
-    'if': if nextTokenIs('(') then begin
-      result := TXQTermIf.Create();
-      with TXQTermIf(result) do begin
-        push(parsePrimaryLevel);
-        expect(')'); expect('then');
-        push(parse());
-        expect('else');
-        push(parse());
-      end;
-      exit;
-    end;
+    'if': if nextTokenIs('(') then
+       exit(parseIf);
     'try': if (parsingModel in PARSING_MODEL_XQUERY3) and (nextToken(true) = '{') then
       exit(parseTryCatch);
   end;
@@ -3495,6 +3533,12 @@ begin
   end;
   result := parsePrimaryLevel;
   expect('}');
+end;
+
+function TXQParsingContext.parseEnclosedExpr: TXQTerm;
+begin
+  expect('{');
+  result := parseOptionalExpr31;
 end;
 
 procedure resolveFunctionParams(f: TXQTermDefineFunction; sc: TXQStaticContext);

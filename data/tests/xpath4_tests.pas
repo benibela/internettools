@@ -27,7 +27,7 @@ begin
 
   t('12__3___4', '1234');
   t('0b1_000_0', '16');
-  t('0x_f_F_', '255');
+  t('0xf_F', '255');
 
   t('`{{}}}}{{ {1 to 3} ``abc&gt;`', '{}}{ 1 2 3 `abc&gt;');
 
@@ -97,6 +97,13 @@ begin
   t('all-equal((1,1,1,1,1.0))', 'true');
   t('all-different((1 to 3, 1))', 'false');
 
+  t('if (true()) { 1 }', '1');
+  t('if (false()) { 1 }', '');
+  t('let $x := if (false()) { 1 } return count($x)', '0');
+  t('if (true()) { 1 } else {2}', '1');
+  t('if (false()) { 1 } else {2}', '2');
+  t('if (false()) { 1 } else if (true()) {2} else {3}', '2');
+  t('if (false()) { 1 } else if (false()) {2} else {3}', '3');
 
   writeln('XPath 4.0 ', tester.count, ' completed');
   tester.free
