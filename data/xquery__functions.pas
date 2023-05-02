@@ -5013,9 +5013,20 @@ begin
   result := xqFunctionParse_Common(context, argc, args, 'xml-external-parsed-entity');
 end;
 
-function xqFunctionParse_HTML(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+function xqFunctionParse_HTML_Old(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := xqFunctionParse_Common(context, argc, args, 'html');
+end;
+
+function xqFunctionParse_HTML40(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
+var
+  method: String;
+begin
+  method := 'html';
+  if (argc = 2) and (args[1].instanceOf(baseJSONiqSchema.object_)) then begin
+    if args[1].getProperty('method').toString = 'xhtml' then method := 'xhtml';
+  end;
+  result := xqFunctionParse_Common(context, argc, args, method);
 end;
 
 function splitEQName(context: TXQEvaluationContext; const eqname: string; out namespaceURL, localpart: string; kind: TXQDefaultNamespaceKind = xqdnkUnknown): boolean;
@@ -9180,7 +9191,7 @@ begin
 
   fn3.registerFunction('parse-xml', @xqFunctionParse_XML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
   fn3.registerFunction('parse-xml-fragment', @xqFunctionParse_XML_Fragment, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentNodeOrEmpty]);
-  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
+  {pxp3}pxpold.registerFunction('parse-html', @xqFunctionParse_HTML_old, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([stringOrEmpty, documentElementNodeOrEmpty]);
   fn3.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, elementSerializationParamsOrEmpty, stringt]);
   fn3_1.registerFunction('serialize', @xqFunctionSerialize, [xqcdContextOther]).setVersionsShared([itemStar, stringt],  [itemStar, itemOrEmpty, stringt]);
 
@@ -9220,7 +9231,7 @@ begin
   fn3_1.registerFunction('xml-to-json', @xqFunctionXML_to_JSON).setVersionsShared([nodeOrEmpty, stringOrEmpty], [nodeOrEmpty, map, stringOrEmpty]);
 
 
-  fn4.reserveFunctionMemory(3,4,5);
+  fn4.reserveFunctionMemory(3,5,5);
   fn4.registerFunction('index-where', @xqFunctionIndex_Where, [itemStar, functionItemBoolean, integerStar], []);
   fn4.registerFunction('is-NaN', @xqFunctionIsNan).setVersionsShared([atomic, boolean]);
   fn4.registerFunction('characters', @xqFunctionCharacters).setVersionsShared([stringOrEmpty, stringStar]);
@@ -9236,7 +9247,7 @@ begin
   fn4.registerFunction('all-equal', @xqFunctionAllEqual, [xqcdContextCollation, xqcdContextTime, xqcdContextOther]).setVersionsShared([atomicStar, boolean],  [atomicStar, stringt, boolean]);
   fn4.registerInterpretedFunction('all-different', [atomicStar, boolean], '($input as anyAtomicType*) as boolean', 'count(distinct-values($input)) = count($input)', [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
   fn4.registerInterpretedFunction('all-different', [atomicStar, stringt, boolean], '($input as anyAtomicType*, $collation as xs:string) as boolean', 'count(distinct-values($input, $collation)) = count($input)', [xqcdContextCollation, xqcdContextTime, xqcdContextOther]);
-
+  fn4.registerFunction('parse-html', @xqFunctionParse_HTML40, [xqcdFocusItem,xqcdContextOther]).setVersionsShared([itemOrEmpty, documentElementNodeOrEmpty], [itemOrEmpty, map, documentElementNodeOrEmpty]);
 
   fnarray4 := TXQNativeModule.Create(XMLnamespace_XPathFunctionsArray);
   fnarray4.acceptedModels := PARSING_MODEL4;
