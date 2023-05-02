@@ -478,7 +478,8 @@ var known: TNamespaceList;
     ecp := builder.encodingForEntitying;
     isLatin1 := (ecp = CP_LATIN1) or (ecp = CP_WINDOWS1252) or (ecp = CP_DOS850);
     for cp in buffer.enumerateUtf8CodePoints do begin
-      if (cp <= $7F) or (isLatin1 and (cp <= $FF) and (cp > $9F)) then builder.append(chr(cp))
+      if cp <= $7F then builder.append(chr(cp))
+      else if isLatin1 and (cp <= $FF) and (cp > $9F) then builder.appendCodePoint(cp) //we output utf-8 regardless of the encoding. it will be converted later
       else builder.appendHexEntity(cp);
     end;
   end;
