@@ -24,6 +24,8 @@ type TXQSerializationParamsHelper = record helper for TXQSerializationParams
   function needQNameList(var list: PXQHashsetQName): PXQHashsetQName;
 end;
 
+function isUnicodeEncoding(e: TSystemCodePage): boolean;
+procedure escapeUnicodeInJSONforEncoding(var serializer: TXQSerializer; const s: string; encoding: TSystemCodePage);
 
 procedure serializeJSON(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
 procedure serializeAdaptive(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
@@ -465,15 +467,11 @@ procedure TSpecialStringHandler.appendJSONStringWithoutQuotes(const s: string);
   procedure appendReEncoded();
   var temp: string;
       subserializer: TXQSerializer;
-      cp: Integer;
   begin
     subserializer.init(@temp);
     appendToSerializer(subserializer);
     subserializer.final;
-    for cp in temp.enumerateUtf8CodePoints do begin
-      if cp <= $7F then serializer.append(chr(cp))
-      else serializer.appendJSONStringUnicodeEscape(cp);
-    end;
+    escapeUnicodeInJSONforEncoding(serializer^, temp, params^.encodingCP);
   end;
 
 begin
@@ -603,6 +601,17 @@ begin
 end;
 
 
+procedure escapeUnicodeInJSONforEncoding(var serializer: TXQSerializer; const s: string; encoding: TSystemCodePage);
+var cp: Integer;
+  isLatin1: Boolean;
+begin
+  isLatin1 := (encoding = CP_LATIN1) or (encoding = CP_WINDOWS1252) or (encoding = CP_DOS850);
+  for cp in s.enumerateUtf8CodePoints do begin
+    if cp <= $7F then serializer.append(chr(cp))
+    else if isLatin1 and (cp <= $FF) and (cp > $9F) then serializer.appendCodePoint(cp) //we output utf-8 regardless of the encoding. it will be converted later
+    else serializer.appendJSONStringUnicodeEscape(cp);
+  end;
+end;
 
 procedure serializeJSON(var serializer: TXQSerializer; const v: IXQValue; const params: TXQSerializationParams);
 var
