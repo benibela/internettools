@@ -722,6 +722,7 @@ protected
 public
   buffer: pstring;
   procedure init(abuffer:pstring; basecapacity: SizeInt = 64; aencoding: TSystemCodePage = {$ifdef HAS_CPSTRING}CP_ACP{$else}CP_UTF8{$endif});
+  procedure resetBuffer(abuffer:pstring; basecapacity: SizeInt = 64);
   procedure clear;
   procedure final;
   function count: SizeInt; inline;
@@ -1633,6 +1634,14 @@ end;
 
 procedure TStrBuilder.init(abuffer: pstring; basecapacity: SizeInt; aencoding: TSystemCodePage);
 begin
+  resetBuffer(abuffer, basecapacity);
+  //encoding := strActualEncoding(buffer^);
+  SetCodePage(RawByteString(abuffer^), aencoding, false);
+  encoding := strActualEncoding(aencoding);
+end;
+
+procedure TStrBuilder.resetBuffer(abuffer: pstring; basecapacity: SizeInt);
+begin
   buffer := abuffer;
   if basecapacity <= 0 then basecapacity := 1;
   if length(abuffer^) <> basecapacity then
@@ -1642,10 +1651,6 @@ begin
 
   next := pointer(abuffer^);
   bufferend := next + basecapacity;
-
-  //encoding := strActualEncoding(buffer^);
-  SetCodePage(RawByteString(abuffer^), aencoding, false);
-  encoding := strActualEncoding(aencoding);
 end;
 
 procedure TStrBuilder.clear;
