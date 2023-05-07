@@ -165,7 +165,8 @@ const CP_UTF32 = 12000;
       CP_UTF32BE = 12001;
       CP_WINDOWS1252 = 1252; //a super set of ISO 8859-1. ISO-8859-1 is a different superset of ISO 8859-1 (beware the dash). But most people mean this when they say iso-8859-1
       CP_LATIN1 = 28591; //this is the actual ISO-8859-1.
-      CP_DOS850 = 850; //DOS variant of latin-1
+      CP_DOS437 = 437; //DOS variant of latin-1
+      CP_DOS850 = 850; //new DOS variant of latin-1
 
 
 type

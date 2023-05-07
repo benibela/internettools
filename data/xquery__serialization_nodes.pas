@@ -112,6 +112,14 @@ procedure serializeNodes(base: TTreeNode; var builder: TIndentingJSONXHTMLStrBui
 
 function XQKeyOrderFromString(const s: string): TXQKeyOrder;
 
+type TCharSet = set of byte;
+     TLatin1Overlap = record
+       maximumIncluded, allFrom: integer;
+       allincluded: TCharSet;
+     end;
+
+function codepageHasUnicodeLatin1(codepage: TSystemCodePage): TLatin1Overlap;
+
 implementation
 uses
   bbutils,
@@ -460,7 +468,7 @@ var known: TNamespaceList;
   var subserializer: TXHTMLStrBuilder;
       buffer: string;
       cp: Integer;
-      isLatin1: Boolean;
+      availableLatin1: TLatin1Overlap;
       ecp: TSystemCodePage;
   begin
     subserializer.init(@buffer, length(text));
@@ -474,12 +482,15 @@ var known: TNamespaceList;
     subserializer.final;
     builder.reserveadd(length(buffer));
     //like xquery__serialization..appendReEncoded for JSON
-    //todo: make it faster
+    //todo: make it faster. process 8 bytes of ascii, and put availableLatin1 in inline variables
     ecp := builder.encodingForEntitying;
-    isLatin1 := (ecp = CP_LATIN1) or (ecp = CP_WINDOWS1252) or (ecp = CP_DOS850);
+    availableLatin1 := codepageHasUnicodeLatin1(ecp);
+    with availableLatin1 do
     for cp in buffer.enumerateUtf8CodePoints do begin
-      if cp <= $7F then builder.append(chr(cp))
-      else if isLatin1 and (cp <= $FF) and (cp > $9F) then builder.appendCodePoint(cp) //we output utf-8 regardless of the encoding. it will be converted later
+      if cp <= $7F then
+        builder.append(chr(cp))
+      else if (cp <= maximumIncluded) and ((cp >= allFrom) or (cp in allincluded)) then
+        builder.appendCodePoint(cp) //we output utf-8 regardless of the encoding. it will be converted later
       else builder.appendHexEntity(cp);
     end;
   end;
@@ -727,6 +738,43 @@ begin
     else
       raiseXQEvaluationException('SEPM0017', 'Invalid serialization parameter: key-order= ' + s);
       result := xqkoUnordered;
+  end;
+end;
+
+function codepageHasUnicodeLatin1(codepage: TSystemCodePage): TLatin1Overlap;
+begin
+  with result do begin
+    maximumIncluded:= $FF;
+    case strActualEncoding(codepage) of
+      CP_DOS437: begin
+        allFrom := $FF;
+        allincluded := [0..127,160..163,165,170..172,176..178,181,183,186..189,191,196..199,201,209,214,220,223..226,228..239,241..244,246..247,249..252,255];
+      end;
+      CP_DOS850,
+      858,
+      CP_WINDOWS1252
+      : begin
+        allFrom := 160;
+        allincluded := [0..127,160..255];
+      end;
+      CP_LATIN1: begin
+        allFrom := 0;
+        allincluded := [0..255];
+      end;
+      852: begin //do we need that one?
+        allFrom := $100;
+        allincluded := [0..127,160,164,167..168,171..173,176,180,184,187,193..194,196,199,201,203,205..206,211..212,214..215,218,220..221,223,225..226,228,231,233,235,237..238,243..244,246..247,250,252..253];
+      end;
+      28605: begin //do we need that one?
+        allFrom := 191;
+        allincluded := [0..163,165,167,169..179,181..183,185..187,191..255];
+      end;
+      else begin
+        maximumIncluded := 127;
+        allFrom := $100;
+        allincluded := [0..127];
+      end;
+    end;
   end;
 end;
 

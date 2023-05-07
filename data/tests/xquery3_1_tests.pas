@@ -34,6 +34,9 @@ begin
   t('serialize(<a>xyzä</a>, map {"method": "xml", "cdata-section-elements": QName("", "a") })', '<a><![CDATA[xyzä]]></a>');
   t('serialize(<a>]]>]]>xy]]>zä]]>]]></a>, map {"method": "xml", "cdata-section-elements": QName("", "a") })', '<a><![CDATA[]]]]><![CDATA[>]]]]><![CDATA[>xy]]]]><![CDATA[>zä]]]]><![CDATA[>]]]]><![CDATA[>]]></a>');
   t('serialize(<a>]]>]]>xy]]>zä]]>]]></a>, map {"method": "xml", "encoding": "us-ascii", "cdata-section-elements": QName("", "a") })', '<a><![CDATA[]]]]><![CDATA[>]]]]><![CDATA[>xy]]]]><![CDATA[>z]]>&#xE4;<![CDATA[]]]]><![CDATA[>]]]]><![CDATA[>]]></a>');
+  t('serialize(<a>xä&#1234;</a>, map {"method": "xml", "encoding": "us-ascii"})', '<a>x&#xE4;&#x4D2;</a>');
+  t('serialize(<a>xä&#1234;</a>, map {"method": "xml", "encoding": "latin1"})', '<a>xä&#x4D2;</a>');
+
 
   t('serialize(<a><b><c>xx</c><c>yy</c></b></a>, map {"indent": true()})', ('<a>'#10'  <b>'#10'    <c>xx</c>'#10'    <c>yy</c>'#10'  </b>'#10'</a>'));
   t('serialize(<a><b><c>xx</c><c>yy</c></b></a>, map {"indent": true(), "suppress-indentation": QName("", "b")})', ('<a>'#10'  <b><c>xx</c><c>yy</c></b>'#10'</a>'));

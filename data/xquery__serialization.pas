@@ -603,12 +603,15 @@ end;
 
 procedure escapeUnicodeInJSONforEncoding(var serializer: TXQSerializer; const s: string; encoding: TSystemCodePage);
 var cp: Integer;
-  isLatin1: Boolean;
+  availableLatin1: TLatin1Overlap;
 begin
-  isLatin1 := (encoding = CP_LATIN1) or (encoding = CP_WINDOWS1252) or (encoding = CP_DOS850);
+  availableLatin1 := codepageHasUnicodeLatin1(encoding);
+  with availableLatin1 do
   for cp in s.enumerateUtf8CodePoints do begin
-    if cp <= $7F then serializer.append(chr(cp))
-    else if isLatin1 and (cp <= $FF) and (cp > $9F) then serializer.appendCodePoint(cp) //we output utf-8 regardless of the encoding. it will be converted later
+    if cp <= $7F then
+      serializer.append(chr(cp))
+    else if (cp <= maximumIncluded) and ((cp >= allFrom) or (cp in allincluded)) then
+      serializer.appendCodePoint(cp) //we output utf-8 regardless of the encoding. it will be converted later
     else serializer.appendJSONStringUnicodeEscape(cp);
   end;
 end;
