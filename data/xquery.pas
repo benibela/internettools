@@ -2960,13 +2960,13 @@ public
     function evaluate(expression: string; model: TXQParsingModel; tree:TTreeNode = nil): IXQValue;
     function evaluate(expression: string; model: TXQParsingModel; const contextItem: IXQValue): IXQValue;
 
-    //** Evaluates an XQuery 3.1 expression with a certain tree element as current node.
+    //** Evaluates an XQuery 3.1 (and parts of 4.0) expression with a certain tree element as current node.
     function evaluateXQuery(expression: string; tree:TTreeNode = nil): IXQValue;
-    //** Evaluates an XQuery 3.1 expression with a certain tree element as current node.
+    //** Evaluates an XQuery 3.1 (and parts of 4.0) expression with a certain tree element as current node.
     function evaluateXQuery(expression: string; const contextItem: IXQValue): IXQValue;
-    //** Evaluates an XPath 3.1 expression with a certain tree element as current node.
+    //** Evaluates an XPath 3.1 (and parts of 4.0) expression with a certain tree element as current node.
     function evaluateXPath(expression: string; tree:TTreeNode = nil): IXQValue;
-    //** Evaluates an XPath 3.1 expression with a certain tree element as current node.
+    //** Evaluates an XPath 3.1 (and parts of 4.0) expression with a certain tree element as current node.
     function evaluateXPath(expression: string; const contextItem: IXQValue): IXQValue;
 
     //** Evaluates an XPath 2.0 expression with a certain tree element as current node.
@@ -7919,7 +7919,7 @@ begin
   sharedVersions := true;
   SetLength(versions, 1);
   minArgCount:=length(v) - 1;
-  maxArgCount:=maxArgCount;
+  maxArgCount:=maxArgCount; //todo: ???
   setVersionsShared(0, v);
 end;
 
