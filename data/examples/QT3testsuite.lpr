@@ -1701,13 +1701,16 @@ begin
       collationsInternal.Clear;
       collationsInternal.Assign(env.collations);
     end;
-    if (env.defaultCollation <> '') and (collationsInternal[0] <> env.defaultCollation) then
+    if (env.defaultCollation <> '') and (collationsInternal[0] <> env.defaultCollation) then begin
       collationsInternal.Exchange(0, collationsInternal.IndexOf(env.defaultCollation));
+      xq.StaticContext.collation := collationsInternal.Objects[0] as TXQCollation;
+    end;
   end else if (collationsInternal.Count = 0)
               or (collationsInternal.Count > 1)
               or ((collationsInternal.Count = 1) and (collationsInternal.Objects[0] <> xqtsCollations.Objects[0])) then begin
     collationsInternal.Clear;
     addDefaultCollations(collationsInternal);
+    xq.StaticContext.collation := collationsInternal.Objects[0] as TXQCollation;
   end;
 
 
@@ -1974,6 +1977,7 @@ begin
 
   TXQueryEngine.registerCollation(TXQCollation(xqtsCollations.Objects[0]));
   if config.version in PARSING_MODEL3_1 then begin
+    TXQueryEngine.registerCollation(TXQCollation(xqtsCollations.Objects[1]));
     registerFallbackUnicodeConversion;
     registerModuleUCAICU;
   end;
