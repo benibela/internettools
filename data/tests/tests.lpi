@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="11"/>
+    <Version Value="12"/>
     <General>
       <Flags>
         <MainUnitHasCreateFormStatements Value="False"/>
         <MainUnitHasTitleStatement Value="False"/>
+        <MainUnitHasScaledStatement Value="False"/>
+        <CompatibilityMode Value="True"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
-      <MainUnit Value="0"/>
       <Title Value="tests"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
@@ -86,14 +87,12 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set ModuleImport --test-case modules-simple"/>
         <WorkingDirectory Value="/home/benito/xxtest"/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="--mode xquery3  --print-failed-inputs --print-test-cases fe --parser fcl-xml  --test-set ModuleImport --test-case modules-simple"/>
             <WorkingDirectory Value="/home/benito/xxtest"/>
           </local>
         </Mode0>
@@ -207,7 +206,7 @@
       </Checks>
       <VerifyObjMethodCallValidity Value="True"/>
       <Optimizations>
-        <OptimizationLevel Value="4"/>
+        <OptimizationLevel Value="2"/>
       </Optimizations>
     </CodeGeneration>
     <Linking>
@@ -222,7 +221,7 @@
     </Linking>
   </CompilerOptions>
   <Debugging>
-    <Exceptions Count="18">
+    <Exceptions Count="19">
       <Item1>
         <Name Value="EAbort"/>
       </Item1>

@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="11"/>
+    <Version Value="12"/>
     <PathDelim Value="\"/>
     <General>
       <Flags>
         <MainUnitHasCreateFormStatements Value="False"/>
         <MainUnitHasTitleStatement Value="False"/>
+        <MainUnitHasScaledStatement Value="False"/>
+        <CompatibilityMode Value="True"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
-      <MainUnit Value="0"/>
       <Title Value="QT3testsuite"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
@@ -55,7 +56,6 @@
           </Parsing>
           <CodeGeneration>
             <TargetCPU Value="arm"/>
-            <TargetOS Value="linux"/>
           </CodeGeneration>
         </CompilerOptions>
       </Item3>
@@ -88,14 +88,14 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe --test-case analyzeString-028"/>
+        <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe --test-case Axes085"/>
         <WorkingDirectory Value="\home\benito\opt\qt3tests"/>
       </local>
       <FormatVersion Value="2"/>
       <Modes Count="1">
         <Mode0 Name="default">
           <local>
-            <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe --test-case analyzeString-028"/>
+            <CommandLineParams Value="--mode xquery3.1  --print-failed-inputs --print-test-cases fe --test-case Axes085"/>
             <WorkingDirectory Value="\home\benito\opt\qt3tests"/>
           </local>
         </Mode0>
@@ -132,11 +132,6 @@
         <StackChecks Value="True"/>
       </Checks>
     </CodeGeneration>
-    <Linking>
-      <Debugging>
-        <TrashVariables Value="True"/>
-      </Debugging>
-    </Linking>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="11">

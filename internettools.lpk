@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-
-
 <CONFIG>
   <Package Version="5">
     <Name Value="internettools"/>
@@ -17,7 +14,7 @@
     </CompilerOptions>
     <Description Value="This package provides standard conformant XPath/XQuery 3.1 interpreters with a compatibility mode for older XPath/XQuery versions and extensions for - among others - JSONiq, pattern matching, CSS and HTML; as well as functions to perform HTTP/S requests on Windows/Linux/MacOSX/Android and an XProc-like webscraping language"/>
     <License Value="GPLv3"/>
-    <Version Major="1" Minor="0" Release="0"/>
+    <Version Major="1"/>
     <Files Count="40">
       <Item1>
         <Filename Value="internettoolsconfig.inc"/>
@@ -181,6 +178,9 @@
       </Item40>
     </Files>
     <CompatibilityMode Value="True"/>
+    <i18n>
+      <EnableI18N Value="True"/>
+    </i18n>
     <RequiredPkgs Count="1">
       <Item1>
         <PackageName Value="FCL"/>
