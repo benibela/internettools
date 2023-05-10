@@ -441,14 +441,14 @@ begin
         xsstInteger, xsstDecimal:
           if v is TXQValueInt64 then outv^ := TXQValueInt64.create(self, v.toInt64)
           else outv^ := TXQValueDecimal.create(self, v.toDecimal);
-        xsstFloat, xsstDouble: outv^ := TXQValueFloat.create(self, v.toFloat);
+        xsstFloat, xsstDouble: outv^ := TXQValueFloat.create(self, v.toDouble);
       end;
     exit;
   end else if st.derivedFrom([schema.decimal, schema.boolean]) then begin
     if v is TXQValueInt64 then exit(tryCreateValue(v.toInt64, outv))
     else exit(tryCreateValue(v.toDecimal, outv));
   end else if st.derivedFrom([schema.float, schema.double]) then
-    exit(tryCreateValue(v.toFloat, outv))
+    exit(tryCreateValue(v.toDouble, outv))
   else
    exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
 end;

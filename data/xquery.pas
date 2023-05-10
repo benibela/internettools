@@ -139,7 +139,7 @@ type
   end;
 
   //**Type of xqvalue (see TXQValue)
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkDouble, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
   TXQMapPropertyKeyKind = (xqmpkkStringKeys, xqmpkkStandardKeys );
 
   TXQTermFlowerOrderEmpty = (xqeoStatic, xqeoEmptyLeast, xqeoEmptyGreatest);
@@ -529,7 +529,8 @@ type
     function toBoolean: boolean;  //**< Returns the value as boolean; dynamically converted, if necessary
     function toBooleanEffective: boolean;  //**< Returns the effective boolean value, as defined in XPath. (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64;  //**< Returns the value as int64; dynamically converted, if necessary
-    function toFloat: xqfloat;  //**< Returns the value as xqfloat (double); dynamically converted, if necessary
+    function toFloat: xqfloat;  deprecated 'use toDouble';//**< deprecated, alias for toDouble
+    function toDouble: xqfloat;  //**< Returns the value as xqfloat (double); dynamically converted, if necessary
     function toDecimal: BigDecimal;  //**< Returns the value as bigdecimal; dynamically converted, if necessary
     function toString: string;  //**< Returns the value as string; dynamically converted, if necessary
     function toJoinedString(const sep: string=' '): string;  //**< Returns the value as joined string (string-join($self, $sep)); dynamically converted, if necessary
@@ -587,8 +588,8 @@ type
     property Count: SizeInt read getSequenceCount;
 
 
-    //**Same as toFloat, but throws an exception if the conversion is not invalid
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat;
+    //**Same as toDouble, but throws an exception if the conversion is not invalid
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 
     //internally used
     procedure enumeratePropertyKeys(var keyset: TXQHashsetStr);
@@ -627,8 +628,9 @@ type
     function toBoolean: boolean; virtual; //**< Returns the value as boolean; dynamically converted, if necessary
     function toBooleanEffective: boolean; virtual; //**< Returns the effective boolean value (the main difference to toBoolean is that toBooleanEffective returns true for the string "false", while toBoolean returns false)
     function toInt64: int64; virtual; //**< Returns the value as int64; dynamically converted, if necessary
-    function toFloat: xqfloat; virtual; //**< Returns the value as xqfloat; dynamically converted, if necessary
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; virtual;
+    function toFloat: xqfloat;  deprecated 'use toDouble';//**< deprecated, alias for toDouble
+    function toDouble: xqfloat; virtual; //**< Returns the value as xqfloat; dynamically converted, if necessary
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; virtual;
     function toDecimal: BigDecimal; virtual; //**< Returns the value as BigDecimal; dynamically converted, if necessary
     function toString: string; override; //**< Returns the value as string; dynamically converted, if necessary
     function toStringArray: TStringArray;
@@ -750,7 +752,7 @@ type
     class function classKind: TXQValueKind; override;
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
-    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
+    function toDouble: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to int64
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
@@ -779,8 +781,8 @@ type
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: int64; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: bigdecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
-    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDouble: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function hashCode: uint32; override;
@@ -808,8 +810,8 @@ type
 
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
-    function toFloat: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDouble: xqfloat; override; //**< Converts the TXQValue dynamically to xqfloat
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
@@ -838,7 +840,7 @@ type
     function toBoolean: boolean; override; //**< Converts the TXQValue dynamically to boolean
     function toInt64: Int64; override; //**< Converts the TXQValue dynamically to integer
     function toDecimal: BigDecimal; override; //**< Converts the TXQValue dynamically to BigDecimal
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
     function hashCode: uint32; override;
@@ -867,7 +869,7 @@ type
     function toBooleanEffective: boolean; override;
     function toString: string; override;
     function toDateTime: TDateTime; override;
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function hashCode: uint32; override;
 
     function clone: IXQValue; override;
@@ -887,7 +889,7 @@ type
     function toBooleanEffective: boolean; override;
     function toString: string; override;
     function toDateTime: TDateTime; override;
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function hashCode: uint32; override;
 
     function toBinaryBytes: TBytes; override;
@@ -987,7 +989,7 @@ type
     function toBooleanEffective: boolean; override; //Returns the effective boolean value. Raises an exception if count > 1 and first element is not a node/json-item
     function toInt64: Int64; override; //**< Converts the first element to integer
     function toDecimal: BigDecimal; override; //**< Converts the first element to BigDecimal
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function toString: string; override; //**< Converts the first element to string
     function toJoinedString(const sep: string=' '): string; override;
     function toDateTime: TDateTime; override; //**< Converts the first element to TDateTime
@@ -1035,7 +1037,7 @@ type
     function toBooleanEffective: boolean; override; //**< Returns true
     function toString: string; override; //**< Converts the TXQValue dynamically to string
     function toDateTime: TDateTime; override; //**< Converts the TXQValue dynamically to TDateTime
-    function toFloatChecked(scontext: TXQStaticContext): xqfloat; override;
+    function toDoubleChecked(scontext: TXQStaticContext): xqfloat; override;
     function toNode: TTreeNode; override; //**< Returns the node
     function hashCode: uint32; override;
 
@@ -2861,7 +2863,7 @@ type
     You can evaluate XQuery/XPath-expressions by calling the class methods, e.g. @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) or @code(TXQueryEngine.evaluateStaticXPath2('expression', nil).toInt64) which returns the value of the expression, converted to the corresponding type.@br
     If you want to process an HTML/XML document, you have to pass the root TTreeNode (obtained by TTreeParser) instead of nil.@br@br@br
     If you call @code(TXQueryEngine.evaluateStaticXPath3('expression', nil)) without a following toType-call, you obtain the result as an IXQValue. (see IXQValue on how to use it)@br
-    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toFloat) an extended. @br@br
+    With a toType-call it is converted in the corresponding type, e.g. @code(toInt64) returns a int64, @code(toString) a string, @code(toNode) a TTreeNode or @code(toDouble) an extended. @br@br
 
     You can also create a TXQueryEngine instance and then call @code(parseXPath2('expression')) and @code(evaluateXPath2()). @br
     This is not as easy, but you have more options.
@@ -5238,9 +5240,9 @@ begin
     case vk of
       pvkString: exit(v.toString = w.toString);
       pvkBinary: exit( (v.typeAnnotation.base = w.typeAnnotation.base) and (v.toString = w.toString)) ;
-      pvkFloat:
-        exit(   (v.toFloat = w.toFloat)
-            or  (v.toFloat.IsNan() and w.toFloat.IsNan())
+      pvkDouble:
+        exit(   (v.toDouble = w.toDouble)
+            or  (v.toDouble.IsNan() and w.toDouble.IsNan())
         );
       pvkInt64: exit(v.toInt64 = w.toInt64);
       pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
@@ -5254,29 +5256,29 @@ begin
   end else begin
     if v.hashCode <> w.hashCode then exit(false);
     case vk of
-      pvkFloat: if not (v.toFloat.isFinite) then exit(false);
+      pvkDouble: if not (v.toDouble.isFinite) then exit(false);
       pvkInt64, pvkBigDecimal: {fallthrough};
       else exit(false)
     end;
     case wk of
-      pvkFloat: if not (w.toFloat.isFinite) then exit(false);
+      pvkDouble: if not (w.toDouble.isFinite) then exit(false);
       pvkInt64, pvkBigDecimal: {fallthrough};
       else exit(false)
     end;
     case vk of
       pvkInt64: case wk of
-        pvkFloat: exit(compareIntToFloat(v.toInt64, w.toFloat));
+        pvkDouble: exit(compareIntToFloat(v.toInt64, w.toDouble));
         pvkBigDecimal: exit(compareIntToBCD(v.toInt64, w.toDecimal));
         else ;
       end;
       pvkBigDecimal: case wk of
-        pvkFloat: exit(compareFloatToBCD(w.toFloat, v.toDecimal));
+        pvkDouble: exit(compareFloatToBCD(w.toDouble, v.toDecimal));
         pvkInt64: exit(compareIntToBCD(w.toInt64, v.toDecimal));
         else ;
       end;
-      pvkFloat: case wk of
-        pvkInt64: exit(compareIntToFloat(w.toInt64, v.toFloat));
-        pvkBigDecimal: exit(compareFloatToBCD(v.toFloat, w.toDecimal));
+      pvkDouble: case wk of
+        pvkInt64: exit(compareIntToFloat(w.toInt64, v.toDouble));
+        pvkBigDecimal: exit(compareFloatToBCD(v.toDouble, w.toDecimal));
         else ;
       end;
       else ;
@@ -5457,7 +5459,7 @@ begin
 
 
   //standard double path
-  fromF := args[1].toFloat;
+  fromF := args[1].toDouble;
   if fromF.isFinite then begin
     fromF := fromF.round();
     if fromF > maxLen then goto exitWithZeroLength;
@@ -5474,7 +5476,7 @@ begin
     goto exitFromFromTillInfinity;
   end;
 
-  lenF := args[2].toFloat;
+  lenF := args[2].toDouble;
   if lenF.isFinite() then begin
     lenF := lenF.round;
     if lenF <= 0 then goto exitWithZeroLength;
@@ -6920,11 +6922,11 @@ var ak, bk: TXQValueKind;
     cmpClass: TXSType;
     ad, bd: xqfloat;
   begin
-    if ((ak = pvkFloat) and TXQValueFloat(a).value.IsNan()) or ((bk = pvkFloat) and TXQValueFloat(b).value.IsNan()) then
+    if ((ak = pvkDouble) and TXQValueFloat(a).value.IsNan()) or ((bk = pvkDouble) and TXQValueFloat(b).value.IsNan()) then
       exit(xqcrNaN);
     cmpClass := TXSType.commonDecimalType(a, b);
-    ad := a.toFloatChecked(Self);
-    bd := b.toFloatChecked(self);
+    ad := a.toDoubleChecked(Self);
+    bd := b.toDoubleChecked(self);
     if cmpClass.derivedFrom(baseSchema.Double) then begin
       result := xqfloat(ad).compare((bd));
     end else if cmpClass.derivedFrom(baseSchema.Float) then begin
@@ -6946,7 +6948,7 @@ var ak, bk: TXQValueKind;
   begin
     case k of
       pvkInt64, pvkBigDecimal, //this case is handled in vtod
-      pvkFloat: begin
+      pvkDouble: begin
         raisePXPInternalError(); //float trigger floating point conversion
         result := ''; //hide warning
       end;
@@ -7034,7 +7036,7 @@ var ak, bk: TXQValueKind;
       pvkInt64:
         result := TXQCompareResult.compare(TXQValueInt64(a).value, TXQValueInt64(b).value);
       pvkBigDecimal: result := compareAsBigDecimals();
-      pvkFloat: result := compareCommonFloat();
+      pvkDouble: result := compareCommonFloat();
       pvkDateTime: begin
         if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(xqcrIncomparable);
         adate := @TXQValueDateTime(a).value;
@@ -7114,7 +7116,7 @@ begin
     if (ak = pvkString) and not a.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(a, b.typeAnnotation);
     if (bk = pvkString) and not b.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(b, a.typeAnnotation);
   end;
-  if (ak = pvkFloat) or (bk = pvkFloat) then
+  if (ak = pvkDouble) or (bk = pvkDouble) then
     exit(compareCommonFloat());
   if (ak in [pvkInt64, pvkBigDecimal]) or (bk in [pvkInt64, pvkBigDecimal]) then begin
     //if not (ak in [pvkInt64, pvkBigDecimal]) and strictTypeChecking and (baseSchema.decimal.tryCreateValue(a) <> xsceNoError) then raiseXPTY0004TypeError(a, 'decimal');
@@ -7246,10 +7248,10 @@ begin
   if not comparableTypes(a, b) then exit(xqcrIncomparable); //todo:   nodes?
 
   ak := a.kind; bk := b.kind;
-  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) then begin
-    if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(xqcrEqual)
+  if ((ak = pvkDouble) and IsNan(TXQValueFloat(a).value)) then begin
+    if ((bk = pvkDouble) and IsNan(TXQValueFloat(b).value)) then exit(xqcrEqual)
     else exit(xqcrLessThan); //move NaNs first for fn:sort
-  end else if ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then exit(xqcrGreaterThan);
+  end else if ((bk = pvkDouble) and IsNan(TXQValueFloat(b).value)) then exit(xqcrGreaterThan);
   result := compareAtomic(a,b,overrideCollation);
 end;
 
@@ -7267,8 +7269,8 @@ begin
 begin
   result:=false;
   ak := a.kind; bk := b.kind;
-  if ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)) then
-    exit(acceptNAN and ((ak = pvkFloat) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkFloat) and IsNan(TXQValueFloat(b).value)));}
+  if ((ak = pvkDouble) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkDouble) and IsNan(TXQValueFloat(b).value)) then
+    exit(acceptNAN and ((ak = pvkDouble) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkDouble) and IsNan(TXQValueFloat(b).value)));}
 end;
 
 
@@ -7282,7 +7284,7 @@ var
 begin
   ak := a.kind;
   bk := b.kind;
-  if ((ak in [pvkInt64, pvkFloat, pvkBigDecimal]) and (bk in [pvkInt64, pvkFloat, pvkBigDecimal]))
+  if ((ak in [pvkInt64, pvkDouble, pvkBigDecimal]) and (bk in [pvkInt64, pvkDouble, pvkBigDecimal]))
      or ((ak = bk) and (ak in [pvkBoolean, pvkString, pvkBinary])) then
     exit(true);
 
@@ -8058,7 +8060,7 @@ begin
     pvkUndefined: result := false;
     pvkInt64: result := evaluatedCondition.toInt64 = index;
     pvkBigDecimal: result := xqvalueDecimalEqualInt(evaluatedCondition, index);
-    pvkFloat: result := (evaluatedCondition.toFloat = index);
+    pvkDouble: result := (evaluatedCondition.toDouble = index);
     pvkDateTime: raise EXQEvaluationException.create('FORG0006', 'Sequence filter returned invalid value');
     else {pvkBoolean, pvkString,pvkSequence,pvkNode,pvkArray,pvkObject,pvkNull:} result := evaluatedCondition.toBooleanEffective;
   end;
@@ -9052,8 +9054,8 @@ begin
       end;
     end;
     //optimization for a single number
-    if value.kind in [pvkBigDecimal, pvkInt64, pvkFloat] then begin
-      if ((value.kind = pvkFloat) and (frac(value.toFloat) <> 0)) or
+    if value.kind in [pvkBigDecimal, pvkInt64, pvkDouble] then begin
+      if ((value.kind = pvkDouble) and (frac(value.toDouble) <> 0)) or
          ((value.kind = pvkBigDecimal) and (not value.toDecimal.isInt64() )) then exit;
       i64 := value.toInt64;
       if (i64 >= 1) and (i64 <= sequence.getSequenceCount) then outList.add(sequence.get(i64));

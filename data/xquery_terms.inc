@@ -2025,12 +2025,12 @@ var meta: PFlowerSortingData;
     if emptyLeast then begin
       if v.isUndefined and not w.isUndefined then
         exit(true);
-      if ((v is TXQValueFloat) and IsNan(v.toFloat)) and not w.isUndefined and not ((w is TXQValueFloat) and IsNan(w.toFloat)) then
+      if ((v is TXQValueFloat) and IsNan(v.toDouble)) and not w.isUndefined and not ((w is TXQValueFloat) and IsNan(w.toDouble)) then
         exit(true);
     end else begin
       if w.isUndefined and not v.isUndefined then
         exit(true);
-      if ((w is TXQValueFloat) and IsNan(w.toFloat)) and not v.isUndefined and not ((v is TXQValueFloat) and IsNan(v.toFloat)) then
+      if ((w is TXQValueFloat) and IsNan(w.toDouble)) and not v.isUndefined and not ((v is TXQValueFloat) and IsNan(v.toDouble)) then
         exit(true);
     end;
 
@@ -3195,7 +3195,7 @@ begin
     end else if xqofCastUntypedToDouble in op.flags then
       for i := 0 to 1 do
         case evilkids[i].kind of
-          pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toFloatChecked(context.staticContext) );
+          pvkString, pvkNode: evilkids[i] := xqvalue(evilkids[i].toDoubleChecked(context.staticContext) );
           else;
         end;
     op.checkOrConvertTypes(@evilkids[0], 2, context, self);

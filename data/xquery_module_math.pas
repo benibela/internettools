@@ -91,7 +91,7 @@ begin
     v := xqvalue();
     exit(false);
   end;
-  f := args[0].toFloat;
+  f := args[0].toDouble;
   result := true;
 end;
 
@@ -255,9 +255,9 @@ var
 
 begin
   if args[0].isUndefined then exit(xqvalue);
-  a := args[0].toFloat;
+  a := args[0].toDouble;
   if IsNan(a) then begin
-    if args[1].toFloat = 0 then exit(xqv(1))
+    if args[1].toDouble = 0 then exit(xqv(1))
     else exit(xqv(NaN));
   end;
   if a = 1 then exit(xqv(1));
@@ -272,7 +272,7 @@ begin
         else b := 2147483646;
         if bd.signed then b := -b;
       end;
-    end else b := args[1].toFloat;
+    end else b := args[1].toDouble;
     result := xqv(double(power(a, b)));
     {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif} //otherwise pow(-2.5, 3333) does not raise the exception here, but somewhere later
 
@@ -293,8 +293,8 @@ var
   a: xqfloat;
   b: xqfloat;
 begin
-  a := args[0].toFloat;
-  b := args[1].toFloat;
+  a := args[0].toDouble;
+  b := args[1].toDouble;
   if IsNan(a) or IsNan(b) then exit(xqv(NaN));
   result := xqv(arctan2(a, b));{
          If y is a finite value greater (less) than 0, and x is negative infinity, +pi (-pi) is returned.

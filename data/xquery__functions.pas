@@ -151,11 +151,11 @@ begin
       if i64 = low(int64) then result := TXQValueDecimal.create(baseSchema.integer, - arg.toDecimal)
       else result := TXQValueInt64.create(- i64);
     end;
-    pvkFloat: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toFloat);
+    pvkDouble: result := TXQValueFloat.create((arg.typeAnnotation as TXSSimpleType).primitive, - arg.toDouble);
     pvkUndefined: result := xqvalue();
     pvkSequence: result := xqvalueUnaryMinus(cxt, nothing, arg.get(1));
     pvkArray: result := xqvalueUnaryMinus(cxt, nothing, arrayHeadOrEmpty(arg));
-    else result := TXQValueFloat.create(- arg.toFloat);
+    else result := TXQValueFloat.create(- arg.toDouble);
   end;
 end;
 
@@ -165,11 +165,11 @@ begin
   case arg.kind of
     pvkBigDecimal: result := TXQValueDecimal.create(arg.typeAnnotation, arg.toDecimal);
     pvkInt64: result := TXQValueInt64.create(arg.toInt64);
-    pvkFloat: result := TXQValueFloat.create(arg.typeAnnotation, arg.toFloat);
+    pvkDouble: result := TXQValueFloat.create(arg.typeAnnotation, arg.toDouble);
     pvkUndefined: result := xqvalue();
     pvkSequence: result := xqvalueUnaryPlus(cxt, nothing, arg.get(1));
     pvkArray: result := xqvalueUnaryPlus(cxt, nothing, arrayHeadOrEmpty(arg));
-    else result := TXQValueFloat.create(arg.toFloat);
+    else result := TXQValueFloat.create(arg.toDouble);
   end;
 end;
 
@@ -224,7 +224,7 @@ begin
     exit;
   end;
 
-  af := a.toFloat; bf := b.toFloat;
+  af := a.toDouble; bf := b.toDouble;
   {if IsInfinite(af) or IsInfinite(bf) then begin
     if not (IsInfinite(af) and IsInfinite(bf))  then result := xqvalueF(af + bf, a, b)
     else if isNegInf(af) and isNegInf(bf)  then result := xqvalueF(-Infinity, a, b)
@@ -301,7 +301,7 @@ begin
     exit(xqvalueSubtractDates(cxt,a,b));
   end;
 
-  ad := a.toFloat; bd := b.toFloat;
+  ad := a.toDouble; bd := b.toDouble;
   {if IsNan(ad) or IsNan(bd) then result := xqvalueF(getNaN, a, b)
   else if IsInfinite(ad) or IsInfinite(bd) then begin
     if not (IsInfinite(ad) and IsInfinite(bd))  then result := xqvalueF(ad - bd, a, b)
@@ -396,16 +396,16 @@ begin
     if bk <> pvkDateTime then begin
       if (not (a.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(b) <> xsceNoError) then exit(xqvalue);
       result := a.clone;
-      (result.toValue as TXQValueDateTime).multiplyComponents(b.toFloat);
+      (result.toValue as TXQValueDateTime).multiplyComponents(b.toDouble);
     end else begin
       if (not (b.typeAnnotation as TXSDateTimeType).isDuration) or (baseSchema.double.tryCreateValue(a) <> xsceNoError) then exit(xqvalue);
       result := b.clone;
-      (result.toValue as TXQValueDateTime).multiplyComponents(a.toFloat);
+      (result.toValue as TXQValueDateTime).multiplyComponents(a.toDouble);
     end;
     exit;
   end;
 
-  ad := a.toFloat; bd := b.toFloat;
+  ad := a.toDouble; bd := b.toDouble;
   {this explicitly checks for the IEEE special case handling, but is not needed with the rigth exception mask
   if IsNan(ad) then result := a
   else if IsNan(bd) then result := b
@@ -469,7 +469,7 @@ begin
       end;
       exit(xqvalue);
     end;
-    f:= b.toFloat;
+    f:= b.toDouble;
     result := a.clone;
     if IsInfinite(f) then (result.toValue as TXQValueDateTime).multiplyComponents(0)
     else (result.toValue as TXQValueDateTime).divideComponents(f);
@@ -483,18 +483,18 @@ begin
     exit(t.createValue(a.toDecimal / bd));
   end;
 
-  f:= b.toFloat;
+  f:= b.toDouble;
   if isnan(f) or (f = 0) then begin
     if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
       raiseDivisionBy0NotAllowed;
     if IsNan(f) then exit(xqvalueF(xqfloat.NaN, a, b));
-    e := a.toFloat;
+    e := a.toDouble;
     if isnan(e) or (e=0) then result := xqvalueF(xqfloat.NaN, a, b)
     else if e.Sign = f.sign then result := xqvalueF(xqfloat.PositiveInfinity, a, b)
     else result := xqvalueF(xqfloat.NegativeInfinity, a, b);
     exit();
   end;
-  e := a.toFloat;
+  e := a.toDouble;
   result := t.createValue(e / f);
 end;
 
@@ -502,7 +502,7 @@ function xqvalueFloatLikeToDecimal(const v: IXQValue): BigDecimal;
 begin
   result := v.toDecimal;
   if result.isZero() then
-    if not (v.kind in [pvkInt64, pvkBigDecimal, pvkFloat]) then
+    if not (v.kind in [pvkInt64, pvkBigDecimal, pvkDouble]) then
       baseSchema.double.createValue(v).toDecimal;  //check special values
 end;
 
@@ -535,10 +535,10 @@ begin
   end;
 
   if not (bk in [pvkInt64, pvkBigDecimal]) then begin
-    bf := b.toFloat;
+    bf := b.toDouble;
     if IsInfinite(bf) then begin
       if not (ak in [pvkInt64, pvkBigDecimal]) then begin
-        af := a.toFloat;;
+        af := a.toDouble;;
         if IsNan(af) or IsInfinite(af) then
           raise EXQEvaluationException.create('err:FOAR0002', 'Invalid value '+a.toXQuery()+' for integer division');
       end;
@@ -583,7 +583,7 @@ begin
   if ak in [pvkInt64, pvkBigDecimal] then
     ad := a.toDecimal
   else begin
-    tempf := a.toFloat;
+    tempf := a.toDouble;
     if isNan(tempf) then exit(a);
     if IsInfinite(tempf) then exit(XQValueF(xqfloat.NaN, a, b));
     ad := a.toDecimal;
@@ -592,7 +592,7 @@ begin
   if bk in [pvkInt64, pvkBigDecimal] then
     bd := b.toDecimal
   else begin
-    tempf := b.toFloat;
+    tempf := b.toDouble;
     if (IsNan(tempf)) then exit(b);
     if IsInfinite(tempf) then exit(a);
     bd := b.toDecimal;
@@ -604,8 +604,8 @@ begin
 
   t := TXSType.commonDecimalType(a, b);
   rd := ad mod bd;
-  if (ak = pvkFloat) and rd.isZero() and ((t = baseSchema.double) or (t = baseSchema.float)) then
-    if a.toFloat.sign then exit(t.createValue(-0.0));
+  if (ak = pvkDouble) and rd.isZero() and ((t = baseSchema.double) or (t = baseSchema.float)) then
+    if a.toDouble.sign then exit(t.createValue(-0.0));
   result := t.createValue(rd);
 end;
 
@@ -926,7 +926,7 @@ begin
   case args[0].kind of
     pvkInt64:      result := baseType.createValue(abs(args[0].toInt64));
     pvkBigDecimal: result := baseType.createValue(abs(args[0].toDecimal));
-    else           result := baseType.createValue(abs(args[0].toFloat));
+    else           result := baseType.createValue(abs(args[0].toDouble));
   end;
 end;
 
@@ -941,7 +941,7 @@ begin
     pvkInt64:      result := baseType.createValue(args[0].toInt64);
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmCeil));
     else begin
-      v := args[0].toFloat;
+      v := args[0].toDouble;
       if not v.isFinite() then exit(baseType.createValue(v));
       if frac(v) > 0 then result := baseType.createValue(v - frac(v) + 1)
       else result := baseType.createValue(v - frac(v));
@@ -961,7 +961,7 @@ begin
     pvkInt64:      result := baseType.createValue(args[0].toInt64);
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, 0, bfrmFloor));
     else begin
-      v := args[0].toFloat;
+      v := args[0].toDouble;
       if not v.isFinite() then exit(baseType.createValue(v));
       if frac(v) < 0 then result := baseType.createValue(v - frac(v) - 1)
       else result := baseType.createValue(v - frac(v));
@@ -1054,8 +1054,8 @@ begin
       else if prec <= 17 then result := baseType.createValue(intRound(args[0].toInt64, prec))
       else result := baseType.createValue(0);
     pvkBigDecimal: result := baseType.createValue(round(args[0].toDecimal, prec, bfrmRoundHalfUp));
-    pvkFloat: begin
-      f := args[0].toFloat;
+    pvkDouble: begin
+      f := args[0].toDouble;
       if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
       else if prec > 4933 then result := baseType.createValue(0)
       else result := baseType.createValue(f.round(prec));
@@ -1124,7 +1124,7 @@ begin
        exit(baseType.createValue(round(args[0].toDecimal, prec, bfrmRoundHalfToEven)));
      end;
     else begin
-      f := args[0].toFloat;
+      f := args[0].toDouble;
       if not f.isFinite then exit(baseType.createValue(f));
 
       if argc = 1 then exit(baseType.createValue(floatRoundHalfToEven(f)));
@@ -2661,8 +2661,8 @@ begin
       result := (i64 >= low(integer)) and (i64 <= high(Integer));
       if result then outv := i64;
     end;
-    pvkFloat: begin
-      f := v.toFloat;
+    pvkDouble: begin
+      f := v.toDouble;
       if IsNan(f) then exit(false); //comparison works with infinite
       result := (f >= low(integer)) and (f <= high(Integer)) and (frac(f) = 0);
       if result then outv := trunc(f);
@@ -3110,7 +3110,7 @@ begin
   requiredArgCount(argc, 0, 1);
   if argc = 0 then exit(xqvalue(xqfloat(Random)))
   else if args[0].instanceOf(baseSchema.integer) then exit(xqvalue(random(args[0].toInt64)))
-  else exit(xqvalue(xqfloat(Random * args[0].toFloat)));
+  else exit(xqvalue(xqfloat(Random * args[0].toDouble)));
 end;
 
 function xqFunctionRandom_Seed(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -4090,9 +4090,9 @@ function getPromotedType(const v: IXQValue): TXQValueKind;
 
     if (a = pvkInt64) and (b = pvkInt64) then exit(pvkInt64);
     if (a in [pvkInt64,pvkBigDecimal]) and (b in [pvkInt64,pvkBigDecimal]) then exit(pvkBigDecimal);
-    if (a = pvkFloat) and (b = pvkFloat) then exit(pvkFloat);
+    if (a = pvkDouble) and (b = pvkDouble) then exit(pvkDouble);
 
-    if (a = pvkFloat) or (b = pvkFloat) then exit(pvkFloat);
+    if (a = pvkDouble) or (b = pvkDouble) then exit(pvkDouble);
     if (a = pvkBigDecimal) or (b = pvkBigDecimal) then exit(pvkBigDecimal);
     if (a = pvkInt64) or (b = pvkInt64) then exit(pvkInt64);
 
@@ -4232,11 +4232,11 @@ begin
         else {impossible};
       end;
     end;
-    pvkFloat: begin
+    pvkDouble: begin
       tempf := 0;
       try
         for pv in enumerable do
-          tempf += pv^.toFloat;
+          tempf += pv^.toDouble;
         result := getPromotedDecimalType(seq).createValue(tempf);
       except
         on e: EInvalidOp do raise EXQEvaluationException.Create('FOAR0002', e.Message);
@@ -4266,7 +4266,7 @@ begin
     xqvalueSeqSqueeze(result);
     if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result))
     else case result.kind of
-      pvkInt64, pvkBigDecimal, pvkFloat: exit;
+      pvkInt64, pvkBigDecimal, pvkDouble: exit;
       pvkDateTime: if (result.instanceOf(baseSchema.yearMonthDuration)) or (result.instanceOf(baseSchema.dayTimeDuration)) then
         exit
         else raiseError;
@@ -4288,10 +4288,10 @@ begin
         tempd := tempd + pv^.toDecimal;
       result := getPromotedDecimalType(seq).createValue(tempd / seq.Count);
     end;
-    pvkFloat: begin
+    pvkDouble: begin
       tempf:=0;
       for pv in enumerable do begin
-        tempf2 := pv^.toFloat;;
+        tempf2 := pv^.toDouble;;
         if (tempf2.IsNan()) or (tempf2.IsPositiveInfinity and tempf.IsNegativeInfinity()) or (tempf2.IsNegativeInfinity() and tempf.IsPositiveInfinity)  then
           exit(getPromotedDecimalType(seq).createValue(xqfloat.NaN));
         tempf += tempf2;
@@ -4331,7 +4331,7 @@ begin
     if result.getSequenceCount > 0 then begin
       if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result));
       case result.kind of
-        pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkFloat, pvkString, pvkBinary: exit; //ok
+        pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkDouble, pvkString, pvkBinary: exit; //ok
         pvkDateTime:
           if (result.typeAnnotation as TXSDateTimeType).isDuration and not (result.instanceOf(baseSchema.yearMonthDuration) or result.instanceOf(baseSchema.dayTimeDuration)) then
             raiseError
@@ -4403,12 +4403,12 @@ begin
         end;
       if result = nil then result := seq.get(1) else result._AddRef;
     end;
-    pvkFloat: begin
+    pvkDouble: begin
       result := nil;
-      tempf := seq.get(1).toFloat;
+      tempf := seq.get(1).toDouble;
       if not isnan(tempf) then
         for pv in enumerable do begin
-          tempf2 := pv^.toFloat;
+          tempf2 := pv^.toDouble;
           if isnan(tempf2) then begin
             xqvalueMoveNoRefCount(pv^, result);
             break;
@@ -6438,8 +6438,8 @@ begin
 
   case args[0].kind of
     pvkUndefined: exit(xqvalue(data^.nan));
-    pvkFloat: begin
-      numberf := args[0].toFloat;
+    pvkDouble: begin
+      numberf := args[0].toDouble;
       if IsNan(numberf) then exit(xqvalue(data^.nan));
       if not numberf.sign then currentPictureParser := 0
       else if currentPictureParser = 0 then pictureParser[0].prefix := strGetUnicodeCharacter(data^.chars[xqdfpMinusSign]) + pictureParser[0].prefix;
@@ -6938,7 +6938,7 @@ begin
         pvkObject, pvkFunction: errorFOTY0013(list[i].toValue);
         pvkArray: for w in list[i].GetEnumeratorArrayTransparentUnsafe do
           if w.kind in [pvkObject, pvkFunction] then errorFOTY0013(w);
-        pvkUndefined, pvkBoolean, pvkInt64, pvkFloat, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkNull: ;
+        pvkUndefined, pvkBoolean, pvkInt64, pvkDouble, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkNull: ;
       end;
     list.sort(@compareDirect, TObject(@sortContext));
   end else begin
@@ -7913,7 +7913,7 @@ begin
         'xquery-version': begin
           if not (ps.value.kind in [pvkBigDecimal, pvkInt64]) then
             raiseXPTY0004TypeError(args[1], 'Invalid xquery version ');
-          if ps.value.toFloat > 3.1000000001 {floating point is not exact for 3.1} then
+          if ps.value.toDouble > 3.1000000001 {floating point is not exact for 3.1} then
             raise EXQEvaluationException.create('FOQM0006', 'Invalid xquery version ' + args[1].toXQuery);
         end;
         'vendor-options', 'variables': begin
@@ -8577,8 +8577,8 @@ end;
 
 function xqFunctionIsNaN({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
-  if args[0].kind = pvkFloat then
-    if args[0].toFloat.IsNan() then
+  if args[0].kind = pvkDouble then
+    if args[0].toDouble.IsNan() then
       exit(xqvalueTrue);
   result := xqvalueFalse;
 end;

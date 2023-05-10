@@ -129,6 +129,11 @@ end;
 
 function TXQValue.toFloat: xqfloat;
 begin
+  result := toDouble;
+end;
+
+function TXQValue.toDouble: xqfloat;
+begin
   result:= xqfloat.parse(toString);
 end;
 
@@ -369,7 +374,7 @@ begin
     pvkBoolean:    result := qualifiedTypeName(IfThen(toBoolean, 'true()', 'false()'), 'boolean');
     pvkNull:       result := 'null';
     pvkInt64:      result := qualifiedTypeName(toString, 'integer');
-    pvkFloat:      result := qualifiedTypeName(toString, '');
+    pvkDouble:      result := qualifiedTypeName(toString, '');
     pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(toDecimal.IsIntegral(), 'integer', 'decimal') );
     pvkString, pvkBinary: result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
     pvkQName, pvkDateTime:
@@ -496,10 +501,10 @@ begin
   result.ptrs[0] := GetEnumeratorPtrUnsafe;
 end;
 
-function TXQValue.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValue.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking then raiseXPTY0004TypeError(self, 'float/double');
-  result := self.toFloat;
+  result := self.toDouble;
 end;
 
 function TXQValue.debugAsStringWithTypeAnnotation(textOnly: boolean = true): string;
@@ -988,7 +993,7 @@ begin
   if bool then result:=1 else result:=0;
 end;
 
-function TXQValueBoolean.toFloat: xqfloat;
+function TXQValueBoolean.toDouble: xqfloat;
 begin
   if bool then result:=1 else result:=0;
 end;
@@ -1071,12 +1076,12 @@ begin
   result:=value;
 end;
 
-function TXQValueInt64.toFloat: xqfloat;
+function TXQValueInt64.toDouble: xqfloat;
 begin
   Result:=value;
 end;
 
-function TXQValueInt64.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueInt64.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   ignore(scontext);
   result := value;
@@ -1139,12 +1144,12 @@ end;
 constructor TXQValueFloat.create(atypeAnnotation: TXSType; const avalue: IXQValue);
 begin
   inherited create(atypeannotation);
-  value := avalue.toFloat;
+  value := avalue.toDouble;
 end;
 
 class function TXQValueFloat.classKind: TXQValueKind;
 begin
-  Result:=pvkFloat;
+  Result:=pvkDouble;
 end;
 {$ImplicitExceptions on}
 
@@ -1167,12 +1172,12 @@ begin
   Result:=trunc(value);
 end;
 
-function TXQValueFloat.toFloat: xqfloat;
+function TXQValueFloat.toDouble: xqfloat;
 begin
   Result:=value;
 end;
 
-function TXQValueFloat.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueFloat.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   ignore(scontext);
   Result:=value;
@@ -1376,10 +1381,10 @@ begin
  Result:=value;
 end;
 
-function TXQValueDecimal.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueDecimal.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   ignore(scontext);
-  result := toFloat;
+  result := toDouble;
 end;
 
 function TXQValueDecimal.toString: string;
@@ -1489,7 +1494,7 @@ begin
   result := StrToDateTimeDef(str,0);
 end;
 
-function TXQValueString.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueString.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
   if not TryStrToXQFloat(str, result) then
@@ -1550,7 +1555,7 @@ begin
   result := 0;
 end;
 
-function TXQValueBinary.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueBinary.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   ignore(scontext);
   raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to float.');
@@ -2192,10 +2197,10 @@ begin
   else result := 0;
 end;
 
-function TXQValueSequence.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueSequence.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   if getSequenceCount <> 1 then raiseXPTY0004TypeError(self, 'float/double');
-  Result := seq[0].toFloatChecked(scontext);
+  Result := seq[0].toDoubleChecked(scontext);
 end;
 
 {$ImplicitExceptions off}
@@ -2479,7 +2484,7 @@ begin
   result := StrToDateTimeDef(toString,0);
 end;
 
-function TXQValueNode.toFloatChecked(scontext: TXQStaticContext): xqfloat;
+function TXQValueNode.toDoubleChecked(scontext: TXQStaticContext): xqfloat;
 begin
   ignore(scontext);
   if scontext.strictTypeChecking and (nodeTypeAnnotation(node) = baseSchema.string_) then raiseXPTY0004TypeError(self, 'float/double');

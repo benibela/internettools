@@ -123,12 +123,12 @@ begin
   result := true;
   case v.kind of
     pvkInt64: res := v.toInt64;
-    pvkFloat: begin
-      if IsNan(v.toFloat) or (IsInfinite(v.toFloat) and (v.toFloat < 0)) then begin
+    pvkDouble: begin
+      if IsNan(v.toDouble) or (IsInfinite(v.toDouble) and (v.toDouble < 0)) then begin
         exit(false);
-      end else if IsInfinite(v.toFloat) then begin
+      end else if IsInfinite(v.toDouble) then begin
         res := high(res);
-      end else res := round(v.toFloat);
+      end else res := round(v.toDouble);
     end;
     {pvkBigDecimal:}else begin
       temp := round(v.toDecimal);

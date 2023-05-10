@@ -168,7 +168,7 @@ function pack_double(argc: SizeInt; args: PIXQValue): IXQValue;
 var endian: TEndian = TEndian.Big;
   d: xqfloat;
 begin
-  d := args[0].toFloat;
+  d := args[0].toDouble;
   if argc = 2 then endian := getEndianness(args[1]);
   if IsNan(d) then PQWord(@d)^ := QWord($7ff8000000000000);
   if CPUEndian <> endian then PQWord(@d)^ := SwapEndian(PQWord(@d)^);
