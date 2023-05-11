@@ -1614,6 +1614,66 @@ type
   end;
 
 
+  TXSTypeAnnotation = (
+    xstNoType                 ,
+    xstAnyType                ,
+    xstAnySimpleType          ,
+    xstAnyAtomicType          ,
+    xstUntyped                ,
+    xstUntypedAtomic          ,
+
+    xstBoolean                ,
+    xstDateTime               ,
+    xstDate                   ,
+    xstTime                   ,
+    xstGDay                   ,
+    xstGMonth                 ,
+    xstGMonthDay              ,
+    xstGYear                  ,
+    xstGYearMonth             ,
+    xstDuration               ,
+    xstDecimal                ,
+    xstDouble                 ,
+    xstFloat                  ,
+    xstAnyURI                 ,
+    xstBase64Binary           ,
+    xstHexBinary              ,
+    xstString                 ,
+    xstQName                  ,
+    xstNOTATION               ,
+    xstInteger                ,
+    xstNonPositiveInteger     ,
+    xstNegativeInteger        ,
+    xstNonNegativeInteger     ,
+    xstPositiveInteger        ,
+    xstUnsignedLong           ,
+    xstUnsignedInt            ,
+    xstUnsignedShort          ,
+    xstUnsignedByte           ,
+    xstLong                   ,
+    xstInt                    ,
+    xstShort                  ,
+    xstByte                   ,
+    xstNormalizedString       ,
+    xstToken                  ,
+    xstLanguage               ,
+    xstNMTOKEN                ,
+    xstName                   ,
+    xstNCName                 ,
+    xstID                     ,
+    xstIDREF                  ,
+    xstENTITY                 ,
+    xstNMTOKENS               ,
+    xstIDREFS                 ,
+    xstENTITIES               ,
+    xstYearMonthDuration      ,
+    xstDayTimeDuration        ,
+    xstDateTimeStamp
+  );
+  TXSTypeAnnotationHelper = type helper for TXSTypeAnnotation
+    function derivedFrom(t: TXSType): boolean;
+  end;
+
   TXSSchemaVersion = (xsd10, xsd11);
   //** XML Schema
   TXSSchema = class
@@ -1642,6 +1702,8 @@ type
     //3.1 only
     error: TXSSimpleType;
     numeric: TXSUnionType;
+
+    types: array[TXSTypeAnnotation] of TXSType;
 
     constructor Create;
     destructor Destroy; override;
@@ -3272,13 +3334,6 @@ type TXQDebugTracingEvent = procedure (term: TXQTerm; const context: TXQEvaluati
 //**Experimental event to trace the evaluation of a query
 var XQOnGlobalDebugTracing: TXQDebugTracingEvent;
 
-type
-
-{ TXQValue_DatePart }
-
-//** (Abstract) Class containing different parts of a date
-TXQValue_DatePart = class (TXQValueDateTime)
-end;
 
 type
 
@@ -3600,6 +3655,11 @@ begin
   t := PPointer(@a)^ ;
   PPointer(@a)^ := PPointer(@b)^;
   PPointer(@b)^ := t;
+end;
+
+function TXSTypeAnnotationHelper.derivedFrom(t: TXSType): boolean;
+begin
+  result := baseSchema.types[self].derivedFrom(t);
 end;
 
 
