@@ -47,7 +47,7 @@ var st: TSystemTime;
 begin
   st := default(TSystemTime);
   GetLocalTime(st);
-  result := dateTimeFormat(mask, st.Year, st.month, st.Day, st.Hour, st.MilliSecond, st.Second, st.MilliSecond * 1000000);
+  result := dateTimeFormat(mask, st.Year, st.month, st.Day, st.Hour, st.Minute, st.Second, st.MilliSecond * 1000000);
 end;
 
   procedure log(const s: string);
