@@ -1049,6 +1049,7 @@ type
     procedure addAll(other: TBaseArrayList);
     procedure addAll(const other: array of TElement);
     procedure add(const item: TElement);
+    procedure insert(Index: SizeInt; const item: TElement);
     procedure clear;
     procedure delete(Index: SizeInt);
     procedure deleteLast();
@@ -1933,6 +1934,23 @@ begin
   inc(fcount);
 end;
 
+procedure TBaseArrayList.insert(Index: SizeInt; const item: TElement);
+var
+  shifted: SizeInt;
+begin
+  if Index = count then add(item)
+  else begin
+    checkIndex(index);
+    if FCount = capacity then expand;
+    shifted := count - index;
+    fbuffer[index + shifted] := default(TElement);
+    move(FBuffer[index], FBuffer[index + 1], sizeof(TElement)*shifted);
+    FillChar(FBuffer[index], sizeof(TElement), 0);
+    FBuffer[index] := item;
+    inc(fcount);
+  end;
+end;
+
 procedure TBaseArrayList.clear;
 begin
   SetLength(FBuffer, 0);
@@ -1948,7 +1966,7 @@ begin
   FBuffer[index] := Default(TElement);
   moveCount := FCount - index - 1;
   p := @fbuffer[index];
-  move((p + index)^, p, sizeof(TElement) * moveCount);
+  move((p + 1)^, p^, sizeof(TElement) * moveCount);
   dec(fcount);
   fillchar(fbuffer[fcount], sizeof(TElement), 0);
 end;
