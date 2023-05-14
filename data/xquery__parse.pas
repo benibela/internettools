@@ -565,7 +565,7 @@ end;
 
 procedure TFlowerVariableChecker.undeclare(v: PXQTermVariable);
 begin
-  knownVars.add(v^, nil);
+  knownVars.add(v^, xqvalue()); //todo??
 end;
 
 constructor TFlowerVariableChecker.create;
@@ -1931,8 +1931,8 @@ function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
       if length(s) = 0 then exit;
       if (length(parent.children) > 0)
          and objInheritsFrom(parent.children[high(parent.children)], TXQTermConstant)
-         and (TXQTermConstant(parent.children[high(parent.children)]).value is TXQValueString) then
-        (TXQTermConstant(parent.children[high(parent.children)]).value as TXQValueString).str += s
+         and (TXQTermConstant(parent.children[high(parent.children)]).value.kind = pvkString) then
+        TXQTermConstant(parent.children[high(parent.children)]).value.appendString(s)
       else
         parent.push(TXQTermConstant.create(xqvalue(s)));
     end;
@@ -2638,13 +2638,13 @@ var
     v := normalizeLineEnding(strFromPchar(from, too - from + 1));
     if allowEntityReplacement then v := replaceEntitiesIfNeeded(v);
     if result <> nil then begin
-      if result.InheritsFrom(TXQTermConstant) and (TXQTermConstant(result).value is TXQValueString) then
-        (TXQTermConstant(result).value as TXQValueString).str += v
+      if result.InheritsFrom(TXQTermConstant) and (TXQTermConstant(result).value.kind = pvkString) then
+        TXQTermConstant(result).value.appendString(v)
       else if result.InheritsFrom(TXQTermNamedFunction) and functionIsConcat(TXQTermNamedFunction(result))
               and objInheritsFrom(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)], TXQTermConstant)
-              and (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value is TXQValueString )
+              and (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value.kind = pvkString )
               then
-        (TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value as TXQValueString).str += v
+        TXQTermConstant(TXQTermNamedFunction(result).children[high(TXQTermNamedFunction(result).children)]).value.appendString(v)
       else pushTerm(TXQTermConstant.create(v));
     end else pushTerm(TXQTermConstant.create(v));
   end;
@@ -2691,7 +2691,7 @@ begin
     on EXQParsingException do begin result.free; raise; end;
   end;
   if result = nil then result := TXQTermConstant.create('')
-  else if result.InheritsFrom(TXQTermConstant) and not (TXQTermConstant(result).value is TXQValueString) then
+  else if result.InheritsFrom(TXQTermConstant) and not (TXQTermConstant(result).value.kind = pvkString) then
     result := TXQTermNamedFunction.create(XMLNamespaceUrl_XPathFunctions, 'string', [result]);
 end;
 
@@ -2855,7 +2855,7 @@ end;
 function createDynamicErrorTerm(const code, msg: string): TXQTermNamedFunction;
 begin
   result := TXQTermNamedFunction.create(XMLNamespaceURL_XPathFunctions, 'error', [
-                TXQTermConstant.create(TXQValueQName.create(XMLNamespaceURL_XQTErrors, 'err', code)),
+                TXQTermConstant.create(TXQBoxedQName.create(XMLNamespaceURL_XQTErrors, 'err', code)),
                 TXQTermConstant.create(msg)]);
 end;
 
@@ -2871,7 +2871,7 @@ var
   namespace: TNamespace;
 begin
   result := term;
-  if typ.storage = TXQValueQName then begin
+  if typ.isQNameType then begin
     if typ = baseSchema.NOTATION then result := castFail('XPST0080')
     else if objInheritsFrom(term.children[0], TXQTermConstant) then begin
       case TXQTermConstant(term.children[0]).value.kind of
@@ -2892,8 +2892,8 @@ begin
             if pos(':', name) > 0 then begin
               namespace := staticContext.findNamespace(strSplitGet(':', name), xqdnkElementType);
               if namespace = nil then result := createDynamicErrorTerm('FONS0004', 'Failed to find namespace of: '+TXQTermConstant(term.children[0]).value.toString)
-              else result := TXQTermConstant.Create(TXQValueQName.create(typ, namespace, name));
-            end else result := TXQTermConstant.Create(TXQValueQName.create(typ, staticContext.findNamespace('', xqdnkElementType), name));
+              else result := TXQTermConstant.Create(TXQBoxedQName.create(namespace, name));
+            end else result := TXQTermConstant.Create(TXQBoxedQName.create(staticContext.findNamespace('', xqdnkElementType), name));
           end;
         end;
         pvkUndefined: begin
@@ -3559,7 +3559,7 @@ end;
 procedure initializeFunctions(module: TXQTermModule; var context: TXQEvaluationContext);
 var
   i: SizeInt;
-  functions: array of TXQValueFunction;
+  functions: array of TXQBoxedFunction;
   functionCount: SizeInt;
   children: array of TXQTerm;
   staticContext: TXQStaticContext;
@@ -4224,7 +4224,7 @@ var
   temp: String;
   annotations: TXQAnnotations;
   marker: PChar;
-  serializationOptions: TXQValueStringMap = nil;
+  serializationOptions: TXQBoxedStringMap = nil;
 
 
   namespaceMode: TXQNamespaceMode;
@@ -4458,10 +4458,10 @@ begin
             end;
             'http://www.w3.org/2010/xslt-xquery-serialization': begin
               if serializationOptions = nil then begin
-                serializationOptions := TXQValueStringMap.create();
+                serializationOptions := TXQBoxedStringMap.create();
                 serializationOptions.setMutable(#0'static-options', xqvalueTrue); //mark the map as wrapping statically given options
               end;
-              if serializationOptions.hasProperty(token, nil) then
+              if serializationOptions.hasProperty(token) then
                 raiseParsingError('XQST0110', 'Duplicate');
               case token of
                 'parameter-document':
@@ -4502,7 +4502,7 @@ begin
     end else if nextToken() <> '' then raiseSyntaxError('Module should have ended, but input query did not');
     declarationDuplicateChecker.free;
     if serializationOptions <> nil then
-      staticContext.serializationOptions := serializationOptions;
+      staticContext.serializationOptions := serializationOptions.boxInIXQValue;
   except
     if staticContext.decimalNumberFormats <> nil then
       for oldDecimalFormatCount := staticContext.decimalNumberFormats.Count - 1 downto oldDecimalFormatCount do begin

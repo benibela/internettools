@@ -233,7 +233,7 @@ begin
         if (tempVars.count = 1) and (tempVars.getName(0) = templateParser.UnnamedVariableName) then begin
           result := tempVars.get(0);
           tempVars.free;
-        end else result := tempVars.toStringMap;
+        end else result := tempVars.toStringMap.boxInIXQValue;
       end;
     end;
     else begin
@@ -338,7 +338,7 @@ begin
     pvkNode: raise EXQEvaluationException.Create('pxp:ASSERT', 'Got '+dest.toXQuery()+', but expected resolved url');
     pvkObject: begin
       tempHeaders := defaultInternet.additionalHeaders.Text;
-      dest.toValue.prepareInternetRequest(method, url, post, defaultInternet);
+      dest.prepareInternetRequest(method, url, post, defaultInternet);
       result := internetaccess.httpRequest(method, url, post);
       defaultInternet.additionalHeaders.Text := tempHeaders;
     end;

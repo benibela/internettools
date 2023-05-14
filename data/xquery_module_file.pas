@@ -42,10 +42,14 @@ const Error_NoDir = 'no-dir';
       Error_Not_Found =  'not-found';
       Error_Out_Of_Range = 'out-of-range';
       error_unknown_encoding = 'unknown-encoding';
-procedure raiseFileError(code, message: string; const item: IXQValue = nil);
+procedure raiseFileError(code, message: string; const item: IXQValue);
 begin
-  if item <> nil then message += '("'+item.toJoinedString()+'")';
+  message += '("'+item.toJoinedString()+'")';
   raise EXQEvaluationException.create(code, message, XMLNamespace_Expath_File, item);
+end;
+procedure raiseFileError(code, message: string);
+begin
+  raise EXQEvaluationException.create(code, message, XMLNamespace_Expath_File);
 end;
 
 type
@@ -217,7 +221,7 @@ var
   dateTime: TDateTime;
   fn: String;
   search: TRawByteSearchRec;
-  dt: TXQValueDateTime;
+  dt: TXQBoxedDateTime;
 begin
   ignore(context);
   fn := normalizePath(args[0]);
@@ -225,9 +229,9 @@ begin
     raiseFileError(ifthen(FileOrDirectoryExists(normalizePath(args[0])), Error_Io_Error, Error_Not_Found), 'Could not get age', args[0] );
   dateTime := FileDateToDateTime(search.Time);
   sysutils.FindClose(search);
-  dt := TXQValueDateTime.create(baseSchema.dateTime, dateTime);
+  dt := TXQBoxedDateTime.create(baseSchema.dateTime, dateTime);
   dt.value.timezone:=-GetLocalTimeOffset;;
-  result := dt;
+  result := xqvalue(dt);
 end;
 
 function size(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -311,7 +315,7 @@ var
   tempdata: RawByteString;
 begin
   if argc = 3 then params.initFromXQValue(context, args[2])
-  else params.initFromXQValue(context, nil);
+  else params.initFromXQValue(context, xqvalue());
   params.allowEncodingConversion := true;
   tempdata := serialize(args[1], params);
   params.done;
@@ -340,7 +344,7 @@ end;
 function append_Binary(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   ignore(context);
-  result := writeOrAppendSomething(args[0], true, (args[1] as TXQValueBinary).toBinaryBytes);
+  result := writeOrAppendSomething(args[0], true, (args[1]).toBinaryBytes);
 end;
 function append_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -364,7 +368,7 @@ begin
   ignore(context);
   offset := -1;
   if argc >= 3 then if not xqToUInt64(args[2], offset) then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := writeOrAppendSomething(args[0], argc >= 3, (args[1] as TXQValueBinary).toBinaryBytes, offset);
+  result := writeOrAppendSomething(args[0], argc >= 3, (args[1]).toBinaryBytes, offset);
 end;
 function write_Text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
@@ -544,7 +548,7 @@ begin
     end;
 
     lister.startSearch(dir, ifthen(relative, '', dir));
-    result := TXQValueSequence.create(lister.seq);
+    result := TXQBoxedSequence.create(lister.seq).boxInIXQValue;
     lister.seq := nil;
     xqvalueSeqSqueeze(result);
     if result.getSequenceCount = 0 then
@@ -637,7 +641,7 @@ begin
   if argc >= 2 then rangeErr := rangeErr or not xqToUInt64(args[1], from);
   if argc >= 3 then rangeErr := rangeErr or not xqToUInt64(args[2], len);
   if rangeErr then raiseFileError(Error_Out_Of_Range, Error_Out_Of_Range, args[2]);
-  result := TXQValueBinary.create(baseSchema.base64Binary, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len)));
+  result := xqvalue(TXQBoxedBinary.create(bdtBase64, base64.EncodeStringBase64(readFromFile(normalizePath(args[0]), from, len))));
 end;
 
 function read_text(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue): IXQValue;

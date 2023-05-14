@@ -38,16 +38,18 @@ type Error = object
     conversion_error = 'conversion-error';
     unknown_significance_order = 'unknown-significance-order';
 end;
-procedure raiseBinaryError(code, message: string; const item: IXQValue = nil);
+procedure raiseBinaryError(code, message: string; const item: IXQValue);
 var
   temp: String;
 begin
-  if item <> nil then begin
     temp := item.toJoinedString();
     if length(temp) > 100 then temp := copy(temp, 1, 100) + '...';
     message += '("'+temp+'")';
-  end;
   raise EXQEvaluationException.create(code, message, XMLNamespace_Expath_Binary, item);
+end;
+procedure raiseBinaryError(code, message: string);
+begin
+  raise EXQEvaluationException.create(code, message, XMLNamespace_Expath_Binary);
 end;
 
 procedure checkOffsetSize(const bytes: TBytes; const xqv: IXQValue; offset: SizeInt; size: SizeInt = 0);
@@ -123,12 +125,12 @@ begin
       ss.free;
     end;
   end;
-  result := TXQValueBinary.create(baseSchema.base64Binary, b64);
+  result := xqvalue(TXQBoxedBinary.create(bdtBase64, b64));
 end;
 
 function xqvalue(const bytes: TBytes; offset, size: SizeInt): IXQValue; overload;
 begin
-  checkOffsetSize(bytes, nil, offset, size);
+  checkOffsetSize(bytes, xqvalue(), offset, size);
   size := min(length(bytes) - offset, size); //if we reach this part, we have triple checking the length
   result := xqvalue(pbyte(bytes) + offset, size);
 end;

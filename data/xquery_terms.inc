@@ -18,39 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 }
 
-procedure copyAnnotations(var target: TXQAnnotations; const source: TXQAnnotations);
-var
-  i: SizeInt;
-  j: SizeInt;
-begin
-  target:= source;
-  SetLength(target, length(target));
-  for i := 0 to high(target) do
-    with target[i] do begin
-      name := name.clone;
-      SetLength(params, length(params));
-      for j := 0 to high(params) do
-        params[j] := params[j].clone;
-    end;
-end;
-
-procedure freeAnnotations(annotations: TXQAnnotations);
-var
-  i: SizeInt;
-  j: SizeInt;
-begin
-  for i := 0 to high(annotations) do begin
-    annotations[i].name.Free;
-    for j := 0 to high(annotations[i].params) do
-      annotations[i].params[j].free;
-  end;
-
-end;
 
 function TXQTerm.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
-  result := nil;
+  result.clear;
   raise EXQEvaluationException.create('pxp:INTERNAL', debugTermToString + ' cannot be evaluated');
 end;
 
@@ -71,7 +43,7 @@ end;
 
 procedure TXQTerm.raiseEvaluationError(const errcode, s: string);
 begin
-  raise EXQEvaluationException.Create(errcode, s, nil, nil, self);
+  raise EXQEvaluationException.Create(errcode, s, nil, self);
 end;
 
 procedure TXQTerm.raiseTypeError0004(const s: string);
@@ -350,24 +322,24 @@ var source: IXQValue;
   end;
 
 var
-  ar: TXQValueJSONArray;
-  seq: TXQValueSequence;
+  ar: TXQBoxedArray;
+  seq: TXQBoxedSequence;
   i: Int64;
   pk: PIXQValue;
-  w: TXQValue;
+  w: IXQValue;
 begin
   if unary then begin
     source := context.SeqValue;
-    if source = nil then raiseXQEvaluationException('XPDY0002', 'No context item');
+    if source.isUndefined then raiseXQEvaluationException('XPDY0002', 'No context item');
   end else source := children[0].evaluate(context);
-  keys := nil;
-  if mode = xqtjlmParenthesized then keys := xqvalueAtomize(children[high(children)].evaluate(context));
-  result := nil;
+  if mode = xqtjlmParenthesized then keys := xqvalueAtomize(children[high(children)].evaluate(context))
+  else keys.clear;
+  result.clear;
   seq := nil;
   for pv in source.GetEnumeratorPtrUnsafe do begin
     case pv^.kind of
       pvkArray: begin
-        ar := pv^ as TXQValueJSONArray;
+        ar := pv^.getDataArray;
         case mode of
           xqtjlmInteger: if (integerKey >= 1) and (integerKey <= ar.seq.Count) then xqvalueSeqConstruct(result, seq, ar.seq[integerKey - 1])
                          else raiseInvalidKey('FOAY0001');
@@ -400,7 +372,6 @@ begin
     else raiseTypeError0004('Need array/map', pv^);
     end;
   end;
-  if result = nil then result := xqvalue();
 end;
 
 function TXQTermJSONLookup.getContextDependencies: TXQContextDependencies;
@@ -454,11 +425,11 @@ end;
 function TXQTermFilterSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var temp: TXQPathMatchingStepFilter;
   list: TXQVList;
-  seq: TXQValueSequence;
+  seq: TXQBoxedSequence;
 begin
   list := TXQVList.create();
-  seq := TXQValueSequence.create(list);
-  result := seq;
+  seq := TXQBoxedSequence.create(list);
+  result := seq.boxInIXQValue;
 
   temp.filter := children[1];
   temp.dependencies := temp.filter.getContextDependencies;
@@ -521,23 +492,23 @@ var varname: string;
     arrayIndex: SizeInt;
     value: IXQValue;
 
-    seq: TXQValueSequence;
+    seq: TXQBoxedSequence;
     temp: PIXQValue;
 
     procedure applyProperties;
     var i: SizeInt;
-      temp: TXQValueJSONArray;
+      temp: TXQBoxedArray;
       j: SizeInt;
     begin
       for i := 0 to high(properties) do
         case value.kind of
           pvkObject: value := value.getProperty(properties[i]);
           pvkArray: begin
-            temp := value as TXQValueJSONArray;
+            temp := value.getDataArray;
             if not properties[i].toIntDecimalTry(j) then j := -1;
             if j < 0 then raiseEvaluationError('pxp:VAR', 'Negative array elements cannot be assigned to');
             if (j = 0) or (j > temp.seq.Count) then value := xqvalue()
-            else value := temp.seq.get(j - 1);
+            else value := temp.seq.items[j - 1];
           end;
           else begin
             value := xqvalue();
@@ -601,12 +572,12 @@ begin
       applyProperties;
       if ({%H-}arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
       else if arrayIndex > value.getSequenceCount then begin
-        seq := TXQValueSequence.create(value);
+        seq := TXQBoxedSequence.create(value);
         seq.add(result);
-        value := seq;
+        value := seq.boxInIXQValue;
       end
       else begin
-        seq := TXQValueSequence.create(max(arrayIndex, value.getSequenceCount));
+        seq := TXQBoxedSequence.create(max(arrayIndex, value.getSequenceCount));
         if arrayIndex = 0 then seq.seq.add(result);
         for temp in value.GetEnumeratorPtrUnsafe do begin
           dec(arrayIndex);
@@ -618,7 +589,7 @@ begin
           end;
         end;
         if arrayIndex > 0 then seq.seq.add(result);
-        value := seq;
+        value := seq.boxInIXQValue;
       end;
     end;
     amArrayAppend:
@@ -626,9 +597,9 @@ begin
         value := Result
       else begin
        applyProperties;
-       seq := TXQValueSequence.create(value);
+       seq := TXQBoxedSequence.create(value);
        seq.add(result);
-       value := seq;
+       value := seq.boxInIXQValue;
      end;
   end;
 
@@ -665,19 +636,18 @@ begin
   if not extern and (length(annotations) > 0) then
     extern := annotations[high(annotations)].name.isEqual(XMLNamespaceURL_MyExtensionsNew, 'external');
 
-  result := nil;
+  result.clear;
   if hasExpression then
     result := expression.evaluate(context);
 
-  if extern then begin
-    if (context.staticContext.sender <> nil) and assigned(context.staticContext.sender.OnDeclareExternalVariable) then begin
+  if extern and (context.staticContext.sender <> nil) and assigned(context.staticContext.sender.OnDeclareExternalVariable) then begin
      //raiseParsingError('XPST0001','External variable declared, but no callback registered to OnDeclareExternalVariable.');
-      name := (variable as TXQTermVariable).value;
-      nsu := (variable as TXQTermVariable).namespace;
-      context.staticContext.sender.OnDeclareExternalVariable(context.staticContext, self, nsu, name, result);
-    end;
-  end;
-  if result = nil then raiseEvaluationError('XPDY0002', 'No value for external variable ' + getVariable.ToString+ ' given.');
+    name := (variable as TXQTermVariable).value;
+    nsu := (variable as TXQTermVariable).namespace;
+    context.staticContext.sender.OnDeclareExternalVariable(context.staticContext, self, nsu, name, result);
+  end else
+    if not hasExpression and result.isUndefined then
+      raiseEvaluationError('XPDY0002', 'No value for external variable ' + getVariable.ToString+ ' given.');
 
   if hasTypeDeclaration then
     if not sequenceType.instanceOf(result, context) then
@@ -815,7 +785,7 @@ end;
 function TXQTermSequenceType.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
-  result := TXQValueFunction.create(self); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
+  result := xqvalue(TXQBoxedFunction.create(self)); //return a function returning this term. This allows returning the type itself, without having a "type"-type in the type system.
 end;
 
 function TXQTermSequenceType.serialize: string;
@@ -887,7 +857,7 @@ begin
     0: result := allowNone;
     1: begin
       if v.kind = pvkSequence then v := v.get(1);  //does this matter?
-      if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.tryCreateValue(v) = xsceNoError
+      if not atomicTypeInfo.isQNameType then result := atomicTypeInfo.tryCreateValue(v) = xsceNoError
       else result := (atomicTypeInfo as TXSQNameType).castable(v, staticContext);
     end;
     else result := false;
@@ -903,10 +873,10 @@ begin
       result := xqvalue();
     end;
     1: begin
-      if atomicTypeInfo.storage <> TXQValueQName then result := atomicTypeInfo.createValue(v)
+      if not atomicTypeInfo.isQNameType then result := atomicTypeInfo.createValue(v)
       else result := (atomicTypeInfo as TXSQNameType).cast(v, context);
     end;
-    else begin raiseXPTY0004TypeError(v, debugTermToString); result := nil; end;
+    else begin raiseXPTY0004TypeError(v, debugTermToString); result := xqvalue(); end;
   end;
 end;
 
@@ -946,7 +916,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   var
     notEmpty, propertyTypeNeedsChecking: Boolean;
     v: PIXQValue;
-    w: TXQValue;
+    w: IXQValue;
     p: TXQStandardProperty;
   begin
     propertyTypeNeedsChecking := length(children) > 0;
@@ -979,15 +949,20 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   var
     v: PIXQValue;
   begin
-    for v in ta.GetEnumeratorPtrUnsafe do
-      if not v.typeAnnotation.derivedFrom(atomicTypeInfo) then
-        exit(false);
+    if atomicTypeInfo = baseSchema.structuredItem then begin
+      for v in ta.GetEnumeratorPtrUnsafe do
+        if not (v.kind in [pvkArray, pvkNode, pvkObject]) then
+          exit(false);
+    end else
+      for v in ta.GetEnumeratorPtrUnsafe do
+        if not v.typeAnnotation.derivedFrom(atomicTypeInfo) then
+          exit(false);
     result := true;
   end;
 
   function checkAtomicSequence: boolean;
   var atomicCount: SizeInt;
-    function checkAtomicRecursion(v: TXQValue): boolean;
+    function checkAtomicRecursion(const v: IXQValue): boolean;
     var
       w: PIXQValue;
     begin
@@ -996,7 +971,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
         pvkSequence: begin
           result := true;
           for w in v.GetEnumeratorPtrUnsafe do begin
-            result := checkAtomicRecursion(w.toValue);
+            result := checkAtomicRecursion(w^);
             if not result then exit;
           end;
         end
@@ -1008,7 +983,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     end;
   begin
     atomicCount := 0;
-    result := checkAtomicRecursion(ta.toValue);
+    result := checkAtomicRecursion(ta);
     if result then begin
       case atomicCount of
         0: result := allowNone;
@@ -1021,10 +996,10 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
   function checkFunctionTestSequence: boolean;
   var
     sub, pw: PIXQValue;
-    fun: TXQValueFunction;
+    fun: TXQBoxedFunction;
     i: SizeInt;
     returnType: TXQTermSequenceType;
-    w: TXQValue;
+    w: IXQValue;
   begin
     if length(arguments) > 0 then returnType := arguments[high(arguments)];
     result := true;
@@ -1032,7 +1007,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
       case sub.kind of
         pvkFunction: begin
           if length(arguments) = 0 then continue;
-          fun := sub^ as TXQValueFunction;
+          fun := sub^.getDataFunction;
           if (length(arguments) <> length(fun.parameters) + 1) then exit(false);
           for i := 0 to high(fun.parameters) do
             if (fun.parameters[i].seqtype <> nil) and not arguments[i].subtypeOf(fun.parameters[i].seqtype) then exit(false);
@@ -1254,10 +1229,10 @@ end;
 
 function TXQTermSequenceType.functionCoercion(const v: IXQValue): IXQValue;
 var
-  fun: TXQValueFunction;
+  fun: TXQBoxedFunction;
   needCoercion: Boolean;
   i: SizeInt;
-  fresult: TXQValueFunction;
+  fresult: TXQBoxedFunction;
   tempvar: TXQTermVariable;
 begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
@@ -1267,7 +1242,7 @@ begin
   if length(arguments) = 0 then exit(v);
   case v.kind of
     pvkFunction: begin
-      fun := v as TXQValueFunction;
+      fun := v.getDataFunction;
       if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
       needCoercion := false;
       for i := 0 to high(fun.parameters) do
@@ -1280,7 +1255,7 @@ begin
             then
               needCoercion := true;
       if not needCoercion then exit(v);
-      fresult := TXQValueFunction.create();
+      fresult := TXQBoxedFunction.create();
       fresult.namespaceURL := fun.namespaceURL;
       fresult.namespacePrefix := fun.namespacePrefix;
       fresult.name:=fun.name;
@@ -1290,11 +1265,11 @@ begin
     end;
     pvkObject, pvkArray: begin
       if (length(arguments) <> 1 + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
-      fresult := TXQValueFunction.create();
+      fresult := TXQBoxedFunction.create();
     end;
     else begin
       raiseInternalError(2019010223);
-      exit(nil);
+      exit(xqvalue);
     end;
   end;
   //see TXQTermDefineFunction.defineDynamicPartialApplication
@@ -1309,7 +1284,7 @@ begin
   end;
   fresult.ownsTerms := true;
   fresult.resulttype := TXQTermSequenceType(arguments[high(arguments)].clone);
-  result := fresult;
+  result := xqvalue(fresult);
 end;
 
 function TXQTermSequenceType.isItemStar(): boolean;
@@ -1349,7 +1324,7 @@ end;
 function TXQTermSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  tempSeq: TXQValueSequence;
+  tempSeq: TXQBoxedSequence;
   targetLength, ccount, stacksize: SizeInt;
   stack: TXQEvaluationStack;
   evilkids: PIXQValue;
@@ -1376,8 +1351,8 @@ begin
         end;
     end
     else begin
-      tempSeq := TXQValueSequence.create(targetLength);
-      result := tempSeq;
+      tempSeq := TXQBoxedSequence.create(targetLength);
+      result := tempSeq.boxInIXQValue;
       for i := 0 to ccount - 1 do
         tempSeq.add(evilkids[i]);
     end;
@@ -1395,9 +1370,14 @@ end;
 
 { TXQTermArray }
 
-procedure TXQValueJSONArray.add(const value: IXQValue);
+procedure TXQBoxedArray.add(const value: IXQValue);
 begin
   seq.add(value);
+end;
+
+function TXQBoxedArray.boxInIXQValue: IXQValue;
+begin
+  result := IXQValue.create(pvkArray, xstJSONiqArray, self);
 end;
 
 function TXQTermArrayBase.getContextDependencies: TXQContextDependencies;
@@ -1411,12 +1391,12 @@ end;
 function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  tempSeq: TXQValueJSONArray;
+  tempSeq: TXQBoxedArray;
 begin
-  tempSeq := TXQValueJSONArray.create(length(children));
+  tempSeq := TXQBoxedArray.create(length(children));
   for i := 0 to high(children) do
     tempSeq.add(children[i].evaluate(context));
-  result := tempSeq;
+  result := tempSeq.boxInIXQValue;
 end;
 
 
@@ -1426,8 +1406,7 @@ var
   list: TXQVList;
 begin
   list := TXQVList.create(length(children));
-  list.Capacity := length(children);
-  result := TXQValueJSONArray.create(list);
+  result := TXQBoxedArray.create(list).boxInIXQValue;
   for i := 0 to high(children) do
     list.addInArray(children[i].evaluate(context));
 end;
@@ -1436,11 +1415,11 @@ end;
 function TXQTermJSONiqArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  tempSeq: TXQValueJSONArray;
+  tempSeq: TXQBoxedArray;
   v: IXQValue;
 begin
-  tempSeq := TXQValueJSONArray.create(length(children));
-  result := tempSeq;
+  tempSeq := TXQBoxedArray.create(length(children));
+  result := tempSeq.boxInIXQValue;
   for i := 0 to high(children) do begin
     v := children[i].evaluate(context);
     if (v.kind = pvkNode) and (v.toNode.getParent() <> nil) then
@@ -1540,7 +1519,7 @@ function TXQTermFlowerSubClause.evaluate(var context: TXQEvaluationContext): IXQ
 begin
   ignore(context);
   raiseEvaluationError('pxp:INTERNAL', 'A flower subclause cannot be evaluated');
-  result := nil;
+  result := xqvalue();
 end;
 
 function TXQTermFlowerSubClause.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
@@ -2025,16 +2004,16 @@ var meta: PFlowerSortingData;
     if emptyLeast then begin
       if v.isUndefined and not w.isUndefined then
         exit(true);
-      if ((v is TXQValueFloat) and IsNan(v.toDouble)) and not w.isUndefined and not ((w is TXQValueFloat) and IsNan(w.toDouble)) then
+      if ((v.kind = pvkDouble) and IsNan(v.toDouble)) and not w.isUndefined and not ((w.kind = pvkDouble) and IsNan(w.toDouble)) then
         exit(true);
     end else begin
       if w.isUndefined and not v.isUndefined then
         exit(true);
-      if ((w is TXQValueFloat) and IsNan(w.toDouble)) and not v.isUndefined and not ((v is TXQValueFloat) and IsNan(v.toDouble)) then
+      if ((w.kind = pvkDouble) and IsNan(w.toDouble)) and not v.isUndefined and not ((v.kind = pvkDouble) and IsNan(v.toDouble)) then
         exit(true);
     end;
 
-    if (collation <> nil) and (v is TXQValueString) and (w is TXQValueString) then
+    if (collation <> nil) and (v.kind = pvkString) and (w.kind = pvkString) then
       exit(ord(collation.compare(v.toString, w.toString)) < 0);
     temp := meta^.context^.staticContext.compareAtomic(v,w,nil) ;
     result := temp = xqcrLessThan;
@@ -2103,7 +2082,7 @@ end;
 function TXQTermFlower.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   sortingCache: TFPList;
-  finalResult: TXQValueSequence;
+  finalResult: TXQBoxedSequence;
   currentTuple: TOrderedTuple;
   counts: array of SizeInt = nil;
 
@@ -2166,14 +2145,14 @@ var
 
       function subsequence(const from, toi: SizeInt): IXQValue;
       var
-        seq: TXQValueSequence;
+        seq: TXQBoxedSequence;
         i: SizeInt;
       begin
         if from = toi then exit(binding.get(from));
-        seq := TXQValueSequence.create(toi-from+1);
+        seq := TXQBoxedSequence.create(toi-from+1);
         for i := from to toi do
           seq.seq.add(binding.get(i));
-        result := seq;
+        result := seq.boxInIXQValue; //should be more than 1 item since from <> toi
       end;
 
       function checkCondition(at: SizeInt; const condition: TXQTermFlowerWindowVarsAndCondition; forceTrue: boolean = false): boolean;
@@ -2459,7 +2438,7 @@ var
           0: lastTuple.vars[k] := xqvalue();
           1: lastTuple.vars[k] := tempLists[k][0];
           else begin
-            lastTuple.vars[k] := TXQValueSequence.create(tempLists[k]);
+            lastTuple.vars[k] := TXQBoxedSequence.create(tempLists[k]).boxInIXQValue;
             tempLists[k] := nil;
           end;
         end;
@@ -2547,8 +2526,8 @@ var i: SizeInt;
 
 begin
   //see precompute
-  finalResult := TXQValueSequence.create();
-  result := finalResult;
+  finalResult := TXQBoxedSequence.create();
+  result := finalResult.boxInIXQValue;
   oldSortingCache := nil;
   currentTuple := nil;
 
@@ -2850,7 +2829,7 @@ begin
       interpretedFunction.contextOverrideParameterNames(context, argcount);
       result := interpretedFunction.evaluate(context, self);
     end;
-    else begin assert(false); result := nil; end;
+    else begin assert(false); result.clear; end;
   end;
 
   {$ifdef checkreturntypes}
@@ -3022,7 +3001,7 @@ begin
     0: ;
     1: begin
       t := TXSType(TObject(func));
-      if t.storage <> TXQValueQName then result := TXSType(TObject(func)).createValue(result)
+      if not t.isQNameType then result := TXSType(TObject(func)).createValue(result)
       else result := (t as TXSQNameType).cast(result, context);
     end
     else raiseEvaluationError('XPTY0004', 'Need singleton value to cast as '+TXSType(TObject(func)).name);
@@ -3039,18 +3018,18 @@ end;
 { TXQDynamicFunctionCall }
 
 function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
-  procedure raiseOutofBounds(numindex: int64; a: TXQValueJSONArray);
+  procedure raiseOutofBounds(numindex: int64; a: TXQBoxedArray);
   begin
     raiseEvaluationError('FOAY0001', 'Array index out of bounds: '+inttostr(numindex)+LineEnding+'Array size: ' + inttostr(a.Size));
   end;
 var
   func: IXQValue;
   index: IXQValue;
-  ara: TXQValueJSONArray;
+  ara: TXQBoxedArray;
   i, stackSize: SizeInt;
   resultSeq: TXQVList;
   v: PIXQValue;
-  funcref: TXQValueFunction;
+  funcref: TXQBoxedFunction;
   numindex: Int64;
 
 begin
@@ -3061,11 +3040,11 @@ begin
     else raise EXQEvaluationException.create('XPTY0004', 'Cannot use an empty sequence as function, if JSONiq is disabled');
   if (func.kind = pvkSequence) and (func.getSequenceCount = 1) then func := func.get(1);
 
-  if func is TXQValueFunction then begin
+  if func.kind = pvkFunction then begin
     stackSize := context.temporaryVariables.Count;
     for i:=1 to high(children) do
       context.temporaryVariables.push(children[i].evaluate(context));
-    funcref := func as TXQValueFunction;
+    funcref := func.getDataFunction;
     if Assigned(XQOnGlobalDebugTracing) then XQOnGlobalDebugTracing(self, context, length(children)-1, context.temporaryVariables.topptr(high(children)-1));
     funcref.contextOverrideParameterNames(context, high(children));
     result := funcref.evaluate(context, self);
@@ -3081,7 +3060,7 @@ begin
         pvkObject:
           resultSeq.add(v.enumeratePropertyKeys());
         pvkArray: begin
-          ara := v^ as TXQValueJSONArray;;
+          ara := v^.getDataArray;
           for i := 0 to ara.seq.Count-1 do
             resultSeq.add(ara.seq[i]);
         end;
@@ -3103,12 +3082,12 @@ begin
             raiseTypeError0004('Expected integer index', index)
         end;
         numindex := index.toInt64;
-        if (numindex < 1) or (numindex > (v^ as TXQValueJSONArray).seq.Count) then begin
+        if (numindex < 1) or (numindex > (v^.getDataArray).seq.Count) then begin
           if not context.staticContext.AllowJSONiqOperations then
-            raiseOutofBounds(numindex, v^ as TXQValueJSONArray);
+            raiseOutofBounds(numindex, v^.getDataArray);
           continue;
         end;
-        resultSeq.add((v^ as TXQValueJSONArray).seq[numindex-1]);
+        resultSeq.add((v^.getDataArray).seq[numindex-1]);
       end;
       pvkObject: begin
         resultSeq.add(v^.getProperty(index));
@@ -3245,7 +3224,7 @@ begin
   context.SeqIndex := 1;
   context.SeqLength := seq.getSequenceCount;
   list := TXQVList.create(context.SeqLength);
-  context.SeqValue := nil;
+  context.SeqValue.clear;
   try
     try
       for pv in seq.GetEnumeratorPtrUnsafe do begin
@@ -3467,7 +3446,7 @@ end;
 
 function TXQTermNodeMatcher.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue = nil) and assigned(context.extensionContext) and assigned(context.extensionContext.TextNode) then begin
+  if (queryCommand.matching = [qmText]) and (queryCommand.typ = tneaDirectChildImplicit) and (context.SeqValue.isUndefined) and assigned(context.extensionContext) and assigned(context.extensionContext.TextNode) then begin
     if assigned(context.staticContext.sender.OnWarningDeprecated) then
       context.staticContext.sender.OnWarningDeprecated(context.staticContext.sender, 'DO NOT USE text() in pattern matching. Use either matched-text() or ./text() . So far text() has behaved like matched-text(), but the behavior will be changed to ./text(). (the behavior of matched-text() will later change to return the same value as matched-text() and ./matched-text() )');
     result := xqvalue(context.extensionContext.TextNode);
@@ -3587,6 +3566,11 @@ begin
   value := avalue;
 end;
 
+constructor TXQTermConstant.create(const qname: TXQBoxedQName);
+begin
+  value := xqvalue(qname);
+end;
+
 function TXQTermConstant.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
   ignore(context);
@@ -3646,7 +3630,7 @@ function TXQTermPatternMatcher.evaluate(var context: TXQEvaluationContext): IXQV
 begin
   ignore(context);
   raiseEvaluationError('pxp:INTERNAL', 'TXQTermPatternMatcher.evaluate');
-  result := nil;
+  result.clear;
 end;
 
 function TXQTermPatternMatcher.getContextDependencies: TXQContextDependencies;
@@ -3688,7 +3672,7 @@ begin
     result := context.getGlobalVariable(value, namespace)
   else begin
     fail;
-    result := nil;
+    result.clear;
   end;
 end;
 
@@ -3823,7 +3807,7 @@ function TXQTermTypeSwitch.TXQTermTypeSwitchClause.evaluate(var context: TXQEval
 begin
   ignore(context);
   raiseInternalError(1604301730);
-  result := nil;
+  result.clear;
 end;
 
 function TXQTermTypeSwitch.TXQTermTypeSwitchClause.clone: TXQTerm;
@@ -3915,7 +3899,7 @@ begin
     if TXQTermTypeSwitchClause(children[i]).matched(context, v, result) then
       exit;
   raiseInternalError(164301750);
-  result := nil;
+  result.clear;
 end;
 
 function TXQTermTypeSwitch.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_VisitAction;
@@ -4422,13 +4406,13 @@ var
       end;
 
     var
-      vname: TXQValueQName;
+      vname: TXQBoxedQName;
       namespaceUrlPrefix: String;
       eqnameKind: TXQEQNameParseResult;
     begin
       if (v.kind = pvkSequence) and (v.getSequenceCount = 1) then v := v.get(1);
       if (v.instanceOf(baseSchema.QName))  then begin
-        vname := (v as TXQValueQName);
+        vname := (v.getDataQName);
         setTreeNamespaceFromQName(vname.url, vname.prefix, defkind);
         tree.value := vname.local;
       end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
@@ -4668,12 +4652,12 @@ end;
 
 function TXQTermMapConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  obj: TXQValueStandardMap;
+  obj: TXQBoxedStandardMap;
   i: SizeInt;
   v: IXQValue;
 begin
-  obj := TXQValueStandardMap.create();
-  result := obj;
+  obj := TXQBoxedStandardMap.create();
+  result := obj.boxInIXQValue;
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
@@ -4690,28 +4674,31 @@ end;
 
 function TXQTermJSONiqObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
 function transformValue(v: IXQValue): IXQValue;
+var
+  a: TXQBoxedArray;
 begin
   if v.getSequenceCount = 0 then
-    exit(TXQValueJSONNull.create());
+    exit(IXQValue.create(pvkNull, xstJSONiqNull, nil));
   if v.kind = pvkSequence then
     if v.getSequenceCount > 1 then begin
-      result := TXQValueJSONArray.create(v.getSequenceCount);
-      (result as TXQValueJSONArray).seq.add(v);
+      a := TXQBoxedArray.create(v.getSequenceCount);
+      result := a.boxInIXQValue;
+      a.seq.add(v);
       exit;
     end else v := v.get(1);
-  if v is TXQValueNode then
+  if v.kind = pvkNode then
     exit(xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode)));
   result := v;
 end;
 
 var
-  obj: TXQValueStringMap;
+  obj: TXQBoxedStringMap;
   i: SizeInt;
   skippedOptionals: SizeInt = 0;
   v: IXQValue;
 begin
-  obj := TXQValueStringMap.create();
-  result := obj;
+  obj := TXQBoxedStringMap.create();
+  result := obj.boxInIXQValue;
   if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
   for i := 0 to length(children) div 2 - 1 do begin
     v := children[i*2+1].evaluate(context);
@@ -4851,7 +4838,7 @@ end;
 
 function TXQTermDefineFunction.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
-  temp: TXQValueFunction;
+  temp: TXQBoxedFunction;
   tempVisitor: TXQTerm_VisitorReplaceKnownVariables;
   i: SizeInt;
   dfv: IXQValue;
@@ -4865,7 +4852,7 @@ begin
          and (TXQTermNamedFunction(children[high(children)]).kind in [xqfkUnknown, xqfkNativeInterpreted])
          and (length(TXQTermNamedFunction(children[high(children)]).interpretedFunction.parameters) = parameterCount)
          then begin
-        temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone as TXQValueFunction;
+        temp := TXQTermNamedFunction(children[high(children)]).interpretedFunction.directClone;
         assert(Assigned(context.staticContext) and Assigned(context.staticContext.sender));
         if temp.context.staticContext.sender = nil then temp.context.staticContext := context.staticContext.sender.StaticContext; //only for native interpreted functions
       end else temp := define(context, false);
@@ -4874,13 +4861,13 @@ begin
     xqtdfDynamicPartialApplication: begin
       assert(objInheritsFrom(children[0], TXQTermDynamicFunctionCall));
       dfv := TXQTermDynamicFunctionCall(children[0]).children[0].evaluate(context);
-      if not (dfv is TXQValueFunction) then raiseEvaluationError('XPTY0004', 'Need function for partial application, got: '+dfv.toXQuery());
-      temp := defineDynamicPartialApplication(context, dfv as TXQValueFunction);
+      if dfv.kind <> pvkFunction then raiseEvaluationError('XPTY0004', 'Need function for partial application, got: '+dfv.toXQuery());
+      temp := defineDynamicPartialApplication(context, dfv.getDataFunction);
     end;
   end;
   if not temp.ownsTerms then
     temp.assignCopiedTerms(temp);
-  result := temp;
+  result := xqvalue(temp);
   if kind <> xqtdfUserDefined then exit;
   tempVisitor := TXQTerm_VisitorReplaceKnownVariables.Create();
   try
@@ -4909,12 +4896,12 @@ begin
   end;
 end;
 
-function TXQTermDefineFunction.define(var context: TXQEvaluationContext; const clearFocus: boolean): TXQValueFunction;
+function TXQTermDefineFunction.define(var context: TXQEvaluationContext; const clearFocus: boolean): TXQBoxedFunction;
 var
   i: SizeInt;
   v: TXQTermVariable;
 begin
-  result := TXQValueFunction.create();
+  result := TXQBoxedFunction.create();
   if name <> nil then begin
     result.namespaceURL := name.namespaceURL;
     result.namespacePrefix := name.namespacePrefix;
@@ -4941,7 +4928,7 @@ begin
   if clearFocus then begin
     result.context.extensionContext := nil;
     result.context.sharedEvaluationContext := nil;
-    result.context.SeqValue := nil;
+    result.context.SeqValue.clear;
     result.context.SeqIndex := 0;
     result.context.SeqLength := 0;
   end;
@@ -5111,7 +5098,7 @@ begin
   initialized := true;
 end;
 
-function TXQTermDefineFunction.defineStaticPartialApplication(var context: TXQEvaluationContext): TXQValueFunction;
+function TXQTermDefineFunction.defineStaticPartialApplication(var context: TXQEvaluationContext): TXQBoxedFunction;
 var
   f: TXQTermNamedFunction;
   version: PXQFunctionParameterTypes;
@@ -5121,7 +5108,7 @@ begin
   version := findNamedFunctionVersion(context);
   f := TXQTermNamedFunction(children[high(children)]);
 
-  result := TXQValueFunction.create();
+  result := TXQBoxedFunction.create();
   if (f.kind in [xqfkUnknown, xqfkNativeInterpreted]) and (length(f.interpretedFunction.annotations) > 0) then
     copyAnnotations(result.annotations, f.interpretedFunction.annotations);
   if f.kind = xqfkTypeConstructor then result.body := TXQTermNamedFunctionTypeConstructor.create()
@@ -5169,7 +5156,7 @@ begin
   result.context.sharedEvaluationContext := nil;
 end;
 
-function TXQTermDefineFunction.defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQValueFunction): TXQValueFunction;
+function TXQTermDefineFunction.defineDynamicPartialApplication(var context: TXQEvaluationContext; f: TXQBoxedFunction): TXQBoxedFunction;
 var
   j: SizeInt;
   i, stackSize: SizeInt;
@@ -5177,9 +5164,9 @@ var
 begin
   ch := (children[0] as TXQTermWithChildren).children;
   if length(ch) <> length(f.parameters) + 1 then raiseParsingError('XPTY0004', 'Invalid argument count');
-  result := TXQValueFunction.create();
+  result := TXQBoxedFunction.create();
   copyAnnotations(result.annotations, f.annotations);
-  result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(f));
+  result.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(xqvalue(f)));
   setlength(result.parameters, parameterCount);
   stackSize := context.temporaryVariables.Count;
   j := 0;
@@ -5255,9 +5242,8 @@ begin
           end;
         if matches then begin
           context.temporaryVariables.popTo(stackSize);
-          context.temporaryVariables.push(infoVars[0], TXQValueQName.create(ns, nsprefix, e.errorCode));
+          context.temporaryVariables.push(infoVars[0], xqvalue(TXQBoxedQName.create(ns, nsprefix, e.errorCode)));
           context.temporaryVariables.push(infoVars[1], xqvalue(e.rawMessage));
-          if e.value = nil then e.value := xqvalue();
           context.temporaryVariables.push(infoVars[2],e.value);
           context.temporaryVariables.push(infoVars[3], xqvalue());
           context.temporaryVariables.push(infoVars[4],xqvalue());

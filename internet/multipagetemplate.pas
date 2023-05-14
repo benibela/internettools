@@ -602,7 +602,7 @@ function TTemplateActionCatch.checkError(reader: TMultipageTemplateReader; const
 begin
   result := check;
   if result then begin
-    reader.setVariable('code', TXQValueQName.create(namespace,prefix,code), XMLNamespaceURL_XQTErrors);
+    reader.setVariable('code', xqvalue(TXQBoxedQName.create(namespace,prefix,code)), XMLNamespaceURL_XQTErrors);
     //description, value, ...
     performChildren(reader);
   end;
@@ -850,18 +850,21 @@ var
   listx, x: IXQValue;
   testx: IXQuery;
   context: TXQEvaluationContext;
+  hasList: Boolean;
 begin
-  if list <> '' then begin
+  hasList := list <> '';
+  listx.clear;
+  if hasList then begin
     if varname = '' then raise ETemplateReader.Create('A list attribute at a loop node requires a var attribute');
     listx := evaluateQuery(reader, list);
-  end else listx := nil;
+  end;
   if test <> '' then begin
     reader.needLoadedData;
     testx := parseQuery(reader, test);
     context := reader.parser.QueryContext;
   end else testx := nil;
 
-  if listx = nil then begin
+  if not hasList then begin
     if testx <> nil then
       while testx.evaluate(context).toBoolean do
         performChildren(reader);
@@ -1015,7 +1018,7 @@ begin
       if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
       else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
         reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), tempvalue) then begin
-        with reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1).tovalue do
+        with reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1) do
           if kind = pvkObject then prepareInternetRequest(curmethod, cururl, post, reader.internet)
           else cururl := toString;
       end else cururl := reader.parser.replaceEnclosedExpressions(url);

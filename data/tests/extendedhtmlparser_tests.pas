@@ -92,7 +92,7 @@ var i:longint;
            end;
   end;
 var previoushtml, temp: string;
-  tempobj: TXQValueStringMap;
+  tempobj: TXQBoxedStringMap;
     procedure t(const template, html, expected: string);
     begin
       inc(globalTestCount);
@@ -900,10 +900,10 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
 
 
   extParser.variableChangeLog.clear;
-  tempobj := TXQValueStringMap.create();
+  tempobj := TXQBoxedStringMap.create();
   tempobj.setMutable('a', xqvalue('Hallo'));
   tempobj.setMutable('b', xqvalue(17));
-  extParser.variableChangeLog.add('test', tempobj);
+  extParser.variableChangeLog.add('test', tempobj.boxInIXQValue);
   cmp(extParser.variableChangeLog.get('test').getProperty('a').toString, 'Hallo');
   cmp(extParser.variableChangeLog.get('test').getProperty('b').toString, '17');
   cmp(extParser.VariableChangeLogCondensed.get('test').getProperty('a').toString, 'Hallo');
@@ -912,10 +912,10 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   extParser.parseTemplate('<a/>');
   extParser.parseHTML('<a/>');
 
-  tempobj := TXQValueStringMap.create();
+  tempobj := TXQBoxedStringMap.create();
   tempobj.setMutable('a', xqvalue('Hallo2'));
   tempobj.setMutable('b', xqvalue(18));
-  extParser.variableChangeLog.add('test', tempobj);
+  extParser.variableChangeLog.add('test', tempobj.boxInIXQValue);
   cmp(extParser.variableChangeLog.get('test').getProperty('a').toString, 'Hallo2');
   cmp(extParser.variableChangeLog.get('test').getProperty('b').toString, '18');
   cmp(extParser.VariableChangeLogCondensed.get('test').getProperty('a').toString, 'Hallo2');

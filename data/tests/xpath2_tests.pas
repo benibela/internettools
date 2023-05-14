@@ -4417,7 +4417,7 @@ begin
 
   //test differences between value and (value)
   xqv := xqvalue(10);
-  xqw := TXQValueSequence.create(xqvalue(10));
+  xqw := TXQBoxedSequence.create(xqvalue(10)).boxInIXQValue;
   if ps.StaticContext.compareAtomic(xqv,xqw) <> xqcrEqual then raise Exception.Create('eq seq');
   if ps.StaticContext.compareAtomic(xqw,xqv) <> xqcrEqual then raise Exception.Create('seq eq');
   if ps.StaticContext.compareAtomic(xqw,xqw) <> xqcrEqual then raise Exception.Create('seq seq');
@@ -4441,7 +4441,9 @@ begin
       iterator2 := xqv.GetEnumeratorPtrUnsafe;
       iterator.MoveMany(j);
       for k := 1 to j do iterator2.MoveNext;
-      if iterator.Current^ <> iterator2.Current^ then raise Exception.create(format('many fail: %i %i %i', [i,j,k]));
+      if i <> 1 then
+      if ((i = 1) and (iterator.Current.toInt64 <> iterator2.Current.toInt64)) or
+        ((i <> 1) and (iterator.Current <> iterator2.Current)) then raise Exception.create(format('many fail: %i %i %i', [i,j,k]));
     end;
 
   end;

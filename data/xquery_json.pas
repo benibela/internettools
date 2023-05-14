@@ -55,24 +55,24 @@ function xqFunctionIsNull({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 begin
   result := args[0];
   xqvalueSeqSqueeze(result);
-  result := xqvalue(result is TXQValueJSONNull);
+  result := xqvalue(result.kind = pvkNull);
 end;
 
 function xqFunctionNull({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
-  result := TXQValueJSONNull.Create();
+  result := IXQValue.create(pvkNull, xstJSONiqNull, nil);
 end;
 
 
 
 function xqFunctionObject({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var resobj: TXQValueStringMap;
-    procedure merge(another: TXQValue);
+var resobj: TXQBoxedStringMap;
+    procedure merge(another: IXQValue);
     var
       p: TXQProperty;
     begin
       for p in another.getEnumeratorStringPropertiesUnsafe do begin
-        if resobj.hasProperty(p.key,nil) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
+        if resobj.hasProperty(p.key) then raise EXQEvaluationException.create('jerr:JNDY0003', 'Duplicated key names in '+resobj.boxInIXQValue.jsonSerialize(tnsText)+' and '+another.jsonSerialize(tnsText));
         resobj.setMutable(p.key, p.Value);
       end;
     end;
@@ -80,17 +80,13 @@ var resobj: TXQValueStringMap;
 var v: IXQValue;
   i: SizeInt;
 begin
-  resobj := TXQValueStringMap.create();
-  try
-    for i := 0 to argc-1 do
-      for v in args[i] do begin
-        if v.kind <> pvkObject then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.toXQuery());
-        merge(v.toValue);
-      end;
-  except
-    on EXQEvaluationException do begin resobj.free; raise; end
-  end;
-  result := resobj;
+  resobj := TXQBoxedStringMap.create();
+  result := resobj.boxInIXQValue;
+  for i := 0 to argc-1 do
+    for v in args[i] do begin
+      if v.kind <> pvkObject then raise EXQEvaluationException.create('XPTY0004', 'Expected object, got: '+v.toXQuery());
+      merge(v);
+    end;
 end;
 
 
@@ -168,14 +164,14 @@ end;
 function xqFunctionMembers({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
-  ara: TXQValueJSONArray;
+  ara: TXQBoxedArray;
   i: SizeInt;
   list: TXQVList;
 begin
   list := TXQVList.create();
   for v in args[0] do
-    if v is TXQValueJSONArray then begin
-      ara := v as TXQValueJSONArray;
+    if v.kind = pvkArray then begin
+      ara := v.toArray;
       for i := 0 to ara.seq.Count-1 do
         list.add(ara.seq[i]);
     end;
@@ -189,8 +185,7 @@ begin
   a := args[0];
   if (a.kind = pvkSequence) and (a.getSequenceCount = 1) then a := a.get(1);
   if a.getSequenceCount = 0 then exit(xqvalue());
-  if not (a is TXQValueJSONArray) then raise EXQEvaluationException.create('pxp:ARRAY', 'Expected array, got: '+a.toXQuery());
-  result := xqvalue((a as TXQValueJSONArray).seq.Count);
+  result := xqvalue(a.toArray.seq.Count);
 end;
 
 

@@ -23,7 +23,7 @@ type
   constructor create;
   destructor Destroy; override;
   procedure DeclareExternalVariableEvent(const {%H-}context: TXQStaticContext; {%H-}sender: TObject; const namespace: string;  const variable: string; var value: IXQValue);
-  procedure DeclareExternalFunctionEvent({%H-}sender: TObject; const {%H-}context: TXQStaticContext; const {%H-}namespace: string;  const functionName: string; var value: TXQValueFunction);
+  procedure DeclareExternalFunctionEvent({%H-}sender: TObject; const {%H-}context: TXQStaticContext; const {%H-}namespace: string;  const functionName: string; var value: TXQBoxedFunction);
   procedure ImportModule({%H-}sender: TObject; {%H-}context: TXQStaticContext; const namespace: string; const {%H-}at: array of string);
 end;
 
@@ -2054,7 +2054,7 @@ begin
 end;
 
 procedure THelper.DeclareExternalFunctionEvent(sender: TObject; const context: TXQStaticContext; const namespace: string;
-  const functionName: string; var value: TXQValueFunction);
+  const functionName: string; var value: TXQBoxedFunction);
 begin
   case functionName of
   'test-importfunc1': value.body := func1;

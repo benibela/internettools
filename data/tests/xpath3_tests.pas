@@ -140,6 +140,8 @@ procedure unittests(testerrors, testerrmath: boolean);
   t('fn:for-each(("john", "jane"), fn:string-to-codepoints#1)', '106 111 104 110 106 97 110 101');
   t('fn:for-each(("23", "29"), xs:int#1)', '23 29');
   t('fn:filter(1 to 10, function($a) {$a mod 2 = 0})', '2 4 6 8 10');
+  t('fn:fold-left(10, 0, function($a, $b) { $a + $b })', '10');
+  t('fn:fold-left((100,7), 0, function($a, $b) { $a + $b })', '107');
   t('fn:fold-left(1 to 5, 0, function($a, $b) { $a + $b })', '15');
   t('fold-left((2,3,5,7), 1, function($a, $b) { $a * $b })', '210');
   t('fold-left((true(), false(), false()), false(), function($a, $b) { $a or $b })', 'true');

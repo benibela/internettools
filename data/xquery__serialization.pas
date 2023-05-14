@@ -32,7 +32,8 @@ procedure serializeAdaptive(var serializer: TXQSerializer; const v: IXQValue; co
 procedure serializeXMLHTMLText(var serializer: TXQSerializer; const v: IXQValue; var params: TXQSerializationParams);
 type PSerializationParams = ^TXQSerializationParams;
 function serializeWithContextDefaults(const context: TXQEvaluationContext; const value: IXQValue): string;
-function serialize(const context: TXQEvaluationContext; const value: IXQValue; const serializationParams: IXQValue = nil): string;
+function serialize(const context: TXQEvaluationContext; const value: IXQValue): string;
+function serialize(const context: TXQEvaluationContext; const value: IXQValue; const serializationParams: IXQValue): string;
 procedure serialize(var serializer: TXQSerializer; const value: IXQValue; var serializationParams: TXQSerializationParams);
 function serialize(const value: IXQValue; var serializationParams: TXQSerializationParams): RawByteString;
 
@@ -66,12 +67,12 @@ end;
 
 function hashsetQNameIncludeAll(var hs: TXQHashsetQName; const v: IXQValue): boolean;
 var
-  qname: TXQValueQName;
+  qname: TXQBoxedQName;
   pw: PIXQValue;
 begin
   for pw in v.GetEnumeratorPtrUnsafe do begin
     if pw^.kind <> pvkQName then exit(false);
-    qname := pw^.toValue as TXQValueQName;
+    qname := pw^.getDataQName;
     hs.include(qname.url, qname.local);
   end;
   result := true;
@@ -269,16 +270,16 @@ var
     if characterMaps = nil then new(characterMaps,init);
     if pp.value.kind <> pvkObject then error;
     for characterp in pp.value.getEnumeratorPropertiesUnsafe do begin
-      if (not  TXQValueOwnershipTracker.isKeyStringLike(characterp.key.toValue)) or (characterp.Value.kind <> pvkString) then error;
+      if (not  TXQValueOwnershipTracker.isKeyStringLike(characterp.key)) or (characterp.Value.kind <> pvkString) then error;
       characterMaps.include(characterp.key.toString, characterp.Value.toString);
     end;
   end;
 
 begin
   for pp in v.getEnumeratorPropertiesUnsafe do begin
-    if not TXQValueOwnershipTracker.isKeyStringLike(pp.key.toValue) then begin
-      if (pp.key.kind = pvkQName) and ((pp.key as TXQValueQName).url = XMLNamespaceURL_MyExtensionsNew) then
-        setExtensionProperty((pp.key as TXQValueQName).local, pp.value.toString);
+    if not TXQValueOwnershipTracker.isKeyStringLike(pp.key) then begin
+      if (pp.key.kind = pvkQName) and (pp.key.getDataQName.url = XMLNamespaceURL_MyExtensionsNew) then
+        setExtensionProperty(pp.key.getDataQName.local, pp.value.toString);
       continue;
     end;
     case pp.Value.getSequenceCount of
@@ -321,7 +322,7 @@ begin
         allowDuplicateNames := false;
         omitXmlDeclaration := false;
         tempDoc := v.getProperty('parameter-document');
-        if assigned(tempDoc) then setFromNode(context, tempDoc.toNode, true);
+        if tempDoc.isAssigned then setFromNode(context, tempDoc.toNode, true);
       end;
       'parameter-document': if not staticOptions then
         raiseXQEvaluationException('XQST0109', 'Unknown serialization option.');
@@ -333,8 +334,7 @@ end;
 
 procedure TXQSerializationParamsHelper.initFromXQValue(const context: TXQEvaluationContext;const v: IXQValue);
 begin
-  if v = nil then initDefault(false)
-  else case v.kind of
+  case v.kind of
     pvkObject: begin
       initDefault(true);
       setFromMap(context, v);
@@ -628,7 +628,7 @@ begin
     'xhtml': serializer.nodeFormat := tnsXML;
     'html': serializer.nodeFormat := tnsHTML;
     'text': serializer.nodeFormat := tnsText;
-    else serializer.error('SEPM0016', v.toValue);
+    else serializer.error('SEPM0016', v);
   end;
 
   if params.hasNormalizationForm or (params.characterMaps <> nil) or not isUnicodeEncoding(params.encodingCP) then begin
@@ -877,6 +877,11 @@ end;
 function serializeWithContextDefaults(const context: TXQEvaluationContext; const value: IXQValue): string;
 begin
   result := serialize(context, value, context.staticContext.serializationOptions);
+end;
+
+function serialize(const context: TXQEvaluationContext; const value: IXQValue): string;
+begin
+  result := serialize(context, value, xqvalue());
 end;
 
 function serialize(const context: TXQEvaluationContext; const value: IXQValue; const serializationParams: IXQValue): string;

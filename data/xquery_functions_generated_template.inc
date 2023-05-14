@@ -2,7 +2,7 @@ function castSomethingToDatetime(const v: ixqvalue): ixqvalue;
 var s: string;
 begin
   result := v;
-  if not (result is TXQValueDateTime) then begin
+  if result.kind <> pvkDateTime then begin
     s := result.toString;
     if strcontains(s, 'T') then result := baseSchema.dateTime.createValue(result)
     else if strcontains(s, '-') then result := baseSchema.date.createValue(result)
@@ -52,7 +52,7 @@ begin
   tempCorrectlyInitialized.min:=v.getInternalDateTimeData^.timezone;
   tempCorrectlyInitialized.hour:=tempCorrectlyInitialized.min div 60; tempCorrectlyInitialized.min:=tempCorrectlyInitialized.min mod 60;
   tempCorrectlyInitialized.timezone:=high(Integer);
-  result := TXQValueDateTime.create(baseSchema.dayTimeDuration, tempCorrectlyInitialized);
+  result := xqvalue(TXQBoxedDateTime.create(baseSchema.dayTimeDuration, tempCorrectlyInitialized));
 end;
 
 

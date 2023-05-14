@@ -2,12 +2,11 @@
 
 { TXSType }
 
-constructor TXSType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; aschema: TXSSchema);
+constructor TXSType.Create(aname: string; aparent: TXSType; aschema: TXSSchema);
 begin
   name := aname;
   base := aparent;
   schema := aschema;
-  storage := astorage;
   id := -1;
 
   if (schema = nil) and (base <> nil) then schema := base.schema;
@@ -85,7 +84,7 @@ end;
 
 class function TXSType.commonType(const a, b: IXQValue): TXSType;
 begin
-  result := commonType(a.typeAnnotation, b.typeAnnotation);
+  result := commonType(baseSchema.types[a.typeAnnotation], baseSchema.types[b.typeAnnotation]);
 end;
 
 function TXSType.getIntegerType: TXSType;
@@ -110,7 +109,7 @@ end;
 
 class function TXSType.commonIntegerType(const a, b: IXQValue): TXSNumericType;
 begin
-  result := commonIntegerType(a.typeAnnotation, b.typeAnnotation);
+  result := commonIntegerType(baseSchema.types[a.typeAnnotation], baseSchema.types[b.typeAnnotation]);
 end;
 
 function TXSType.getDecimalType: TXSType;
@@ -172,9 +171,14 @@ var
   at: TXSType;
   bt: TXSType;
 begin
-  at := a.typeAnnotation;
-  bt := b.typeAnnotation;
+  at := baseSchema.types[a.typeAnnotation];
+  bt := baseSchema.types[b.typeAnnotation];
   result := commonDecimalType(at, bt, baseSchema.Double);
+end;
+
+function TXSType.isQNameType: boolean;
+begin
+  result := typeAnnotation in [xstQName, xstNOTATION];
 end;
 
 
@@ -263,22 +267,22 @@ begin
   result := false;
 end;
 
-function TXSType.tryCreateValue(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValue(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 begin
-  if v.typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.node]) then
+  if (v.kind = pvkNode) or ((v.kind = pvkString) and baseSchema.types[v.typeAnnotation].derivedFrom([baseSchema.string_, baseSchema.untypedAtomic])) then
     exit(tryCreateValue(v.toString, outv));
   result := tryCreateValueInternal(v, outv);
 end;
 
 
-function TXSType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 begin
   if base = nil then exit(xsceXPTY0004);
   result := base.tryCreateValueInternal(v, outv);
-  if (result = xsceNoError) and (outv <> nil) then (outv^).ftypeAnnotation := self;
+  if (result = xsceNoError) and (outv <> nil) then (outv^).setTypeAnnotation(typeAnnotation);
 end;
 
-function TXSType.tryCreateValue(v: string; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValue(v: string; outv: PIXQValue): TXSCastingError;
 begin
   case whiteSpaceFacet of
     xsfwReplace: v := StringReplace(StringReplace(StringReplace(v, #9, ' ', [rfReplaceAll]), #$A, ' ', [rfReplaceAll]), #$D, ' ', [rfReplaceAll]);
@@ -288,29 +292,29 @@ begin
   result := tryCreateValueInternal(v, outv);
 end;
 
-function TXSType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValueInternal(const v: String; outv: PIXQValue): TXSCastingError;
 begin
   if base = nil then exit(xsceXPTY0004);
   result := base.tryCreateValueInternal(v, outv);
-  if (result = xsceNoError) and (outv <> nil) then (outv^).ftypeAnnotation := self;
+  if (result = xsceNoError) and (outv <> nil) then (outv^).setTypeAnnotation(typeAnnotation);
 end;
 
-function TXSType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValue(const v: Int64; outv: PIXQValue): TXSCastingError;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
-function TXSType.tryCreateValue(const v: xqfloat; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValue(const v: xqfloat; outv: PIXQValue): TXSCastingError;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
-function TXSType.tryCreateValue(const v: BigDecimal; outv: PXQValue): TXSCastingError;
+function TXSType.tryCreateValue(const v: BigDecimal; outv: PIXQValue): TXSCastingError;
 begin
   result := tryCreateValue(xqvalue(v), outv);
 end;
 
-function TXSType.xsceXPTY0004ButTryCreatingFromAFakeSingleton(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSType.xsceXPTY0004ButTryCreatingFromAFakeSingleton(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 begin
   result := xsceXPTY0004;
   if not xqvalueIsFakeSingleton(v) then exit;
@@ -321,11 +325,11 @@ end;
 
 { TXSUnionType }
 
-constructor TXSUnionType.Create(aname: string; aparent: TXSType; astorage: TXQValueClass; amembers: array of TXSType);
+constructor TXSUnionType.Create(aname: string; aparent: TXSType; amembers: array of TXSType);
 var
   i: SizeInt;
 begin
-  inherited Create(aname, aparent, astorage);
+  inherited Create(aname, aparent);
   SetLength(members, length(amembers));
   for i := 0 to high(members) do
     members[i] := amembers[i];
@@ -341,7 +345,7 @@ begin
   result := false;
 end;
 
-function TXSUnionType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSUnionType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 var
   i: SizeInt;
   temp: TXSCastingError;
@@ -349,7 +353,7 @@ begin
   if v.typeAnnotation.derivedFrom(self) then begin
     //xs:numeric special case
     result := xsceNoError;
-    if outv <> nil then outv^ := v.toValue;
+    if outv <> nil then outv^ := v;
     exit;
   end;
   if length(members) = 0 then //xs:error special case
@@ -362,7 +366,7 @@ begin
   end;
 end;
 
-function TXSUnionType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
+function TXSUnionType.tryCreateValueInternal(const v: String; outv: PIXQValue): TXSCastingError;
 var
   i: SizeInt;
   temp: TXSCastingError;
@@ -384,7 +388,7 @@ constructor TXSListType.Create(aname: string; aparent: TXSType; aitemType: TXSSi
 var
   i: SizeInt;
 begin
-  inherited create(aname, aparent, TXQValueSequence);
+  inherited create(aname, aparent);
   itemType := aitemType;
   whiteSpaceFacet:=xsfwCollapse;
   case aitemType.variety of
@@ -397,55 +401,58 @@ begin
   end;
 end;
 
-function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 begin
-  if v.get(1).typeAnnotation.derivedFrom([baseSchema.string_, baseSchema.untypedAtomic, baseSchema.node]) then
+  if (v.get(1).kind = pvkNode) or (baseSchema.types[v.get(1).typeAnnotation].derivedFrom([baseSchema.string_, baseSchema.untypedAtomic])) then
     exit(tryCreateValue(v.toString, outv));
   Result:=xsceXPTY0004;
 end;
 
-function TXSListType.tryCreateValueInternal(const v: String; outv: PXQValue): TXSCastingError;
+function TXSListType.tryCreateValueInternal(const v: String; outv: PIXQValue): TXSCastingError;
 var
   l: TStringArray;
-  temp: TXQValue;
-  ptemp: PXQValue;
+  temp: IXQValue;
+  ptemp: PIXQValue;
   i: SizeInt;
+  seq: TXQBoxedSequence = nil;
 begin
   l := strSplit(v, ' ');
   if outv <> nil then begin
-    outv^ := TXQValueSequence.create(length(l));
+    seq := TXQBoxedSequence.create(length(l));
+    outv^ := seq.boxInIXQValue;
     ptemp := @temp;
   end else ptemp := nil;
   result := xsceNoError;
   for i := 0 to high(l) do begin
     result := itemType.tryCreateValue(l[i], ptemp);
     if result <> xsceNoError then break;
-    if outv <> nil then TXQValueSequence(outv^).add(ptemp^);
+    if outv <> nil then seq.add(ptemp^);
   end;
-  if (outv <> nil) and (result <> xsceNoError) then FreeAndNil(outv^);
+  if (outv <> nil) and (result <> xsceNoError) then outv^.clear;
 end;
 
 
 { TXSIntegerType }
 
-function TXSNumericType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSNumericType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
-  st := v.typeAnnotation;
+  st := baseSchema.types[v.typeAnnotation];
   result := xsceXPTY0004;
   if st.derivedFrom(self) then begin
     result := xsceNoError;
     if outv <> nil then
       case subType of
         xsstInteger, xsstDecimal:
-          if v is TXQValueInt64 then outv^ := TXQValueInt64.create(self, v.toInt64)
-          else outv^ := TXQValueDecimal.create(self, v.toDecimal);
-        xsstFloat, xsstDouble: outv^ := TXQValueFloat.create(self, v.toDouble);
+          if v.kind = pvkInt64 then outv^ := xqvalue(v.toInt64, typeAnnotation)
+          else outv^ := xqvalue(v.toDecimal, typeAnnotation);
+        xsstFloat: outv^ := xqvalue(v.toFloatSingle, typeAnnotation);
+        xsstDouble: outv^ := xqvalue(v.toDouble, typeAnnotation);
       end;
     exit;
   end else if st.derivedFrom([schema.decimal, schema.boolean]) then begin
-    if v is TXQValueInt64 then exit(tryCreateValue(v.toInt64, outv))
+    if v.kind = pvkInt64 then exit(tryCreateValue(v.toInt64, outv))
     else exit(tryCreateValue(v.toDecimal, outv));
   end else if st.derivedFrom([schema.float, schema.double]) then
     exit(tryCreateValue(v.toDouble, outv))
@@ -453,7 +460,7 @@ begin
    exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
 end;
 
-function TXSNumericType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
+function TXSNumericType.tryCreateValueInternal(const v: string; outv: PIXQValue): TXSCastingError;
 var
   pure: Boolean;
   procedure slowPath;
@@ -467,9 +474,9 @@ var
       if pure then exit();
       if strEqual(v, '+INF') and (baseSchema.version = xsd10) then exit;
       case v of
-        'NaN':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.NaN);
-        'INF', '+INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.PositiveInfinity);
-        '-INF':  if outv <> nil then outv^ := TXQValueFloat.create(self, xqfloat.NegativeInfinity);
+        'NaN':  if outv <> nil then outv^ := xqvalue(xqfloat.NaN, typeAnnotation);
+        'INF', '+INF':  if outv <> nil then outv^ := xqvalue(xqfloat.PositiveInfinity, typeAnnotation);
+        '-INF':  if outv <> nil then outv^ := xqvalue(xqfloat.NegativeInfinity, typeAnnotation);
         else exit();
       end;
       result := xsceNoError;
@@ -487,18 +494,18 @@ var
     if (outv <> nil) then
       case subType of
         xsstInteger, xsstDecimal:
-          if temp.isInt64() then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(temp))
-          else outv^ := TXQValueDecimal.create(self, temp);
+          if temp.isInt64() then outv^ := xqvalue(BigDecimalToInt64(temp), typeAnnotation)
+          else outv^ := xqvalue(temp, typeAnnotation);
         xsstFloat, xsstDouble: begin
           try
             if temp.isZero() and strBeginsWith(v, '-') then tempd := -0.0
             else if subType = xsstDouble then tempd := temp.toDouble
             else tempd := temp.toSingle;
             {$if defined(cpui386) or defined(CPUX86_64)} ClearExceptions();{$endif}
-            outv^ := TXQValueFloat.create(self, tempd);
+            outv^ := xqvalue(tempd, typeAnnotation);
           except
-            on EOverflow do outv^ := TXQValueFloat.create(self, xqfloat.PositiveInfinity);
-            on EUnderflow do outv^ := TXQValueFloat.create(self, xqfloat.NegativeInfinity);
+            on EOverflow do outv^ := xqvalue(xqfloat.PositiveInfinity, typeAnnotation);
+            on EUnderflow do outv^ := xqvalue(xqfloat.NegativeInfinity, typeAnnotation);
           end;
         end;
       end
@@ -523,7 +530,7 @@ var
       result := xsceFORG0001;
       exit;
     end else result := xsceNoError;
-    if assigned(outv) then outv^ := TXQValueDecimal.create(d);
+    if assigned(outv) then outv^ := xqvalue(d, typeAnnotation);
   end;
 
 var
@@ -582,7 +589,7 @@ begin
       if TryStrToXQFloat(v, tempd) then begin
         if v[length(v)] in ['e', 'E'] then exit(xsceFORG0001);
         if (length(constrainingFacets) = 0) and (subType = xsstDouble) then begin
-          if outv <> nil then outv^ := TXQValueFloat.create(self, tempd);
+          if outv <> nil then outv^ := xqvalue(tempd, typeAnnotation);
           exit(xsceNoError);
         end else exit(tryCreateValue(tempd, outv))
       end;
@@ -592,19 +599,19 @@ begin
   slowPath;
 end;
 
-function TXSNumericType.tryCreateValue(const v: Int64; outv: PXQValue): TXSCastingError;
+function TXSNumericType.tryCreateValue(const v: Int64; outv: PIXQValue): TXSCastingError;
 begin
   if (length(constrainingFacets) > 0) and not constraintsSatisfied(v) then exit(xsceFORG0001);
   result := xsceNoError;
   if (outv <> nil) then
     case subType of
-      xsstInteger, xsstDecimal: outv^ := TXQValueInt64.create(self, v);
-      xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
-      xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+      xsstInteger, xsstDecimal: outv^ := xqvalue(v, typeAnnotation);
+      xsstFloat:   outv^ := xqvalue(single(v), typeAnnotation);
+      xsstDouble:  outv^ := xqvalue(double(v), typeAnnotation);
     end
 end;
 
-function TXSNumericType.tryCreateValue(const v: BigDecimal; outv: PXQValue): TXSCastingError;
+function TXSNumericType.tryCreateValue(const v: BigDecimal; outv: PIXQValue): TXSCastingError;
 var i: BigDecimal;
 begin
   if (subType = xsstInteger) and (not v.isIntegral()) then i := round(v, 0, bfrmTrunc) //i might satisfy the constraints, but integer(i) not
@@ -615,14 +622,14 @@ begin
     case subType of
       xsstInteger: begin
         if not i.isIntegral() then i := round(i, 0, bfrmTrunc);
-        if i.isInt64() then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
-        else outv^ := TXQValueDecimal.create(self, i);
+        if i.isInt64() then outv^ := xqvalue(BigDecimalToInt64(i), typeAnnotation)
+        else outv^ := xqvalue(i, typeAnnotation);
       end;
       xsstDecimal:
-        if i.isInt64() then outv^ := TXQValueInt64.create(self, BigDecimalToInt64(i))
-        else outv^ := TXQValueDecimal.create(self, i);
-      xsstFloat:   outv^ := TXQValueFloat.create(self, i.toSingle);
-      xsstDouble:  outv^ := TXQValueFloat.create(self, i.toDouble);
+        if i.isInt64() then outv^ := xqvalue(BigDecimalToInt64(i), typeAnnotation)
+        else outv^ := xqvalue(i, typeAnnotation);
+      xsstFloat:   outv^ := xqvalue(single(i.toSingle), typeAnnotation);
+      xsstDouble:  outv^ := xqvalue(i.toDouble, typeAnnotation);
     end;
 end;
 
@@ -633,7 +640,7 @@ begin
 end;
 {$ImplicitExceptions on}
 
-function TXSNumericType.tryCreateValue(const v: xqfloat; outv: PXQValue): TXSCastingError;
+function TXSNumericType.tryCreateValue(const v: xqfloat; outv: PIXQValue): TXSCastingError;
   function checkConstraints: boolean;
   var
     bd: BigDecimal;
@@ -661,8 +668,8 @@ begin
       if not sispure then begin
         if outv <> nil then
           case subType of
-            xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
-            xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+            xsstFloat:   outv^ := xqvalue(single(v), typeAnnotation);
+            xsstDouble:  outv^ := xqvalue(double(v), typeAnnotation);
             else;
           end;
         exit;
@@ -673,8 +680,8 @@ begin
       end;
       if outv <> nil then
         case subType of
-          xsstFloat:   outv^ := TXQValueFloat.create(self, single(v));
-          xsstDouble:  outv^ := TXQValueFloat.create(self, double(v));
+          xsstFloat:   outv^ := xqvalue(single(v), typeAnnotation);
+          xsstDouble:  outv^ := xqvalue(double(v), typeAnnotation);
           else;
         end;
     end;
@@ -683,7 +690,7 @@ end;
 
 constructor TXSNumericType.create(const aname: string; aparent: TXSType; asubtype: TXSNumericSubType);
 begin
-  inherited create(aname, aparent, TXQValueDecimal);
+  inherited create(aname, aparent);
   subType:=asubtype;
 end;
 
@@ -719,28 +726,28 @@ end;
 
 { TXSBooleanType }
 
-function TXSBooleanType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue = nil): TXSCastingError;
+function TXSBooleanType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue = nil): TXSCastingError;
 var
   st: TXSType;
 begin
-  st := v.typeAnnotation;
+  st := baseSchema.types[v.typeAnnotation];
   if st.derivedFrom([schema.untypedAtomic, schema.string_]) then exit(tryCreateValue(v.toString, outv));
   if not st.derivedFrom([schema.boolean, schema.float, schema.double, schema.decimal]) then
     exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v,outv));
   result := xsceNoError;
-  if outv <> nil then outv^ := TXQValueBoolean.create(self, v.toBoolean);
+  if outv <> nil then outv^ := xqvalue(v.toBoolean);
 end;
 
-function TXSBooleanType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
+function TXSBooleanType.tryCreateValueInternal(const v: string; outv: PIXQValue): TXSCastingError;
 begin
   case v of
     '1', 'true': begin
       result := xsceNoError;
-      if (outv <> nil) then outv^ := TXQValueBoolean.create(self, true);
+      if (outv <> nil) then outv^ := xqvalueTrue;
     end;
     '0', 'false': begin
       result := xsceNoError;
-      if (outv <> nil) then outv^ := TXQValueBoolean.create(self, false);
+      if (outv <> nil) then outv^ := xqvalueFalse;
     end;
     else result := xsceFORG0001;
   end;
@@ -749,11 +756,11 @@ end;
 
 { TXSStringType }
 
-function TXSStringType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSStringType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
-  st := v.typeAnnotation;
+  st := baseSchema.types[v.typeAnnotation];
   result := xsceXPTY0004;
   case subType of
     xsstString: result := tryCreateValueInternal(v.toString, outv);
@@ -762,24 +769,26 @@ begin
         exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
       result := xsceNoError;
       if outv <> nil then
-        if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then
-          outv^ := TXQValueBinary.create(self, v.toString)
+        if st.derivedFrom(schema.hexBinary) = (subType = xsstHexBinary) then begin
+          if (subType = xsstHexBinary) then outv^ := xqvalue(TXQBoxedBinary.create(bdtHex, v.toString))
+          else outv^ := xqvalue(TXQBoxedBinary.create(bdtBase64, v.toString))
+        end
         else if subType = xsstHexBinary then
-          outv^ := TXQValueBinary.create(self, base64.DecodeStringBase64(v.toString).encodeHex)
+          outv^ := xqvalue(TXQBoxedBinary.create(bdtHex, base64.DecodeStringBase64(v.toString).encodeHex))
         else
-          outv^ := TXQValueBinary.create(self, base64.EncodeStringBase64(v.toString.decodeHex))
+          outv^ := xqvalue(TXQBoxedBinary.create(bdtBase64, base64.EncodeStringBase64(v.toString.decodeHex)))
     end;
     xsstUrl: begin
       if not st.derivedFrom(schema.anyURI) then
         exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
       result := xsceNoError;
       if (outv <> nil) then
-        outv^ := TXQValueString.create(self, v.toString);
+        outv^ := xqvalue(v.toString, typeAnnotation);
     end;
   end;
 end;
 
-function TXSStringType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
+function TXSStringType.tryCreateValueInternal(const v: string; outv: PIXQValue): TXSCastingError;
 begin
   if lexicalSpacePattern <> '' then begin
     EnterCriticalsection(lexicalSpaceRegexCS);
@@ -794,15 +803,15 @@ begin
   result := xsceNoError;
   if (outv <> nil) then
     case subType of
-      xsstHexBinary: outv^ := TXQValueBinary.create(self, UpperCase(v));
-      xsstBase64Binary: outv^ := TXQValueBinary.create(self, StringReplace(v, ' ', '', [rfReplaceAll]));
-      else outv^ := TXQValueString.create(self, v);
+      xsstHexBinary: outv^ := xqvalue(TXQBoxedBinary.create(bdtHex, UpperCase(v)));
+      xsstBase64Binary: outv^ := xqvalue(TXQBoxedBinary.create(bdtBase64, StringReplace(v, ' ', '', [rfReplaceAll])));
+      else outv^ := xqvalue(v, typeAnnotation);
     end;
 end;
 
 constructor TXSStringType.create(const aname: string; aparent: TXSType; asubtype: TXSStringSubType; pattern: string = '');
 begin
-  inherited Create(aname, aparent, TXQValueString);
+  inherited Create(aname, aparent);
   subType:=asubtype;
   lexicalSpacePattern := pattern;
   if lexicalSpacePattern <> '' then InitCriticalSection(lexicalSpaceRegexCS);
@@ -820,9 +829,9 @@ end;
 
 { TXSQNameType }
 
-constructor TXSQNameType.create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
+constructor TXSQNameType.create(aname: string; aparent: TXSType = nil; aschema: TXSSchema = nil);
 begin
-  inherited create(aname, aparent, astorage, aschema);
+  inherited create(aname, aparent, aschema);
   //qnameRegex := TRegExpr.Create(RegExpr_XMLQName);
 end;
 
@@ -832,21 +841,23 @@ begin
   inherited Destroy;
 end;
 
-function TXSQNameType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSQNameType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
   result := xsceXPTY0004;
   if self = schema.NOTATION then exit(); //NOTATION itself is an abstract type
-  st := v.typeAnnotation;
-  if st.derivedFrom([schema.NOTATION, schema.QName]) and (v is TXQValueQName) then begin
+  st := baseSchema.types[v.typeAnnotation];
+  if st.derivedFrom([schema.NOTATION, schema.QName]) and (v.kind = pvkQName) then begin
     result := xsceNoError;
-    if outv <> nil then
-      outv^ := TXQValueQName.create(self, (v as TXQValueQName).url, (v as TXQValueQName).prefix, (v as TXQValueQName).local);
+    if outv <> nil then begin
+      outv^ := v;
+      outv^.setTypeAnnotation(typeAnnotation);
+    end;
   end else result := xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv);
 end;
 
-function TXSQNameType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
+function TXSQNameType.tryCreateValueInternal(const v: string; outv: PIXQValue): TXSCastingError;
 begin
   ignore(v); ignore(outv);
   result := xsceXPTY0004;
@@ -854,7 +865,7 @@ end;
 
 function TXSQNameType.castable(const v: IXQValue; const context: TXQStaticContext): boolean;
 begin
-  result := (v.typeAnnotation.storage = TXQValueQName)
+  result := (baseSchema.types[v.typeAnnotation].isQNameType)
             or ((context.model in PARSING_MODEL3)
                 and (v.kind = pvkString)
                 and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic))
@@ -879,14 +890,15 @@ var
   namespace: TNamespace;
   s: String;
 begin
-  if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
+  if baseSchema.types[v.typeAnnotation].isQNameType then exit(createValue(v));
   s := trim(v.toString);
   castAllowed(v, s, context.staticContext);
   if pos(':', s) > 0 then begin
     namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
     if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);
   end else namespace := context.findNamespace('', xqdnkElementType);
-  result := TXQValueQName.create(self, namespace, s);
+  result := xqvalue(TXQBoxedQName.create(namespace, s));
+  result.setTypeAnnotation(typeAnnotation);
 end;
 
 function TXSQNameType.cast(const v: IXQValue; const context: TXQStaticContext): IXQValue;
@@ -894,14 +906,15 @@ var
   namespace: TNamespace;
   s: String;
 begin
-  if v.typeAnnotation.storage = TXQValueQName then exit(createValue(v));
+  if baseSchema.types[v.typeAnnotation].isQNameType then exit(createValue(v));
   s := trim(v.toString);
   castAllowed(v, s, context  );
   if pos(':', s) > 0 then begin
     namespace := context.findNamespace(strSplitGet(':', s), xqdnkElementType);
     if namespace = nil then raise EXQEvaluationException.create('FONS0004', 'Failed to find namespace of: '+v.toString);
   end else namespace := context.findNamespace('', xqdnkElementType);
-  result := TXQValueQName.create(self, namespace, s);
+  result := xqvalue(TXQBoxedQName.create(namespace, s));
+  result.setTypeAnnotation(typeAnnotation);
 end;
 
 
@@ -933,11 +946,11 @@ begin
 
 end;
 
-function TXSDateTimeType.tryCreateValueInternal(const v: IXQValue; outv: PXQValue): TXSCastingError;
+function TXSDateTimeType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 var
   st: TXSType;
 begin
-  st := v.typeAnnotation;
+  st := baseSchema.types[v.typeAnnotation];
   if isDuration then begin
     if not ( objInheritsFrom(st, TXSDateTimeType) and (st as TXSDateTimeType).isDuration ) then
       exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv))
@@ -949,23 +962,23 @@ begin
          exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv))
   end;
   if length(constrainingFacets) > 0 then begin
-    assert(v is TXQValueDateTime);
-    if not constraintsSatisfied(v.getInternalDateTimeData^) then exit(xsceFORG0001);
+    assert(v.kind = pvkDateTime);
+    if not constraintsSatisfied(v.getDataDateTime.value) then exit(xsceFORG0001);
   end;
   result := xsceNoError;
   if (outv <> nil) then
-    if v is TXQValueDateTime then //should always be true
-      outv^ := TXQValueDateTime.create(self, truncated(v.getInternalDateTimeData^))
-     else
+    if v.kind = pvkDateTime then begin //should always be true
+      outv^ := xqvalue(TXQBoxedDateTime.create(self, truncated(v.getDataDateTime.value)))
+     end else
       result := tryCreateValueInternal(v.toString, outv);
 end;
 
-function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PXQValue): TXSCastingError;
+function TXSDateTimeType.tryCreateValueInternal(const v: string; outv: PIXQValue): TXSCastingError;
 var
   tvd: TXQValueDateTimeData;
   temp: TDateTimeParsingResult;
 begin
-  temp := TXQValueDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd);
+  temp := TXQBoxedDateTime.tryCreateFromString(v, fixedDateTimePattern, @tvd);
   case temp of
     dtprFailure: exit(xsceFORG0001);
     dtprFailureValueTooHigh: exit(xsceFODT0001);
@@ -975,12 +988,12 @@ begin
   if not constraintsSatisfied(tvd) then exit(xsceFORG0001);
   result := xsceNoError;
   if (outv <> nil) then
-    outv^ := TXQValueDateTime.create(self, truncated(tvd))
+    outv^ := xqvalue(TXQBoxedDateTime.create(self, truncated(tvd)))
 end;
 
 constructor TXSDateTimeType.Create(aname: string; aparent: TXSType; apattern: string; atruncation: TXQDateTimeTruncation);
 begin
-  inherited create(aname, aparent, TXQValueDateTime);
+  inherited create(aname, aparent);
   fixedDateTimePattern := apattern;
   truncation := atruncation;
   isDuration := strBeginsWith(apattern, '[-]P');
@@ -1140,16 +1153,15 @@ end;
 { TXSSimpleType }
 
 
-constructor TXSSimpleType.Create(aname: string; aparent: TXSType = nil; astorage: TXQValueClass = nil; aschema: TXSSchema = nil);
+constructor TXSSimpleType.Create(aname: string; aparent: TXSType = nil; aschema: TXSSchema = nil);
 begin
-  inherited create(aname, aparent, astorage, aschema);
+  inherited create(aname, aparent, aschema);
 
 
 
   if objInheritsFrom(base, TXSSimpleType) then begin
     primitive := TXSSimpleType(base).primitive;
     variety := TXSSimpleType(base).variety;
-    if storage = nil then storage := base.storage;
     whiteSpaceFacet := base.whiteSpaceFacet;
     whiteSpaceFixed := base.whiteSpaceFixed;
   end;
@@ -1189,8 +1201,8 @@ function restrictedIntegerType(name: string; parent: TXSType; const minValue, ma
 begin
   result := TXSNumericType.Create(name, parent, xsstInteger);
   SetLength(Result.constrainingFacets, 2);
-  result.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueDecimal.create(parent, maxValue));
-  result.constrainingFacets[1] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueDecimal.create(parent, minValue));
+  result.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, xqvalue(maxValue));
+  result.constrainingFacets[1] := TXSConstrainingFacetValue.Create(xsfMinInclusive, xqvalue(minValue));
 end;
 
 function restrictedStringType(name: string; parent: TXSType; pattern: string = ''): TXSSimpleType;
@@ -1209,6 +1221,8 @@ end;
 
 constructor TXSSchema.Create;
 
+var
+  t: TXSTypeAnnotation;
 begin
   version := xsd11;
   typeList.init;
@@ -1219,22 +1233,22 @@ begin
     anyAtomicType := baseSchema.anyAtomicType;
     exit;
   end;
-  AnyType := TXSSimpleType.Create('anyType', nil, nil, self);
+  AnyType := TXSSimpleType.Create('anyType', nil, self);
     AnySimpleType := TXSSimpleType.Create('anySimpleType', AnyType);
       AnyAtomicType := TXSSimpleType.Create('anyAtomicType', AnySimpleType);
 
   //--primitive base types--
-  boolean := primitiveBaseType(TXSBooleanType.create('boolean', AnyAtomicType, TXQValueBoolean));
+  boolean := primitiveBaseType(TXSBooleanType.create('boolean', AnyAtomicType));
 
-  DateTime := primitiveBaseType(TXSDateTimeType.create('dateTime', AnyAtomicType, 'yyyy+-mm-ddThh:nn:ss[.z+][Z]$'));
-  Date := primitiveBaseType(TXSDateTimeType.create('date', AnyAtomicType, 'yyyy+-mm-dd[Z]$', xqdttTime));
-  time := primitiveBaseType(TXSDateTimeType.create('time', AnyAtomicType, 'hh:nn:ss[.z+][Z]$', xqdttDate));
+  DateTime := primitiveBaseType(TXSDateTimeType.create('dateTime', AnyAtomicType, 'yyyy+-mm-ddThh:nn:ss[.z+][Z]$')) as TXSDateTimeType;
+  Date := primitiveBaseType(TXSDateTimeType.create('date', AnyAtomicType, 'yyyy+-mm-dd[Z]$', xqdttTime)) as TXSDateTimeType;
+  time := primitiveBaseType(TXSDateTimeType.create('time', AnyAtomicType, 'hh:nn:ss[.z+][Z]$', xqdttDate)) as TXSDateTimeType;
   GDay := primitiveBaseType(TXSDateTimeType.create('gDay', AnyAtomicType, '---dd[Z]$', xqdttTime));
   GMonth := primitiveBaseType(TXSDateTimeType.create('gMonth', AnyAtomicType, '--mm[Z]$', xqdttTime));
   GMonthDay := primitiveBaseType(TXSDateTimeType.create('gMonthDay', anyAtomicType, '--mm-dd[Z]$', xqdttTime));
   GYear := primitiveBaseType(TXSDateTimeType.create('gYear', AnyAtomicType, 'yyyy+[Z]$', xqdttTime));
   GYearMonth := primitiveBaseType(TXSDateTimeType.create('gYearMonth', AnyAtomicType, 'yyyy+-mm[Z]$', xqdttTime));
-  Duration := primitiveBaseType(TXSDateTimeType.create('duration', AnyAtomicType, '[-]P[Y+"Y"][m+M][d+D][T[h+H][n+M][s+[.z+]S]]$'));
+  Duration := primitiveBaseType(TXSDateTimeType.create('duration', AnyAtomicType, '[-]P[Y+"Y"][m+M][d+D][T[h+H][n+M][s+[.z+]S]]$')) as TXSDateTimeType;
 
 
   Decimal := TXSNumericType(primitiveBaseType(TXSNumericType.create('decimal', AnyAtomicType, xsstDecimal)));
@@ -1244,36 +1258,33 @@ begin
   AnyURI := primitiveBaseType(TXSStringType.create('anyURI', AnyAtomicType, xsstUrl));
   anyURI.whiteSpaceFacet:=xsfwCollapse; anyURI.whiteSpaceFixed := true;
   Base64Binary := primitiveBaseType(TXSStringType.create('base64Binary', AnyAtomicType, xsstBase64Binary, '^(([A-Za-z0-9+/] *){4})*(([A-Za-z0-9+/] *){2}[AEIMQUYcgkosw048] *=|[A-Za-z0-9+/] *[AQgw] *= *=)?$'));
-  Base64Binary.storage := TXQValueBinary;
   base64Binary.whiteSpaceFacet:=xsfwCollapse; base64Binary.whiteSpaceFixed := true;
   hexBinary := primitiveBaseType(TXSStringType.create('hexBinary', AnyAtomicType, xsstHexBinary, '^([0-9A-Fa-f][0-9A-Fa-f])*$'));
-  Base64Binary.storage := TXQValueBinary;
   hexBinary.whiteSpaceFacet:=xsfwCollapse; hexBinary.whiteSpaceFixed := true;
   String_ := primitiveBaseType(TXSStringType.create('string', AnyAtomicType, xsstString));
 
-  QName := primitiveBaseType(TXSQNameType.create('QName', AnyAtomicType, TXQValueQName)) as TXSQNameType;
-  NOTATION := primitiveBaseType(TXSQNameType.create('NOTATION', AnyAtomicType, TXQValueQName)) as TXSQNameType;
+  QName := primitiveBaseType(TXSQNameType.create('QName', AnyAtomicType)) as TXSQNameType;
+  NOTATION := primitiveBaseType(TXSQNameType.create('NOTATION', AnyAtomicType)) as TXSQNameType;
 
 
   //--numbers--
   //abstract
   Integer := TXSNumericType.Create('integer', Decimal, xsstInteger);
-    Integer.storage := TXQValueDecimal;
 
       NonPositiveInteger := TXSNumericType.Create('nonPositiveInteger', integer);
       SetLength(NonPositiveInteger.constrainingFacets, 1);
-      nonPositiveInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueDecimal.create(integer, 0));
+      nonPositiveInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, xqvalue(0));
         NegativeInteger := TXSNumericType.Create('negativeInteger', nonPositiveInteger);
         SetLength(negativeInteger.constrainingFacets, 1);
-        negativeInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, TXQValueDecimal.create(integer, -1));
+        negativeInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMaxInclusive, xqvalue(-1));
 
 
       nonNegativeInteger := TXSNumericType.Create('nonNegativeInteger', integer);
       SetLength(nonNegativeInteger.constrainingFacets, 1);
-      nonNegativeInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueDecimal.create(integer, 0));
+      nonNegativeInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMinInclusive, xqvalue(0));
         positiveInteger := TXSNumericType.Create('positiveInteger', nonNegativeInteger);
         SetLength(positiveInteger.constrainingFacets, 1);
-        positiveInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMinInclusive, TXQValueDecimal.create(integer, 1));
+        positiveInteger.constrainingFacets[0] := TXSConstrainingFacetValue.Create(xsfMinInclusive, xqvalue(1));
 
   //specialized positive
         UnsignedLong := restrictedIntegerType('unsignedLong', NonNegativeInteger, 0, StrToBigDecimal('18446744073709551615'));
@@ -1316,21 +1327,24 @@ begin
   untypedAtomic := TXSStringType.Create('untypedAtomic', anyAtomicType, xsstString);
 
   //sequence, node: TXSType;
-  node := TXSType.Create('node()', nil, TXQValueNode, self);
-  sequence := TXSType.Create('sequence*', nil, TXQValueSequence, self);
-  function_ := TXSType.Create('function(*)', nil, TXQValueFunction, self);
+  node := TXSType.Create('node()', nil, self);
+  sequence := TXSType.Create('sequence*', nil, self);
+  function_ := TXSType.Create('function(*)', nil, self);
 
-  error := TXSUnionType.Create('error',nil,nil,[]);
+  error := TXSUnionType.Create('error',nil,[]);
   error.variety := xsvAbsent;
   error.schema := self;
   typeList['error'] := error;
 
-  numeric := TXSUnionType.Create('numeric', anyAtomicType, TXQValueDecimal, [double, decimal, float, integer]);
+  numeric := TXSUnionType.Create('numeric', anyAtomicType, [double, decimal, float, integer]);
 
-  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, TXQValueString, [untypedAtomic, untyped, node]);
+  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, [untypedAtomic, untyped, node]);
 
 
-  types[xstNoType                 ] := nil;
+  types[xstNoType                 ] := Untyped;  //used to prevent access violation and in type-of
+
+  types[xstNode                 ] := node;  //used to prevent access violation and in type-of
+
   types[xstAnyType                ] := AnyType                ;
   types[xstAnySimpleType          ] := AnySimpleType          ;
   types[xstAnyAtomicType          ] := AnyAtomicType          ;
@@ -1383,6 +1397,7 @@ begin
   types[xstYearMonthDuration      ] := YearMonthDuration      ;
   types[xstDayTimeDuration        ] := DayTimeDuration        ;
   types[xstDateTimeStamp          ] := DateTimeStamp          ;
+  for t := Succ(low(types)) to xstDateTimeStamp do types[t].typeAnnotation := t;
 end;
 
 destructor TXSSchema.Destroy;
@@ -1404,15 +1419,25 @@ end;
 { TJSSchema }
 
 constructor TJSONiqAdditionSchema.create;
+var
+  t: TXSTypeAnnotation;
 begin
   inherited;
-  jsNull := primitiveBaseType(TXSSimpleType.create('null', AnyAtomicType, TXQValueJSONNull)); jsNull.schema := self;
+  jsNull := primitiveBaseType(TXSSimpleType.create('null', AnyAtomicType)); jsNull.schema := self;
 
 
   jsonItem := TXSType.Create('json-item()', baseSchema.structuredItem);  jsonItem.schema := self;
-  array_ := TXSSimpleType.Create('array()', jsonItem, TXQValueJSONArray);
-  object_ := TXSSimpleType.Create('object()', jsonItem, TXQValueMapLike);
+  array_ := TXSSimpleType.Create('array()', jsonItem);
+  object_ := TXSSimpleType.Create('object()', jsonItem);
 //  jsonItem, array_, object_: TXSType;
+
+  types[xstJSONiqNull] := jsNull;
+  types[xstJSONiqObject] := object_;
+  types[xstJSONiqArray] := array_;
+  for t := xstJSONiqNull to xstJSONiqArray do begin
+    types[t].typeAnnotation := t;
+    baseSchema.types[t] := types[t];
+  end;
 end;
 
 

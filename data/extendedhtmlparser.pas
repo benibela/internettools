@@ -2570,11 +2570,11 @@ begin
       temp.KeepPreviousVariables:=kpvForget;
       temp.OutputEncoding:=context.staticContext.stringEncoding;
       for template in argv[0] do begin
-        if template is TXQValueString then temp.parseTemplate(template.toString)
-        else if template is TXQValueNode then temp.parseTemplate(template.toNode.outerXML())
+        if template.kind = pvkString then temp.parseTemplate(template.toString)
+        else if template.kind = pvkNode then temp.parseTemplate(template.toNode.outerXML())
         else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.toXQuery());
         for html in argv[1] do begin
-          if not (html is TXQValueNode) then
+          if html.kind <> pvkNode then
             raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.toXQuery());
           temp.FHtmlTree := html.toNode;
           if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match pattern to html');
@@ -2583,7 +2583,7 @@ begin
             if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
               list.add(cols.get(0))
             else
-             list.add(cols.toStringMap);
+             list.add(cols.toStringMap.boxInIXQValue);
 
           finally
             cols.free;
@@ -2630,7 +2630,7 @@ begin
   temp.UnnamedVariableName := '$';
   temp.FQueryEngine := context.staticContext.sender;
   temp.FQueryContext := context;
-  temp.FQueryContext.SeqValue := nil; //todo: why is this needed?
+  temp.FQueryContext.SeqValue.clear;
   temp.FQueryContext.extensionContext := @temp.FExtensionContext;
   temp.ParsingExceptions := false;
   temp.FTemplate.addTree(template.getDocument());

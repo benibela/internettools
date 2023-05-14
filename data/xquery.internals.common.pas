@@ -101,6 +101,7 @@ type
     procedure setBaseValue(const Key:TKey;const Value:TBaseValue);
     function include(const Key:TKey; const Value:TBaseValue; allowOverride: boolean=true):PHashMapEntity;
     procedure baseAssign(const other: TXQBaseHashmap);
+    procedure includeAll(const other: TXQBaseHashmap);
   public
     constructor init;
     destructor done;
@@ -752,6 +753,15 @@ begin
   CellToEntityIndex:=other.CellToEntityIndex;
   SetLength(entities, length(Entities));
   SetLength(CellToEntityIndex, length(CellToEntityIndex));
+end;
+
+procedure TXQBaseHashmap.includeAll(const other: TXQBaseHashmap);
+var p: PHashMapEntity;
+begin
+  if size > 0 then begin
+    for p in other do
+      include(p.key, p.value);
+  end else baseAssign(other);
 end;
 
 function TXQBaseHashmap.findEntity(const Key:TKey;CreateIfNotExist:boolean=false):PHashMapEntity;

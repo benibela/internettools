@@ -27,7 +27,7 @@ interface
 
 uses xquery, simplehtmltreeparser, classes;
 
-type TXQValueDateTimeHelper = class helper for TXQValueDateTime
+type TXQBoxedDateTimeHelper = class helper for TXQBoxedDateTime
     procedure multiplyComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure divideComponents(fac: xqfloat); //Multiply all components of value with fac
     procedure addDuration(const D: TXQValueDateTimeData); //Adds a duration to the current datetime/duration
@@ -104,7 +104,7 @@ begin
   sortInDocumentOrderUnchecked;
 end;
 
-procedure TXQValueDateTimeHelper.multiplyComponents(fac: xqfloat);
+procedure TXQBoxedDateTimeHelper.multiplyComponents(fac: xqfloat);
 begin
   if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + toXQuery())
   else if IsInfinite(fac) then raise EXQEvaluationException.create('FODT0002', 'Cannot multiply INF * ' + toXQuery());
@@ -113,7 +113,7 @@ begin
   truncateRange();
 end;
 
-procedure TXQValueDateTimeHelper.divideComponents(fac: xqfloat);
+procedure TXQBoxedDateTimeHelper.divideComponents(fac: xqfloat);
 begin
   if IsNan(fac) then raise EXQEvaluationException.create('FOCA0005', 'Cannot multiply NaN * ' + toXQuery())
   else if fac = 0 then raise EXQEvaluationException.create('FODT0002', 'Cannot divide duration by zero: ' + toXQuery());
@@ -122,10 +122,10 @@ begin
   truncateRange();
 end;
 
-procedure TXQValueDateTimeHelper.addDuration(const D: TXQValueDateTimeData);
+procedure TXQBoxedDateTimeHelper.addDuration(const D: TXQValueDateTimeData);
 var temp: TXQValueDateTimeData;
 begin
-  if (typeAnnotation as TXSDateTimeType).isDuration then begin
+  if typeAnnotationType.isDuration then begin
     setMonths(value, value.toMonths + D.toMonths, true);
     setDayTime(value, value.toDayTime + d.toDayTime);
   end else begin
@@ -135,11 +135,11 @@ begin
   truncateRange;
 end;
 
-procedure TXQValueDateTimeHelper.subtractDuration(D: TXQValueDateTimeData);
+procedure TXQBoxedDateTimeHelper.subtractDuration(D: TXQValueDateTimeData);
 var temp: TXQValueDateTimeData;
   i: Integer;
 begin
-  if (typeAnnotation as TXSDateTimeType).isDuration then begin
+  if typeAnnotationType.isDuration then begin
     setMonths(value, value.toMonths - D.toMonths, true);
     setDayTime(value, value.toDayTime - d.toDayTime);
   end else begin
@@ -150,7 +150,7 @@ begin
   truncateRange;
 end;
 
-procedure TXQValueDateTimeHelper.truncateRangeH();
+procedure TXQBoxedDateTimeHelper.truncateRangeH();
 begin
   truncateRange();
 end;

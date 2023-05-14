@@ -18,11 +18,11 @@ procedure hashmaptests;
 var m: TXQHashmapXQValue;
 begin
   m.init;
-  m.include(xqvalue('abc'), TXQValueString.create('def') );
+  m.include(xqvalue('abc'), xqvalue('def') );
   test(m[xqvalue('abc')].toString, 'def');
-  m.include(xqvalue('0'), TXQValueString.create('str0') );
+  m.include(xqvalue('0'), xqvalue('str0') );
   test(m[xqvalue('0')].toString, 'str0');
-  m.include(xqvalue(0), TXQValueString.create('int0') );
+  m.include(xqvalue(0), xqvalue('int0') );
   test(m[xqvalue(0)].toString, 'int0');
   test(m[xqvalue('0')].toString, 'str0');
   test(m[xqvalue('abc')].toString, 'def');
