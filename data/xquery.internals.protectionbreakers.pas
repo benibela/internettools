@@ -35,11 +35,6 @@ type TXQBoxedDateTimeHelper = class helper for TXQBoxedDateTime
     procedure truncateRangeH();
   end;
 
-  TXQVListHelper = class helper for TXQVList
-    function Buffer: PIXQValue; inline;
-    procedure sortInDocumentOrderUncheckedH; inline;
-  end;
-
   TXQueryEngineHelper = class helper for TXQueryEngine
   public
     function getPatternMatcherTextStart: TTreeNode; inline;
@@ -94,15 +89,6 @@ begin
 end;
 
 
-function TXQVListHelper.Buffer: PIXQValue;
-begin
-  result := fbuffer;
-end;
-
-procedure TXQVListHelper.sortInDocumentOrderUncheckedH;
-begin
-  sortInDocumentOrderUnchecked;
-end;
 
 procedure TXQBoxedDateTimeHelper.multiplyComponents(fac: xqfloat);
 begin

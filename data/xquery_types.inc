@@ -553,11 +553,11 @@ end;
 function IXQValue.toJoinedString(const sep: string): string;
 var i: SizeInt;
     builder: TStrBuilder;
-    seq: TXQVList;
+    enum: TXQValueEnumeratorPtrUnsafe;
 begin
   case kind of
-    pvkSequence: seq := TXQBoxedSequence(getDataPointer).seq;
-    pvkArray: seq := TXQBoxedArray(getDataPointer).seq;
+    pvkSequence: enum := self.GetEnumeratorPtrUnsafe;
+    pvkArray: enum := self.GetEnumeratorMembersPtrUnsafe;
     pvkObject: begin
       if not globalCurrentQueryInfo.AllowJSONiqOperations then
         raise EXQEvaluationException.create('FOTY0013', 'Object cannot be used as string', nil, self); //0013 because it is implicitly calling fn:data
@@ -565,12 +565,12 @@ begin
     end
     else begin result := toString; exit; end;
   end;
-  if seq.count = 0 then exit('');
+  if not enum.MoveNext then exit('');
   builder.init(@result);
-  builder.append(seq[0].toJoinedString(sep));
-  for i := 1 to seq.count - 1 do begin
+  builder.append(enum.Current.toJoinedString(sep));
+  while enum.MoveNext do begin
     builder.append(sep);
-    builder.append(seq[i].toJoinedString(sep));
+    builder.append(enum.Current.toJoinedString(sep));
   end;
   builder.final;
 end;
@@ -682,9 +682,9 @@ begin
   else begin raiseXPTY0004TypeError(self, 'binary'); result := nil; end;
 end;
 
-function IXQValue.toXQVList: TXQVList;
+function IXQValueHelper.toXQVList: TXQValueList;
 begin
-  result:=TXQVList.Create;
+  result:=TXQValueList.Create;
   result.add(self);
 end;
 
@@ -1105,9 +1105,9 @@ begin
   case kind of
     pvkSequence: with getDataSequence do begin
       if seq.Count > 0 then begin
-        result.fcurrent:=@seq.fbuffer[0];
+        result.fcurrent:=@seq.buffer[0];
         dec(result.fcurrent);
-        result.flast := @seq.fbuffer[seq.Count-1];
+        result.flast := @seq.buffer[seq.Count-1];
         //we do not need to set result.fsingleelement, since we set flast to non-nil
       end else TXQValueEnumeratorPtrUnsafe.clear(result);
     end
@@ -1775,9 +1775,9 @@ function IXQValue.stringifyNodes: IXQValue;
 begin
   case kind of
     pvkObject: result := objectStringifiedNodes;
-    pvkSequence: result := TXQBoxedSequence.create(getDataSequence.seq.stringifyNodes).boxInIXQValue;
+    pvkSequence: result := getDataSequence.seq.stringifyNodes.toXQValueSequenceSqueezed;
     pvkNode: Result:=xqvalue(toString);
-    pvkArray: result := TXQBoxedArray.create(getDataArray.seq.stringifyNodes).boxInIXQValue;
+    pvkArray: result := getDataArray.seq.stringifyNodes.toXQValueArray;
     else result := self;
   end;
 end;
@@ -1867,8 +1867,7 @@ function IXQValue.filter(const q: string): IXQValue;
 var
   term: TXQuery;
   tempContext: TXQEvaluationContext;
-  list: TXQVList;
-  seq: TXQBoxedSequence;
+  list: TXQValueList;
   tempFilter: TXQPathMatchingStepFilter;
 begin
   term := defaultQueryEngine.parseTerm(q, high(TXQParsingModel), defaultQueryEngine.StaticContext);
@@ -1877,11 +1876,9 @@ begin
 
     tempFilter.filter := term.getTerm;
     tempFilter.dependencies := tempFilter.filter.getContextDependencies;
-    list := TXQVList.create();
-    seq := TXQBoxedSequence.create(list);
-    result := seq.boxInIXQValue;
+    list := TXQValueList.create();
     TXQueryEngine.filterSequence(self, list, tempFilter, tempContext);
-    xqvalueSeqSqueeze(result);
+    result := xqvalueSeqSqueezed(list);
 
   finally
     term.free;
@@ -1994,17 +1991,14 @@ end;
 
 
 
-
-
-
 function TXQBoxedValue._AddRef: SizeInt;
 begin
-  result := {$ifdef cpu32}InterlockedIncrement{$else}InterlockedIncrement64{$endif}(FRefCount);
+  result := InterlockedIncrement(FRefCount);
 end;
 
 function TXQBoxedValue._Release: SizeInt;
 begin
-  result := {$ifdef cpu32}InterlockedDecrement{$else}InterlockedDecrement64{$endif}(FRefCount);
+  result := InterlockedDecrement(FRefCount);
   if result = 0 then
     Free;
 end;
@@ -2486,16 +2480,16 @@ end;
 
 constructor TXQBoxedSequence.create(capacity: SizeInt);
 begin
-  seq := TXQVList.Create(capacity);
+  seq := TXQValueList.Create(capacity);
 end;
 
 constructor TXQBoxedSequence.create(firstChild: IXQValue);
 begin
-  seq := TXQVList.Create;
+  seq := TXQValueList.Create;
   seq.add(firstChild);
 end;
 
-constructor TXQBoxedSequence.create(list: TXQVList);
+constructor TXQBoxedSequence.create2(var list: TXQValueList);
 begin
   seq := list;
 end;
@@ -2522,7 +2516,7 @@ end;
 
 destructor TXQBoxedSequence.Destroy;
 begin
-  seq.Free;
+  seq.release;
   inherited Destroy;
 end;
 
@@ -2774,9 +2768,9 @@ end;
 
 function TXQBoxedStringMap.enumeratePropertyValues: IXQValue;
 var p: TXQHashmapStrOwningXQValue.PHashMapEntity;
-  tempseq: TXQVList;
+  tempseq: TXQValueList;
 begin
-  tempseq := TXQVList.create(mapdata.Count);
+  tempseq := TXQValueList.create(mapdata.Count);
   for p in mapdata do
     tempseq.add(p.value);
   result := xqvalueSeqSqueezed(tempseq);
@@ -2968,9 +2962,9 @@ end;
 function TXQBoxedStringMapPendingUpdate.enumeratePropertyValues: IXQValue;
 var
   p: TXQHashmapStrOwningXQValue.PHashMapEntity;
-  l: TXQVList;
+  l: TXQValueList;
 begin
-  l := TXQVList.create();
+  l := TXQValueList.create();
   if prototype <> nil then l.add(prototype.enumeratePropertyValues);
   for p in mapdata do
     l.add(p.value);
@@ -3145,9 +3139,9 @@ end;
 
 function TXQBoxedStandardMap.enumeratePropertyKeys: IXQValue;
 var p: TXQHashmapXQValue.PHashMapEntity;
-  list: TXQVList;
+  list: TXQValueList;
 begin
-  list := TXQVList.create(size);
+  list := TXQValueList.create(size);
   for p in mapdata do
     list.add(p.key);
   xqvalueSeqSqueezed(result, list);
@@ -3162,9 +3156,9 @@ end;
 
 function TXQBoxedStandardMap.enumeratePropertyValues: IXQValue;
 var p: TXQHashmapXQValue.PHashMapEntity;
-  list: TXQVList;
+  list: TXQValueList;
 begin
-  list := TXQVList.create(size);
+  list := TXQValueList.create(size);
   for p in mapdata do
     list.add(p.value);
   xqvalueSeqSqueezed(result, list);
@@ -3174,14 +3168,14 @@ end;
 
 
 
-constructor TXQBoxedArray.create(takeList: TXQVList);
+constructor TXQBoxedArray.create2(takeList: TXQValueList);
 begin
   seq := takeList
 end;
 
-constructor TXQBoxedArray.create(capacity: SizeInt);
+constructor TXQBoxedArray.create2(capacity: SizeInt);
 begin
-  seq := TXQVList.create(capacity);
+  seq := TXQValueList.create(capacity);
 end;
 
 function TXQBoxedArray.GetEnumeratorMembers: TXQValueEnumerator;
@@ -3193,9 +3187,9 @@ end;
 function TXQBoxedArray.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
   if seq.Count > 0 then begin
-    result.fcurrent:=@seq.fbuffer[0];
+    result.fcurrent:=@seq.buffer[0];
     dec(result.fcurrent);
-    result.flast := @seq.fbuffer[seq.Count-1];
+    result.flast := @seq.buffer[seq.Count-1];
   end else TXQValueEnumeratorPtrUnsafe.clear(result);
 end;
 
@@ -3209,8 +3203,7 @@ var
   newValue: IXQValue;
   i: SizeInt;
   idx: SizeInt;
-  resultArray: TXQBoxedArray;
-  resseq: TXQVList;
+  resseq: TXQValueList;
 begin
   if (not props^.toIntDecimalTry(idx)) or (idx < 0) then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
 
@@ -3222,21 +3215,20 @@ begin
     newValue := seq[idx-1].setImmutable(props + 1, len - 1, v)
   else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+props^+' to assign to '+strJoin(props, len, '.'));
 
-  resultArray := TXQBoxedArray.create(seq.Count);
-  resseq := resultArray.seq;
+  resseq := TXQValueList.create(seq.Count);
   if idx = 0 then resseq.add(newValue);
   idx -= 1;
   for i := 0 to seq.Count - 1 do
     if i <> idx  then resseq.add(seq[i])
     else resseq.add(newValue);
   if idx >= seq.Count then resseq.add(newValue); //e.g. $a(1000) := ..
-  result := resultArray.boxInIXQValue;
+  result := xqvalueArray(resseq);
 end;
 
 
 destructor TXQBoxedArray.Destroy;
 begin
-  seq.Free;
+  seq.release;
   inherited Destroy;
 end;
 
@@ -3318,9 +3310,9 @@ begin
   {$IFDEF TRACK_STACK_VARIABLE_NAMES}
   if length(parameters) = 0 then exit;
   stack := inContext.temporaryVariables;
-  if length(stack.debugNames) < stack.items.capacity then SetLength(stack.debugNames, stack.items.capacity);
+  if length(stack.debugNames) < stack.list.capacity then SetLength(stack.debugNames, stack.list.capacity);
   for i := 0 to high(parameters) do
-    stack.debugNames[stack.fcount - high(parameters) - 1 + i] := parameters[i].variable.value;
+    stack.debugNames[stack.count - high(parameters) - 1 + i] := parameters[i].variable.value;
   {$endif}
 end;
 

@@ -496,7 +496,7 @@ begin
 end;
 
 type TXQFileLister = object(TFileLister)
-  seq: TXQVList;
+  seq: TXQValueList;
   filter: TWrappedRegExpr;
   constructor init;
   procedure foundSomething(const dir, current: String; const search: TRawByteSearchRec); virtual;
@@ -505,7 +505,6 @@ end;
 constructor TXQFileLister.init;
 begin
   inherited;
-  seq := nil;
   filter := nil;
 end;
 
@@ -533,7 +532,7 @@ begin
   lister.init();
   try
     lister.recurse := recurse;
-    lister.seq := TXQVList.create();
+    lister.seq := TXQValueList.create();
     if (mask <> '*') and (mask <> '') then begin
       transformedMask := '';
       for c in mask do
@@ -548,15 +547,12 @@ begin
     end;
 
     lister.startSearch(dir, ifthen(relative, '', dir));
-    result := TXQBoxedSequence.create(lister.seq).boxInIXQValue;
-    lister.seq := nil;
-    xqvalueSeqSqueeze(result);
+    result := xqvalueSeqSqueezed(lister.seq);
     if result.getSequenceCount = 0 then
       if not DirectoryExists(dir) then
         raiseFileError(Error_NoDir, 'Could not list', path);
   finally
     if lister.filter <> nil then wregexprFree(lister.filter);
-    lister.seq.free;
   end;
 end;
 

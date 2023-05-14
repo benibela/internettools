@@ -66,10 +66,8 @@ type
   TXSType = class;
   TXSDateTimeType = class;
   TXSSchema = class;
-  TXQVList=class;
   PIXQValue = ^IXQValue;
   TXQVariableChangeLog=class;
-  TXQEvaluationStack=class;
   TXQTerm=class;
   TXQTermWithChildren=class;
   TXQTermArray = array of TXQTerm;
@@ -272,7 +270,6 @@ type
     function toDateTime: TDateTime;  //**< Returns the value as dateTime; dynamically converted, if necessary
     function toNode: TTreeNode;  //**< Returns the value as node; or nil if it is no node
     function toBinaryBytes: TBytes;
-    function toXQVList: TXQVList;  //**< Returns a TXQVList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
     function toXQuery: string; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
     function toQName: TXQBoxedQName;
     function toFunction: TXQBoxedFunction;
@@ -328,6 +325,97 @@ type
   end;
   TXQVArray = array of IXQValue;
 
+  PXQValueList = ^TXQValueList;
+  (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences *)
+  TXQValueList = record
+    type THeader = record
+      refcount: SizeInt;
+      count, capacity: SizeInt; // count
+    end;
+    PHeader = ^THeader;
+    T = IXQValue;
+    PT = PIXQValue;
+  public
+    class operator Initialize(var e: TXQValueList);
+    class operator Finalize(var e: TXQValueList);
+    class operator AddRef(var e: TXQValueList);
+    class operator Copy(constref s: TXQValueList; var d: TXQValueList);
+  private
+    data: pointer;
+  private
+    function getCapacity: sizeint;
+    function getItem(i: sizeint): IXQValue;
+    procedure setCapacity(AValue: sizeint);
+    procedure setItem(i: sizeint; AValue: IXQValue);
+    function getBuffer: PT; inline;
+    function getCount: SizeInt; inline;
+    procedure setCount(c: SizeInt);
+    procedure raiseInvalidIndexError(i: SizeInt);
+    procedure checkIndex(i: SizeInt); inline; //**< Range check
+
+    procedure insertSingle(i: SizeInt; const child: IXQValue); inline; //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
+    procedure reserve(cap: sizeint);
+
+    class function getMemForList(acount, acapacity: SizeInt): pointer; static;
+  public
+    class function create(acapacity: SizeInt = 0): TXQValueList; static;
+    class function create(other: TXQValueList): TXQValueList; static;
+    class function createNew: PXQValueList; static;
+    procedure destroy;
+    procedure addRef;
+    procedure release;
+
+    procedure clear;
+    procedure addInArray(const value: IXQValue); //inline;
+
+    procedure revert; //**< Reverts the list
+    procedure sort(cmp: TPointerCompareFunction; sortData: TObject = nil); //**< Sorts the list
+    procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
+
+    property count: sizeint read getCount write setCount;
+    property capacity: sizeint read getCapacity write setCapacity;
+    property items[i: sizeint]: IXQValue read getitem write setItem; default;
+    property buffer: PT read getBuffer;
+
+
+
+    procedure insert(i: SizeInt; const value: IXQValue);  //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure add(const value: IXQValue); //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure addOrdered(const node: IXQValue); //**< Adds an IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
+    procedure add(node: TTreeNode);
+    procedure add(list: TXQValueList);
+    procedure addOrdered(list: TXQValueList);
+    function stringifyNodes: TXQValueList;
+    function hasNodes: boolean;
+
+    function toXQValueArray: IXQValue;
+    function toXQValueSequenceSqueezed: IXQValue;
+  end;
+
+  {$define TRACK_STACK_VARIABLE_NAMES}
+  TXQEvaluationStack = class
+  private
+    list: TXQValueList;
+    {$ifdef TRACK_STACK_VARIABLE_NAMES}debugNames: array of string;{$endif}
+    procedure failTop(const name: TXQTermVariable; i: SizeInt = 0);
+    function getBuffer: PIXQValue; inline;
+    function getCount: sizeint; inline;
+  public
+    //class function create(acapacity: SizeInt = 0): TXQEvaluationStack; static;
+    constructor create(acapacity: SizeInt = 0);
+    destructor Destroy; override;
+    procedure push(const value: ixqvalue);
+    procedure pop();
+    procedure popTo(newCount: SizeInt);
+    function top(i: SizeInt = 0): IXQValue;
+    function topptr(i: SizeInt = 0): PIXQValue; inline;
+
+    procedure push(const name: TXQTermVariable; const v: ixqvalue); inline;
+    function top(const name: TXQTermVariable; i: SizeInt = 0): IXQValue; inline;
+
+    property count: sizeint read getCount;
+    property buffer: PIXQValue read getBuffer;
+  end;
 
   //** @abstract(Iterator over PIXQValue.) Faster version of TXQValueEnumerator
   TXQValueEnumeratorPtrUnsafe = record
@@ -342,7 +430,7 @@ type
     function MoveMany(count: sizeint): Boolean;
     procedure CopyBlock(target: PIXQValue); //**< Copies all XQValue to the destination buffer and increases their ref count. For maximal performance, there is no check that the buffer is large enough
     procedure CopyBlock(target: PIXQValue; count: SizeInt); //**< Copies count XQValue to the destination buffer and increases their ref count.
-    procedure CopyToList(list: TXQVList; count: SizeInt);
+    procedure CopyToList(var list: TXQValueList; count: SizeInt);
     property Current: PIXQValue read FCurrent;
     function GetEnumerator: TXQValueEnumeratorPtrUnsafe;
   end;
@@ -649,24 +737,31 @@ type
       function call2(const v, w: IXQValue): IXQValue;
     end;
 
+    TXQBoxedStringMap = class;
+    TXQJsonContainer = record
+      placeholderInserted: boolean; //arrays are immutable, so the array is first parsed and then inserted. However, maps are inserted directly
+      objectKey: string;
+      case isArray: boolean of
+       true: (list: PXQValueList);
+       false: (map: TXQBoxedStringMap)
+    end;
+    PXQJsonContainer = ^TXQJsonContainer;
+
     TXQJsonParser = class(TJsonReader)
     protected
       fallbackFunctionCaller: PXQBatchFunctionCall;
-      containerStack: array of TXQBoxedValue;
+      containerStack: array of TXQJsonContainer;
       containerCount: SizeInt;
-      currentContainer: TXQBoxedValue;
       currentObjectKey: string;
-      outputSeq: TXQBoxedSequence;
-      outputResult: IXQValue;
+      outputSeq: TXQValueList;
       procedure appendEscapedString(var sb: TStrBuilder; p: pchar; l: integer);
       procedure initJSONScanner(const data: string); override;
       procedure disposeFallbackFunctionCaller;
     protected
       function decodeNumber: IXQValue;
-      procedure setCurrentContainer; inline;
-      function pushContainer(container: TXQBoxedValue): TXQBoxedValue;
+      function pushContainer(isArray: boolean; container: pointer): pointer;
       function popContainer: TJSONParsingPhase;
-      procedure pushValue(const v: ixqvalue);
+      function pushValue(const v: ixqvalue): boolean;
       procedure readArray; override;
       procedure readObject; override;
       procedure readArrayEnd(var newParsingPhase: TJSONParsingPhase); override;
@@ -799,11 +894,11 @@ type
 
   //** Type for a sequence containing an arbitrary number (>= 0) of other IXQValue
   TXQBoxedSequence = class (TXQBoxedValue)
-    seq: TXQVList;    //**< list of the contained sequence values.
+    seq: TXQValueList;    //**< list of the contained sequence values.
 
     constructor create(capacity: SizeInt = 0);
     constructor create(firstChild: IXQValue);
-    constructor create(list: TXQVList);
+    constructor create2(var list: TXQValueList);
 
 
     procedure add(const value: IXQValue); inline;  //**< Simply adds a value to the sequence (notice that an xpath sequence cannot contain another sequence, so they will be merged)
@@ -1034,10 +1129,10 @@ type
 
   //** JSON array of other IXQValue
   TXQBoxedArray = class (TXQBoxedValue)
-    seq: TXQVList;
+    seq: TXQValueList;
 
-    constructor create(takeList: TXQVList); reintroduce; virtual;
-    constructor create(capacity: SizeInt = 0); reintroduce; virtual;
+    constructor create2(takeList: TXQValueList); reintroduce; virtual;
+    constructor create2(capacity: SizeInt = 0); reintroduce; virtual;
 
     function GetEnumeratorMembers: TXQValueEnumerator;
     function GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe; //override;
@@ -1117,6 +1212,8 @@ type
 
 
   IXQValueHelper = record helper for IXQValue
+    function toXQVList: TXQValueList;  //**< Returns a TXQValueList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
+
     procedure appendString(const str: string);
     //function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single element, the array contains that element; if it is a sequence, the array contains each element of the sequence
 
@@ -1478,68 +1575,6 @@ type
 
   //============================XQUERY META STUFF ==========================
 
-  { TXQVList }
-
-  TXQVOnStackList = object(specialize TCopyingArrayList<IXQValue>)
-    function breakBuffer: PIXQValue;
-  end;
-
-  (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences *)
-  TXQVCustomList = class
-  private
-    function getitem(i: sizeint): IXQValue;
-    procedure setItem(i: sizeint; AValue: IXQValue);
-  protected
-    procedure insertSingle(i: SizeInt; const child: IXQValue); inline; //**< Inserts a IXQValue to the sequence. Does not perform sequence flattening
-    procedure reserve(maxCapacity: sizeint);
-    function getfbuffer: PIXQValue;
-    function getcount: SizeInt;
-    procedure setcount(c: SizeInt);
-  public
-    items: TXQVOnStackList;
-    property fbuffer: PIXQValue read getfbuffer;
-
-    procedure clear;
-    procedure addInArray(const value: IXQValue); inline;
-
-    procedure revert; //**< Reverts the list
-    procedure sort(cmp: TPointerCompareFunction; data: TObject = nil); //**< Sorts the list
-    procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
-
-    property fcount: sizeint read getcount write setcount;
-    property count: sizeint read getcount write setcount;
-    property itemsDefault[i: sizeint]: IXQValue read getitem write setItem; default;
-  end;
-
-  (*** @abstract(List of TXQValue-s). If a sequence is inserted/added, it is flattened, so only the contained items are added  *)
-  TXQVList = class(TXQVCustomList)
-    constructor create(acapacity: SizeInt = 0);
-    constructor create(other: TXQVCustomList);
-    procedure insert(i: SizeInt; const value: IXQValue); reintroduce; //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure add(const value: IXQValue); reintroduce; //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure addOrdered(const node: IXQValue); //**< Adds an IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure add(node: TTreeNode);
-    procedure add(list: TXQVCustomList);
-    procedure addOrdered(list: TXQVList);
-    function stringifyNodes: TXQVList;
-    function hasNodes: boolean;
-  end;
-
-  {$define TRACK_STACK_VARIABLE_NAMES}
-  TXQEvaluationStack = class(TXQVCustomList)
-  private
-    {$ifdef TRACK_STACK_VARIABLE_NAMES}debugNames: array of string;{$endif}
-    procedure failTop(const name: TXQTermVariable; i: SizeInt = 0);
-  public
-    procedure push(const value: ixqvalue);
-    procedure pop();
-    procedure popTo(newCount: SizeInt);
-    function top(i: SizeInt = 0): IXQValue;
-    function topptr(i: SizeInt = 0): PIXQValue; inline;
-
-    procedure push(const name: TXQTermVariable; const v: ixqvalue); inline;
-    function top(const name: TXQTermVariable; i: SizeInt = 0): IXQValue; inline;
-  end;
 
   (***
     @abstract(Basic/pure function, taking some TXQValue-arguments and returning a new IXQValue.)
@@ -2849,7 +2884,7 @@ public
     function parseXStringNullTerminated(str: string): TXQuery;
 
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
-    class procedure filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);
+    class procedure filterSequence(const sequence: IXQValue; var outList: TXQValueList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);
     //** Applies @code(filter) to all elements in the (sequence) and deletes all non-matching elements (implements []) (may convert result to nil!)
     class procedure filterSequence(var result: IXQValue; const filter: TXQPathMatchingStepFilters; var context: TXQEvaluationContext);
 
@@ -2907,10 +2942,11 @@ public
   function xqvalue(const sl: array of string): IXQValue; //**< Creates a sequence of untyped strings
   function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
   function xqvalue(const s: TXQHashsetStr): IXQValue; //**< Creates a sequence
+  function xqvalueArray(var l: TXQValueList): IXQValue;
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
-  function xqvalueSeqSqueezed(l: TXQVList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
-  procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
+  function xqvalueSeqSqueezed(l: TXQValueList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
+  procedure xqvalueSeqSqueezed(out result: IXQValue; var l: TXQValueList); //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
   //** Adds a value to an implicit sequence list in result, i.e. you call it multiple times and the result becomes a sequence of all the add values.  @br
   //** For the first call result and seq must be nil. @br
   //** The point is that it only creates a sequence if there are multiple values, and it is especially fast, if you do not expect multiple values.
@@ -3420,6 +3456,17 @@ end;
 
 
 
+{$ifdef cpu64}
+function InterlockedIncrement (var Target: int64) : int64; overload;
+begin
+  InterlockedIncrement64(target);
+end;
+function InterlockedDecrement (var Target: int64) : int64; overload;
+begin
+  InterlockedDecrement64(target);
+end;
+{$endif}
+
 
 
 
@@ -3771,14 +3818,14 @@ begin
   end;
 end;
 
-procedure TXQValueEnumeratorPtrUnsafe.CopyToList(list: TXQVList; count: SizeInt);
+procedure TXQValueEnumeratorPtrUnsafe.CopyToList(var list: TXQValueList; count: SizeInt);
 var
   oldcount: SizeInt;
 begin
   oldcount := list.Count;
-  list.reserve(list.Count + count);
-  list.fcount := list.fcount + count;
-  CopyBlock(@list.fbuffer[oldcount], count);
+  //list.reserve(list.Count + count);
+  list.count := list.count + count;
+  CopyBlock(@list.buffer[oldcount], count);
 end;
 
 function TXQValueEnumeratorPtrUnsafe.GetEnumerator: TXQValueEnumeratorPtrUnsafe;
@@ -3853,97 +3900,261 @@ begin
   result:=TTreeNode.compareInDocumentOrder(PIXQValue(p1)^.toNode,PIXQValue(p2)^.toNode);
 end;
 
-procedure TXQVCustomList.sortInDocumentOrderUnchecked;
+procedure TXQValueList.sortInDocumentOrderUnchecked;
 begin
-  if fcount < 2 then exit;
-  stableSort(@fbuffer[0], @fbuffer[fcount-1], sizeof(IXQValue), @compareXQInDocumentOrder);
+  if count < 2 then exit;
+  stableSort(@buffer[0], @buffer[count-1], sizeof(IXQValue), @compareXQInDocumentOrder);
 end;
 
-function TXQVCustomList.getitem(i: sizeint): IXQValue;
+function TXQValueList.getCapacity: sizeint;
 begin
-  result := items[i];
+  result := PHeader(data).capacity;
 end;
 
-procedure TXQVCustomList.setItem(i: sizeint; AValue: IXQValue);
+function TXQValueList.getItem(i: sizeint): IXQValue;
 begin
-  items[i] := avalue
+  checkIndex(i);
+  result := buffer[i];
 end;
 
-procedure TXQVCustomList.insertSingle(i: SizeInt; const child: IXQValue);
+procedure TXQValueList.setCapacity(AValue: sizeint);
+  procedure setBufferSize(c: SizeInt);
+  var
+    oldcap: SizeInt;
+    newdata: Pointer;
+    pv, pe: PT;
+  begin
+    oldcap := capacity;
+    if PHeader(data).refcount <= 1 then //is this thread safe?
+      ReAllocMem(data, sizeof(THeader) + c * sizeof(T))
+    else begin
+      newdata := GetMem(sizeof(THeader) + c * sizeof(T));
+      move(data^, newdata^, sizeof(THeader) + oldcap * sizeof(T));
+      pv := PT(newdata + sizeof(THeader));
+      pe := pv + count;
+      while pv < pe do begin
+        pv^.addRef;
+        inc(pv);
+      end;
+      InterlockedDecrement(PHeader(data).refcount);
+      data := newdata;
+      PHeader(newdata).refcount := 1;
+    end;
+
+    PHeader(data).capacity := c;
+    if c > oldcap then
+      FillChar(buffer[oldcap], sizeof(T) * (c - oldcap), 0);
+  end;
+var
+  fcapacity: SizeInt;
 begin
-  items.insert(i, child);
+  fcapacity := capacity;
+  if avalue > fcapacity then setBufferSize(AValue)
+  else if avalue < count then setCount(AValue)
+  else if avalue < fcapacity then setBufferSize(AValue);
 end;
 
-procedure TXQVCustomList.reserve(maxCapacity: sizeint);
+procedure TXQValueList.setItem(i: sizeint; AValue: IXQValue);
 begin
-  if maxCapacity < Count then exit;
-  items.capacity:=maxCapacity;
-end;
-function TXQVOnStackList.breakBuffer: PIXQValue;
-begin
-  if count > 0 then
-  result := @FBuffer[0]
-  else result := nil;
+  checkIndex(i);
+  buffer[i] := avalue
 end;
 
-
-function TXQVCustomList.getfbuffer: PIXQValue;
+function TXQValueList.getBuffer: PT;
 begin
-  result := items.breakBuffer;
+  result := PIXQValue(data + sizeof(THeader));
 end;
 
-function TXQVCustomList.getcount: SizeInt;
+procedure TXQValueList.insertSingle(i: SizeInt; const child: IXQValue);
+var
+  fcount: SizeInt;
+  fbuffer: PIXQValue;
 begin
-  result := items.count;
+  fcount := count;
+  reserve(fcount + 1);
+  fbuffer := buffer;
+  if i <> fcount then begin
+    checkIndex(i);
+    move(fbuffer[i], fbuffer[i+1], (fcount - i) * sizeof(T));
+    //fillchar(fbuffer[i],sizeof(fbuffer[i]),0);
+    fbuffer[i].encoded := 0;
+  end;
+  fbuffer[i] := child;
+  PHeader(data).count +=1;
 end;
-procedure TXQVCustomList.setcount(c: SizeInt);
+
+procedure TXQValueList.reserve(cap: sizeint);
+var
+  oldCapacity, newcap: SizeInt;
 begin
-  items.count:=c;
+  oldCapacity := capacity;
+  if cap <= oldCapacity then exit;
+
+  if cap < 4 then newcap := 4
+  else if (cap < 1024) and (cap <= oldCapacity * 2) then newcap := oldCapacity * 2
+  else if (cap < 1024) then newcap := cap
+  else if cap <= oldCapacity + 1024 then newcap := oldCapacity + 1024
+  else newcap := cap;
+
+  capacity:=newcap;
 end;
 
-procedure TXQVCustomList.clear;
+class function TXQValueList.getMemForList(acount, acapacity: SizeInt): pointer;
+var
+  size: SizeInt;
 begin
-  items.clear;
+  size := sizeof(THeader) + acapacity*sizeof(T);
+  result := GetMem(size);
+  PHeader(result).refcount := 1;
+  PHeader(result).count := acount;
+  PHeader(result).capacity := acapacity;
 end;
 
-procedure TXQVCustomList.addInArray(const value: IXQValue);
+class function TXQValueList.create(acapacity: SizeInt): TXQValueList;
 begin
-  items.add(value);
+  result.release;
+  result.data := getMemForList(0, acapacity);
+  FillChar(result.buffer^, acapacity * sizeof(T), 0);
+end;
+
+class function TXQValueList.create(other: TXQValueList): TXQValueList;
+var
+  rbuffer: PIXQValue;
+  i: SizeInt;
+begin
+  result.release;
+  result.data := getMemForList(other.count, other.count);
+  rbuffer := result.buffer;
+  move(other.buffer^, rbuffer^, sizeof(T) * other.count);
+  for i := 0 to other.count - 1 do rbuffer[i].addRef;
+end;
+
+class function TXQValueList.createNew: PXQValueList;
+begin
+  new(result);
+  result.data := getMemForList(0,0);
+end;
+
+procedure TXQValueList.destroy;
+var
+  i: SizeInt;
+  fbuffer: PIXQValue;
+begin
+  fbuffer := buffer;
+  for i := 0 to count - 1 do fbuffer[i].release;
+  Freemem(data);
+  data := nil;
+end;
+
+procedure TXQValueList.addRef;
+begin
+  InterlockedIncrement(PHeader(data).refcount);
+end;
+
+procedure TXQValueList.release;
+var
+  refcount: sizeint;
+begin
+  if data = nil then exit;
+  refcount := InterlockedDecrement(PHeader(data).refcount) ;
+  if refcount = 0 then
+    destroy
+  { else
+    data := nil; //prevent double free}
+end;
+
+function TXQValueList.getCount: SizeInt;
+begin
+  result := PHeader(data).count;
+end;
+procedure TXQValueList.setCount(c: SizeInt);
+var
+  i: SizeInt;
+  fbuffer: PT;
+begin
+  reserve(c);
+  if c < count then begin
+    fbuffer := buffer;
+    for i := c to count - 1 do
+      fbuffer[i].release;
+    FillChar(fbuffer[c], (count - c) * sizeof(T), 0);
+  end;
+  PHeader(data)^.count:=c;
+end;
+
+procedure TXQValueList.raiseInvalidIndexError(i: SizeInt);
+begin
+  raiseXQEvaluationException('pxp:INTERNAL', 'Invalid TXQValueList index: '+IntToStr(i));
+end;
+
+procedure TXQValueList.checkIndex(i: SizeInt);
+begin
+  if (i < 0) or (i >= count) then raiseInvalidIndexError(i);
+end;
+
+procedure TXQValueList.clear;
+begin
+  count := 0;
+end;
+
+procedure TXQValueList.addInArray(const value: IXQValue);
+var
+  fcount: SizeInt;
+begin
+  fcount := count;
+  if fcount = capacity then
+    reserve(fcount + 1);
+  buffer[fcount].encoded := value.encoded;
+  value.addRef;
+  PHeader(data).count += 1;
 end;
 
 
 
 
-procedure TXQVCustomList.revert;
+procedure TXQValueList.revert;
 var
  h: SizeInt;
  i: SizeInt;
+ fbuffer: PIXQValue;
 begin
   if count=0 then exit;
   h :=count-1;
+  fbuffer := buffer;
   for i:=0 to count div 2 - 1 do //carefully here. xqswap(a,a) causes a memory leak
     xqswap(fbuffer[i], fbuffer[h-i]);
 end;
 
-procedure TXQVCustomList.sort(cmp: TPointerCompareFunction; data: TObject);
+procedure TXQValueList.sort(cmp: TPointerCompareFunction; sortData: TObject);
 begin
   if count <= 1 then exit;
-  stableSort(@fbuffer[0], @fbuffer[count-1], sizeof(fbuffer[0]), cmp, data);
+  stableSort(@buffer[0], @buffer[count-1], sizeof(T), cmp, sortData);
 end;
 
-
-constructor TXQVList.create(acapacity: SizeInt);
+class operator TXQValueList.Initialize(var e: TXQValueList);
 begin
-  items.init;
-  items.capacity := (acapacity);
+  e.data := nil;
 end;
 
-constructor TXQVList.create(other: TXQVCustomList);
+class operator TXQValueList.Finalize(var e: TXQValueList);
 begin
-  add(other);
+  e.release;
 end;
 
-procedure TXQVList.insert(i: SizeInt; const value: IXQValue);
+class operator TXQValueList.AddRef(var e: TXQValueList);
+begin
+  e.addRef;
+end;
+
+class operator TXQValueList.Copy(constref s: TXQValueList; var d: TXQValueList);
+begin
+  s.AddRef();
+  d.release;
+  d.data := s.data;
+end;
+
+
+procedure TXQValueList.insert(i: SizeInt; const value: IXQValue);
 var
  v: PIXQValue;
 begin
@@ -3959,7 +4170,7 @@ begin
   end;
 end;
 
-procedure TXQVList.add(const value: IXQValue);
+procedure TXQValueList.add(const value: IXQValue);
 var
  othercount: SizeInt;
  enumerator: TXQValueEnumeratorPtrUnsafe;
@@ -3971,9 +4182,9 @@ begin
       if othercount > 0 then begin
         enumerator := value.GetEnumeratorPtrUnsafe;
         //reserve(fcount + othercount);
-        oldcount := items.count;
-        items.count:=items.count + othercount;
-        enumerator.copyBlock(@fbuffer[oldcount]);
+        oldcount :=  count;
+        count := count + othercount;
+        enumerator.copyBlock(@buffer[oldcount]);
         //inc(fcount, othercount);
       end;
     end;
@@ -3984,12 +4195,12 @@ begin
       PPointer(fbuffer)[fcount] := value;
       value._AddRef;
       fcount += 1;}
-      items.add(value);
+      addInArray(value);
     end;
   end;
 end;
 
-procedure TXQVList.addOrdered(const node: IXQValue);
+procedure TXQValueList.addOrdered(const node: IXQValue);
 var
  a,b,m, cmp: SizeInt;
  s: PIXQValue;
@@ -4031,14 +4242,16 @@ begin
       end;
     end;
     pvkUndefined: ;
-    pvkSequence:
+    pvkSequence: begin
+      reserve(count + node.Count);
       for s in node.GetEnumeratorPtrUnsafe do
         addOrdered(s^); //TODO: optimize
+    end
     else raise EXQEvaluationException.Create('pxp:INTERNAL', 'invalid merging');
   end;
 end;
 
-procedure TXQVList.add(node: TTreeNode);
+procedure TXQValueList.add(node: TTreeNode);
 //var
 //  temp: TXQValueNode; //faster than ixqvalue
 begin
@@ -4051,40 +4264,60 @@ begin
   fcount += 1;}
 end;
 
-procedure TXQVList.add(list: TXQVCustomList);
+procedure TXQValueList.add(list: TXQValueList);
 var
   i, oldcount: SizeInt;
+  otherbuffer: PT;
 begin
   oldcount := count;
   count := count + list.count;
   //reserve(count + list.Count);
-  for i := 0 to list.Count - 1 do list.fbuffer[i].AddRef();
-  move(list.fbuffer[0], fbuffer[oldcount], list.Count * sizeof(IXQValue));
+  otherbuffer := list.buffer;
+  for i := 0 to list.Count - 1 do otherbuffer[i].AddRef();
+  move(otherbuffer[0], buffer[oldcount], list.Count * sizeof(IXQValue));
 end;
 
-procedure TXQVList.addOrdered(list: TXQVList);
+procedure TXQValueList.addOrdered(list: TXQValueList);
 var
   i: SizeInt;
+  otherbuffer: PT;
 begin
-  for i := 0 to list.Count - 1 do addOrdered(list.fbuffer[i]);
+  otherbuffer := list.buffer;
+  reserve(count + list.count);
+  for i := 0 to list.Count - 1 do addOrdered(otherbuffer[i]);
 end;
 
-function TXQVList.stringifyNodes: TXQVList;
+function TXQValueList.stringifyNodes: TXQValueList;
 var
   i: SizeInt;
+  fbuffer: PT;
 begin
-  result := TXQVList.create(Count);
+  result := TXQValueList.create(Count);
+  fbuffer := buffer;
   for i := 0 to Count - 1 do
     result.add(fbuffer[i].stringifyNodes);
 end;
 
-function TXQVList.hasNodes: boolean;
+function TXQValueList.hasNodes: boolean;
 var
   i: SizeInt;
+  fbuffer: PT;
 begin
+  fbuffer := buffer;
   for i := 0 to Count - 1 do
     if fbuffer[i].hasNodes then exit(true);
   result := false;
+end;
+
+function TXQValueList.toXQValueArray: IXQValue;
+begin
+  AddRef();
+  result := IXQValue.create(pvkArray, xstJSONiqArray, TXQBoxedArray.create2(self));
+end;
+
+function TXQValueList.toXQValueSequenceSqueezed: IXQValue;
+begin
+  xqvalueSeqSqueezed(result, self);
 end;
 
 
@@ -4210,12 +4443,12 @@ end;
 function xqvalue(sl: TStringList): IXQValue;
 var
   i: SizeInt;
-  list: TXQVList;
+  list: TXQValueList;
 begin
   if sl.Count = 0 then exit(xqvalue());
   if sl.Count = 1 then exit(xqvalue(sl[0]));
 
-  list := TXQVList.create(sl.Count);
+  list := TXQValueList.create(sl.Count);
   for i:=0 to sl.Count - 1 do
     list.add(xqvalue(sl[i]));
   xqvalueSeqSqueezed(result, list)
@@ -4250,10 +4483,10 @@ end;
 
 function xqvalue(const sl: array of string): IXQValue;
 var
-  resseq: TXQVList;
+  resseq: TXQValueList;
   i: SizeInt;
 begin
-  resseq := TXQVList.create(length(sl));
+  resseq := TXQValueList.create(length(sl));
   for i := 0 to high(sl) do
     resseq.add(xqvalue(sl[i], xstUntypedAtomic));
   xqvalueSeqSqueezed(result, resseq);
@@ -4261,10 +4494,10 @@ end;
 
 function xqvalue(const sl: array of IXQValue): IXQValue;
 var
-  resseq: TXQVList;
+  resseq: TXQValueList;
   i: SizeInt;
 begin
-  resseq := TXQVList.create(length(sl));
+  resseq := TXQValueList.create(length(sl));
   for i := 0 to high(sl) do
     resseq.add(sl[i]);
   xqvalueSeqSqueezed(result, resseq);
@@ -4272,13 +4505,19 @@ end;
 
 function xqvalue(const s: TXQHashsetStr): IXQValue;
 var
-  resseq: TXQVList;
+  resseq: TXQValueList;
   k: string;
 begin
-  resseq := TXQVList.create(s.Count);
+  resseq := TXQValueList.create(s.Count);
   for k in s do
     resseq.add(xqvalue(k));
   xqvalueSeqSqueezed(result, resseq);
+end;
+
+function xqvalueArray(var l: TXQValueList): IXQValue;
+begin
+  l.AddRef();
+  result := IXQValue.create(pvkArray, xstJSONiqArray, TXQBoxedArray.create2(l));
 end;
 
 function xqvalue(v: TTreeNode): IXQValue;
@@ -4299,22 +4538,22 @@ begin
   v := v.get(1);
 end;
 
-function xqvalueSeqSqueezed(l: TXQVList): IXQValue;
+function xqvalueSeqSqueezed(l: TXQValueList): IXQValue;
 begin
   xqvalueSeqSqueezed(result, l);
 end;
 
-procedure xqvalueSeqSqueezed(out result: IXQValue; l: TXQVList);
+procedure xqvalueSeqSqueezed(out result: IXQValue; var l: TXQValueList);
 begin
   case l.Count of
     0: result := xqvalue();
     1: result := l[0];
     else begin
-      result := IXQValue.create(pvkSequence, xstNoType, TXQBoxedSequence.create(l));
+      l.AddRef();
+      result := IXQValue.create(pvkSequence, xstNoType, TXQBoxedSequence.create2(l));
       exit;
     end;
   end;
-  l.free;
 end;
 
 procedure xqvalueSeqConstruct(var result: IXQValue; var seq: TXQBoxedSequence; const add: IXQValue);
@@ -5647,10 +5886,10 @@ end;
 function TXQVariableChangeLog.getAll(const name: string;  const namespaceURL: string): IXQValue;
 var
   i: SizeInt;
-  list: TXQVList;
+  list: TXQValueList;
 begin
   result := xqvalue();
-  list := TXQVList.create();
+  list := TXQValueList.create();
   for i:=0 to count - 1 do
     if (varstorage[i].name = name) and (varstorage[i].namespaceURL = namespaceURL) then
       list.add(varstorage[i].value);
@@ -5724,7 +5963,7 @@ var
   i: SizeInt;
   pv: PIXQValue;
   xhasNodes: Boolean;
-  list: TXQVList;
+  list: TXQValueList;
 begin
   for i:=0 to count-1 do
     case varstorage[i].value.kind of
@@ -5737,7 +5976,7 @@ begin
             break;
           end;
         if xhasNodes then begin
-          list := txqvlist.create(varstorage[i].value.getSequenceCount);
+          list := TXQValueList.create(varstorage[i].value.getSequenceCount);
           for pv in varstorage[i].value.GetEnumeratorPtrUnsafe do
             if pv^.kind = pvkNode then list.add(xqvalue(pv^.toString))
             else list.add(pv^);
@@ -5964,7 +6203,7 @@ end;
 
 procedure TXQEvaluationStack.push(const value: ixqvalue);
 begin
-  items.add(value);
+  list.addInArray(value);
 {  if fcount >= fcapacity then
     reserve(fcount + 1);         }
   {
@@ -5974,51 +6213,78 @@ begin
 end;
 
 procedure TXQEvaluationStack.pop();
+var
+  oldcount: SizeInt;
 begin
-  items.deleteLast;
-{  assert(fcount > 0);
-  fbuffer[fcount-1].clear;
-  fcount := fcount - 1;}
+  oldcount := count;
+  assert(oldcount > 0);
+  buffer[oldcount-1].clear;
+  TXQValueList.PHeader(list.data).count := oldcount - 1;
 end;
 
 procedure TXQEvaluationStack.popTo(newCount: SizeInt);
-var
-  i: SizeInt;
 begin
-  assert(newCount <= fcount);
-  items.count := newCount;
-{  for i := newCount to fcount - 1 do
-    fbuffer[i].release;
-  FillChar(fbuffer[newCount], sizeof(fbuffer[newCount]) * (fcount - newCount), 0);
-  fcount := newCount;}
+  list.count := newCount;
 end;
 
 function TXQEvaluationStack.top(i: SizeInt): IXQValue;
 begin
+  with list do begin
   assert((i >= 0) and (count - i - 1 >= 0));
-  result := fbuffer[count - i - 1];
+  result := buffer[count - i - 1];
+  end;
 end;
 
 function TXQEvaluationStack.topptr(i: SizeInt): PIXQValue;
 begin
-  result := @fbuffer[count - i - 1];
+  with list do
+  result := @buffer[count - i - 1];
 end;
 
 
 procedure TXQEvaluationStack.push(const name: TXQTermVariable; const v: ixqvalue);
 begin
+  with list do begin
   {$ifdef TRACK_STACK_VARIABLE_NAMES}
-  if fcount >= length(debugNames) then
+  if count >= length(debugNames) then
    setlength(debugNames, length(debugNames) + 128);
-  debugNames[fcount] := name.value;
+  debugNames[count] := name.value;
   {$endif}
   push(v);
+  end;
 end;
 
 procedure TXQEvaluationStack.failTop(const name: TXQTermVariable; i: SizeInt);
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
 end;
+
+function TXQEvaluationStack.getBuffer: PIXQValue;
+begin
+  result := list.buffer;
+end;
+
+function TXQEvaluationStack.getCount: sizeint;
+begin
+  result := list.count;
+end;
+
+constructor TXQEvaluationStack.create(acapacity: SizeInt);
+begin
+  list := TXQValueList.create(acapacity);
+end;
+{class function TXQEvaluationStack.create(acapacity: SizeInt): TXQEvaluationStack;
+begin
+  result.data := TXQValueList.create(acapacity).data;
+end;
+}
+destructor TXQEvaluationStack.Destroy;
+begin
+  list.destroy;
+  inherited Destroy;
+end;
+
+
 function TXQEvaluationStack.top(const name: TXQTermVariable; i: SizeInt): IXQValue;
 begin
   result := top(i);
@@ -6141,56 +6407,77 @@ begin
   //result := nil; //hide warning
 end;
 
-procedure TXQJsonParser.setCurrentContainer;
-begin
-  if containerCount > 0 then
-    currentContainer := containerStack[containerCount-1]
-   else
-    currentContainer := nil;
-end;
-
-function TXQJsonParser.pushContainer(container: TXQBoxedValue): TXQBoxedValue;
+function TXQJsonParser.pushContainer(isArray: boolean; container: pointer): pointer;
 begin
   if length(containerStacK) = containerCount then
     if containerCount < 16 then setlength(containerstack, 16)
     else setlength(containerstack, containercount * 2);
-  containerStack[containerCount] := container;
+  containerStack[containerCount].isArray := isArray;
+  if isArray then begin
+    containerStack[containerCount].placeholderInserted := pushValue(xqvalue);
+    containerStack[containerCount].objectKey := currentObjectKey;
+    containerStack[containerCount].list := container;
+  end else begin
+    containerStack[containerCount].map := TXQBoxedStringMap(container);
+    pushValue(containerStack[containerCount].map.boxInIXQValue);
+  end;
   inc(containerCount);
   result := container;
 end;
 
 function TXQJsonParser.popContainer: TJSONParsingPhase;
+  procedure pushArrayOverride;
+  var
+    a: IXQValue;
+  begin
+    a := containerStack[containerCount].list.toXQValueArray;
+    Dispose(containerStack[containerCount].list);
+    containerStack[containerCount].list := nil;
+
+    if not containerStack[containerCount].placeholderInserted then
+      exit;
+    case result of
+      jppRoot: outputSeq[outputseq.count - 1] := a;
+      jppArrayExpectComma: containerStack[containerCount-1].list^[containerStack[containerCount-1].list.count - 1] := a;
+      jppObjectExpectComma: containerStack[containerCount-1].map.setMutable(containerStack[containerCount].objectKey, a);
+    end;
+  end;
+
 begin
   if containerCount = 0 then raiseError('Unexpected closing parenthesis');
   containerCount -= 1;
-  setCurrentContainer;
-  if currentContainer = nil then result := jppRoot
-  else if currentContainer.ClassType = TXQBoxedArray then result := jppArrayExpectComma
+  if containerCount = 0 then result := jppRoot
+  else if containerStack[containerCount - 1].isArray then result := jppArrayExpectComma
   else result := jppObjectExpectComma;
+
+  if containerStack[containerCount].isArray then
+    pushArrayOverride();
 end;
 
-procedure TXQJsonParser.pushValue(const v: ixqvalue);
+function TXQJsonParser.pushValue(const v: ixqvalue): boolean;
 var
-  hadResult: Boolean;
+  currentContainer: PXQJsonContainer;
 begin
+  result := true;
   case parsingPhase of
     jppArrayExpectValue: begin
-      if currentContainer.classType <> TXQBoxedArray then raiseError();
-      TXQBoxedArray(currentContainer).seq.addInArray(v);
+      currentContainer := @containerStack[containerCount - 1];
+      if not currentContainer.isArray then raiseError();
+      currentContainer.list.addInArray(v);
       parsingPhase := jppArrayExpectComma;
     end;
     jppObjectExpectValue: begin
-      if currentContainer.classType <> TXQBoxedStringMap then raiseError();
+      currentContainer := @containerStack[containerCount - 1];
+      if currentContainer.isArray then raiseError();
       parsingPhase := jppObjectExpectComma;
-      if (duplicateResolve <> xqmdrUseLast) and TXQBoxedStringMap(currentContainer).hasProperty(currentObjectKey) then
-        if duplicateResolve = xqmdrUseFirst then exit
+      if (duplicateResolve <> xqmdrUseLast) and currentContainer.map.hasProperty(currentObjectKey) then
+        if duplicateResolve = xqmdrUseFirst then exit(false)
         else raiseError('Duplicate key', 'FOJS0003');
-      TXQBoxedStringMap(currentContainer).setMutable(currentObjectKey, v);
+      currentContainer.map.setMutable(currentObjectKey, v);
     end;
     jppRoot: begin
-      hadResult := not outputResult.isUndefined;
-      xqvalueSeqConstruct(outputResult, outputSeq, v);
-      if hadResult and not (jpoAllowMultipleTopLevelItems in options) then
+      outputSeq.addInArray(v);
+      if (outputSeq.count > 1) and not (jpoAllowMultipleTopLevelItems in options) then
         raiseError();
     end;
     jppArrayExpectComma,
@@ -6202,14 +6489,12 @@ end;
 {$ImplicitExceptions off}
 procedure TXQJsonParser.readArray;
 begin
-  pushValue(TXQBoxedArray(pushContainer(TXQBoxedArray.create())).boxInIXQValue);
-  setCurrentContainer;
+  pushContainer(true, TXQValueList.createNew);
 end;
 
 procedure TXQJsonParser.readObject;
 begin
-  pushValue(TXQBoxedStringMap(pushContainer(TXQBoxedStringMap.create())).boxInIXQValue);
-  setCurrentContainer
+  pushContainer(false, TXQBoxedStringMap.create());
 end;
 
 procedure TXQJsonParser.readArrayEnd(var newParsingPhase: TJSONParsingPhase);
@@ -6368,11 +6653,9 @@ function TXQJsonParser.parse(const data: string): IXQValue;
 var i: SizeInt;
 begin
   result.clear;
-  currentContainer := nil;
   containerStack := nil;
   containerCount := 0;
-  outputSeq := nil;
-  outputResult.clear;
+  outputSeq := TXQValueList.create(1);
   try
     try
       inherited parse(data);
@@ -6385,11 +6668,11 @@ begin
       raiseError('unclosed');
     end;
 
-    result := outputResult;
+    result := outputSeq.toXQValueSequenceSqueezed;
   finally
     for i := containerCount - 1 downto 0 do //this prevents a crash on deeply nested invalid inputs in nst's JSONTestSuite. Still could not be used for valid inputs as the recursive free crashes later.
-      containerStack[i].free;
-    outputResult.clear;
+      if containerStack[i].isArray then dispose(containerStack[i].list);
+//      else TXQBoxedStringMap(containerStack[i].map).free;}
     disposeFallbackFunctionCaller;
   end;
 end;
@@ -7574,13 +7857,12 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
   procedure convertFunctionTestSequence;
   var
     temp: IXQValue;
-    seq: TXQVList;
+    seq: TXQValueList;
     pv: PIXQValue;
   begin
     checkSequenceCount;
     temp := result;
-    seq := TXQVList.create(temp.getSequenceCount);
-    result := TXQBoxedSequence.create(seq).boxInIXQValue;
+    seq := TXQValueList.create(temp.getSequenceCount);
     for pv in temp.GetEnumeratorPtrUnsafe do begin
       case pv.kind of
         pvkFunction:
@@ -7592,7 +7874,7 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
           term.raiseTypeError0004('Expected function', pv^);
       end;
     end;
-    xqvalueSeqSqueeze(result);
+    result := xqvalueSeqSqueezed(seq);
   end;
 
   function atomizeAndCastSingle(const w: IXQValue): IXQValue;
@@ -8844,7 +9126,7 @@ begin
 end;
 
 
-class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; outList: TXQVList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);
+class procedure TXQueryEngine.filterSequence(const sequence: IXQValue; var outList: TXQValueList; const filter: TXQPathMatchingStepFilter; var context: TXQEvaluationContext);
 var
  v: PIXQValue;
  i, backupA, backupB: SizeInt;
@@ -8902,34 +9184,28 @@ end;
 
 class procedure TXQueryEngine.filterSequence(var result: IXQValue; const filter: TXQPathMatchingStepFilters; var context: TXQEvaluationContext);
 var i:SizeInt;
-  list1, list2, temp: TXQVList;
-  seq1, seq2: IXQValue;
+  list1, list2: TXQValueList;
+  temp: pointer;
 begin
   case length(filter) of
     0: exit;
     1: ;
-    else begin
-      list2 := TXQVList.create();
-      seq2 := TXQBoxedSequence.create(list2).boxInIXQValue;
-    end;
+    else list2 := TXQValueList.create();
   end;
-  list1 := TXQVList.create();
-  seq1 := TXQBoxedSequence.create(list1).boxInIXQValue;
+  list1 := TXQValueList.create();
 
   filterSequence(result, list1, filter[0], context);
   for i:=1 to high(filter) do begin
-    xqswap(seq1, seq2{%H-}); //hide unitialized warning, since this only happens if length(filter) > 1
-    temp := list1; list1 := {%H-}list2; list2 := temp;
-    filterSequence(seq2, list1, filter[i], context);
+    temp := list1.data; list1.data := list2.data; list2.data := temp;
+    filterSequence(xqvalueSeqSqueezed(list2), list1, filter[i], context);
   end;
-  result := seq1;
-  xqvalueSeqSqueeze(result);
+  result := xqvalueSeqSqueezed(list1);
 end;
 
 
 class function TXQueryEngine.expandSequence(const previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
 var oldnode,newnode: TTreeNode;
-    newList: TXQVList;
+    newList: TXQValueList;
     nodeCondition: TXQPathNodeCondition;
 
 procedure jsoniqDescendants(const v: IXQValue; const searchedProperty: string);
@@ -8958,13 +9234,12 @@ begin
 end;
 
 var
-    newList2: TXQVList;
-    newListSeq, newListSeq2: IXQValue;
+    newList2: TXQValueList;
 
-  function filter(const v: IXQValue): TXQVList;
+  function filter(const v: IXQValue): TXQValueList;
   var
     i, lastfilter: SizeInt;
-    temp: TXQVList;
+    temp: pointer;
   begin
     //filtering is done with a swap list approach
     //first v is filtered and the output written in list 1
@@ -8978,17 +9253,16 @@ var
       lastfilter := lastfilter - lastfilter and 1;
       while i <= lastfilter do begin
         //technically this does not swap. It can considered to be the loop of the swap approach unrolled, so that it behaves as if it was swapping
-        filterSequence(newListSeq2, newList, command.filters[i], context);
+        filterSequence(xqvalueSeqSqueezed(newList2), newList, command.filters[i], context);
         inc(i);
-        filterSequence(newListSeq, newList2, command.filters[i], context);
+        filterSequence(xqvalueSeqSqueezed(newList), newList2, command.filters[i], context);
         inc(i);
       end;
       if length(command.filters) and 1 = 0 then begin
-        filterSequence(newListSeq2, newList, command.filters[high(command.filters)], context);
-        xqswap(newListSeq, newListSeq2);
-        temp := newList;
-        newList := newList2;
-        newList2 := temp;
+        filterSequence(xqvalueSeqSqueezed(newList2), newList, command.filters[high(command.filters)], context);
+        temp := newList.data;
+        newList.data := newList2.data;
+        newList2.data := temp;
       end;
     end;
     result := newList2;
@@ -9000,15 +9274,16 @@ var
   tempContext: TXQEvaluationContext;
   onlyNodes: boolean;
   n: PIXQValue;
-  resultSeq: TXQBoxedSequence;
+  resultList: TXQValueList;
 
   tempNamespace: TNamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
   namespaceMatching: TXQNamespaceMode;
-  tempList: TXQVList;
+  tempList: TXQValueList;
   pv: PIXQValue;
   attrib: TTreeNode;
+  tempListBuffer: PIXQValue;
 
 
 
@@ -9016,7 +9291,7 @@ var
 begin
   if (previous.getSequenceCount = 0) then exit(previous);
 
-  resultSeq:=TXQBoxedSequence.create(previous.getSequenceCount);
+  resultList:=TXQValueList.create(previous.getSequenceCount);
   try
     if command.typ = tneaFunctionSpecialCase then begin
       tempContext := context;
@@ -9038,13 +9313,10 @@ begin
       namespaceMatching := xqnmURL;
     end else namespaceMatching := xqnmNone;
 
-    newList := TXQVList.create();
-    newListSeq := TXQBoxedSequence.create(newList).boxInIXQValue;
-    if length(command.filters) > 0 then begin
-      newList2 := TXQVList.create();
-      newListSeq2 := TXQBoxedSequence.create(newList2).boxInIXQValue;
-    end else
-      tempList := newList; //no filter, no need to copy lists
+    newList := TXQValueList.create();
+    if length(command.filters) > 0 then
+      newList2 := TXQValueList.create();
+
 
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
     onlyNodes := false;
@@ -9058,6 +9330,7 @@ begin
           tempContext.SeqValue := n^;
           if n^.kind = pvkNode then tempContext.extensionContext := nil;
           newList.add(command.specialCase.evaluate(tempContext));
+          //writeln('      ',newList[newList.count - 1].toString);
         end;
         tneaAttribute: begin
           oldnode := n^.toNode;
@@ -9144,29 +9417,27 @@ begin
         case newList.Count of
           0: continue;
           1: tempList := filter(newList[0]);
-          else tempList := filter(newListSeq);
+          else tempList := filter(xqvalueSeqSqueezed(newList));
         end;
-      end;
+      end else tempList := newList; //no filter, no need to copy lists
 
       if tempList.Count = 0 then continue;
       if command.typ in [tneaAncestor,tneaSameOrAncestor,tneaPreceding,tneaPrecedingSibling] then
         tempList.revert; //revert the list, because it is now in ancestor order (needed for indices in filtering), but need to be returned in document order
 
-      if resultSeq.seq.Count = 0 then onlyNodes := tempList[0].kind = pvkNode;
+      if resultList.Count = 0 then onlyNodes := tempList[0].kind = pvkNode;
+      tempListBuffer := tempList.buffer;
       for i := 0 to tempList.Count - 1 do
-        if (tempList.fbuffer[i].kind = pvkNode) <> onlyNodes then
+        if (tempListBuffer[i].kind = pvkNode) <> onlyNodes then
           raise EXQEvaluationException.Create(IfThen(lastExpansion, 'XPTY0018', 'XPTY0019'), 'Nodes and non-node values must not be mixed in step expressions');
-      if onlyNodes then resultSeq.seq.addOrdered(tempList)
-      else resultSeq.seq.add(tempList);
+      if onlyNodes then resultList.addOrdered(tempList)
+      else resultList.add(tempList);
     end;
 
   except
-    resultSeq.free;
     raise;
   end;
-
-  result := resultSeq.boxInIXQValue;
-  xqvalueSeqSqueeze(result);
+  result := xqvalueSeqSqueezed(resultList);
   //writeln('new seq (',result.getSequenceCount,'): ');
   //for pv in result.GetEnumeratorPtrUnsafe do write(pv^.toString, ', ');
   //writeln;

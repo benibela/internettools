@@ -275,14 +275,14 @@ end;
 function TXQTermReadObjectProperty.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   obj: IXQValue;
-  seq: TXQVList;
+  seq: TXQValueList;
   v: PIXQValue;
 begin
   if length(children) = 0 then raiseEvaluationError('pxp:OBJ', 'Found no term to read property from');
   if length(children) > 1 then raiseEvaluationError('pxp:OBJ', 'Can only read property from one term');
   obj:=children[0].evaluate(context);
 
-  seq := TXQVList.create(obj.getSequenceCount);
+  seq := TXQValueList.create(obj.getSequenceCount);
   for v in obj.GetEnumeratorPtrUnsafe do
     if v^.kind = pvkObject then
        seq.add(v^.getProperty(propname));
@@ -424,18 +424,15 @@ end;
 
 function TXQTermFilterSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var temp: TXQPathMatchingStepFilter;
-  list: TXQVList;
-  seq: TXQBoxedSequence;
+  list: TXQValueList;
 begin
-  list := TXQVList.create();
-  seq := TXQBoxedSequence.create(list);
-  result := seq.boxInIXQValue;
+  list := TXQValueList.create();
 
   temp.filter := children[1];
   temp.dependencies := temp.filter.getContextDependencies;
 
   TXQueryEngine.filterSequence(children[0].evaluate(context), list, temp, context);
-  xqvalueSeqSqueeze(result);
+  result := xqvalueSeqSqueezed(list);
 end;
 
 function TXQTermFilterSequence.getContextDependencies: TXQContextDependencies;
@@ -1391,41 +1388,41 @@ end;
 function TXQTermJSONArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  tempSeq: TXQBoxedArray;
+  tempSeq: TXQValueList;
 begin
-  tempSeq := TXQBoxedArray.create(length(children));
+  tempSeq := TXQValueList.create(length(children));
   for i := 0 to high(children) do
     tempSeq.add(children[i].evaluate(context));
-  result := tempSeq.boxInIXQValue;
+  result := tempSeq.toXQValueArray;
 end;
 
 
 function TXQTermArray3_1.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  list: TXQVList;
+  list: TXQValueList;
 begin
-  list := TXQVList.create(length(children));
-  result := TXQBoxedArray.create(list).boxInIXQValue;
+  list := TXQValueList.create(length(children));
   for i := 0 to high(children) do
     list.addInArray(children[i].evaluate(context));
+  result := list.toXQValueArray;
 end;
 
 
 function TXQTermJSONiqArray.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  tempSeq: TXQBoxedArray;
+  tempSeq: TXQValueList;
   v: IXQValue;
 begin
-  tempSeq := TXQBoxedArray.create(length(children));
-  result := tempSeq.boxInIXQValue;
+  tempSeq := TXQValueList.create(length(children));
   for i := 0 to high(children) do begin
     v := children[i].evaluate(context);
     if (v.kind = pvkNode) and (v.toNode.getParent() <> nil) then
       v := xqvalue(context.staticContext.needTemporaryNodes.addClone(v.toNode));
     tempSeq.add(v);
   end;
+  result := tempSeq.toXQValueArray;
 end;
 
 
@@ -2317,11 +2314,11 @@ var
               end else begin
                 varIndex := hasStaticVariable(log.getName(i), log.varstorage[i].namespaceURL);
                 if varIndex > -1 then begin
-                  context.temporaryVariables.fbuffer[curcount + varIndex] := log.get(i);
+                  context.temporaryVariables.buffer[curcount + varIndex] := log.get(i);
                   if needFullTuple then
                     currentTuple.vars[clauseIndex[pos]+varIndex] := log.get(i);
                   evaluateForLoop(pos+1);
-                  context.temporaryVariables.fbuffer[curcount + varIndex] := empty;
+                  context.temporaryVariables.buffer[curcount + varIndex] := empty;
                 end;
               end;
             end;
@@ -2427,7 +2424,7 @@ var
     lastTuple: TOrderedTuple;
     //Grouping collects for all tuples that have the same value in the grouping vars all values of the nonGroupingVars
     //We put these values for each nonGroupingVars in a tempList
-    tempLists: array of TXQVList = nil;
+    tempLists: array of TXQValueList = nil;
     nonGroupingVars: array of SizeInt = nil;
 
     procedure closeGroupedTuple;
@@ -2438,8 +2435,7 @@ var
           0: lastTuple.vars[k] := xqvalue();
           1: lastTuple.vars[k] := tempLists[k][0];
           else begin
-            lastTuple.vars[k] := TXQBoxedSequence.create(tempLists[k]).boxInIXQValue;
-            tempLists[k] := nil;
+            lastTuple.vars[k] := tempLists[k].toXQValueSequenceSqueezed;
           end;
         end;
     end;
@@ -2451,8 +2447,7 @@ var
       sortingCache.Add(oldSortingCache[i]);
       lastTuple := TOrderedTuple(oldSortingCache[i]);
       for k in nonGroupingVars do begin
-        if tempLists[k] = nil then tempLists[k] := TXQVList.create(1)
-        else tempLists[k].clear;
+        tempLists[k] := TXQValueList.create(1);
         tempLists[k].add(lastTuple.vars[k]);
       end;
     end;
@@ -2510,7 +2505,7 @@ var
         inc(i);
       end;
       closeGroupedTuple;
-      for k in nonGroupingVars do tempLists[k].free;
+      for k in nonGroupingVars do tempLists[k].release;
       oldSortingCache.free;
     end;
 
@@ -3027,7 +3022,7 @@ var
   index: IXQValue;
   ara: TXQBoxedArray;
   i, stackSize: SizeInt;
-  resultSeq: TXQVList;
+  resultSeq: TXQValueList;
   v: PIXQValue;
   funcref: TXQBoxedFunction;
   numindex: Int64;
@@ -3054,7 +3049,7 @@ begin
   end;
 
   if length(children) = 1 then begin
-    resultSeq := TXQVList.create();
+    resultSeq := TXQValueList.create();
     for v in func.GetEnumeratorPtrUnsafe do begin
       case v^.kind of
         pvkObject:
@@ -3073,7 +3068,7 @@ begin
 
   if Length(children) <> 2 then raiseEvaluationError('JNTY0018', 'Multiple array indices or object prop given');
   index := children[1].evaluate(context);
-  resultSeq := TXQVList.create();
+  resultSeq := TXQValueList.create();
   for v in func.GetEnumeratorPtrUnsafe do
     case v^.kind of
       pvkArray: begin
@@ -3212,7 +3207,7 @@ end;
 function TXQTermSimpleMap.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   seq, oldContextItem: IXQValue;
-  list: TXQVList;
+  list: TXQValueList;
   oldSeqIndex, oldSeqLength: SizeInt;
   pv: PIXQValue;
   oldExtension: PXQExtensionEvaluationContext;
@@ -3223,20 +3218,15 @@ begin
   context.extensionContext := nil;
   context.SeqIndex := 1;
   context.SeqLength := seq.getSequenceCount;
-  list := TXQVList.create(context.SeqLength);
+  list := TXQValueList.create(context.SeqLength);
   context.SeqValue.clear;
   try
-    try
-      for pv in seq.GetEnumeratorPtrUnsafe do begin
-        xqvalueMoveNoRefCount(pv^, context.SeqValue);
-        list.add(children[1].evaluate(context));
-        context.SeqIndex += 1;
-      end;
-      xqvalueSeqSqueezed(result, list)
-    except
-      list.free;
-      raise;
+    for pv in seq.GetEnumeratorPtrUnsafe do begin
+      xqvalueMoveNoRefCount(pv^, context.SeqValue);
+      list.add(children[1].evaluate(context));
+      context.SeqIndex += 1;
     end;
+    xqvalueSeqSqueezed(result, list)
   finally
     xqvalueVaporize(context.SeqValue);
     context.setContextItem(oldContextItem,oldSeqIndex,oldSeqLength);
@@ -4681,9 +4671,7 @@ begin
     exit(IXQValue.create(pvkNull, xstJSONiqNull, nil));
   if v.kind = pvkSequence then
     if v.getSequenceCount > 1 then begin
-      a := TXQBoxedArray.create(v.getSequenceCount);
-      result := a.boxInIXQValue;
-      a.seq.add(v);
+      result := v.toXQVList.toXQValueArray;
       exit;
     end else v := v.get(1);
   if v.kind = pvkNode then

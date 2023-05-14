@@ -2553,49 +2553,44 @@ function xqFunctionMatches(const context: TXQEvaluationContext; argc: sizeint; a
 var temp: THtmlTemplateParser;
     template, html: IXQValue;
     cols: TXQVariableChangeLog;
-    list: TXQVList;
+    list: TXQValueList;
 begin
   requiredArgCount(argc, 2);
-  list := TXQVList.create();
+  list := TXQValueList.create();
+  temp := THtmlTemplateParser.create; //TODO: optimize
   try
-    temp := THtmlTemplateParser.create; //TODO: optimize
-    try
-      temp.TemplateParser.parsingModel:=pmHTML;
-      temp.TemplateParser.repairMissingStartTags:=false;
+    temp.TemplateParser.parsingModel:=pmHTML;
+    temp.TemplateParser.repairMissingStartTags:=false;
 
-      temp.QueryEngine.StaticContext.Free;
-      temp.QueryEngine.StaticContext := context.staticContext.clone();
-      temp.QueryEngine.staticContext.sender := temp.QueryEngine;
-      temp.FQueryContext.staticContext := temp.QueryEngine.StaticContext;
-      temp.KeepPreviousVariables:=kpvForget;
-      temp.OutputEncoding:=context.staticContext.stringEncoding;
-      for template in argv[0] do begin
-        if template.kind = pvkString then temp.parseTemplate(template.toString)
-        else if template.kind = pvkNode then temp.parseTemplate(template.toNode.outerXML())
-        else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.toXQuery());
-        for html in argv[1] do begin
-          if html.kind <> pvkNode then
-            raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.toXQuery());
-          temp.FHtmlTree := html.toNode;
-          if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match pattern to html');
-          cols := temp.VariableChangeLogCondensed.collected;
-          try
-            if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
-              list.add(cols.get(0))
-            else
-             list.add(cols.toStringMap.boxInIXQValue);
+    temp.QueryEngine.StaticContext.Free;
+    temp.QueryEngine.StaticContext := context.staticContext.clone();
+    temp.QueryEngine.staticContext.sender := temp.QueryEngine;
+    temp.FQueryContext.staticContext := temp.QueryEngine.StaticContext;
+    temp.KeepPreviousVariables:=kpvForget;
+    temp.OutputEncoding:=context.staticContext.stringEncoding;
+    for template in argv[0] do begin
+      if template.kind = pvkString then temp.parseTemplate(template.toString)
+      else if template.kind = pvkNode then temp.parseTemplate(template.toNode.outerXML())
+      else raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for patter. Expected node or string, but got: '+template.toXQuery());
+      for html in argv[1] do begin
+        if html.kind <> pvkNode then
+          raise EXQEvaluationException.Create('pxp:PATTERN', 'Invalid type for matched node. Expected node or string, but got: '+html.toXQuery());
+        temp.FHtmlTree := html.toNode;
+        if not temp.matchLastTrees then raise EXQEvaluationException.Create('pxp:TEMPLATE', 'Failed to match pattern to html');
+        cols := temp.VariableChangeLogCondensed.collected;
+        try
+          if (cols.count = 1) and (cols.getName(0) = temp.UnnamedVariableName) then
+            list.add(cols.get(0))
+          else
+           list.add(cols.toStringMap.boxInIXQValue);
 
-          finally
-            cols.free;
-          end;
+        finally
+          cols.free;
         end;
       end;
-    finally
-      temp.free;
     end;
-  except
-    list.free;
-    raise;
+  finally
+    temp.free;
   end;
   xqvalueSeqSqueezed(result, list)
 end;

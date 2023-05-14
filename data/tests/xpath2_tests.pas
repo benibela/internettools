@@ -480,7 +480,7 @@ begin
   t('r/a[exists(@wtf)]/@href', '/some/people/use/this!', '<r><a href=/some/people/use/this! wtf/></r>');
                 //path rules
   t('a/b/c/../../x/text()', '3', '<a><b><x>1</x><c><x>2</x></c></b><x>3</x></a>');
-  t('join(a//(x/text()))', '1 2 3', '');
+  t('join(a//(x/text()))', '1 2 3', ''); //if this returns 1 2, the ordered insertion like addOrdered is broken (because is found first, but reordered to be last). Perhaps inserted correctly, but the count is set wrong
   t('join(a//string(x/text()))', '3 1   2    ', '');
   t('a//x/text()', '123', ''); //if this returns 3 it is probably evaluated as a//(x/text()) and not ordered
   t('a//x/string(text())', '123', ''); //if this returns 3 it is probably evaluated as a//(x/text()) and not ordered

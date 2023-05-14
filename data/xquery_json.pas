@@ -166,9 +166,9 @@ var
   v: IXQValue;
   ara: TXQBoxedArray;
   i: SizeInt;
-  list: TXQVList;
+  list: TXQValueList;
 begin
-  list := TXQVList.create();
+  list := TXQValueList.create();
   for v in args[0] do
     if v.kind = pvkArray then begin
       ara := v.toArray;
