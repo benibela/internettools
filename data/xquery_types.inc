@@ -172,9 +172,9 @@ end;
 class operator IXQValue.Copy(constref s: IXQValue; var d: IXQValue);
 begin
   {$ifdef LOGMGM}writeln('copy ', s.toString, ' @', strFromPtr(@s),  '   =>  ', d.toString, ' @', strFromPtr(@d));{$endif}
+  s.addRef;
   d.release;
   d.encoded := s.encoded;
-  d.addRef;
 end;
 
 procedure IXQValue.addRef;

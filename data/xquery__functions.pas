@@ -4888,23 +4888,12 @@ end;
 procedure foldLeft(var f: TXQBatchFunctionCall; const iter: TXQValueEnumeratorPtrUnsafe);
 var
   v: PIXQValue;
-  i: Integer;
-  tempwtf: IXQValue;
 begin
   //fn:fold-left(fn:tail($seq), $f($zero, fn:head($seq)), $f)
   with f do
     for v in iter do begin
-{      writeln('iter');
-      write('stack: ');
-      for i := 0 to stack.count - 1 do write(stack.items[i].toString, ', ');
-      writeln;}
       stack.topptr(0)^ := v^;
-      tempwtf := call(); //why does this need a temporary variable??
-      stack.topptr(1)^ := tempwtf;//call();
-
-{      write('stack: ');
-      for i := 0 to stack.count - 1 do write(stack.items[i].toString, ', ');
-      writeln;}
+      stack.topptr(1)^ := call();
     end;
   //result is stack.topptr(1)^
 end;
@@ -4912,7 +4901,7 @@ end;
 function xqFunctionFold(const context: TXQEvaluationContext; left: boolean; args: PIXQValue): IXQValue;
 var
   i, count: SizeInt;
-  seq, tempwtf: IXQValue;
+  seq: IXQValue;
   f: TXQBatchFunctionCall;
 begin
   count := args[0].getSequenceCount;
@@ -4929,8 +4918,7 @@ begin
       // $f(fn:head($seq), fn:fold-right(fn:tail($seq), $zero, $f))
       for i := count downto 1 do begin
         stack.topptr(1)^ := seq.get(i);
-        tempwtf := call();
-        stack.topptr(0)^ := tempwtf;
+        stack.topptr(0)^ := call();
       end;
       result := f.stack.topptr(0)^;
     end;
@@ -7461,14 +7449,12 @@ var
   f: TXQBatchFunctionCall;
   list: TXQValueList;
   i: SizeInt;
-  tempwtf: IXQValue;
 begin
   list := arrayAsList(argv^);
   f.init(context, argv[2], argv[1]);
   for i := list.count -1 downto 0 do with f do begin
     stack.topptr(1)^ := list[i];
-    tempwtf := call();
-    stack.topptr(0)^ := tempwtf;
+    stack.topptr(0)^ := call();
   end;
   result := f.stack.topptr(0)^;
   f.done;
