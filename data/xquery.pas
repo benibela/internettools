@@ -327,9 +327,17 @@ type
   PXQValueList = ^TXQValueList;
   (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences *)
   TXQValueList = record
-    type THeader = record
+    type
+    TFlagsAndPadding = record
+      case boolean of
+        true: (itemsNeedNoRefCounting: boolean);
+        false: (padding: pointer);
+    end;
+
+    THeader = record
       refcount: SizeInt;
       count, capacity: SizeInt; // count
+      flagsAndPadding: TFlagsAndPadding;
     end;
     PHeader = ^THeader;
     T = IXQValue;
@@ -377,6 +385,7 @@ type
     property capacity: sizeint read getCapacity write setCapacity;
     property items[i: sizeint]: IXQValue read getitem write setItem; default;
     property buffer: PT read getBuffer;
+    function header: PHeader; inline;
 
     procedure insert(i: SizeInt; const value: IXQValue);  //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
@@ -3878,6 +3887,11 @@ begin
   result := PHeader(data).refcount;
 end;
 
+function TXQValueList.header: PHeader;
+begin
+  result := PHeader(data);
+end;
+
 function TXQValueList.getCapacity: sizeint;
 begin
   result := PHeader(data).capacity;
@@ -3978,6 +3992,7 @@ begin
   PHeader(result).refcount := 1;
   PHeader(result).count := acount;
   PHeader(result).capacity := acapacity;
+  PHeader(result).flagsAndPadding.itemsNeedNoRefCounting := false;
 end;
 
 class function TXQValueList.create(acapacity: SizeInt): TXQValueList;
@@ -4018,7 +4033,9 @@ var
   fbuffer: PIXQValue;
 begin
   fbuffer := buffer;
-  for i := 0 to count - 1 do fbuffer[i].release;
+  if not PHeader(data).flagsAndPadding.itemsNeedNoRefCounting then
+    for i := 0 to count - 1 do
+      fbuffer[i].release;
   Freemem(data);
   data := nil;
 end;

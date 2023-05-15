@@ -337,6 +337,7 @@ begin
   list.count := len32;
   resbuffer := list.buffer;
   if (f >= IXQValue.MIN_GCXQ_INT) and (t <= IXQValue.MAX_GCXQ_INT) then begin
+    list.header.flagsAndPadding.itemsNeedNoRefCounting := true;
     temp := xqvalue(BigDecimalToInt64(f));
     for idx := 0 to len32 - 1 do begin
       resbuffer[idx].encoded := temp.encoded;
@@ -2749,6 +2750,7 @@ begin
   if temp = '' then exit(xqvalue);
   if not strIsUtf8Encoded(temp) then SetCodePage(temp, CP_UTF8);
   resseq := TXQValueList.create(length(temp));
+  resseq.header.flagsAndPadding.itemsNeedNoRefCounting := true;
   for cp in strIterator(temp) do
     resseq.add(xqvalue(cp));
   result := resseq.toXQValueSequenceSqueezed;
@@ -3870,6 +3872,7 @@ begin
     i := 0;
     result.clear();
     resseq := TXQValueList.create(1);
+    resseq.header.flagsAndPadding.itemsNeedNoRefCounting := true;
     for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
       i += 1;
       if equal(v, args[1]) then
@@ -8561,6 +8564,7 @@ begin
   requiredArgCount(argc, 2);
   seq := args[0];
   resseq := TXQValueList.create(seq.Count);
+  resseq.header.flagsAndPadding.itemsNeedNoRefCounting := true;
   f.init(context, args[1]);
   pos := 1;
   for pv in seq.GetEnumeratorPtrUnsafe do begin
