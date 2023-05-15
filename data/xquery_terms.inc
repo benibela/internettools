@@ -322,11 +322,11 @@ var source: IXQValue;
   end;
 
 var
-  ar: TXQBoxedArray;
-  seq: TXQBoxedSequence;
+  seq: TXQValueList;
   i: Int64;
   pk: PIXQValue;
   w: IXQValue;
+  ar: TXQValueWeaklySharedList;
 begin
   if unary then begin
     source := context.SeqValue;
@@ -334,44 +334,44 @@ begin
   end else source := children[0].evaluate(context);
   if mode = xqtjlmParenthesized then keys := xqvalueAtomize(children[high(children)].evaluate(context))
   else keys.clear;
-  result.clear;
-  seq := nil;
+  seq := TXQValueList.create();
   for pv in source.GetEnumeratorPtrUnsafe do begin
     case pv^.kind of
       pvkArray: begin
-        ar := pv^.getDataArray;
+        ar := pv^.getDataList;
         case mode of
-          xqtjlmInteger: if (integerKey >= 1) and (integerKey <= ar.seq.Count) then xqvalueSeqConstruct(result, seq, ar.seq[integerKey - 1])
+          xqtjlmInteger: if (integerKey >= 1) and (integerKey <= ar.Count) then seq.add(ar[integerKey - 1])
                          else raiseInvalidKey('FOAY0001');
           xqtjlmName: raiseInvalidKey('XPTY0004');
           xqtjlmParenthesized:
             for pk in keys.GetEnumeratorPtrUnsafe do begin
               if not pk^.instanceOf(baseSchema.integer) and not pk^.instanceOf(baseSchema.untypedAtomic)  then raiseInvalidKey('XPTY0004');
               i := pk^.toInt64;
-              if (i >= 1) and (i <= ar.seq.Count) then xqvalueSeqConstruct(result, seq, ar.seq[i - 1])
+              if (i >= 1) and (i <= ar.Count) then seq.add(ar[i - 1])
               else raiseInvalidKey('FOAY0001');
             end;
           xqtjlmWild:
-            for pw in ar.GetEnumeratorMembersPtrUnsafe do
-              xqvalueSeqConstruct(result, seq, pw^);
+            for pw in ar.GetEnumeratorPtrUnsafe do
+              seq.add(pw^);
         end;
       end;
       pvkObject: begin
         case mode of
-          xqtjlmInteger: xqvalueSeqConstruct(result, seq, pv^.getProperty(xqvalue(integerKey)));
-          xqtjlmName: xqvalueSeqConstruct(result, seq, pv^.getProperty(propname));
+          xqtjlmInteger: seq.add(pv^.getProperty(xqvalue(integerKey)));
+          xqtjlmName: seq.add(pv^.getProperty(propname));
           xqtjlmParenthesized:
             for pk in keys.GetEnumeratorPtrUnsafe do begin
-              xqvalueSeqConstruct(result, seq, pv^.getProperty(pk^));
+              seq.add(pv^.getProperty(pk^));
             end;
           xqtjlmWild:
             for w in pv^.getEnumeratorPropertyValuesUnsafe do
-              xqvalueSeqConstruct(result, seq, w);
+              seq.add(w);
         end;
       end
     else raiseTypeError0004('Need array/map', pv^);
     end;
   end;
+  result := seq.toXQValueSequenceSqueezed;
 end;
 
 function TXQTermJSONLookup.getContextDependencies: TXQContextDependencies;
@@ -489,23 +489,23 @@ var varname: string;
     arrayIndex: SizeInt;
     value: IXQValue;
 
-    seq: TXQBoxedSequence;
+    seq: TXQValueList;
     temp: PIXQValue;
 
     procedure applyProperties;
     var i: SizeInt;
-      temp: TXQBoxedArray;
       j: SizeInt;
+      temp: TXQValueWeaklySharedList;
     begin
       for i := 0 to high(properties) do
         case value.kind of
           pvkObject: value := value.getProperty(properties[i]);
           pvkArray: begin
-            temp := value.getDataArray;
+            temp := value.getDataList;
             if not properties[i].toIntDecimalTry(j) then j := -1;
             if j < 0 then raiseEvaluationError('pxp:VAR', 'Negative array elements cannot be assigned to');
-            if (j = 0) or (j > temp.seq.Count) then value := xqvalue()
-            else value := temp.seq.items[j - 1];
+            if (j = 0) or (j > temp.Count) then value := xqvalue()
+            else value := temp.items[j - 1];
           end;
           else begin
             value := xqvalue();
@@ -569,24 +569,25 @@ begin
       applyProperties;
       if ({%H-}arrayIndex = 1) and (value.getSequenceCount <= 1) then value := result
       else if arrayIndex > value.getSequenceCount then begin
-        seq := TXQBoxedSequence.create(value);
+        seq := TXQValueList.create(2);
+        seq.add(value);
         seq.add(result);
-        value := seq.boxInIXQValue;
+        value := seq.toXQValueSequenceSqueezed;
       end
       else begin
-        seq := TXQBoxedSequence.create(max(arrayIndex, value.getSequenceCount));
-        if arrayIndex = 0 then seq.seq.add(result);
+        seq := TXQValueList.create(max(arrayIndex, value.getSequenceCount));
+        if arrayIndex = 0 then seq.add(result);
         for temp in value.GetEnumeratorPtrUnsafe do begin
           dec(arrayIndex);
-          if arrayIndex <> 0 then seq.seq.add(temp^)
+          if arrayIndex <> 0 then seq.add(temp^)
           else begin
             if assignmentMode = amArrayInsert then
-              seq.seq.add(temp^);
-            seq.seq.add(result);
+              seq.add(temp^);
+            seq.add(result);
           end;
         end;
-        if arrayIndex > 0 then seq.seq.add(result);
-        value := seq.boxInIXQValue;
+        if arrayIndex > 0 then seq.add(result);
+        value := seq.toXQValueSequenceSqueezed;
       end;
     end;
     amArrayAppend:
@@ -594,9 +595,10 @@ begin
         value := Result
       else begin
        applyProperties;
-       seq := TXQBoxedSequence.create(value);
+       seq := TXQValueList.create(2);
+       seq.add(value);
        seq.add(result);
-       value := seq.boxInIXQValue;
+       value := seq.toXQValueSequenceSqueezed;
      end;
   end;
 
@@ -1321,7 +1323,7 @@ end;
 function TXQTermSequence.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   i: SizeInt;
-  tempSeq: TXQBoxedSequence;
+  tempSeq: TXQValueList;
   targetLength, ccount, stacksize: SizeInt;
   stack: TXQEvaluationStack;
   evilkids: PIXQValue;
@@ -1348,10 +1350,10 @@ begin
         end;
     end
     else begin
-      tempSeq := TXQBoxedSequence.create(targetLength);
-      result := tempSeq.boxInIXQValue;
+      tempSeq := TXQValueList.create(targetLength);
       for i := 0 to ccount - 1 do
         tempSeq.add(evilkids[i]);
+      result := tempSeq.toXQValueSequenceSqueezed;
     end;
   end;
   stack.popTo(stacksize);
@@ -1366,16 +1368,6 @@ begin
 end;
 
 { TXQTermArray }
-
-procedure TXQBoxedArray.add(const value: IXQValue);
-begin
-  seq.add(value);
-end;
-
-function TXQBoxedArray.boxInIXQValue: IXQValue;
-begin
-  result := IXQValue.create(pvkArray, xstJSONiqArray, self);
-end;
 
 function TXQTermArrayBase.getContextDependencies: TXQContextDependencies;
 var
@@ -2079,7 +2071,7 @@ end;
 function TXQTermFlower.evaluate(var context: TXQEvaluationContext): IXQValue;
 var
   sortingCache: TFPList;
-  finalResult: TXQBoxedSequence;
+  finalResult: TXQValueList;
   currentTuple: TOrderedTuple;
   counts: array of SizeInt = nil;
 
@@ -2142,14 +2134,14 @@ var
 
       function subsequence(const from, toi: SizeInt): IXQValue;
       var
-        seq: TXQBoxedSequence;
+        seq: TXQValueList;
         i: SizeInt;
       begin
         if from = toi then exit(binding.get(from));
-        seq := TXQBoxedSequence.create(toi-from+1);
+        seq := TXQValueList.create(toi-from+1);
         for i := from to toi do
-          seq.seq.add(binding.get(i));
-        result := seq.boxInIXQValue; //should be more than 1 item since from <> toi
+          seq.add(binding.get(i));
+        result := seq.toXQValueSequenceSqueezed; //should be more than 1 item since from <> toi
       end;
 
       function checkCondition(at: SizeInt; const condition: TXQTermFlowerWindowVarsAndCondition; forceTrue: boolean = false): boolean;
@@ -2505,7 +2497,6 @@ var
         inc(i);
       end;
       closeGroupedTuple;
-      for k in nonGroupingVars do tempLists[k].release;
       oldSortingCache.free;
     end;
 
@@ -2521,8 +2512,7 @@ var i: SizeInt;
 
 begin
   //see precompute
-  finalResult := TXQBoxedSequence.create();
-  result := finalResult.boxInIXQValue;
+  finalResult := TXQValueList.create();
   oldSortingCache := nil;
   currentTuple := nil;
 
@@ -2594,7 +2584,7 @@ begin
         TOrderedTuple(sortingCache[i]).Free;
       end;
     end;
-    xqvalueSeqSqueeze(result);
+    result := finalResult.toXQValueSequenceSqueezed;
   finally
     FreeAndNil(sortingCache);
     FreeAndNil(currentTuple);
@@ -3013,19 +3003,19 @@ end;
 { TXQDynamicFunctionCall }
 
 function TXQTermDynamicFunctionCall.evaluate(var context: TXQEvaluationContext): IXQValue;
-  procedure raiseOutofBounds(numindex: int64; a: TXQBoxedArray);
+  procedure raiseOutofBounds(numindex: int64; const a: TXQValueWeaklySharedList);
   begin
-    raiseEvaluationError('FOAY0001', 'Array index out of bounds: '+inttostr(numindex)+LineEnding+'Array size: ' + inttostr(a.Size));
+    raiseEvaluationError('FOAY0001', 'Array index out of bounds: '+inttostr(numindex)+LineEnding+'Array size: ' + inttostr(a.Count));
   end;
 var
   func: IXQValue;
   index: IXQValue;
-  ara: TXQBoxedArray;
   i, stackSize: SizeInt;
   resultSeq: TXQValueList;
   v: PIXQValue;
   funcref: TXQBoxedFunction;
   numindex: Int64;
+  ara: TXQValueWeaklySharedList;
 
 begin
   //if length(children) < 2 then raiseEvaluationError('XPST0003', 'Only one argument given, need function AND arguments');
@@ -3055,9 +3045,9 @@ begin
         pvkObject:
           resultSeq.add(v.enumeratePropertyKeys());
         pvkArray: begin
-          ara := v^.getDataArray;
-          for i := 0 to ara.seq.Count-1 do
-            resultSeq.add(ara.seq[i]);
+          ara := v^.getDataList;
+          for i := 0 to ara.Count-1 do
+            resultSeq.add(ara[i]);
         end;
         else if not AllowJSONDefaultInternal then raise EXQEvaluationException.create('XPTY0004', 'Invalid type for function call: '+v^.toXQuery());
       end;
@@ -3077,12 +3067,12 @@ begin
             raiseTypeError0004('Expected integer index', index)
         end;
         numindex := index.toInt64;
-        if (numindex < 1) or (numindex > (v^.getDataArray).seq.Count) then begin
+        if (numindex < 1) or (numindex > v^.Size) then begin
           if not context.staticContext.AllowJSONiqOperations then
-            raiseOutofBounds(numindex, v^.getDataArray);
+            raiseOutofBounds(numindex, v^.getDataList);
           continue;
         end;
-        resultSeq.add((v^.getDataArray).seq[numindex-1]);
+        resultSeq.add((v^.getDataList)[numindex-1]);
       end;
       pvkObject: begin
         resultSeq.add(v^.getProperty(index));
@@ -4664,8 +4654,6 @@ end;
 
 function TXQTermJSONiqObjectConstructor.evaluate(var context: TXQEvaluationContext): IXQValue;
 function transformValue(v: IXQValue): IXQValue;
-var
-  a: TXQBoxedArray;
 begin
   if v.getSequenceCount = 0 then
     exit(IXQValue.create(pvkNull, xstJSONiqNull, nil));

@@ -126,6 +126,7 @@ var tempb: Boolean;
   randomboundary, bce1, bce2: String;
   iterator, iterator2: TXQValueEnumeratorPtrUnsafe;
   nbsp: string;
+  templist: TXQValueList;
 begin
   testid := 0;
 //  time := Now;
@@ -4417,7 +4418,10 @@ begin
 
   //test differences between value and (value)
   xqv := xqvalue(10);
-  xqw := TXQBoxedSequence.create(xqvalue(10)).boxInIXQValue;
+  templist := TXQValueList.create();
+  templist.add(xqvalue(10));
+  templist.AddRef();
+  xqw := IXQValue.create(pvkSequence, xstNoType, PPointer(@templist)^);
   if ps.StaticContext.compareAtomic(xqv,xqw) <> xqcrEqual then raise Exception.Create('eq seq');
   if ps.StaticContext.compareAtomic(xqw,xqv) <> xqcrEqual then raise Exception.Create('seq eq');
   if ps.StaticContext.compareAtomic(xqw,xqw) <> xqcrEqual then raise Exception.Create('seq seq');

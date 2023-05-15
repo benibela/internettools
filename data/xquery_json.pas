@@ -164,18 +164,18 @@ end;
 function xqFunctionMembers({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   v: IXQValue;
-  ara: TXQBoxedArray;
   i: SizeInt;
   list: TXQValueList;
+  ara: TXQValueWeaklySharedList;
 begin
   list := TXQValueList.create();
   for v in args[0] do
     if v.kind = pvkArray then begin
-      ara := v.toArray;
-      for i := 0 to ara.seq.Count-1 do
-        list.add(ara.seq[i]);
+      ara := v.toArrayMembersList;
+      for i := 0 to ara.Count-1 do
+        list.add(ara[i]);
     end;
-  xqvalueSeqSqueezed(result, list)
+  result := list.toXQValueSequenceSqueezed;
 end;
 
 function xqFunctionSize({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -185,7 +185,7 @@ begin
   a := args[0];
   if (a.kind = pvkSequence) and (a.getSequenceCount = 1) then a := a.get(1);
   if a.getSequenceCount = 0 then exit(xqvalue());
-  result := xqvalue(a.toArray.seq.Count);
+  result := xqvalue(a.Size);
 end;
 
 

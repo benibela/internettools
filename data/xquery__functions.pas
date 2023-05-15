@@ -110,15 +110,15 @@ const NonNumericKind = [pvkUndefined, pvkBoolean, pvkQName, pvkObject, pvkArray,
 
 //================================Operators=====================================
 
-function arrayAsList(const a: IXQValue): TXQValueList;
+function arrayAsList(const a: IXQValue): TXQValueWeaklySharedList;
 begin
   if a.kind <> pvkArray then raiseXPTY0004TypeError(a, 'array');
-  result := a.getDataArray.seq;
+  result := a.getDataList;
 end;
 
 function arrayHeadOrEmpty(const a: IXQValue): IXQValue;
 var
-  l: TXQValueList;
+  l: TXQValueWeaklySharedList;
 begin
   l := arrayAsList(a);
   if l.Count = 0 then result := xqvalue
@@ -2075,19 +2075,18 @@ var onlyFormsWithOverriddenValue: boolean = false;
 
     function findForms(n: TTreeNode): IXQValue;
     var
-      nodeseq: TXQBoxedSequence;
+      nodeseq: TXQValueList;
       nlast: TTreeNode;
     begin
-      nodeseq := TXQBoxedSequence.create();
-      result := nodeseq.boxInIXQValue;
+      nodeseq := TXQValueList.create();
       if n.typ in [tetOpen, tetDocument] then nlast := n.reverse
       else nlast := n.next;
       while (n <> nlast) and (n <> nil) do begin
         if (n.typ = tetOpen) and (n.hash = HTMLNodeNameHashs.form) and striEqual(n.value, 'form') then nodeseq.add(xqvalue(n));
         n := n.next;
       end;
-      if nodeseq.seq.Count = 0 then failedToFindForm();
-      xqvalueSeqSqueeze(result);
+      if nodeseq.Count = 0 then failedToFindForm();
+      result := nodeseq.toXQValueSequenceSqueezed;
     end;
 
 var requestOverride: THttpRequestParams;
@@ -2141,7 +2140,7 @@ var requestOverride: THttpRequestParams;
     end;
 
 var v: PIXQValue;
-  resseq: TXQBoxedSequence;
+  resseq: TXQValueList;
   form, overrideOptions, nresult: IXQValue;
 begin
   requiredArgCount(argc, 0, 2);
@@ -2178,15 +2177,14 @@ begin
   requestOverride.init;
   requestOverride.addXQValue(overrideOptions, context.staticContext);
 
-  resseq := TXQBoxedSequence.create();
-  result := resseq.boxInIXQValue;
+  resseq := TXQValueList.create();
   for v in form.GetEnumeratorPtrUnsafe do begin
     nresult := encodeForm(v^.toNode);
     if lastFormHadOverriddenValue or not onlyFormsWithOverriddenValue then begin
       resseq.add(nresult);
     end;
   end;
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
   requestOverride.done;
   if onlyFormsWithOverriddenValue and (result.Count = 0) then failedToFindForm();
 end;
@@ -2300,12 +2298,12 @@ var
   procedure updateContentType(const header: string);
   var
     headers: IXQValue;
-    tempSeq: TXQBoxedSequence;
+    tempSeq: TXQValueList;
     h: IXQValue;
     tempstr: String;
   begin
     headers := obj.getProperty('headers');
-    tempSeq := TXQBoxedSequence.create(headers.getSequenceCount);
+    tempSeq := TXQValueList.create(headers.getSequenceCount);
     if header <> '' then
       tempSeq.add(xqvalue(header));
     for h in headers.GetEnumeratorArrayTransparentUnsafe do begin
@@ -2313,7 +2311,7 @@ var
       if not striBeginsWith(tempstr, 'Content-Type') then
         tempSeq.add(h);
     end;
-    result := result.setImmutable('headers', tempSeq.boxInIXQValue).boxInIXQValue;
+    result := result.setImmutable('headers', tempSeq.toXQValueSequenceSqueezed).boxInIXQValue;
   end;
 
   procedure serializeRequestUrlEncoded;
@@ -2458,14 +2456,14 @@ end;
 function xqFunctionRequest_decode(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
 var paramobj: TXQBoxedStringMap;
   procedure addParam(const name, value: string);
-  var tempseq: TXQBoxedSequence;
+  var tempseq: TXQValueList;
       v: IXQValue;
   begin
     if paramobj.hasProperty(name, v) then begin
-      tempseq := TXQBoxedSequence.create(v.getSequenceCount + 1);
+      tempseq := TXQValueList.create(v.getSequenceCount + 1);
       tempseq.add(v);
       tempseq.add(xqvalue(value));
-      paramobj.setMutable(name, tempseq.boxInIXQValue);
+      paramobj.setMutable(name, tempseq.toXQValueSequenceSqueezed);
     end else paramobj.setMutable(name, value);
   end;
 
@@ -2546,7 +2544,7 @@ begin
 end;
 
 function xqFunctionResolve_Html(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;
-var resseq: TXQBoxedSequence;
+var resseq: TXQValueList;
     baseUri: String;
 
   procedure addString(const s: string);
@@ -2643,13 +2641,11 @@ begin
      if (n <> nil) and assigned(n.getDocument()) then baseUri := n.getDocument().baseURI;
   end;
 
-  resseq := TXQBoxedSequence.create();
-  result := resseq.boxInIXQValue;
+  resseq := TXQValueList.create();
   if argc > 0 then resolve(args[0])
   else if context.SeqValue.isAssigned then resolve(context.SeqValue)
   else resolve(xqvalue(context.contextNode(true)));
-
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 {$ImplicitExceptions off}
@@ -2747,16 +2743,15 @@ end;
 function xqFunctionString_to_codepoints({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var temp: RawByteString;
  cp: Integer;
- resseq: TXQBoxedSequence;
+ resseq: TXQValueList;
 begin
   temp := args[0].toString;
   if temp = '' then exit(xqvalue);
   if not strIsUtf8Encoded(temp) then SetCodePage(temp, CP_UTF8);
-  resseq := TXQBoxedSequence.create(length(temp));
+  resseq := TXQValueList.create(length(temp));
   for cp in strIterator(temp) do
     resseq.add(xqvalue(cp));
-  result := resseq.boxInIXQValue;
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 function xqFunctionBinary_To_String(argc: SizeInt; args: PIXQValue): IXQValue;
@@ -3864,7 +3859,7 @@ var
 
 var  i: sizeint;
      v: IXQValue;
-     resseq: TXQBoxedSequence;
+     resseq: TXQValueList;
 begin
   if argc = 3 then collationOverride := TXQueryEngine.getCollation(args[2].toString, context.staticContext.baseURI)
   else collationOverride := nil;
@@ -3874,12 +3869,13 @@ begin
   end else begin
     i := 0;
     result.clear();
-    resseq := nil;
+    resseq := TXQValueList.create(1);
     for v in args[0].GetEnumeratorArrayTransparentUnsafe do begin
       i += 1;
       if equal(v, args[1]) then
-        xqvalueSeqConstruct(result, resseq, xqvalue(i));
+        resseq.add(xqvalue(i));
     end;
+    result := resseq.toXQValueSequenceSqueezed;
   end;
 end;
 
@@ -4606,7 +4602,7 @@ var
   node: TTreeNode;
   attrib: TTreeAttribute;
   useTrueId: Boolean;
-  resseq: TXQBoxedSequence;
+  resseq: TXQValueList;
 begin
   ignore(parentElement); //we should give the parent element of an id-element, but atm we ignore all id-elements
   result.clear();
@@ -4628,8 +4624,7 @@ begin
 
     useTrueId := XQGlobalUseIDfromDTD;
 
-    resseq := TXQBoxedSequence.create();
-    result := resseq.boxInIXQValue;
+    resseq := TXQValueList.create();
     while node <> nil do begin
       for attrib in node.getEnumeratorAttributes do begin
         if (not useTrueId and context.staticContext.nodeCollation.equal(attrib.value, 'id')) or
@@ -4644,7 +4639,7 @@ begin
   finally
     sl.free;
   end;
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 
@@ -4678,7 +4673,7 @@ var
   attrib: TTreeAttribute;
   useTrueId: Boolean;
   temp: String;
-  resseq: TXQBoxedSequence;
+  resseq: TXQValueList;
 begin
   result.clear();
 
@@ -4703,8 +4698,7 @@ begin
     useTrueId := XQGlobalUseIDfromDTD;
     if not useTrueId then exit(xqvalue);
 
-    resseq := TXQBoxedSequence.create();
-    result := resseq.boxInIXQValue;
+    resseq := TXQValueList.create();
     while node <> nil do begin
       for attrib in node.getEnumeratorAttributes do begin
         if  attrib.getDataTypeHack() = 2 then
@@ -4718,7 +4712,7 @@ begin
   finally
     sl.free;
   end;
-  xqvalueSeqSqueeze(Result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 
@@ -4990,13 +4984,12 @@ end;
 function xqFunctionAvailable_Environment_Variables({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 var
   i: Integer;
-  resseq: TXQBoxedSequence;
+  resseq: TXQValueList;
 begin
-  resseq := TXQBoxedSequence.create();
-  result := resseq.boxInIXQValue;
+  resseq := TXQValueList.create();
   for i:=1 to GetEnvironmentVariableCount do
     resseq.add(xqvalue(strBefore(GetEnvironmentString(i), '=')));
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 function xqFunctionParse_Common(const context: TXQEvaluationContext; {%H-}argc: SizeInt; args: PIXQValue; typ: string): IXQValue;
@@ -5231,17 +5224,17 @@ function TXQTermRNG.evaluate(var context: TXQEvaluationContext): IXQValue;
   var
     n, i: SizeInt;
     pos: array of SizeInt = nil;
-    resseq: TXQBoxedSequence;
+    resseq: TXQValueList;
   begin
     n := v.getSequenceCount;
     if n = 1 then exit(v);
-    resseq := TXQBoxedSequence.create(n);
-    result := resseq.boxInIXQValue;
+    resseq := TXQValueList.create(n);
     SetLength(pos, n);
     for i := 1 to n do pos[i - 1] := i;
     state.shuffle(pos);
     for i in pos do
-      resseq.seq.addInArray(v.get(i));
+      resseq.addInArray(v.get(i));
+    result := resseq.toXQValueSequenceSqueezed;
   end;
 
 begin
@@ -7185,7 +7178,7 @@ var
  all: Boolean;
  i: Integer;
  input: string;
- resseq: TXQBoxedSequence;
+ resseq: TXQValueList;
  matchResults: TWrappedRegExprMatchResults;
 begin
   input := argv[0].toString;
@@ -7199,8 +7192,7 @@ begin
       SetLength(matches, argv[2].getSequenceCount);
       for i := 0 to high(matches) do matches[i] := argv[2].get(i+1).toInt64;
     end;
-    resseq := TXQBoxedSequence.create();
-    result := resseq.boxInIXQValue;
+    resseq := TXQValueList.create();
     matchResults := wregexprMatch(regex, input, all);
     while matchResults.findNext do begin
       for i := 0 to high(matches) do
@@ -7211,7 +7203,7 @@ begin
         for i := 0 to high(matches) do
           resseq.add(xqvalue(''));
       end;
-    xqvalueSeqSqueeze(result);
+    result := resseq.toXQValueSequenceSqueezed;
   finally
     wregexprFree(regEx)
   end;
@@ -7233,7 +7225,7 @@ end;
 
 function xqFunctionArrayGet({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  list: TXQValueList;
+  list: TXQValueWeaklySharedList;
   p: Int64;
 begin
   list := arrayAsList(argv^);
@@ -7244,20 +7236,22 @@ end;
 
 function xqFunctionArrayPut({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
+  oldlist: TXQValueWeaklySharedList;
   list: TXQValueList;
   p: Int64;
 begin
-  list := arrayAsList(argv^);
+  oldlist := arrayAsList(argv^);
   p := argv[1].toInt64 - 1;
-  if (p < 0) or (p >= list.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
-  list := TXQValueList.create(list);
+  if (p < 0) or (p >= oldlist.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
+  list := TXQValueList.create(oldlist);
   list[p] := argv[2];
   result := list.toXQValueArray;
 end;
 
 function xqFunctionArrayAppend({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  list, list2: TXQValueList;
+  list: TXQValueWeaklySharedList;
+  list2: TXQValueList;
 begin
   list := arrayAsList(argv^);
   list2 := TXQValueList.create(list.Count + 1);
@@ -7268,22 +7262,22 @@ end;
 
 function xqFunctionArraySubarray(argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  a: TXQBoxedArray;
   p, len: SizeInt64;
   iter: TXQValueEnumeratorPtrUnsafe;
   list: TXQValueList;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
+  a := argv^.toArrayMembersList;
   p := argv[1].toInt64 - 1;
   if argc = 3 then begin
     len := argv[2].toInt64;
     if len < 0 then raise EXQEvaluationException.create('FOAY0002', 'Negative length', nil, argv^);
   end else begin
-    len := a.Size - p;
+    len := a.Count - p;
     if len < 0 then len := 0;
   end;
-  if (p < 0) or (p + len >= a.Size + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
-  iter := a.GetEnumeratorMembersPtrUnsafe;
+  if (p < 0) or (p + len >= a.Count + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
+  iter := a.GetEnumeratorPtrUnsafe;
   list := TXQValueList.create(len);
   if iter.MoveMany(p) then
     iter.CopyToList(list, len);
@@ -7292,36 +7286,36 @@ end;
 
 function xqFunctionArrayRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  a: TXQBoxedArray;
   iter: TXQValueEnumeratorPtrUnsafe;
   p: SizeInt;
   list: TXQValueList;
   indices: TSizeintArray = nil;
   i: SizeInt;
   pv: PIXQValue;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
-  iter := a.GetEnumeratorMembersPtrUnsafe;
+  a := argv^.toArrayMembersList;
+  iter := a.GetEnumeratorPtrUnsafe;
   case argv[1].getSequenceCount of
     0: exit(argv^);
     1: begin
       p := argv[1].toInt64 - 1;
-      if (p < 0) or (p >= a.Size) then raiseInvalidArrayOutOfBounds(argv^, p);
-      list := TXQValueList.create(a.Size - 1);
+      if (p < 0) or (p >= a.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
+      list := TXQValueList.create(a.Count - 1);
       iter.CopyToList(list, p  );
       if iter.MoveNext then
-        iter.CopyToList(list, a.Size - p - 1 );
+        iter.CopyToList(list, a.Count - p - 1 );
     end;
     else begin
       SetLength(indices, argv[1].getSequenceCount);
       i := 0;
       for pv in argv[1].GetEnumeratorPtrUnsafe do begin
         indices[i] := pv^.toInt64 - 1;
-        if (indices[i] < 0) or (indices[i] >= a.Size) then raiseInvalidArrayOutOfBounds(argv^, indices[i]);
+        if (indices[i] < 0) or (indices[i] >= a.Count) then raiseInvalidArrayOutOfBounds(argv^, indices[i]);
         inc(i);
       end;
       stableSort(indices);
-      list := TXQValueList.create(a.Size - length(indices));
+      list := TXQValueList.create(a.Count - length(indices));
       p := 0;
       for i := 0 to high(indices) do
         if p <= indices[i] then begin
@@ -7329,7 +7323,7 @@ begin
           iter.MoveNext;
           p := indices[i] + 1;
         end;
-      if p < a.Size then iter.CopyToList(list, a.Size - p);
+      if p < a.Count then iter.CopyToList(list, a.Count - p);
     end;
   end;
   result := list.toXQValueArray;
@@ -7337,43 +7331,43 @@ end;
 
 function xqFunctionArrayInsert_before({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  a: TXQBoxedArray;
   list: TXQValueList;
   p: Int64;
   iter: TXQValueEnumeratorPtrUnsafe;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
+  a := argv^.toArrayMembersList;
   p := argv[1].toInt64 - 1;
-  if (p < 0) or (p > a.Size) then raiseInvalidArrayOutOfBounds(argv^, p);
-  iter := a.GetEnumeratorMembersPtrUnsafe;
-  list := TXQValueList.create(a.Size + 1);
+  if (p < 0) or (p > a.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
+  iter := a.GetEnumeratorPtrUnsafe;
+  list := TXQValueList.create(a.Count + 1);
   iter.CopyToList(list, p);
   list.addInArray(argv[2]);
-  iter.CopyToList(list, a.Size - p);
+  iter.CopyToList(list, a.Count - p);
   result := list.toXQValueArray;
 end;
 
 function xqFunctionArrayHead({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  a: TXQBoxedArray;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
-  if a.Size = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
-  result := a.seq[0];
+  a := argv^.toArrayMembersList;
+  if a.Count = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
+  result := a[0];
 end;
 
 function xqFunctionArrayTail({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  a: TXQBoxedArray;
   list: TXQValueList;
   iter: TXQValueEnumeratorPtrUnsafe;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
-  if a.Size = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
-  iter := a.GetEnumeratorMembersPtrUnsafe;
-  list := TXQValueList.create(a.Size - 1);
+  a := argv^.toArrayMembersList;
+  if a.Count = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
+  iter := a.GetEnumeratorPtrUnsafe;
+  list := TXQValueList.create(a.Count - 1);
   iter.MoveNext;
-  iter.CopyToList(list, a.Size - 1);
+  iter.CopyToList(list, a.Count - 1);
   result := list.toXQValueArray;
 end;
 
@@ -7393,7 +7387,7 @@ var
 begin
   list := TXQValueList.create();
   for pv in argv^.GetEnumeratorPtrUnsafe do begin
-    list.add(pv^.toArray.seq);
+    list.add(pv^.toArrayMembersList);
   end;
   result := list.toXQValueArray;
 end;
@@ -7404,12 +7398,12 @@ var
   list: TXQValueList;
   f: TXQBatchFunctionCall;
   pv: PIXQValue;
-  a: TXQBoxedArray;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
-  list := TXQValueList.create(a.Size);
+  a := argv^.toArrayMembersList;
+  list := TXQValueList.create(a.Count);
   f.init(context, argv[1]);
-  for pv in a.GetEnumeratorMembersPtrUnsafe do
+  for pv in a.GetEnumeratorPtrUnsafe do
     list.addInArray(f.call1(pv^));
   f.done;
   result := list.toXQValueArray;
@@ -7418,14 +7412,14 @@ end;
 function xqFunctionArrayFilter(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQValueList;
-  a: TXQBoxedArray;
   f: TXQBatchFunctionCall;
   pv: PIXQValue;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
-  list := TXQValueList.create(a.Size);
+  a := argv^.toArrayMembersList;
+  list := TXQValueList.create(a.Count);
   f.init(context, argv[1]);
-  for pv in a.GetEnumeratorMembersPtrUnsafe do
+  for pv in a.GetEnumeratorPtrUnsafe do
     if f.call1(pv^).toBooleanEffective then
       list.addInArray(pv^);
   f.done;
@@ -7434,12 +7428,12 @@ end;
 
 function xqFunctionArrayFold_left(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
-  a: TXQBoxedArray;
   f: TXQBatchFunctionCall;
+  a: TXQValueWeaklySharedList;
 begin
-  a := argv^.toArray;
+  a := argv^.toArrayMembersList;
   f.init(context, argv[2], argv[1]);
-  foldLeft(f, a.GetEnumeratorMembersPtrUnsafe);
+  foldLeft(f, a.GetEnumeratorPtrUnsafe);
   result := f.stack.topptr(1)^;
   f.done;
 end;
@@ -7447,7 +7441,7 @@ end;
 function xqFunctionArrayFold_right(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   f: TXQBatchFunctionCall;
-  list: TXQValueList;
+  list: TXQValueWeaklySharedList;
   i: SizeInt;
 begin
   list := arrayAsList(argv^);
@@ -7464,16 +7458,16 @@ function xqFunctionArrayFor_each_pair(const context: TXQEvaluationContext; {%H-}
 var
   list: TXQValueList;
   i: SizeInt;
-  a, b: TXQBoxedArray;
   count: Int64;
   f: TXQBatchFunctionCall;
   iter1, iter2: TXQValueEnumeratorPtrUnsafe;
+  b, a: TXQValueWeaklySharedList;
 begin
-  a := argv[0].toArray;
-  b := argv[1].toArray;
-  iter1 := a.GetEnumeratorMembersPtrUnsafe;
-  iter2 := b.GetEnumeratorMembersPtrUnsafe;
-  count := min(a.Size, b.Size);
+  a := argv[0].toArrayMembersList;
+  b := argv[1].toArrayMembersList;
+  iter1 := a.GetEnumeratorPtrUnsafe;
+  iter2 := b.GetEnumeratorPtrUnsafe;
+  count := min(a.Count, b.Count);
   list := TXQValueList.create(count);
   f.init(context, argv[2]);
   for i := 1 to count do begin
@@ -7519,36 +7513,30 @@ end;
 function xqFunctionArrayPartition(const context: TXQEvaluationContext; {%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   f: TXQBatchFunctionCall;
-  resseq, currentPartition: TXQBoxedSequence;
+  resseq, currentPartition: TXQValueList;
   pv: PIXQValue;
   list: IXQValue;
 begin
-  resseq := nil;
-  result.clear();
-  currentPartition := TXQBoxedSequence.create();
-  currentPartition._AddRef;
+  resseq := TXQValueList.create();
+  currentPartition := TXQValueList.create();
   list := argv[0];
   f.init(context, argv[1], xqvalue());
   try
     for pv in list.GetEnumeratorPtrUnsafe do with f do begin
       stack.topptr(0)^ := pv^;
       if call.toBooleanEffective then begin
-        if currentPartition.seq.Count > 0 then
-          xqvalueSeqConstruct(result, resseq, currentPartition.seq.toXQValueArray);
-        currentPartition.seq := TXQValueList.create();
+        //if currentPartition.Count > 0 then
+        resseq.add(currentPartition.toXQValueArray);
+        currentPartition := TXQValueList.create();
       end;
+      if currentPartition.refCount > 2 then //one ref in currentPartition, one on the stack
+        currentPartition := TXQValueList.create(currentPartition); //todo: test this.
       currentPartition.add(pv^);
-      case currentPartition.seq.Count of
-        //0: stack.topptr(1)^ := xqvalue;
-        1: stack.topptr(1)^ := currentPartition.seq[0];
-        else stack.topptr(1)^ := currentPartition.boxInIXQValue;
-      end;
+      stack.topptr(1)^ := currentPartition.toXQValueSequenceSqueezed;
     end;
   finally
     f.done;
-    xqvalueSeqConstruct(result, resseq, currentPartition.seq.toXQValueArray);
-    currentPartition.seq := TXQValueList.create();
-    currentPartition._Release;
+    result := resseq.toXQValueSequenceSqueezed;
   end;
 end;
 
@@ -7560,7 +7548,7 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
     value: IXQValue;
     resobj: TXQBoxedStringMap;
     pprop: TXQProperty;
-    tempseq: TXQBoxedSequence;
+    tempseq: TXQValueList;
   begin
     resobj := TXQBoxedStringMap.create();
     result := resobj.boxInIXQValue;
@@ -7572,10 +7560,10 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
             xqmdrUseFirst: ;
             xqmdrUseLast: resobj.setMutable(pprop.key, pprop.Value);
             xqmdrCombine: begin
-              tempseq := TXQBoxedSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq := TXQValueList.create(value.getSequenceCount + pprop.Value.getSequenceCount);
               tempseq.add(value);
               tempseq.add(pprop.Value);
-              resobj.setMutable(pprop.key, tempseq.boxInIXQValue);
+              resobj.setMutable(pprop.key, tempseq.toXQValueSequenceSqueezed);
             end;
             xqmdrRetain, xqmdrUseAny: assert(false);
           end;
@@ -7588,7 +7576,7 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
     pv: PIXQValue;
     value: IXQValue;
     resmap: TXQBoxedStandardMap;
-    tempseq: TXQBoxedSequence;
+    tempseq: TXQValueList;
     pprop: TXQStandardProperty;
   begin
     resmap := TXQBoxedStandardMap.create();
@@ -7601,10 +7589,10 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
             xqmdrUseFirst: ;
             xqmdrUseLast: resmap.setMutable(pprop.key, pprop.Value);
             xqmdrCombine: begin
-              tempseq := TXQBoxedSequence.create(value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq := TXQValueList.create(value.getSequenceCount + pprop.Value.getSequenceCount);
               tempseq.add(value);
               tempseq.add(pprop.Value);
-              resmap.setMutable(pprop.key, tempseq.boxInIXQValue);
+              resmap.setMutable(pprop.key, tempseq.toXQValueSequenceSqueezed);
             end;
             xqmdrRetain, xqmdrUseAny: assert(false);
           end;
@@ -7669,7 +7657,7 @@ begin
   for pv in v.GetEnumeratorPtrUnsafe do begin
     case pv^.kind of
       pvkArray:
-        for pw in pv^.toArray.GetEnumeratorMembersPtrUnsafe do
+        for pw in pv^.toArrayMembersList.GetEnumeratorPtrUnsafe do
           mapFind(outseq, key, pw^);
       pvkObject:
         case pv^.getPropertyKeyKind of
@@ -8568,12 +8556,11 @@ var f: TXQBatchFunctionCall;
     seq: IXQValue;
     pv: PIXQValue;
     pos: SizeInt;
-    resseq: TXQBoxedSequence;
+    resseq: TXQValueList;
 begin
   requiredArgCount(argc, 2);
   seq := args[0];
-  resseq := TXQBoxedSequence.create(seq.Count);
-  result := resseq.boxInIXQValue;
+  resseq := TXQValueList.create(seq.Count);
   f.init(context, args[1]);
   pos := 1;
   for pv in seq.GetEnumeratorPtrUnsafe do begin
@@ -8581,7 +8568,7 @@ begin
     inc(pos);
   end;
   f.done;
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 function xqFunctionIsNaN({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
@@ -8709,18 +8696,19 @@ var indexInReplacementNodes: SizeInt;
   function getTransformation(node: TTreeNode): boolean;
     procedure recursiveTransform;
     var old, r: IXQValue;
-      seq: TXQBoxedSequence;
+      seq: TXQValueList;
       pv: PIXQValue;
     begin
       if not (replacement.kind in [pvkNode, pvkSequence]) then exit;
       old := replacement;
       replacement.clear;
-      seq := nil;
+      seq := TXQValueList.create();
       for pv in old.GetEnumeratorPtrUnsafe do begin
         if pv^.kind <> pvkNode then r := pv^
         else r := transformNode(pv^.toNode, false);
-        xqvalueSeqConstruct(replacement, seq, r);
+        seq.add(r);
       end;
+      replacement := seq.toXQValueSequenceSqueezed;
     end;
 
   var
@@ -8823,12 +8811,13 @@ end;
 
 function TNodeTransformer.transformNodes(const roots: array of TTreeNode): IXQValue;
 var
-  resseq: TXQBoxedSequence = nil;
+  resseq: TXQValueList;
   i: sizeint;
 begin
-  result.clear();
+  resseq := TXQValueList.create(length(roots));
   for i := 0 to high(roots) do
-    xqvalueSeqConstruct(result, resseq, transformNode(roots[i]));
+    resseq.add(transformNode(roots[i]));
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 function xqFunctionTransform_Nodes(const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue): IXQValue;

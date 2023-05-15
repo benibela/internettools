@@ -300,6 +300,7 @@ begin
   //group by
   t('for $i in (1,2,3,3) group by $i return $i', '1 2 3');
   t('for $i in (3,2,1,2,3,3) group by $i return $i', '1 2 3');
+  //(if one of these tests and prints a large negative number, there is probably a double free of a list in the groupTuple function)
   t('for $i in (3,3,1,1,2,3,3) let $j := $i group by $i return $i||count($j)', '12 21 34');
   t('for $j in (3,3,1,1,2,3,3) group by $i := $j return $i||count($j)', '12 21 34');
   t('for $j in (3,3,1,1,2,3,3) group by $t := "foo", $i as xs:integer := $j return $i||count($j)', '12 21 34');

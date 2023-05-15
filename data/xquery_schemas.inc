@@ -414,12 +414,11 @@ var
   temp: IXQValue;
   ptemp: PIXQValue;
   i: SizeInt;
-  seq: TXQBoxedSequence = nil;
+  seq: TXQValueList;
 begin
   l := strSplit(v, ' ');
   if outv <> nil then begin
-    seq := TXQBoxedSequence.create(length(l));
-    outv^ := seq.boxInIXQValue;
+    seq := TXQValueList.create(length(l));
     ptemp := @temp;
   end else ptemp := nil;
   result := xsceNoError;
@@ -428,7 +427,9 @@ begin
     if result <> xsceNoError then break;
     if outv <> nil then seq.add(ptemp^);
   end;
-  if (outv <> nil) and (result <> xsceNoError) then outv^.clear;
+  if (outv <> nil) then
+    if result = xsceNoError then outv^ := seq.toXQValueSequenceSqueezed
+    else outv^.clear;
 end;
 
 

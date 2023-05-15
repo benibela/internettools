@@ -181,7 +181,8 @@ procedure IXQValue.addRef;
 begin
   case kind of
     pvkUndefined, pvkBoolean, pvkInt64, {pvkFloat32, }pvkNull: {};
-    pvkSequence, pvkDouble, pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkArray, pvkFunction: TXQBoxedValue(getDataPointer)._AddRef;
+    pvkDouble, pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction: TXQBoxedValue(getDataPointer)._AddRef;
+    pvkSequence, pvkArray: InterlockedIncrement(TXQValueList.PHeader(getDataPointer)^.refcount);
     pvkString: fpc_AnsiStr_Incr_Ref(getDataPointer);
     pvkNode:  TTreeNode(getDataPointer).getDocument().addRef;
   end;
@@ -190,10 +191,16 @@ end;
 procedure IXQValue.release;
 var
   p: Pointer;
+  tempSequence: TXQValueWeaklySharedList;
 begin
   case kind of
     pvkUndefined, pvkBoolean, pvkInt64, {pvkFloat32, }pvkNull: {};
-    pvkSequence, pvkDouble, pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkArray, pvkFunction: TXQBoxedValue(getDataPointer)._Release;
+    pvkSequence, pvkArray: begin
+      tempSequence := getDataList;
+      if InterlockedDecrement(TXQValueList.PHeader(tempSequence.data)^.refcount) = 0 then
+        PXQValueList(@tempSequence)^.destroy;
+    end;
+    pvkDouble, pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction: TXQBoxedValue(getDataPointer)._Release;
     pvkString: begin
       p := getDataPointer;
       fpc_ansistr_decr_ref(p);
@@ -280,9 +287,9 @@ begin
   result := TTreeNode(getDataPointer);
 end;
 
-function IXQValue.getDataSequence: TXQBoxedSequence;
+function IXQValue.getDataList: TXQValueWeaklySharedList;
 begin
-  result := TXQBoxedSequence(getDataPointer);
+  result.data := getDataPointer;
 end;
 
 function IXQValue.getDataBinary: TXQBoxedBinary;
@@ -305,11 +312,6 @@ begin
   result := TXQBoxedMapLike(getDataPointer);
 end;
 
-function IXQValue.getDataArray: TXQBoxedArray;
-begin
-  result := TXQBoxedArray(getDataPointer);
-end;
-
 function IXQValue.getDataFunction: TXQBoxedFunction;
 begin
   result := TXQBoxedFunction(getDataPointer);
@@ -317,16 +319,16 @@ end;
 
 function IXQValue.getSequenceFirst: IXQValue;
 var
-  seq: TXQBoxedSequence;
+  seq: TXQValueWeaklySharedList;
 begin
-  seq := TXQBoxedSequence(getDataPointer);
-  if seq.seq.count = 0 then result.clear
-  else result := seq.seq[0];
+  seq := getDataList;
+  if seq.count = 0 then result.clear
+  else result := seq[0];
 end;
 
 function IXQValue.isUndefined: boolean;
 begin
-  result := (encoded = 0) or ((kind = pvkSequence) and (getDataSequence.count = 0));
+  result := (encoded = 0) or ((kind = pvkSequence) and (getDataList.count = 0));
 end;
 
 function IXQValue.isAssigned: boolean;
@@ -753,10 +755,10 @@ begin
   result := getDataFunction;
 end;
 
-function IXQValue.toArray: TXQBoxedArray;
+function IXQValue.toArrayMembersList: TXQValueWeaklySharedList;
 begin
   requiredKind(self, pvkArray);
-  result := getDataArray;
+  result := getDataList;
 end;
 
 function IXQValue.toMap: TXQBoxedMapLike;
@@ -769,7 +771,7 @@ end;
 function IXQValue.getSequenceCount: SizeInt;
 begin
   case kind of
-    pvkSequence: result := getDataSequence.count;
+    pvkSequence: result := getDataList.count;
     pvkUndefined: result := 0;
     else result := 1;
   end;
@@ -777,14 +779,14 @@ end;
 
 function IXQValue.get(i: SizeInt): IXQValue;
 var
-  seq: TXQBoxedSequence;
+  seq: TXQValueWeaklySharedList;
 begin
   case kind of
     pvkUndefined: result.clear;
     pvkSequence: begin
-      seq := getDataSequence;
+      seq := getDataList;
       if (i < 1) or (i > seq.count) then result.clear
-      else result := seq.seq[i - 1];
+      else result := seq[i - 1];
     end
     else if i = 01 then result := self
     else result.clear;
@@ -917,6 +919,35 @@ begin
 end;
 
 function IXQValue.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): IXQValue;
+  function arraySetImmutable(): IXQValue;
+  var
+    newValue: IXQValue;
+    i: SizeInt;
+    idx: SizeInt;
+    resseq: TXQValueList;
+    seq: TXQValueWeaklySharedList;
+  begin
+    if (not props^.toIntDecimalTry(idx)) or (idx < 0) then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
+    seq := getDataList;
+
+    if (len = 1) then
+      newValue := v
+    else if (idx > seq.Count) then
+      raise EXQEvaluationException.Create('pxp:Array', 'Element index'+props^+' not found, when assigning to '+strJoin(props, len, '.'))
+    else if seq[idx-1].kind in [pvkArray, pvkObject] then
+      newValue := seq[idx-1].setImmutable(props + 1, len - 1, v)
+    else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+props^+' to assign to '+strJoin(props, len, '.'));
+
+    resseq := TXQValueList.create(seq.Count);
+    if idx = 0 then resseq.add(newValue);
+    idx -= 1;
+    for i := 0 to seq.Count - 1 do
+      if i <> idx  then resseq.add(seq[i])
+      else resseq.add(newValue);
+    if idx >= seq.Count then resseq.add(newValue); //e.g. $a(1000) := ..
+    result := xqvalueArray(resseq);
+  end;
+
 begin
   case kind of
     pvkSequence:
@@ -925,7 +956,7 @@ begin
     pvkObject:
       exit(getDataObject.setImmutable(props, len, v).boxInIXQValue);
     pvkArray:
-      exit(getDataArray.setImmutable(props, len, v));
+      exit(arraySetImmutable());
   end;
   raiseInternalErrorObjectExpected('setImmutable (or array)');
   result := xqvalue;
@@ -1092,7 +1123,7 @@ end;
 function IXQValue.Size: SizeInt;
 begin
   case kind of
-    pvkArray: result := getDataArray.Size;
+    pvkArray: result := getDataList.count;
     pvkObject: result := getDataObject.Size;
     else
       raise EXQEvaluationException.create('pxp:INTERNAL', 'Only arrays and objects have a size');
@@ -1103,14 +1134,8 @@ end;
 function IXQValueHelper.GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
   case kind of
-    pvkSequence: with getDataSequence do begin
-      if seq.Count > 0 then begin
-        result.fcurrent:=@seq.buffer[0];
-        dec(result.fcurrent);
-        result.flast := @seq.buffer[seq.Count-1];
-        //we do not need to set result.fsingleelement, since we set flast to non-nil
-      end else TXQValueEnumeratorPtrUnsafe.clear(result);
-    end
+    pvkUndefined: TXQValueEnumeratorPtrUnsafe.clear(result);
+    pvkSequence: result := getDataList.GetEnumeratorPtrUnsafe;
     else TXQValueEnumeratorPtrUnsafe.makesingleelement(self, result);
   end;
 end;
@@ -1118,7 +1143,7 @@ end;
 function IXQValueHelper.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
 begin
   case kind of
-    pvkArray: result := getDataArray.GetEnumeratorMembersPtrUnsafe;
+    pvkArray: result := getDataList.GetEnumeratorPtrUnsafe;
     else
       raise EXQEvaluationException.create('pxp:INTERNAL', 'Array enumerator called on non array.');
       result := default(TXQValueEnumeratorPtrUnsafe);
@@ -1303,28 +1328,30 @@ procedure IXQValueHelper.jsonSerialize(var serializer: TXQSerializer);
   var
     i: SizeInt;
     ws: TXQSerializerInsertWhitespace;
+    seq: TXQValueWeaklySharedList;
   begin
-    with getDataSequence do
+    seq := getDataList;
+    with seq do
     case seq.Count of
       0: serializer.append('null');
-      1: seq[0].jsonSerialize(serializer);
+      1: items[0].jsonSerialize(serializer);
       else begin
         if serializer.standard then serializer.error('SERE0023', self);
         ws := serializer.insertWhitespace;
         if (ws = xqsiwIndent) and (seq.Count <= 8) then begin
           serializer.insertWhitespace := xqsiwConservative;
           for i := 0 to seq.Count - 1 do
-            if seq[i].kind in [pvkObject,pvkArray] then begin
+            if items[i].kind in [pvkObject,pvkArray] then begin
               serializer.insertWhitespace := xqsiwIndent;
               break;
             end;
         end;
         with serializer do begin
           appendJSONArrayStart;
-          seq[0].jsonSerialize(serializer);
+          items[0].jsonSerialize(serializer);
           for i := 1 to seq.Count-1 do begin
             appendJSONArrayComma();
-            seq[i].jsonSerialize(serializer);
+            items[i].jsonSerialize(serializer);
           end;
           appendJSONArrayEnd;
         end;
@@ -1355,26 +1382,28 @@ procedure IXQValueHelper.jsonSerialize(var serializer: TXQSerializer);
   var
     i: SizeInt;
     ws: TXQSerializerInsertWhitespace;
+    a: TXQValueWeaklySharedList;
   begin
-    with getDataArray do begin
-      case seq.Count of
+    a := getDataList;
+    with a do begin
+      case a.Count of
         0: serializer.appendJSONEmptyArray;
         else begin
           ws := serializer.insertWhitespace;
-          if (ws = xqsiwIndent) and (seq.Count <= 8) then begin
+          if (ws = xqsiwIndent) and (a.Count <= 8) then begin
             serializer.insertWhitespace := xqsiwConservative;
-            for i := 0 to seq.Count - 1 do
-              if seq[i].kind in [pvkObject,pvkArray] then begin
+            for i := 0 to a.Count - 1 do
+              if items[i].kind in [pvkObject,pvkArray] then begin
                 serializer.insertWhitespace := xqsiwIndent;
                 break;
               end;
           end;
           with serializer do begin
             appendJSONArrayStart;
-            seq[0].jsonSerialize(serializer);
-            for i := 1 to seq.Count-1 do begin
+            items[0].jsonSerialize(serializer);
+            for i := 1 to a.Count-1 do begin
               appendJSONArrayComma();
-              seq[i].jsonSerialize(serializer);
+              items[i].jsonSerialize(serializer);
             end;
             appendJSONArrayEnd;
           end;
@@ -1458,19 +1487,21 @@ procedure IXQValueHelper.xmlSerialize(var serializer: TXQSerializer);
   procedure sequenceSerialize;
   var
     i: SizeInt;
+    list: TXQValueWeaklySharedList;
   begin
-    with getDataSequence do
+    list := getDataList;
+    with list do
       with serializer do
-        if seq.Count = 0 then
+        if list.Count = 0 then
           appendXMLEmptyElement(sequenceTag)
          else begin
            appendXMLElementStartTag(sequenceTag);
            appendXMLElementStartTag(elementTag);
-           seq[0].xmlSerialize(serializer);
+           items[0].xmlSerialize(serializer);
            appendXMLElementEndTag(elementTag);
-           for i := 1 to seq.Count-1 do begin
+           for i := 1 to list.Count-1 do begin
              appendXMLElementStartTag(elementTag);
-             seq[i].xmlSerialize(serializer);
+             items[i].xmlSerialize(serializer);
              appendXMLElementEndTag(elementTag);
            end;
            appendXMLElementEndTag(sequenceTag);
@@ -1490,19 +1521,21 @@ procedure IXQValueHelper.xmlSerialize(var serializer: TXQSerializer);
   procedure arraySerialize;
   var
     i: SizeInt;
+    list: TXQValueWeaklySharedList;
   begin
-    with getDataArray do begin
+    list := getDataList;
+    with list do begin
       with serializer do
-        if seq.Count = 0 then
+        if list.Count = 0 then
           appendXMLEmptyElement(sequenceTag)
          else begin
            appendXMLElementStartTag(sequenceTag);
            appendXMLElementStartTag(elementTag);
-           seq[0].xmlSerialize(serializer);
+           items[0].xmlSerialize(serializer);
            appendXMLElementEndTag(elementTag);
-           for i := 1 to seq.Count-1 do begin
+           for i := 1 to list.Count-1 do begin
              appendXMLElementStartTag(elementTag);
-             seq[i].xmlSerialize(serializer);
+             items[i].xmlSerialize(serializer);
              appendXMLElementEndTag(elementTag);
            end;
            appendXMLElementEndTag(sequenceTag);
@@ -1621,17 +1654,19 @@ procedure IXQValueHelper.adaptiveSerialize(var serializer: TXQSerializer);
   procedure sequenceSerialize;
   var
     i: SizeInt;
+    list: TXQValueWeaklySharedList;
   begin
-    with getDataSequence do
-      case getSequenceCount of
+    list := getDataList;
+    with list do
+      case count of
         0: serializer.append('()');
-        1: seq[0].adaptiveSerialize(serializer);
+        1: items[0].adaptiveSerialize(serializer);
         else begin
           serializer.append('(');
-          seq[0].adaptiveSerialize(serializer);
-          for i := 1 to getSequenceCount - 1 do begin
+          items[0].adaptiveSerialize(serializer);
+          for i := 1 to count - 1 do begin
             serializer.append(',');
-            seq[i].adaptiveSerialize(serializer);
+            items[i].adaptiveSerialize(serializer);
           end;
           serializer.append(')');
         end;
@@ -1661,13 +1696,13 @@ procedure IXQValueHelper.adaptiveSerialize(var serializer: TXQSerializer);
   var
     i: sizeint;
   begin
-    with getDataArray do begin
+    with getDataList do begin
       serializer.appendJSONArrayStart;
-      if seq.Count > 0 then begin
-        seq[0].adaptiveSerialize(serializer);
-        for i := 1 to seq.Count-1 do begin
+      if Count > 0 then begin
+        items[0].adaptiveSerialize(serializer);
+        for i := 1 to Count-1 do begin
           serializer.appendJSONArrayComma();
-          seq[i].adaptiveSerialize(serializer);
+          items[i].adaptiveSerialize(serializer);
         end;
       end;
       serializer.appendJSONArrayEnd;
@@ -1775,9 +1810,9 @@ function IXQValue.stringifyNodes: IXQValue;
 begin
   case kind of
     pvkObject: result := objectStringifiedNodes;
-    pvkSequence: result := getDataSequence.seq.stringifyNodes.toXQValueSequenceSqueezed;
+    pvkSequence: result := getDataList.stringifyNodes.toXQValueSequenceSqueezed;
     pvkNode: Result:=xqvalue(toString);
-    pvkArray: result := getDataArray.seq.stringifyNodes.toXQValueArray;
+    pvkArray: result := getDataList.stringifyNodes.toXQValueArray;
     else result := self;
   end;
 end;
@@ -1796,9 +1831,9 @@ function IXQValue.hasNodes: boolean;
 begin
   case kind of
     pvkObject: result := objectHasNodes;
-    pvkSequence: result := getDataSequence.seq.hasNodes;
+    pvkSequence: result := getDataList.hasNodes;
     pvkNode: result := true;
-    pvkArray: result := getDataArray.seq.hasNodes;
+    pvkArray: result := getDataList.hasNodes;
     else result := false;
   end;
 end;
@@ -1828,18 +1863,17 @@ end;
 function IXQValue.map(const q: string): IXQValue;
 var
   term: TXQuery;
-  resseq: TXQBoxedSequence;
   i: SizeInt;
+  resseq: TXQValueList;
 begin
   case kind of
-    pvkSequence: with getDataSequence do begin
+    pvkSequence: with getDataList do begin
       term := defaultQueryEngine.parseTerm(q, high(TXQParsingModel), defaultQueryEngine.StaticContext);
       try
-        resseq := TXQBoxedSequence.create(getSequenceCount);
-        result := resseq.boxInIXQValue;
-        for i := 0 to seq.Count - 1 do
-          resseq.add(term.evaluate(seq[i]));
-        xqvalueSeqSqueeze(result);
+        resseq := TXQValueList.create(count);
+        for i := 0 to Count - 1 do
+          resseq.add(term.evaluate(items[i]));
+        result := resseq.toXQValueSequenceSqueezed;
       finally
         term.free;
       end;
@@ -1909,7 +1943,7 @@ end;
 
 function IXQValue.retrieve(): IXQValue;
 var tempContext: TXQEvaluationContext;
-  resseq: TXQBoxedSequence;
+  resseq: TXQValueList;
   function dataToXQV(const data, uri, contenttype: string): ixqvalue;
   var
     f: TInternetToolsFormat;
@@ -1956,14 +1990,13 @@ var v: IXQValue;
     i: SizeInt;
 begin
   tempContext := defaultQueryEngine.getEvaluationContext();
-  resseq := TXQBoxedSequence.create();
-  result := resseq.boxInIXQValue;
+  resseq := TXQValueList.create();
   for i := 1 to getSequenceCount do begin
     v := get(i);
     if v.kind = pvkNode then handle(resolveHTMLCallback(tempContext, 1, @V))
     else handle(v);
   end;
-  xqvalueSeqSqueeze(result);
+  result := resseq.toXQValueSequenceSqueezed;
 end;
 
 function IXQValueHelper.GetEnumerator: TXQValueEnumerator;
@@ -2476,51 +2509,6 @@ begin
 end;
 
 
-{$ImplicitExceptions off}
-
-constructor TXQBoxedSequence.create(capacity: SizeInt);
-begin
-  seq := TXQValueList.Create(capacity);
-end;
-
-constructor TXQBoxedSequence.create(firstChild: IXQValue);
-begin
-  seq := TXQValueList.Create;
-  seq.add(firstChild);
-end;
-
-constructor TXQBoxedSequence.create2(var list: TXQValueList);
-begin
-  seq := list;
-end;
-
-procedure TXQBoxedSequence.add(const value: IXQValue);
-begin
-  seq.add(value);
-end;
-
-procedure TXQBoxedSequence.addOrdered(const node: IXQValue);
-begin
-  seq.addOrdered(node);
-end;
-
-function TXQBoxedSequence.count: sizeint;
-begin
-  result := seq.count;
-end;
-
-function TXQBoxedSequence.boxInIXQValue: IXQValue;
-begin
-  result := IXQValue.create(pvkSequence, xstNoType, self);
-end;
-
-destructor TXQBoxedSequence.Destroy;
-begin
-  seq.release;
-  inherited Destroy;
-end;
-
-{$ImplicitExceptions on}
 
 
 
@@ -3165,72 +3153,6 @@ begin
 end;
 
 
-
-
-
-constructor TXQBoxedArray.create2(takeList: TXQValueList);
-begin
-  seq := takeList
-end;
-
-constructor TXQBoxedArray.create2(capacity: SizeInt);
-begin
-  seq := TXQValueList.create(capacity);
-end;
-
-function TXQBoxedArray.GetEnumeratorMembers: TXQValueEnumerator;
-begin
-  result.fguardian := self.boxInIXQValue;
-  result.ptr := GetEnumeratorMembersPtrUnsafe;
-end;
-
-function TXQBoxedArray.GetEnumeratorMembersPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
-begin
-  if seq.Count > 0 then begin
-    result.fcurrent:=@seq.buffer[0];
-    dec(result.fcurrent);
-    result.flast := @seq.buffer[seq.Count-1];
-  end else TXQValueEnumeratorPtrUnsafe.clear(result);
-end;
-
-function TXQBoxedArray.Size: SizeInt;
-begin
-  result := seq.Count;
-end;
-
-function TXQBoxedArray.setImmutable(const props: PString; len: SizeInt; const v: IXQValue): IXQValue;
-var
-  newValue: IXQValue;
-  i: SizeInt;
-  idx: SizeInt;
-  resseq: TXQValueList;
-begin
-  if (not props^.toIntDecimalTry(idx)) or (idx < 0) then raise EXQEvaluationException.create('pxp:ARRAY', 'Cannot assign to negative array index');
-
-  if (len = 1) then
-    newValue := v
-  else if (idx > seq.Count) then
-    raise EXQEvaluationException.Create('pxp:Array', 'Element index'+props^+' not found, when assigning to '+strJoin(props, len, '.'))
-  else if seq[idx-1].kind in [pvkArray, pvkObject] then
-    newValue := seq[idx-1].setImmutable(props + 1, len - 1, v)
-  else raise EXQEvaluationException.Create('pxp:ARRAY', 'Need array or object '+props^+' to assign to '+strJoin(props, len, '.'));
-
-  resseq := TXQValueList.create(seq.Count);
-  if idx = 0 then resseq.add(newValue);
-  idx -= 1;
-  for i := 0 to seq.Count - 1 do
-    if i <> idx  then resseq.add(seq[i])
-    else resseq.add(newValue);
-  if idx >= seq.Count then resseq.add(newValue); //e.g. $a(1000) := ..
-  result := xqvalueArray(resseq);
-end;
-
-
-destructor TXQBoxedArray.Destroy;
-begin
-  seq.release;
-  inherited Destroy;
-end;
 
 
 
