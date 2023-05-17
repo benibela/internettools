@@ -60,7 +60,7 @@ end;
 
 function xqFunctionNull({%H-}argc: SizeInt; {%H-}args: PIXQValue): IXQValue;
 begin
-  result := IXQValue.create(pvkNull, xstJSONiqNull, nil);
+  result := xqvalueJSONiqNull;
 end;
 
 

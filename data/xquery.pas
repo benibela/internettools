@@ -219,9 +219,9 @@ type
     procedure release;
     procedure clear;
 
-    class function create(akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer ): IXQValue; static;
-    class function create(akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ): IXQValue; static;
-    class function create(smallishInt: Int64): IXQValue; static;
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer ); static; inline;
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ); static; inline;
+    class procedure create(var result: IXQValue; smallishInt: Int64); static; inline;
     class function int64FitsInEncodedIntRange(i: int64): boolean; inline; static;
 
     const KIND_BITS = 4;
@@ -2901,8 +2901,8 @@ public
   function xqvalue(const v: Boolean):IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalueTrue:IXQValue; inline; //**< Creates an boolean IXQValue
   function xqvalueFalse:IXQValue; inline; //**< Creates an boolean IXQValue
-  function xqvalue(const d: Int64):IXQValue; inline; //**< Creates an integer IXQValue
-  function xqvalue(const d: Int64; typeAnnotation: TXSTypeAnnotation):IXQValue; inline; //**< Creates an integer IXQValue
+  function xqvalue(const d: Int64):IXQValue;  //**< Creates an integer IXQValue
+  function xqvalue(const d: Int64; typeAnnotation: TXSTypeAnnotation):IXQValue;  //**< Creates an integer IXQValue
   function xqvalue(v: Integer):IXQValue; inline; //**< Creates an integer IXQValue
   function xqvalue(v: xqfloat; typeAnnotation: TXSTypeAnnotation = xstDouble):IXQValue; inline; //**< Creates an BigDecimal IXQValue
   {$if defined(FPC_HAS_TYPE_SINGLE) and defined(FPC_HAS_TYPE_DOUBLE) }
@@ -2923,6 +2923,7 @@ public
   function xqvalue(const sl: array of IXQValue): IXQValue; //**< Creates a sequence
   function xqvalue(const s: TXQHashsetStr): IXQValue; //**< Creates a sequence
   function xqvalueArray(var l: TXQValueList): IXQValue;
+  function xqvalueJSONiqNull: IXQValue;
 
   procedure xqvalueSeqSqueeze(var v: IXQValue); //**< Squeezes an IXQValue (single element seq => single element, empty seq => undefined)
   function xqvalueSeqSqueezed(var l: TXQValueList): IXQValue; //**< Creates an IXQValue from a list sequence  (assume it FREEs the list)
@@ -3277,7 +3278,6 @@ const MATCH_ALL_NODES = [qmText,qmComment,qmElement,qmProcessingInstruction,qmAt
 
 type TXQueryInternals = object
 //private
-    class var commonValuesUndefined, commonValuesTrue, commonValuesFalse : IXQValue;
     class procedure raiseXSCEError(const err: TXSCastingError; const from, to_: string); static;
     class function treeElementAsString(node: TTreeNode; deepSeparator: string = ''): string; static; inline;
 end;
@@ -4340,7 +4340,7 @@ end;
 function TXQValueList.toXQValueArray: IXQValue;
 begin
   AddRef();
-  result := IXQValue.create(pvkArray, xstJSONiqArray, data);
+  IXQValue.create(result, pvkArray, xstJSONiqArray, data);
 end;
 
 function TXQValueList.toXQValueSequenceSqueezed: IXQValue;
@@ -4359,55 +4359,52 @@ begin
   //result := TXQValueUndefined.Create;
 end;
 
+
+
 function xqvalue(const v: Boolean): IXQValue;
 begin
   case v of
-    true:  result := TXQueryInternals.commonValuesTrue;
-    false: result := TXQueryInternals.commonValuesFalse;
+    true:  result := xqvalueTrue;
+    false: IXQValue.create(result, pvkBoolean, xstBoolean, pointer(PtrInt(0)));
   end;
-
   //result := TXQValueBoolean.Create(v);
 end;
 
 function xqvalueTrue: IXQValue;
 begin
-  result := TXQueryInternals.commonValuesTrue;
+  IXQValue.create(result, pvkBoolean, xstBoolean, pointer(PtrInt(-1)));
 end;
 
 function xqvalueFalse: IXQValue;
 begin
-  result := TXQueryInternals.commonValuesFalse;
+  IXQValue.create(result, pvkBoolean, xstBoolean, pointer(PtrInt(0)));
+end;
+
+procedure boxIntInDecimal(var result: IXQValue; d: Int64; typeAnnotation: TXSTypeAnnotation);
+begin
+  result := xqvalue(BigDecimal(d), typeAnnotation);
 end;
 
 function xqvalue(const d: Int64): IXQValue;
 begin
   if IXQValue.int64FitsInEncodedIntRange(d) then
-    result := IXQValue.create(d)
+    IXQValue.create(result, d)
   else
-    result := xqvalue(d, xstInteger);
+    boxIntInDecimal(result, d, xstInteger);
 end;
 
 function xqvalue(const d: Int64; typeAnnotation: TXSTypeAnnotation): IXQValue;
-  function boxIt(): IXQValue;
-  begin
-    result := xqvalue(BigDecimal(d), typeAnnotation);
-  end;
 begin
   if IXQValue.int64FitsInEncodedIntRange(d) then begin
-    result := IXQValue.create(d);
+    IXQValue.create(result, d);
     result.setTypeAnnotation(typeAnnotation);
   end else
-    result := boxit;
+    boxIntInDecimal(result, d, typeAnnotation);
 end;
 
 function xqvalue(v: Integer): IXQValue;
 begin
-  {case v of
-    0: result := commonValues[cvk0];
-    1: result := commonValues[cvk1];
-    else result := TXQValueInt65.Create(v);
-  end;}
-  result := xqvalue(int64(v));
+  IXQValue.create(result, v);
 end;
 
 
@@ -4417,7 +4414,7 @@ var
 begin
   box := TXQBoxedDouble.Create;
   box.value := v;
-  result := IXQValue.create(pvkDouble, typeAnnotation, box);
+  IXQValue.create(result, pvkDouble, typeAnnotation, box);
 end;
 
 {$if defined(FPC_HAS_TYPE_SINGLE) and defined(FPC_HAS_TYPE_DOUBLE) }
@@ -4453,19 +4450,19 @@ var
   box: TXQBoxedDecimal;
 begin
   box := TXQBoxedDecimal.create(v);
-  result := IXQValue.create(pvkBigDecimal, typeAnnotation, box);
+  IXQValue.create(result, pvkBigDecimal, typeAnnotation, box);
 end;
 
 function xqvalue(const v: string): IXQValue; inline;
 begin
   fpc_AnsiStr_Incr_Ref(pointer(v));
-  result := IXQValue.create(pvkString, xstString, pointer(v));
+  IXQValue.create(result, pvkString, xstString, pointer(v));
 end;
 
 function xqvalue(const v: string; typeAnnotation: TXSTypeAnnotation):IXQValue; inline; //**< Creates a string IXQValue
 begin
   fpc_AnsiStr_Incr_Ref(pointer(v));
-  result := IXQValue.create(pvkString, typeAnnotation, pointer(v));
+  IXQValue.create(result, pvkString, typeAnnotation, pointer(v));
 end;
 
 function xqvalue(sl: TStringList): IXQValue;
@@ -4484,12 +4481,12 @@ end;
 
 function xqvalue(v: TXQBoxedFunction): IXQValue;
 begin
-  result := IXQValue.create(pvkFunction, xstNoType, v);
+  IXQValue.create(result, pvkFunction, xstNoType, v);
 end;
 
 function xqvalue(v: TXQBoxedQName): IXQValue;
 begin
-  result := IXQValue.create(pvkQName, xstQName, v);
+  IXQValue.create(result, pvkQName, xstQName, v);
 end;
 
 function xqvalue(v: TXQBoxedBinary): IXQValue;
@@ -4501,12 +4498,12 @@ begin
     bdtBase64: t := xstBase64Binary;
     else t := xstNoType;
   end;
-  result := IXQValue.create(pvkBinary, t, v);
+  IXQValue.create(result, pvkBinary, t, v);
 end;
 
 function xqvalue(v: TXQBoxedDateTime): IXQValue;
 begin
-  result := IXQValue.create(pvkDateTime, v.typeAnnotationType.typeAnnotation, v);
+  IXQValue.create(result, pvkDateTime, v.typeAnnotationType.typeAnnotation, v);
 end;
 
 function xqvalue(const sl: array of string): IXQValue;
@@ -4545,8 +4542,14 @@ end;
 function xqvalueArray(var l: TXQValueList): IXQValue;
 begin
   l.AddRef();
-  result := IXQValue.create(pvkArray, xstJSONiqArray, l.data);
+  IXQValue.create(result, pvkArray, xstJSONiqArray, l.data);
 end;
+
+function xqvalueJSONiqNull: IXQValue;
+begin
+  IXQValue.create(result, pvkNull, xstJSONiqNull, nil)
+end;
+
 
 function xqvalue(v: TTreeNode): IXQValue;
 var
@@ -4556,7 +4559,7 @@ begin
   else begin
     doc := v.getDocument();
     doc.addRef;
-    result := IXQValue.create(pvkNode, xstNode, pointer(v));
+    IXQValue.create(result, pvkNode, xstNode, pointer(v));
   end;
 end;
 
@@ -4578,7 +4581,7 @@ begin
     1: result := l[0];
     else begin
       l.AddRef();
-      result := IXQValue.create(pvkSequence, xstNoType, l.data);
+      IXQValue.create(result, pvkSequence, xstNoType, l.data);
       exit;
     end;
   end;
@@ -4630,7 +4633,7 @@ begin
   if returnType <> nil then begin
     if humanReadable then result += ' as '
     else result += separator;
-    result += returnType.serialize
+    result += returnType.serialize;
   end;
 end;
 
@@ -6562,7 +6565,7 @@ end;
 
 procedure TXQJsonParser.readNull;
 begin
-  if jsoniqMode then pushValue(IXQValue.create(pvkNull, xstJSONiqNull, nil))
+  if jsoniqMode then pushValue(xqvalueJSONiqNull)
   else pushValue(xqvalue());
 end;
 {$ImplicitExceptions on}
@@ -7488,7 +7491,8 @@ end;
 
 procedure TXQSharedEvaluationContext._AddRefIfNonNil;
 begin
-  if self <> nil then InterlockedIncrement(refcount);
+  if self <> nil then
+    InterlockedIncrement(refcount);
 end;
 
 procedure TXQSharedEvaluationContext._ReleaseIfNonNil;
@@ -10403,9 +10407,6 @@ baseJSONiqSchema := TJSONiqAdditionSchema.create();
 globalTypes.init;
 xquery__functions.initializeFunctions;
 
-TXQueryInternals.commonValuesUndefined.clear;
-TXQueryInternals.commonValuesTrue := IXQValue.create(pvkBoolean, xstBoolean, pointer(PtrInt(-1)));
-TXQueryInternals.commonValuesFalse := IXQValue.create(pvkBoolean, xstBoolean, pointer(PtrInt(0)));
 
 
 baseSchema.cacheDescendants; //this ignores the jsoniq types
@@ -10436,9 +10437,6 @@ finalization
     baseJSONiqSchema.free;
     GlobalInterpretedNativeFunctionStaticContext.Free;
     GlobalStaticNamespaces.Free;
-    TXQueryInternals.commonValuesUndefined.clear;
-    TXQueryInternals.commonValuesTrue.clear;
-    TXQueryInternals.commonValuesFalse.clear;
     TXQueryEngine.freeCommonCaches;
 
     XMLNamespace_XPathFunctions._Release;

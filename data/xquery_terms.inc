@@ -4656,7 +4656,7 @@ function TXQTermJSONiqObjectConstructor.evaluate(var context: TXQEvaluationConte
 function transformValue(v: IXQValue): IXQValue;
 begin
   if v.getSequenceCount = 0 then
-    exit(IXQValue.create(pvkNull, xstJSONiqNull, nil));
+    exit(xqvalueJSONiqNull);
   if v.kind = pvkSequence then
     if v.getSequenceCount > 1 then begin
       result := v.toXQVList.toXQValueArray;

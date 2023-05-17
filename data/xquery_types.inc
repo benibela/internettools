@@ -217,14 +217,14 @@ begin
   end;
 end;
 
-class function IXQValue.create(akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer): IXQValue;
+class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer);
 begin
   if result.encoded <> 0 then
     result.release;
   result.encoded := (QWord(data) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
 end;
 
-class function IXQValue.create(akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue): IXQValue;
+class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue);
 begin
   if result.encoded <> 0 then
     result.release;
@@ -233,12 +233,13 @@ begin
 end;
 
 {$push}{$RangeChecks off}{$OverflowChecks off}
-class function IXQValue.create(smallishInt: Int64): IXQValue;
+class procedure IXQValue.create(var result: IXQValue; smallishInt: Int64);
 begin
   if result.encoded <> 0 then
     result.release;
   result.encoded := int64(smallishInt shl IXQValue.INT_SHIFT_BITS) or ((ord(xstInteger) shl IXQValue.KIND_BITS) or ord(pvkInt64));
 end;
+
 {$pop}
 
 class function IXQValue.int64FitsInEncodedIntRange(i: int64): boolean;
@@ -337,14 +338,33 @@ begin
 end;
 
 function IXQValue.toBoolean: boolean;
+function sequenceToBoolean: boolean;
+begin
+  result := getSequenceFirst.toBoolean;
+end;
+
+function decimalToBoolean: boolean;
+begin
+  result := getDataDecimal <> 0
+end;
+function stringToBoolean: boolean;
+var str: String;
+begin
+  str := getDataString;
+  Result:= (str <> '') and (str <> '0') and (str <> 'false');
+end;
+function binaryToBoolean: boolean;
+begin
+  result := TXQBoxedBinary(getDataPointer).encoded <> ''
+end;
+
 var
   //tempf: Single;
   tempd: Double;
-  str: String;
 begin
   case kind of
     //pvkUndefined: result := false;
-    pvkSequence: result := getSequenceFirst.toBoolean;
+    pvkSequence: result := sequenceToBoolean;
     pvkBoolean:  result := getDataBoolean;
     pvkInt64:      result := getDataInt <> 0;
     {pvkFloat32:  begin
@@ -355,12 +375,9 @@ begin
       tempd := getDataDouble;
       result := not IsNan(tempd) and (tempd <> 0);
     end;
-    pvkBigDecimal: result := getDataDecimal <> 0;
-    pvkString: begin
-      str := getDataString;
-      Result:= (str <> '') and (str <> '0') and (str <> 'false');
-    end;
-    pvkBinary: result := TXQBoxedBinary(getDataPointer).encoded <> '';
+    pvkBigDecimal: result := decimalToBoolean;
+    pvkString: result := stringToBoolean;
+    pvkBinary: result := binaryToBoolean;
     //pvkQName:
     pvkDateTime: result := toDateTime <> 0;
     pvkNode:     result := true;
@@ -374,6 +391,23 @@ begin
 end;
 
 function IXQValue.toBooleanEffective: boolean;
+  function sequenceToBooleanEffective: boolean;
+  begin
+    case getSequenceCount of
+      0: exit(false);
+      1: exit(getSequenceFirst.toBooleanEffective);
+      else
+        case getSequenceFirst.kind of
+          pvkNode, pvkObject, pvkArray: exit(true);
+          else raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean', nil, self);
+        end;
+      end;
+  end;
+  procedure error;
+  begin
+    raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.', nil, self);
+  end;
+
 var
   //tempf: Single;
   tempd: Double;
@@ -381,16 +415,7 @@ begin
   case kind of
     //pvkUndefined: result := false;
     pvkSequence:
-      case getSequenceCount of
-        0: exit(false);
-        1: exit(getSequenceFirst.toBooleanEffective);
-        else
-          case getSequenceFirst.kind of
-            pvkNode, pvkObject, pvkArray: exit(true);
-            else raise EXQEvaluationException.Create('FORG0006', 'A sequence starting with an atomic value cannot be used as boolean', nil, self);
-          end;
-      end;
-
+      result := sequenceToBooleanEffective;
     pvkBoolean:  result := getDataBoolean;
     pvkInt64:      result := getDataInt <> 0;
     {pvkFloat32:  begin
@@ -401,27 +426,27 @@ begin
       tempd := getDataDouble;
       result := not IsNan(tempd) and (tempd <> 0);
     end;
-    pvkBigDecimal: result := getDataDecimal <> 0;
+    pvkBigDecimal: result := toBoolean;
     pvkString: begin
       if (typeAnnotation in [xstString, xstUntypedAtomic, xstAnyURI])
         or typeAnnotation.derivedFrom(baseSchema.string_)
          then
-        result := length(getDataString) > 0
+        result := getDataPointer <> nil //empty string is nil in Pascal
        else
-        raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
+         error;
     end;
     pvkBinary, pvkQName, pvkDateTime: begin
-      raise EXQEvaluationException.create('FORG0006', 'Cannot convert '+toXQuery() + ' to boolean.');
+      error;
       result := false;
     end;
     pvkNode:     result := true;
     pvkObject, pvkArray:   begin
       Result:=true;
       if not globalCurrentQueryInfo.AllowJSONiqOperations then
-        raise EXQEvaluationException.create('FORG0006', 'Object cannot be used as boolean', nil, self);
+        error;
     end;
     pvkFunction: begin
-      raise EXQEvaluationException.Create('FORG0006', 'A function cannot be used a boolean');
+      error;
       result := false;
     end
     else   result :=  toBoolean;
@@ -448,11 +473,14 @@ procedure convertDecimal;
 begin
   result := BigDecimalToInt64(getDataDecimal);
 end;
-
+procedure convertSequence;
+begin
+  result := getSequenceFirst.toInt64;
+end;
 begin
 case kind of
   //pvkUndefined: result := 0;
-  pvkSequence: result := getSequenceFirst.toInt64;
+  pvkSequence: convertSequence;
   pvkBoolean:  if getDataBoolean then result := 1 else result := 0;
   pvkInt64:      result := getDataInt;
   //pvkFloat32:  result := trunc(getDataFloat32);
@@ -670,10 +698,15 @@ end;
 end;
 
 function IXQValue.toNode: TTreeNode;
+  function sequenceToNode: TTreeNode;
+  begin
+    result := getSequenceFirst.toNode
+  end;
+
 begin
   case kind of
     pvkNode: result := TTreeNode(getDataPointer);
-    pvkSequence: result := getSequenceFirst.toNode
+    pvkSequence: result := sequenceToNode;
     else result := nil;
   end;
 end;
@@ -2581,7 +2614,7 @@ end;
 
 function TXQBoxedMapLike.boxInIXQValue: IXQValue;
 begin
-  result := IXQValue.create(pvkObject, xstJSONiqObject, self);
+  IXQValue.create(result, pvkObject, xstJSONiqObject, self);
 end;
 
 
