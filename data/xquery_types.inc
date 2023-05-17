@@ -181,7 +181,8 @@ procedure IXQValue.addRef;
 begin
   case kind of
     pvkUndefined, pvkBoolean, pvkInt64, {pvkFloat32, }pvkNull: {};
-    pvkDouble, pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction: TXQBoxedValue(getDataPointer)._AddRef;
+    pvkDouble: InterlockedIncrement(PXQBoxedDouble(getDataPointer).refcount);
+    pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction: TXQBoxedValue(getDataPointer)._AddRef;
     pvkSequence, pvkArray: InterlockedIncrement(TXQValueList.PHeader(getDataPointer)^.refcount);
     pvkString: fpc_AnsiStr_Incr_Ref(getDataPointer);
     pvkNode:  TTreeNode(getDataPointer).getDocument().addRef;
@@ -205,7 +206,9 @@ begin
       if InterlockedDecrement(TXQValueList.PHeader(tempSequence.data)^.refcount) = 0 then
         PXQValueList(@tempSequence)^.destroy;
     end;
-    pvkDouble, pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction: TXQBoxedValue(getDataPointer)._Release;
+    pvkDouble: if InterlockedDecrement(PXQBoxedDouble(getDataPointer).refcount) = 0 then
+       Freemem(getDataPointer);
+    pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction: TXQBoxedValue(getDataPointer)._Release;
     pvkString: begin
       p := getDataPointer;
       fpc_ansistr_decr_ref(p);
@@ -282,7 +285,7 @@ end;}
 
 function IXQValue.getDataDouble: double;
 begin
-  result := TXQBoxedDouble(getDataPointer).value;
+  result := PXQBoxedDouble(getDataPointer).value;
 end;
 
 function IXQValue.getDataDecimal: bigdecimal;
@@ -1296,10 +1299,10 @@ end;
 
 function xqvalue(v: xqfloat; typeAnnotation: TXSTypeAnnotation): IXQValue;
 var
-  box: TXQBoxedDouble;
+  box: PXQBoxedDouble;
 begin
-  box := TXQBoxedDouble.Create;
-  box.value := v;
+  box := TXQBoxedDouble.create(v);
+  box.refcount := 1;
   IXQValue.create(result, pvkDouble, typeAnnotation, box);
 end;
 
@@ -2345,9 +2348,12 @@ begin
   result := BigDecimalToStr(value)
 end;
 
-constructor TXQBoxedDouble.create(const aflt: xqfloat);
+
+class function TXQBoxedDouble.create(const aflt: xqfloat): PXQBoxedDouble;
 begin
-  value := aflt
+  result := GetMem(sizeof(TXQBoxedDouble));
+  result.refcount := 0;
+  result.value := aflt
 end;
 
 

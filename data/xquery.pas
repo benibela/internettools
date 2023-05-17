@@ -830,10 +830,12 @@ type
   end;
 
   //**Double float value
-  TXQBoxedDouble = class (TXQBoxedValue)
+  PXQBoxedDouble = ^TXQBoxedDouble;
+  TXQBoxedDouble = record
+    refcount: SizeInt;
     value:  double;   //*< plain double value
 
-    constructor create(const aflt: xqfloat = 0);
+    class function create(const aflt: xqfloat = 0): PXQBoxedDouble; static;
   end;
 
 
