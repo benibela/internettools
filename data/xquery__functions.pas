@@ -7547,58 +7547,60 @@ var duplicates: TXQMapDuplicateResolve = xqmdrUseFirst;
   function mergeStringMaps: IXQValue;
   var
     pv: PIXQValue;
-    value: IXQValue;
     resobj: TXQBoxedStringMap;
     pprop: TXQProperty;
     tempseq: TXQValueList;
+    entity: TXQHashmapStrOwningXQValue.PHashMapEntity;
   begin
     resobj := TXQBoxedStringMap.create();
     result := resobj.boxInIXQValue;
     for pv in argv[0].GetEnumeratorPtrUnsafe do begin
       for pprop in pv^.getEnumeratorStringPropertiesUnsafe do begin
-        if resobj.hasProperty(pprop.key, value) then begin
+        entity := resobj.mapdata.findEntity(pprop.key, false);
+        if entity <> nil then begin
           case duplicates of
             xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
             xqmdrUseFirst: ;
             xqmdrUseLast: resobj.setMutable(pprop.key, pprop.Value);
             xqmdrCombine: begin
-              tempseq := TXQValueList.create(value.getSequenceCount + pprop.Value.getSequenceCount);
-              tempseq.add(value);
+              tempseq := TXQValueList.create(entity.Value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq.add(entity.Value);
               tempseq.add(pprop.Value);
               resobj.setMutable(pprop.key, tempseq.toXQValueSequenceSqueezed);
             end;
             xqmdrRetain, xqmdrUseAny: assert(false);
           end;
-        end else resobj.setMutable(pprop.key, pprop.Value);
+        end else resobj.mapdata.include(pprop.key, pprop.Value);
       end;
     end;
   end;
   function mergeStandardMaps: IXQValue;
   var
     pv: PIXQValue;
-    value: IXQValue;
     resmap: TXQBoxedStandardMap;
     tempseq: TXQValueList;
     pprop: TXQStandardProperty;
+    entity: TXQHashmapXQValue.PHashMapEntity;
   begin
     resmap := TXQBoxedStandardMap.create();
     result := resmap.boxInIXQValue;
     for pv in argv[0].GetEnumeratorPtrUnsafe do begin
       for pprop in pv^.getEnumeratorPropertiesUnsafe do begin
-        if resmap.hasProperty(pprop.key, value) then begin
+        entity := resmap.mapdata.findEntity(pprop.key, false);
+        if entity <> nil then begin
           case duplicates of
             xqmdrReject: raise EXQEvaluationException.create('FOJS0003', 'Duplicate keys', nil, argv[0]);
             xqmdrUseFirst: ;
             xqmdrUseLast: resmap.setMutable(pprop.key, pprop.Value);
             xqmdrCombine: begin
-              tempseq := TXQValueList.create(value.getSequenceCount + pprop.Value.getSequenceCount);
-              tempseq.add(value);
+              tempseq := TXQValueList.create(entity.value.getSequenceCount + pprop.Value.getSequenceCount);
+              tempseq.add(entity.value);
               tempseq.add(pprop.Value);
               resmap.setMutable(pprop.key, tempseq.toXQValueSequenceSqueezed);
             end;
             xqmdrRetain, xqmdrUseAny: assert(false);
           end;
-        end else resmap.setMutable(pprop.key, pprop.Value);
+        end else resmap.mapdata.include(pprop.key, pprop.Value);
       end;
     end;
   end;
