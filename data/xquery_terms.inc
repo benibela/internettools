@@ -4624,16 +4624,23 @@ var
   obj: TXQBoxedStandardMap;
   i: SizeInt;
   v: IXQValue;
+  entry: TXQBoxedStandardMapEntry;
 begin
-  obj := TXQBoxedStandardMap.create();
-  result := obj.boxInIXQValue;
-  if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
-  for i := 0 to length(children) div 2 - 1 do begin
-    v := children[i*2+1].evaluate(context);
-    obj.setMutable(children[i*2].evaluate(context), v);
+  if length(children) = 2 then begin
+    entry := TXQBoxedStandardMapEntry.create(children[0].evaluate(context));
+    result := entry.boxInIXQValue;
+    entry.value := children[1].evaluate(context);
+  end else begin
+    obj := TXQBoxedStandardMap.create();
+    result := obj.boxInIXQValue;
+    if length(children) and 1 = 1 then raiseEvaluationError('pxp:OBJ', 'Need an even number of names+values in an object constructor');
+    for i := 0 to length(children) div 2 - 1 do begin
+      v := children[i*2+1].evaluate(context);
+      obj.setMutable(children[i*2].evaluate(context), v);
+    end;
+    if obj.Size <> length(children) div 2 then
+      duplicateError(result);
   end;
-  if obj.Size <> length(children) div 2 then
-    duplicateError(result);
 end;
 
 function TXQTermMapConstructor.getContextDependencies: TXQContextDependencies;

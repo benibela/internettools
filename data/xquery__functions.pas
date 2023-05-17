@@ -7700,15 +7700,14 @@ end;
 function xqFunctionMapEntry({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   obj: TXQBoxedStringMap;
-  map: TXQBoxedStandardMap;
+  map: TXQBoxedStandardMapEntry;
 begin
   if argv[0].typeAnnotation = xstString then begin
     obj := TXQBoxedStringMap.create();
     obj.setMutable(argv[0].toString, argv[1]);
     result := obj.boxInIXQValue;
   end else begin
-    map := TXQBoxedStandardMap.create();
-    map.setMutable(argv[0], argv[1]);
+    map := TXQBoxedStandardMapEntry.create(argv[0], argv[1]);
     result := map.boxInIXQValue;
   end;
 end;

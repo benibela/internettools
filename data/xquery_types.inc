@@ -3492,6 +3492,157 @@ end;
 
 
 
+constructor TXQBoxedStandardMapEntry.TXQValuePropertyValueEnumeratorForStandardMapEntry.create(map: TXQBoxedStandardMapEntry);
+begin
+  fcurrent := map.value;
+  hasNext := true
+end;
+
+function TXQBoxedStandardMapEntry.TXQValuePropertyValueEnumeratorForStandardMapEntry.MoveNext: Boolean;
+begin
+  result := hasNext;
+  hasNext := false;
+end;
+
+constructor TXQBoxedStandardMapEntry.TXQValueStringPropertyEnumeratorForStandardMapEntry.create(map: TXQBoxedStandardMapEntry);
+begin
+  tempEntity.Key := map.key.toString;
+  tempEntity.Value := map.value;
+  fcurrent.entity := @tempEntity;
+  hasNext := true
+end;
+
+function TXQBoxedStandardMapEntry.TXQValueStringPropertyEnumeratorForStandardMapEntry.MoveNext: Boolean;
+begin
+  result := hasNext;
+  hasNext := false;
+end;
+
+constructor TXQBoxedStandardMapEntry.TXQValueStandardPropertyEnumeratorForStandardMapEntry.create(map: TXQBoxedStandardMapEntry);
+begin
+  tempEntity.Key := map.key;
+  tempEntity.Value := map.value;
+  fcurrent.entity := @tempEntity;
+  hasNext := true
+end;
+
+function TXQBoxedStandardMapEntry.TXQValueStandardPropertyEnumeratorForStandardMapEntry.MoveNext: Boolean;
+begin
+  result := hasNext;
+  hasNext := false;
+end;
+
+
+constructor TXQBoxedStandardMapEntry.create(const akey: IXQValue);
+  function setAtomized: boolean;
+  begin
+    key := xqvalueAtomize(akey);
+    if key.getSequenceCount <> 1 then raiseXPTY0004TypeError(key, 'map key');
+  end;
+begin
+  if TXQValueOwnershipTracker.isAtomicKeyValue(akey) then key := akey
+  else setAtomized;
+end;
+
+constructor TXQBoxedStandardMapEntry.create(const akey, avalue: IXQValue);
+begin
+  create(akey);
+  value := avalue;
+end;
+
+destructor TXQBoxedStandardMapEntry.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TXQBoxedStandardMapEntry.Size: SizeInt;
+begin
+  result := 1;
+end;
+
+function TXQBoxedStandardMapEntry.getPropertyKeyKind: TXQMapPropertyKeyKind;
+begin
+  Result := xqmpkkStandardKeys;
+end;
+
+function TXQBoxedStandardMapEntry.hasProperty(const name: string; out avalue: IXQValue): boolean;
+begin
+  result := hasProperty(xqvalue(name), avalue);
+end;
+
+function TXQBoxedStandardMapEntry.hasProperty(const akey: ixqvalue; out avalue: IXQValue): boolean;
+  function checkAtomized: boolean;
+  begin
+    result := TXQValueOwnershipTracker.equal(key, xqvalueAtomize(akey))
+  end;
+begin
+  if TXQValueOwnershipTracker.isAtomicKeyValue(key) then
+    result := TXQValueOwnershipTracker.equal(key, akey)
+   else
+    result := checkAtomized;
+  if result then avalue := value
+  else avalue.clear;
+end;
+
+function TXQBoxedStandardMapEntry.hasProperty(const name: string): boolean;
+var temp: IXQValue;
+begin
+  result := hasProperty(name, temp);
+end;
+
+function TXQBoxedStandardMapEntry.hasProperty(const name: ixqvalue): boolean;
+var temp: IXQValue;
+begin
+  result := hasProperty(name, temp);
+end;
+
+function TXQBoxedStandardMapEntry.getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator;
+begin
+  result := TXQValueStandardPropertyEnumeratorForStandardMapEntry.create(self);
+end;
+
+function TXQBoxedStandardMapEntry.getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator;
+begin
+  result := TXQValuePropertyValueEnumeratorForStandardMapEntry.create(self);
+end;
+
+function TXQBoxedStandardMapEntry.getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator;
+begin
+  result := TXQValueStringPropertyEnumeratorForStandardMapEntry.create(self);
+end;
+
+function TXQBoxedStandardMapEntry.toStandardMap: TXQBoxedStandardMap;
+begin
+  result := TXQBoxedStandardMap.create();
+  result.setMutable(key, value);
+end;
+
+function TXQBoxedStandardMapEntry.setImmutable(const name, avalue: IXQValue): TXQBoxedMapLike;
+begin
+  Result:=toStandardMap.setImmutable(name, avalue);
+end;
+
+function TXQBoxedStandardMapEntry.setImmutable(const name: string; const v: IXQValue): TXQBoxedMapLike;
+begin
+  Result:=toStandardMap.setImmutable(name, v);
+end;
+
+function TXQBoxedStandardMapEntry.enumeratePropertyKeys: IXQValue;
+begin
+  Result:=key;
+end;
+
+procedure TXQBoxedStandardMapEntry.enumeratePropertyKeys(var keyset: TXQHashsetStr);
+begin
+  keyset.include(key.toString);
+end;
+
+function TXQBoxedStandardMapEntry.enumeratePropertyValues: IXQValue;
+begin
+  result := value;
+end;
+
+
 
 
 

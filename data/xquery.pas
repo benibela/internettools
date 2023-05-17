@@ -1129,6 +1129,57 @@ type
     //function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
   end;
 
+  TXQBoxedStandardMapEntry = class (TXQBoxedMapLike)
+  protected
+    key: IXQValue;
+    value: IXQValue;
+  public
+
+    type
+      TXQValueStringPropertyEnumeratorForStandardMapEntry = class(TXQValueStringPropertyEnumerator)
+        tempEntity: TXQHashmapStrOwningXQValue.THashMapEntity;
+        hasNext: boolean;
+        constructor create(map: TXQBoxedStandardMapEntry);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValueStandardPropertyEnumeratorForStandardMapEntry = class(TXQValueStandardPropertyEnumerator)
+        tempEntity: TXQHashmapXQValue.THashMapEntity;
+        hasNext: boolean;
+        constructor create(map: TXQBoxedStandardMapEntry);
+        function MoveNext: Boolean; override;
+      end;
+      TXQValuePropertyValueEnumeratorForStandardMapEntry = class(TXQValuePropertyValueEnumerator)
+        hasNext: boolean;
+        constructor create(map: TXQBoxedStandardMapEntry);
+        function MoveNext: Boolean; override;
+      end;
+
+    constructor create(const akey: IXQValue); reintroduce; virtual;
+    constructor create(const akey, avalue: IXQValue); reintroduce; virtual;
+    destructor Destroy; override;
+
+    function Size: SizeInt; override;
+    function getPropertyKeyKind: TXQMapPropertyKeyKind; override;
+    function hasProperty(const name: string; out avalue: IXQValue): boolean; override; //**< Checks if the object has a certain property (key), and returns the property value
+    function hasProperty(const {%H-}akey: ixqvalue; out avalue: IXQValue): boolean; override; //**< Checks if an object has a certain property (key), and returns the property value
+    function hasProperty(const name: string): boolean; override; //**< Checks if the object has a certain property (key)
+    function hasProperty(const {%H-}name: ixqvalue): boolean; override; //**< Checks if an object has a certain property (key)
+
+    function getEnumeratorPropertiesUnsafe: TXQValueStandardPropertyEnumerator; override;
+    function getEnumeratorPropertyValuesUnsafe: TXQValuePropertyValueEnumerator; override;
+    function getEnumeratorStringPropertiesUnsafe: TXQValueStringPropertyEnumerator; override;
+
+    function toStandardMap: TXQBoxedStandardMap;
+
+    function setImmutable(const name, avalue: IXQValue): TXQBoxedMapLike; overload; override;
+    function setImmutable(const name: string; const v: IXQValue): TXQBoxedMapLike; overload; override; //**< Creates a new object with the same values as the current one and changes a property of it
+
+    function enumeratePropertyKeys: IXQValue; override;
+    procedure enumeratePropertyKeys(var keyset: TXQHashsetStr); override;
+    function enumeratePropertyValues: IXQValue;       override;
+
+    //function clone: IXQValue; override; //**< Creates a hard clone of the object (i.e. also clones all properties)
+  end;
 
   { TXQFunctionParameter }
 
@@ -3391,6 +3442,7 @@ procedure raisePXPInternalError;
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error');
 end;
+
 
 procedure TXQEvaluationContext.raiseXPDY0002ContextItemAbsent;
 begin
