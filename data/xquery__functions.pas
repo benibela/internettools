@@ -3205,7 +3205,6 @@ end;
 
 function xqFunctionType_of({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
-  t: TXSType;
   f: TXQBoxedFunction;
   r: String;
   i: Integer;

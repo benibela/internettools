@@ -219,8 +219,9 @@ type
     procedure release;
     procedure clear;
 
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: QWord ); static; inline;
     class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer ); static; inline;
-    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ); static; inline;
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ); static; //inline;
     class procedure create(var result: IXQValue; smallishInt: Int64); static; inline;
     class function int64FitsInEncodedIntRange(i: int64): boolean; inline; static;
 
@@ -619,7 +620,7 @@ type
     function compareGeneral(const a, b: IXQValue; overrideCollation: TXQCollation; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid): boolean;
     procedure compareGeneral(const a, b: IXQValue; out result: IXQValue; accept1: TXQCompareResult; accept2: TXQCompareResult = xqcrReservedInvalid);
     //**Compares two atomic values and returns 0 as the deepEqual function would if equal, -1 for a < b, and +1 for a > b; -2 for unknown
-    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult; inline;
+    function compareDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): TXQCompareResult;
     function equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean; inline;
     //**internally used (Returns if the eq operator is defined for the types of a and b)
     class function comparableTypes(const a, b: IXQValue): boolean; static;
@@ -716,7 +717,7 @@ type
     procedure appendJSONArrayComma;
     procedure appendJSONArrayEnd;
     procedure appendJSONObjectStart;
-    procedure appendJSONObjectKeyColon(const key: string); inline;
+    procedure appendJSONObjectKeyColon(const key: string); //inline;
     procedure appendJSONObjectComma;
     procedure appendJSONObjectEnd;
     procedure appendJSONString(const s: string);
@@ -2910,8 +2911,8 @@ public
   {$endif}
   function xqvalue(const v: BigDecimal):IXQValue;  //**< Creates an BigDecimal IXQValue
   function xqvalue(const v: BigDecimal; typeAnnotation: TXSTypeAnnotation):IXQValue;  //**< Creates an BigDecimal IXQValue
-  function xqvalue(const v: string):IXQValue; inline; //**< Creates a string IXQValue
-  function xqvalue(const v: string; typeAnnotation: TXSTypeAnnotation):IXQValue; inline; //**< Creates a string IXQValue
+  function xqvalue(const v: string):IXQValue; //**< Creates a string IXQValue
+  function xqvalue(const v: string; typeAnnotation: TXSTypeAnnotation):IXQValue;  //**< Creates a string IXQValue
   function xqvalue({%H-}intentionallyUnusedParameter: TDateTime):IXQValue; inline; //**< Raises an exception (to prevent xquery(TDateTime) from using xquery(float))
   function xqvalue(v: TTreeNode):IXQValue; inline; //**< Creates a node TXQValue
   function xqvalue(sl: TStringList): IXQValue; //**< Creates a sequence of strings (does *not* free the list)
@@ -3435,16 +3436,71 @@ end;
 {$ifdef cpu64}
 function InterlockedIncrement (var Target: int64) : int64; overload;
 begin
-  InterlockedIncrement64(target);
+  result := InterlockedIncrement64(target);
 end;
 function InterlockedDecrement (var Target: int64) : int64; overload;
 begin
-  InterlockedDecrement64(target);
+  result := InterlockedDecrement64(target);
 end;
 {$endif}
 
 
+function TXQValueList.getCount: SizeInt;
+begin
+  result := PHeader(data).count;
+end;
 
+function TXQValueList.getBuffer: PT;
+begin
+  result := PIXQValue(data + sizeof(THeader));
+end;
+
+function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
+begin
+  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs many times
+  if result then
+    inc(fcurrent)
+  else
+    result := MoveNextSingleElement; //not inlined since it only occurs once
+end;
+
+function TXQValueEnumerator.GetCurrent: IXQValue;
+begin
+  result := ptr.current^;
+end;
+
+function TXQValueEnumerator.MoveNext: Boolean;
+begin
+  result := ptr.MoveNext;
+end;
+
+function TXQEvaluationStack.getBuffer: PIXQValue;
+begin
+  result := list.buffer;
+end;
+
+function TXQEvaluationStack.getCount: sizeint;
+begin
+  result := list.count;
+end;
+
+function TXQEvaluationStack.topptr(i: SizeInt): PIXQValue;
+begin
+  with list do
+  result := @buffer[count - i - 1];
+end;
+
+procedure TXQTerm_Visitor.declare(v: PXQTermVariable; theparent: TXQTerm);
+begin
+  parent := theparent;
+  declare(v);
+end;
+
+procedure TXQTerm_Visitor.undeclare(v: PXQTermVariable; theparent: TXQTerm);
+begin
+  parent := theparent;
+  undeclare(v);
+end;
 
 {$I xquery_types.inc}
 
@@ -3729,14 +3785,6 @@ begin
   end;
 end;
 
-function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
-begin
-  result := fcurrent < flast; //the multivalue loop case comes first, because if it occurs many times
-  if result then
-    inc(fcurrent)
-  else
-    result := MoveNextSingleElement; //not inlined since it only occurs once
-end;
 
 function TXQValueEnumeratorPtrUnsafe.MoveMany(count: sizeint): Boolean;
 begin
@@ -3809,19 +3857,9 @@ begin
   result := self;
 end;
 
-function TXQValueEnumerator.GetCurrent: IXQValue;
-begin
-  result := ptr.current^;
-end;
-
 class procedure TXQValueEnumerator.clear(out enum: TXQValueEnumerator);
 begin
   TXQValueEnumeratorPtrUnsafe.clear(enum.ptr);
-end;
-
-function TXQValueEnumerator.MoveNext: Boolean;
-begin
-  result := ptr.MoveNext;
 end;
 
 function TXQValueEnumerator.GetEnumerator: TXQValueEnumerator;
@@ -3897,6 +3935,11 @@ begin
   result := PHeader(data).capacity;
 end;
 
+procedure TXQValueList.checkIndex(i: SizeInt);
+begin
+  if (i < 0) or (i >= count) then raiseInvalidIndexError(data, i);
+end;
+
 function TXQValueList.getItem(i: sizeint): IXQValue;
 begin
   checkIndex(i);
@@ -3944,11 +3987,6 @@ procedure TXQValueList.setItem(i: sizeint; AValue: IXQValue);
 begin
   checkIndex(i);
   buffer[i] := avalue
-end;
-
-function TXQValueList.getBuffer: PT;
-begin
-  result := PIXQValue(data + sizeof(THeader));
 end;
 
 procedure TXQValueList.insertSingle(i: SizeInt; const child: IXQValue);
@@ -4057,10 +4095,6 @@ begin
     data := nil; //prevent double free }
 end;
 
-function TXQValueList.getCount: SizeInt;
-begin
-  result := PHeader(data).count;
-end;
 procedure TXQValueList.setCount(c: SizeInt);
 var
   i: SizeInt;
@@ -4081,10 +4115,6 @@ begin
   raiseXQEvaluationException('pxp:INTERNAL', 'Invalid TXQValueList index: '+IntToStr(i) + ' for list of length ' + inttostr(PHeader(adata).count));
 end;
 
-procedure TXQValueList.checkIndex(i: SizeInt);
-begin
-  if (i < 0) or (i >= count) then raiseInvalidIndexError(data, i);
-end;
 
 procedure TXQValueList.clear;
 begin
@@ -4352,240 +4382,6 @@ end;
 
 
 
-{$IMPLICITEXCEPTIONS OFF}
-function xqvalue: IXQValue;
-begin
-  result.clear;
-  //result := TXQValueUndefined.Create;
-end;
-
-
-
-function xqvalue(const v: Boolean): IXQValue;
-begin
-  case v of
-    true:  result := xqvalueTrue;
-    false: IXQValue.create(result, pvkBoolean, xstBoolean, pointer(PtrInt(0)));
-  end;
-  //result := TXQValueBoolean.Create(v);
-end;
-
-function xqvalueTrue: IXQValue;
-begin
-  IXQValue.create(result, pvkBoolean, xstBoolean, pointer(PtrInt(-1)));
-end;
-
-function xqvalueFalse: IXQValue;
-begin
-  IXQValue.create(result, pvkBoolean, xstBoolean, pointer(PtrInt(0)));
-end;
-
-procedure boxIntInDecimal(var result: IXQValue; d: Int64; typeAnnotation: TXSTypeAnnotation);
-begin
-  result := xqvalue(BigDecimal(d), typeAnnotation);
-end;
-
-function xqvalue(const d: Int64): IXQValue;
-begin
-  if IXQValue.int64FitsInEncodedIntRange(d) then
-    IXQValue.create(result, d)
-  else
-    boxIntInDecimal(result, d, xstInteger);
-end;
-
-function xqvalue(const d: Int64; typeAnnotation: TXSTypeAnnotation): IXQValue;
-begin
-  if IXQValue.int64FitsInEncodedIntRange(d) then begin
-    IXQValue.create(result, d);
-    result.setTypeAnnotation(typeAnnotation);
-  end else
-    boxIntInDecimal(result, d, typeAnnotation);
-end;
-
-function xqvalue(v: Integer): IXQValue;
-begin
-  IXQValue.create(result, v);
-end;
-
-
-function xqvalue(v: xqfloat; typeAnnotation: TXSTypeAnnotation): IXQValue;
-var
-  box: TXQBoxedDouble;
-begin
-  box := TXQBoxedDouble.Create;
-  box.value := v;
-  IXQValue.create(result, pvkDouble, typeAnnotation, box);
-end;
-
-{$if defined(FPC_HAS_TYPE_SINGLE) and defined(FPC_HAS_TYPE_DOUBLE) }
-function xqvalue(v: single; typeAnnotation: TXSTypeAnnotation): IXQValue;
-begin
-  result := xqvalue(double(v), typeAnnotation);
-end;
-{$endif}
-
-{function xqvalue(v: TDateTime): IXQValue;
-begin
-  result := TXQValueDateTime.Create(v);
-end;}
-
-function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
-begin
-  result := default(IXQValue);
-  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
-end;
-
-
-function xqvalue(const v: BigDecimal): IXQValue;
-var
-  t: TXSTypeAnnotation;
-begin
-  if v.isIntegral then t := xstInteger
-  else t := xstDecimal;
-  result := xqvalue(v, t);
-end;
-
-function xqvalue(const v: BigDecimal; typeAnnotation: TXSTypeAnnotation): IXQValue;
-var
-  box: TXQBoxedDecimal;
-begin
-  box := TXQBoxedDecimal.create(v);
-  IXQValue.create(result, pvkBigDecimal, typeAnnotation, box);
-end;
-
-function xqvalue(const v: string): IXQValue; inline;
-begin
-  fpc_AnsiStr_Incr_Ref(pointer(v));
-  IXQValue.create(result, pvkString, xstString, pointer(v));
-end;
-
-function xqvalue(const v: string; typeAnnotation: TXSTypeAnnotation):IXQValue; inline; //**< Creates a string IXQValue
-begin
-  fpc_AnsiStr_Incr_Ref(pointer(v));
-  IXQValue.create(result, pvkString, typeAnnotation, pointer(v));
-end;
-
-function xqvalue(sl: TStringList): IXQValue;
-var
-  i: SizeInt;
-  list: TXQValueList;
-begin
-  if sl.Count = 0 then exit(xqvalue());
-  if sl.Count = 1 then exit(xqvalue(sl[0]));
-
-  list := TXQValueList.create(sl.Count);
-  for i:=0 to sl.Count - 1 do
-    list.add(xqvalue(sl[i]));
-  xqvalueSeqSqueezed(result, list)
-end;
-
-function xqvalue(v: TXQBoxedFunction): IXQValue;
-begin
-  IXQValue.create(result, pvkFunction, xstNoType, v);
-end;
-
-function xqvalue(v: TXQBoxedQName): IXQValue;
-begin
-  IXQValue.create(result, pvkQName, xstQName, v);
-end;
-
-function xqvalue(v: TXQBoxedBinary): IXQValue;
-var
-  t: TXSTypeAnnotation;
-begin
-  case v.dataType of
-    bdtHex: t := xstHexBinary;
-    bdtBase64: t := xstBase64Binary;
-    else t := xstNoType;
-  end;
-  IXQValue.create(result, pvkBinary, t, v);
-end;
-
-function xqvalue(v: TXQBoxedDateTime): IXQValue;
-begin
-  IXQValue.create(result, pvkDateTime, v.typeAnnotationType.typeAnnotation, v);
-end;
-
-function xqvalue(const sl: array of string): IXQValue;
-var
-  resseq: TXQValueList;
-  i: SizeInt;
-begin
-  resseq := TXQValueList.create(length(sl));
-  for i := 0 to high(sl) do
-    resseq.add(xqvalue(sl[i], xstUntypedAtomic));
-  xqvalueSeqSqueezed(result, resseq);
-end;
-
-function xqvalue(const sl: array of IXQValue): IXQValue;
-var
-  resseq: TXQValueList;
-  i: SizeInt;
-begin
-  resseq := TXQValueList.create(length(sl));
-  for i := 0 to high(sl) do
-    resseq.add(sl[i]);
-  xqvalueSeqSqueezed(result, resseq);
-end;
-
-function xqvalue(const s: TXQHashsetStr): IXQValue;
-var
-  resseq: TXQValueList;
-  k: string;
-begin
-  resseq := TXQValueList.create(s.Count);
-  for k in s do
-    resseq.add(xqvalue(k));
-  xqvalueSeqSqueezed(result, resseq);
-end;
-
-function xqvalueArray(var l: TXQValueList): IXQValue;
-begin
-  l.AddRef();
-  IXQValue.create(result, pvkArray, xstJSONiqArray, l.data);
-end;
-
-function xqvalueJSONiqNull: IXQValue;
-begin
-  IXQValue.create(result, pvkNull, xstJSONiqNull, nil)
-end;
-
-
-function xqvalue(v: TTreeNode): IXQValue;
-var
-  doc: TTreeDocument;
-begin
-  if v = nil then result.clear
-  else begin
-    doc := v.getDocument();
-    doc.addRef;
-    IXQValue.create(result, pvkNode, xstNode, pointer(v));
-  end;
-end;
-
-procedure xqvalueSeqSqueeze(var v: IXQValue);
-begin
-  if (v.getSequenceCount > 1) or (v.kind <> pvkSequence) then exit;
-  v := v.get(1);
-end;
-
-function xqvalueSeqSqueezed(var l: TXQValueList): IXQValue;
-begin
-  xqvalueSeqSqueezed(result, l);
-end;
-
-procedure xqvalueSeqSqueezed(out result: IXQValue; var l: TXQValueList);
-begin
-  case l.Count of
-    0: result := xqvalue();
-    1: result := l[0];
-    else begin
-      l.AddRef();
-      IXQValue.create(result, pvkSequence, xstNoType, l.data);
-      exit;
-    end;
-  end;
-end;
 
 
 
@@ -4604,7 +4400,6 @@ end;
 
 
 
-{$IMPLICITEXCEPTIONS ON}
 
 
 
@@ -5002,47 +4797,6 @@ begin
   result := (namespaceURL = ns) and (localname = local);
 end;
 
-procedure TXQValueDateTimeData.initFromMicroSecondStamp(mics: int64; const tz: integer);
-begin
-  mics := initFromMicroSecondStampTimeOnly(mics, tz);
-  dateDecode(mics, @year, @month, @day);
-end;
-
-function TXQValueDateTimeData.initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer): int64;
-begin
-  result := mics div (MicroSecsPerSec * 60 * 60 * 24);
-  mics := mics - result * (MicroSecsPerSec * 60 * 60 * 24);
-  if mics < 0 then mics += (MicroSecsPerSec * 60 * 60 * 24);
-
-  microsecs := mics mod MicroSecsPerSec; mics := mics div MicroSecsPerSec;
-  seconds   := mics mod 60; mics := mics div 60;
-  min       := mics mod 60; mics := mics div 60;
-  hour      := mics mod 24; mics := mics div 24;
-  timezone := tz;
-end;
-
-function TXQValueDateTimeData.toMicroSecondStamp(subtractTimeZone: Boolean = true): int64;
-var
-  tempmin: int64;
-  dayStamp: Int64;
-  timeStamp: Int64;
-begin
-  tempmin := min;
-  if subtractTimeZone and (timezone <> high(Integer)) then tempmin -= timezone;
-  dayStamp := trunc(dateEncode(year, month, day));
-  timeStamp := hour * 3600  + tempmin *60 + seconds;
-  result := (dayStamp * int64(SecsPerDay) + timeStamp) * MicroSecsPerSec + microsecs;
-end;
-
-function TXQValueDateTimeData.toMonths: integer;
-begin
-  result := 12 * year + month;
-end;
-
-function TXQValueDateTimeData.toDayTime: int64;
-begin
-  result := microsecs + MicroSecsPerSec * (seconds + 60 * (min + 60 * (hour + 24 * int64(day))));
-end;
 
 
 
@@ -5409,6 +5163,11 @@ end;
 
 
 {$ImplicitExceptions off}
+function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
+begin
+  result := compareDeepAtomic(a,b,overrideCollation) = xqcrEqual;
+end;
+
 class procedure TXQValueOwnershipTracker.addRef(const v: IXQValue);
 begin
   v.addRef;
@@ -6256,11 +6015,6 @@ begin
   end;
 end;
 
-function TXQEvaluationStack.topptr(i: SizeInt): PIXQValue;
-begin
-  with list do
-  result := @buffer[count - i - 1];
-end;
 
 
 procedure TXQEvaluationStack.push(const name: TXQTermVariable; const v: ixqvalue);
@@ -6278,16 +6032,6 @@ end;
 procedure TXQEvaluationStack.failTop(const name: TXQTermVariable; i: SizeInt);
 begin
   raise EXQEvaluationException.create('pxp:INTERNAL','Stack name mismatch: '+debugNames[count - i - 1]+' <> '+name.value);
-end;
-
-function TXQEvaluationStack.getBuffer: PIXQValue;
-begin
-  result := list.buffer;
-end;
-
-function TXQEvaluationStack.getCount: sizeint;
-begin
-  result := list.count;
 end;
 
 constructor TXQEvaluationStack.create(acapacity: SizeInt);
@@ -6743,12 +6487,14 @@ function xqvalueOrPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQVa
 begin
   ignore(cxt); ignore(a); ignore(b);
   raise EXQEvaluationException.create('PXP:ORPL','Placeholder called');
+  result := xqvalue();
 end;
 
 function xqvalueAndPlaceholder(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 begin
   ignore(cxt); ignore(a); ignore(b);
   raise EXQEvaluationException.create('PXP:ANDPL', 'Placeholder called');
+  result := xqvalue();
 end;
 
 
@@ -7444,18 +7190,6 @@ begin
 end;
 
 
-function TXQStaticContext.equalDeepAtomic(const a, b: IXQValue; overrideCollation: TXQCollation): boolean;
-begin
-  result := compareDeepAtomic(a,b,overrideCollation) = xqcrEqual;
-{var
-  ak: TXQValueKind;
-  bk: TXQValueKind;
-begin
-  result:=false;
-  ak := a.kind; bk := b.kind;
-  if ((ak = pvkDouble) and IsNan(TXQValueFloat(a).value)) or ((bk = pvkDouble) and IsNan(TXQValueFloat(b).value)) then
-    exit(acceptNAN and ((ak = pvkDouble) and IsNan(TXQValueFloat(a).value)) and ((bk = pvkDouble) and IsNan(TXQValueFloat(b).value)));}
-end;
 
 
 class function TXQStaticContext.comparableTypes(const a, b: IXQValue): boolean;

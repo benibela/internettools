@@ -326,6 +326,7 @@ var
  c1024, s: string;
  i: Integer;
 begin
+  c1024 := '';
   SetLength(c1024, 1024);
   for i := 1 to length(c1024) do c1024[i] := chr((i - 1) and $FF);
   test(strlequal(pchar('abcd'),pchar('abcx'), 3, 3) = true);

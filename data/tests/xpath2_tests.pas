@@ -4421,6 +4421,7 @@ begin
   templist := TXQValueList.create();
   templist.add(xqvalue(10));
   templist.AddRef();
+  xqw := xqvalue();
   IXQValue.create(xqw, pvkSequence, xstNoType, PPointer(@templist)^);
   if ps.StaticContext.compareAtomic(xqv,xqw) <> xqcrEqual then raise Exception.Create('eq seq');
   if ps.StaticContext.compareAtomic(xqw,xqv) <> xqcrEqual then raise Exception.Create('seq eq');

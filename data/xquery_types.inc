@@ -188,6 +188,11 @@ begin
   end;
 end;
 
+function IXQValue.getDataList: TXQValueWeaklySharedList;
+begin
+  result.data := getDataPointer;
+end;
+
 procedure IXQValue.release;
 var
   p: Pointer;
@@ -215,6 +220,13 @@ begin
     release;
     encoded := 0;
   end;
+end;
+
+class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: QWord);
+begin
+  if result.encoded <> 0 then
+    result.release;
+  result.encoded := (data shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
 end;
 
 class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer);
@@ -286,11 +298,6 @@ end;
 function IXQValue.getDataNode: TTreeNode;
 begin
   result := TTreeNode(getDataPointer);
-end;
-
-function IXQValue.getDataList: TXQValueWeaklySharedList;
-begin
-  result.data := getDataPointer;
 end;
 
 function IXQValue.getDataBinary: TXQBoxedBinary;
@@ -566,22 +573,24 @@ case kind of
 end;
 end;
 
+
+
 function IXQValue.toStringArray: TStringArray;
 var
-  v: IXQValue;
+  pv: PIXQValue;
   i: sizeint;
 begin
   result := nil;
   SetLength(result, getSequenceCount);
   i := 0;
-  for v in self do begin
-    result[i]:= v.toString;
+  for pv in self.GetEnumeratorPtrUnsafe do begin
+    result[i]:= pv^.toString;
     inc(i);
   end;
 end;
 
 function IXQValue.toJoinedString(const sep: string): string;
-var i: SizeInt;
+var
     builder: TStrBuilder;
     enum: TXQValueEnumeratorPtrUnsafe;
 begin
@@ -992,7 +1001,7 @@ begin
       exit(arraySetImmutable());
   end;
   raiseInternalErrorObjectExpected('setImmutable (or array)');
-  result := xqvalue;
+  result.clear;
 end;
 
 {$push}{$RangeChecks off}{$OverflowChecks off}
@@ -1225,6 +1234,252 @@ begin
     end;
   end;
 end;
+
+
+
+
+{$IMPLICITEXCEPTIONS OFF}
+function xqvalue: IXQValue;
+begin
+  result.clear;
+  //result := TXQValueUndefined.Create;
+end;
+
+
+function xqvalueTrue: IXQValue;
+begin
+  IXQValue.create(result, pvkBoolean, xstBoolean, QWord(-1));
+end;
+
+function xqvalueFalse: IXQValue;
+begin
+  IXQValue.create(result, pvkBoolean, xstBoolean, 0);
+end;
+
+function xqvalue(const v: Boolean): IXQValue;
+begin
+  case v of
+    true:  IXQValue.create(result, pvkBoolean, xstBoolean, QWord(-1));
+    false: IXQValue.create(result, pvkBoolean, xstBoolean, 0);
+  end;
+  //result := TXQValueBoolean.Create(v);
+end;
+
+
+procedure boxIntInDecimal(var result: IXQValue; d: Int64; typeAnnotation: TXSTypeAnnotation);
+begin
+  result := xqvalue(BigDecimal(d), typeAnnotation);
+end;
+
+function xqvalue(const d: Int64): IXQValue;
+begin
+  if IXQValue.int64FitsInEncodedIntRange(d) then
+    IXQValue.create(result, d)
+  else
+    boxIntInDecimal(result, d, xstInteger);
+end;
+
+function xqvalue(const d: Int64; typeAnnotation: TXSTypeAnnotation): IXQValue;
+begin
+  if IXQValue.int64FitsInEncodedIntRange(d) then begin
+    IXQValue.create(result, d);
+    result.setTypeAnnotation(typeAnnotation);
+  end else
+    boxIntInDecimal(result, d, typeAnnotation);
+end;
+
+function xqvalue(v: Integer): IXQValue;
+begin
+  IXQValue.create(result, v);
+end;
+
+
+function xqvalue(v: xqfloat; typeAnnotation: TXSTypeAnnotation): IXQValue;
+var
+  box: TXQBoxedDouble;
+begin
+  box := TXQBoxedDouble.Create;
+  box.value := v;
+  IXQValue.create(result, pvkDouble, typeAnnotation, box);
+end;
+
+{$if defined(FPC_HAS_TYPE_SINGLE) and defined(FPC_HAS_TYPE_DOUBLE) }
+function xqvalue(v: single; typeAnnotation: TXSTypeAnnotation): IXQValue;
+begin
+  result := xqvalue(double(v), typeAnnotation);
+end;
+{$endif}
+
+{function xqvalue(v: TDateTime): IXQValue;
+begin
+  result := TXQValueDateTime.Create(v);
+end;}
+
+function xqvalue(intentionallyUnusedParameter: TDateTime): IXQValue;
+begin
+  result := default(IXQValue);
+  raise EXQEvaluationException.Create('', 'Directly converting a date time is not supported. (the respective function prevents an implicit datetime => float conversion)');
+end;
+
+
+function xqvalue(const v: BigDecimal): IXQValue;
+var
+  t: TXSTypeAnnotation;
+begin
+  if v.isIntegral then t := xstInteger
+  else t := xstDecimal;
+  result := xqvalue(v, t);
+end;
+
+function xqvalue(const v: BigDecimal; typeAnnotation: TXSTypeAnnotation): IXQValue;
+var
+  box: TXQBoxedDecimal;
+begin
+  box := TXQBoxedDecimal.create(v);
+  IXQValue.create(result, pvkBigDecimal, typeAnnotation, box);
+end;
+
+function xqvalue(const v: string): IXQValue;
+var
+  p: Pointer;
+begin
+  p := pointer(v);
+  fpc_AnsiStr_Incr_Ref(p);
+  IXQValue.create(result, pvkString, xstString, p);
+end;
+
+function xqvalue(const v: string; typeAnnotation: TXSTypeAnnotation):IXQValue;  //**< Creates a string IXQValue
+var
+  p: Pointer;
+begin
+  p := pointer(v);
+  fpc_AnsiStr_Incr_Ref(p);
+  IXQValue.create(result, pvkString, typeAnnotation, p);
+end;
+
+function xqvalue(sl: TStringList): IXQValue;
+var
+  i: SizeInt;
+  list: TXQValueList;
+begin
+  if sl.Count = 0 then exit(xqvalue());
+  if sl.Count = 1 then exit(xqvalue(sl[0]));
+
+  list := TXQValueList.create(sl.Count);
+  for i:=0 to sl.Count - 1 do
+    list.add(xqvalue(sl[i]));
+  xqvalueSeqSqueezed(result, list)
+end;
+
+function xqvalue(v: TXQBoxedFunction): IXQValue;
+begin
+  IXQValue.create(result, pvkFunction, xstNoType, v);
+end;
+
+function xqvalue(v: TXQBoxedQName): IXQValue;
+begin
+  IXQValue.create(result, pvkQName, xstQName, v);
+end;
+
+function xqvalue(v: TXQBoxedBinary): IXQValue;
+var
+  t: TXSTypeAnnotation;
+begin
+  case v.dataType of
+    bdtHex: t := xstHexBinary;
+    bdtBase64: t := xstBase64Binary;
+    else t := xstNoType;
+  end;
+  IXQValue.create(result, pvkBinary, t, v);
+end;
+
+function xqvalue(v: TXQBoxedDateTime): IXQValue;
+begin
+  IXQValue.create(result, pvkDateTime, v.typeAnnotationType.typeAnnotation, v);
+end;
+
+function xqvalue(const sl: array of string): IXQValue;
+var
+  resseq: TXQValueList;
+  i: SizeInt;
+begin
+  resseq := TXQValueList.create(length(sl));
+  for i := 0 to high(sl) do
+    resseq.add(xqvalue(sl[i], xstUntypedAtomic));
+  xqvalueSeqSqueezed(result, resseq);
+end;
+
+function xqvalue(const sl: array of IXQValue): IXQValue;
+var
+  resseq: TXQValueList;
+  i: SizeInt;
+begin
+  resseq := TXQValueList.create(length(sl));
+  for i := 0 to high(sl) do
+    resseq.add(sl[i]);
+  xqvalueSeqSqueezed(result, resseq);
+end;
+
+function xqvalue(const s: TXQHashsetStr): IXQValue;
+var
+  resseq: TXQValueList;
+  k: string;
+begin
+  resseq := TXQValueList.create(s.Count);
+  for k in s do
+    resseq.add(xqvalue(k));
+  xqvalueSeqSqueezed(result, resseq);
+end;
+
+function xqvalueArray(var l: TXQValueList): IXQValue;
+begin
+  l.AddRef();
+  IXQValue.create(result, pvkArray, xstJSONiqArray, l.data);
+end;
+
+function xqvalueJSONiqNull: IXQValue;
+begin
+  IXQValue.create(result, pvkNull, xstJSONiqNull, nil)
+end;
+
+
+function xqvalue(v: TTreeNode): IXQValue;
+var
+  doc: TTreeDocument;
+begin
+  if v = nil then result.clear
+  else begin
+    doc := v.getDocument();
+    doc.addRef;
+    IXQValue.create(result, pvkNode, xstNode, pointer(v));
+  end;
+end;
+
+procedure xqvalueSeqSqueeze(var v: IXQValue);
+begin
+  if (v.getSequenceCount > 1) or (v.kind <> pvkSequence) then exit;
+  v := v.get(1);
+end;
+
+function xqvalueSeqSqueezed(var l: TXQValueList): IXQValue;
+begin
+  xqvalueSeqSqueezed(result, l);
+end;
+
+procedure xqvalueSeqSqueezed(out result: IXQValue; var l: TXQValueList);
+begin
+  case l.Count of
+    0: result := xqvalue();
+    1: result := l[0];
+    else begin
+      l.AddRef();
+      IXQValue.create(result, pvkSequence, xstNoType, l.data);
+      exit;
+    end;
+  end;
+end;
+{$ImplicitExceptions on}
+
 
 procedure IXQValueHelper.appendString(const str: string);
 begin
@@ -2077,6 +2332,7 @@ end;
 function TXQBoxedValue.toString: string;
 begin
   raise EXQEvaluationException.create('XPTY0004', 'ToString is not implemented for type  ' + ClassName);
+  result := '';
 end;
 
 constructor TXQBoxedDecimal.create(const v: BigDecimal);
@@ -2197,6 +2453,49 @@ function TXQBoxedQName.toString: string;
 begin
   if prefix <> '' then result := prefix + ':' + local
   else result := local;
+end;
+
+
+procedure TXQValueDateTimeData.initFromMicroSecondStamp(mics: int64; const tz: integer);
+begin
+  mics := initFromMicroSecondStampTimeOnly(mics, tz);
+  dateDecode(mics, @year, @month, @day);
+end;
+
+function TXQValueDateTimeData.initFromMicroSecondStampTimeOnly(mics: int64; const tz: integer): int64;
+begin
+  result := mics div (MicroSecsPerSec * 60 * 60 * 24);
+  mics := mics - result * (MicroSecsPerSec * 60 * 60 * 24);
+  if mics < 0 then mics += (MicroSecsPerSec * 60 * 60 * 24);
+
+  microsecs := mics mod MicroSecsPerSec; mics := mics div MicroSecsPerSec;
+  seconds   := mics mod 60; mics := mics div 60;
+  min       := mics mod 60; mics := mics div 60;
+  hour      := mics mod 24; mics := mics div 24;
+  timezone := tz;
+end;
+
+function TXQValueDateTimeData.toMicroSecondStamp(subtractTimeZone: Boolean = true): int64;
+var
+  tempmin: int64;
+  dayStamp: Int64;
+  timeStamp: Int64;
+begin
+  tempmin := min;
+  if subtractTimeZone and (timezone <> high(Integer)) then tempmin -= timezone;
+  dayStamp := trunc(dateEncode(year, month, day));
+  timeStamp := hour * 3600  + tempmin *60 + seconds;
+  result := (dayStamp * int64(SecsPerDay) + timeStamp) * MicroSecsPerSec + microsecs;
+end;
+
+function TXQValueDateTimeData.toMonths: integer;
+begin
+  result := 12 * year + month;
+end;
+
+function TXQValueDateTimeData.toDayTime: int64;
+begin
+  result := microsecs + MicroSecsPerSec * (seconds + 60 * (min + 60 * (hour + 24 * int64(day))));
 end;
 
 

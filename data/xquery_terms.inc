@@ -240,17 +240,6 @@ begin
   //if result = xqtvaAbort then exit;
 end;
 
-procedure TXQTerm_Visitor.declare(v: PXQTermVariable; theparent: TXQTerm);
-begin
-  parent := theparent;
-  declare(v);
-end;
-
-procedure TXQTerm_Visitor.undeclare(v: PXQTermVariable; theparent: TXQTerm);
-begin
-  parent := theparent;
-  undeclare(v);
-end;
 
 function TXQTerm_Visitor.simpleTermVisitNoRecurse(term: PXQTerm; theparent: TXQTerm): TXQTerm_VisitAction;
 begin
