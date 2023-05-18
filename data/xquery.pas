@@ -220,7 +220,7 @@ type
   IXQValue = record
     encoded: QWord;
 
-    class operator Initialize(var e: IXQValue);
+    class operator Initialize(var e: IXQValue); inline;
     class operator Finalize(var e: IXQValue);
     class operator AddRef(var e: IXQValue);
     class operator Copy(constref s: IXQValue; var d: IXQValue);
@@ -342,6 +342,7 @@ type
   TXQValueList = record
     type
     TFlagsAndPadding = record
+      procedure resetFlags; inline;
       case boolean of
         true: (itemsNeedNoRefCounting: boolean);
         false: (padding: pointer);
@@ -489,7 +490,8 @@ type
     function Count: SizeInt;
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
     property Items[i: SizeInt]: IXQValue read getItem; default;
-    function Buffer: PIXQValue;
+    function Buffer: PIXQValue; inline;
+    function header: TXQValueList.PHeader; inline;
 
     function stringifyNodes: TXQValueList;
     function hasNodes: boolean;
@@ -1258,7 +1260,7 @@ type
 
 
   IXQValueHelper = record helper for IXQValue
-    function toXQVList: TXQValueList;  //**< Returns a TXQValueList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence). (this list is not an interface, don't forget to free it! This is the only interface method returning a non-auto-freed value.)
+    function toXQVList: TXQValueList;  //**< Returns a TXQValueList of all values contained in the implicit sequence. (if the type is not a sequence, it is considered to be a single element sequence).
 
     procedure appendString(const str: string);
     //function toArray: TXQVArray;  //**< Returns the value as array; dynamically converted, if necessary.  @br If the value is a single element, the array contains that element; if it is a sequence, the array contains each element of the sequence
@@ -3533,6 +3535,11 @@ begin
   raise EXQEvaluationException.create('pxp:INTERNAL', 'Internal error');
 end;
 
+procedure TXQValueList.TFlagsAndPadding.resetFlags;
+begin
+  padding := nil;
+end;
+
 
 procedure TXQEvaluationContext.raiseXPDY0002ContextItemAbsent;
 begin
@@ -3597,6 +3604,16 @@ end;
 function TXQValueList.getBuffer: PT;
 begin
   result := PIXQValue(data + sizeof(THeader));
+end;
+
+function TXQValueWeaklySharedListHelper.Buffer: PIXQValue;
+begin
+  result := data + sizeof(TXQValuelist.THeader);
+end;
+
+function TXQValueWeaklySharedListHelper.header: TXQValueList.PHeader;
+begin
+  result := TXQValueList.PHeader(data);
 end;
 
 function TXQValueEnumeratorPtrUnsafe.MoveNext: Boolean;
@@ -4495,10 +4512,6 @@ begin
   end else TXQValueEnumeratorPtrUnsafe.clear(result);}
 end;
 
-function TXQValueWeaklySharedListHelper.Buffer: PIXQValue;
-begin
-  result := data + sizeof(TXQValuelist.THeader);
-end;
 
 function TXQValueWeaklySharedListHelper.stringifyNodes: TXQValueList;
 var
@@ -9055,6 +9068,7 @@ begin
 
 
   if [xqcdFocusItem, xqcdFocusPosition] * filter.dependencies = [] then begin
+    outList.header.flagsAndPadding.resetFlags;
     if not (xqcdFocusLast in filter.dependencies) then value := filter.filter.evaluate(context)
     else begin
       try
@@ -9082,6 +9096,8 @@ begin
     context.extensionContext := nil;
 
     outList.reserve(context.SeqLength);
+    if (context.SeqLength > 1) and (sequence.kind = pvkSequence) then
+      outlist.header.flagsAndPadding := sequence.getDataList.header.flagsAndPadding;
     i := 1;
     filterTerm := filter.filter;
     for v in sequence.GetEnumeratorPtrUnsafe do begin

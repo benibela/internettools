@@ -3907,6 +3907,7 @@ begin
   if atom.kind <> pvkSequence then
     exit(xqvalueAtomize(atom));
   resseq := TXQValueList.create(atom.getSequenceCount);
+  resseq.header.flagsAndPadding := args[0].getDataList.header.flagsAndPadding;
   for v in atom.GetEnumeratorArrayTransparentUnsafe do begin
     found := false;
     for i:= 0 to resseq.Count - 1 do
@@ -3958,6 +3959,7 @@ begin
   dec(i);
 
   list := TXQValueList.create(count - 1 );
+  list.header.flagsAndPadding := args[0].getDataList.header.flagsAndPadding;
   iterator := args[0].GetEnumeratorPtrUnsafe;
   iterator.CopyToList(list, i );
   if iterator.MoveNext then
@@ -3971,6 +3973,7 @@ var
 begin
   if (args[0].kind <> pvkSequence) or (args[0].getSequenceCount < 2) then exit(args[0]);
   list := TXQValueList.create();
+  list.header.flagsAndPadding := args[0].getDataList.header.flagsAndPadding;
   list.add(args[0]);
   list.revert;
   result := xqvalueSeqSqueezed(list);
@@ -3997,6 +4000,7 @@ begin
     exit(args[0].get(from));
 
   resseqseq := TXQValueList.create(len);
+  resseqseq.header.flagsAndPadding := args[0].getDataList.header.flagsAndPadding;
   iterator := args[0].GetEnumeratorPtrUnsafe;
   if iterator.MoveMany(from - 1) then
     iterator.CopyToList(resseqseq, len);
@@ -4757,13 +4761,16 @@ var
   len: SizeInt;
   i: SizeInt;
   seq: TXQValueList;
+  iterator: TXQValueEnumeratorPtrUnsafe;
 begin
   len := args[0].getSequenceCount;
   if len < 2 then exit(xqvalue);
   if len = 2 then exit(args[0].get(2));
   seq := TXQValueList.create(len-1);
-  for i := 2 to len do
-    seq.add(args[0].get(i));
+  if args[0].kind = pvkSequence then seq.header.flagsAndPadding := args[0].getDataList.header.flagsAndPadding;
+  iterator := args[0].GetEnumeratorPtrUnsafe;
+  iterator.MoveNext;
+  iterator.CopyToList(seq, len - 1);
   result := xqvalueSeqSqueezed(seq);
 end;
 
@@ -6980,6 +6987,7 @@ var
 begin
   if args[0].getSequenceCount <= 1 then exit(args[0]);
   list := args[0].toXQVList;
+  if args[0].kind = pvkSequence then list.header.flagsAndPadding := args[0].getDataList.header.flagsAndPadding;;
   sortXQList(list, context, argc, args);
   result := xqvalueSeqSqueezed(list);
 end;
@@ -7281,6 +7289,7 @@ begin
   if (p < 0) or (p + len >= a.Count + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
   iter := a.GetEnumeratorPtrUnsafe;
   list := TXQValueList.create(len);
+  list.header.flagsAndPadding := a.header.flagsAndPadding;
   if iter.MoveMany(p) then
     iter.CopyToList(list, len);
   result := list.toXQValueArray;
@@ -7318,6 +7327,7 @@ begin
       end;
       stableSort(indices);
       list := TXQValueList.create(a.Count - length(indices));
+      if argv[1].kind = pvkSequence then list.header.flagsAndPadding := argv[1].getDataList.header.flagsAndPadding;
       p := 0;
       for i := 0 to high(indices) do
         if p <= indices[i] then begin
@@ -7368,6 +7378,7 @@ begin
   if a.Count = 0 then raiseInvalidArrayOutOfBounds(argv^, 0);
   iter := a.GetEnumeratorPtrUnsafe;
   list := TXQValueList.create(a.Count - 1);
+  list.header.flagsAndPadding := a.header.flagsAndPadding;
   iter.MoveNext;
   iter.CopyToList(list, a.Count - 1);
   result := list.toXQValueArray;
@@ -7376,8 +7387,11 @@ end;
 function xqFunctionArrayReverse({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   list: TXQValueList;
+  a: TXQValueWeaklySharedList;
 begin
-  list := TXQValueList.create(arrayAsList(argv^));
+  a := arrayAsList(argv^);
+  list := TXQValueList.create(a);
+  list.header.flagsAndPadding := a.header.flagsAndPadding;
   list.revert;
   result := list.toXQValueArray;
 end;
@@ -7420,6 +7434,7 @@ var
 begin
   a := argv^.toArrayMembersList;
   list := TXQValueList.create(a.Count);
+  list.header.flagsAndPadding := a.header.flagsAndPadding;
   f.init(context, argv[1]);
   for pv in a.GetEnumeratorPtrUnsafe do
     if f.call1(pv^).toBooleanEffective then
