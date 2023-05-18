@@ -317,6 +317,8 @@ public
 
   procedure addRef; //inline;
   procedure release; //inline;
+  procedure addRef(many: integer); //inline;
+  procedure release(many: integer); //inline;
 
   procedure FreeInstance; override;
 
@@ -1001,6 +1003,18 @@ procedure TTreeDocument.release;
 begin
   if InterlockedDecrement(FRefCount) = 0 then
     Free;
+end;
+
+procedure TTreeDocument.addRef(many: integer);
+begin
+  if many = 1 then addRef()
+  else InterlockedExchangeAdd(FRefCount, many);
+end;
+
+procedure TTreeDocument.release(many: integer);
+begin
+  if many = 1 then release()
+  else InterlockedExchangeAdd(FRefCount, -many);
 end;
 
 procedure TTreeDocument.FreeInstance;

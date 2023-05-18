@@ -404,7 +404,7 @@ type
     procedure insert(i: SizeInt; const value: IXQValue);  //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure addOrdered(const node: IXQValue); //**< Adds an IXQValue to a node sequence. Nodes are sorted in document order and duplicates are skipped. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
-    procedure add(node: TTreeNode);
+    procedure addNodeNoRC(node: TTreeNode);
     procedure add(const list: TXQValueList); inline;
     procedure add(const list: TXQValueWeaklySharedList);
     procedure addOrdered(const list: TXQValueList);
@@ -4464,17 +4464,15 @@ begin
   end;
 end;
 
-procedure TXQValueList.add(node: TTreeNode);
-//var
-//  temp: TXQValueNode; //faster than ixqvalue
+procedure TXQValueList.addNodeNoRC(node: TTreeNode);
+var
+  fcount: SizeInt;
 begin
-  add(xqvalue(node));
-{  if fcount = fcapacity then
+  fcount := count;
+  if fcount = capacity then
     reserve(fcount + 1);
-  temp := TXQValueNode.create(node);
-  PPointer(fbuffer)[fcount] := IXQValue(temp); //the cast on the left side avoids the fpc_assign call and implicit ref counting; the cast on the right side ensures we get the correct pointer without a temporary variable.
-  temp._AddRef;
-  fcount += 1;}
+  IXQValue.create(buffer[fcount], pvkNode, xstNode, pointer(node));
+  PHeader(data).count += 1;
 end;
 
 procedure TXQValueList.add(const list: TXQValueList);
@@ -9229,11 +9227,14 @@ var
     result := newList2;
   end;
 
-
+  procedure raiseMixingError;
+  begin
+    raise EXQEvaluationException.Create(IfThen(lastExpansion, 'XPTY0018', 'XPTY0019'), 'Nodes and non-node values must not be mixed in step expressions');
+  end;
 var
   i: SizeInt;
   tempContext: TXQEvaluationContext;
-  onlyNodes: boolean;
+  resultHasOnlyNodes, newListHasOnlyNodes: boolean;
   n: PIXQValue;
   resultList: TXQValueList;
 
@@ -9280,12 +9281,13 @@ begin
 
 
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
-    onlyNodes := false;
+    resultHasOnlyNodes := false;
     for n in previous.GetEnumeratorPtrUnsafe do begin
       case command.typ of
         tneaFunctionSpecialCase: begin
           if not (n^.kind in [pvkNode, pvkObject, pvkArray]) then
             raise EXQEvaluationException.create('err:XPTY0019', 'The / operator can only be applied to xml/json nodes. Got: '+n^.toXQuery()); //continue;
+          newListHasOnlyNodes := false;
           newList.clear;
           tempContext.SeqIndex += 1;
           tempContext.SeqValue := n^;
@@ -9300,21 +9302,23 @@ begin
             cachedNamespaceURL := oldnode.getNamespaceURL(command.namespaceURLOrPrefix);
             if cachedNamespaceURL = '' then continue;
           end;
+          newListHasOnlyNodes := true;
           newList.clear;
-
           for attrib in oldnode.getEnumeratorAttributes do begin
             if      (not (qmValue in command.matching) or ((attrib.hash = command.valueHash) and striEqual(attrib.value, command.value)))
                 and ((namespaceMatching = xqnmNone) or ( attrib.getNamespaceURL() = cachedNamespaceURL))
                 and not TTreeAttribute(attrib).isNamespaceNode
                 then
-                  newList.add(attrib);
+                  newList.addNodeNoRC(attrib);
           end;
+          oldnode.getDocument().addRef(newList.count);
         end else begin
           tempKind := n^.kind;
           case tempKind of
             pvkNode: begin
               assert(n^.toNode <> nil);
               oldnode := n^.toNode;
+              newListHasOnlyNodes := true;
               //writeln(command.serialize);
               //writeln('oldnode: ',n.toNode.typ, ' ',n.toNode.value,': ', n.toString);
               nodeCondition.init(oldnode, command);
@@ -9329,11 +9333,13 @@ begin
                 if (namespaceMatching <> xqnmPrefix)
                    or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
                    or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
-                newList.add(newnode);
+                newList.addNodeNoRC(newnode);
                 newnode := nodeCondition.getNextNode(newnode);
               end;
+              oldnode.getDocument().addRef(newList.count);
             end;
             pvkObject, pvkArray: begin
+              newListHasOnlyNodes := false;
               if not context.staticContext.jsonPXPExtensions then raise EXQEvaluationException.create('pxp:JSON', 'PXP Json extensions are disabled');
               if (command.namespaceURLOrPrefix <> '') or (command.requiredType <> nil)
                  or not (command.typ in [tneaDirectChild, tneaDirectChildImplicit, tneaDescendant, tneaSameNode])
@@ -9373,6 +9379,7 @@ begin
         end;
       end;
 
+      newList.header.flagsAndPadding.itemsHaveSameKind := newListHasOnlyNodes;
 
       if length(command.filters) > 0 then begin
         case newList.Count of
@@ -9386,15 +9393,20 @@ begin
       if command.typ in [tneaAncestor,tneaSameOrAncestor,tneaPreceding,tneaPrecedingSibling] then
         tempList.revert; //revert the list, because it is now in ancestor order (needed for indices in filtering), but need to be returned in document order
 
-      if resultList.Count = 0 then onlyNodes := tempList[0].kind = pvkNode;
-      tempListBuffer := tempList.buffer;
-      for i := 0 to tempList.Count - 1 do
-        if (tempListBuffer[i].kind = pvkNode) <> onlyNodes then
-          raise EXQEvaluationException.Create(IfThen(lastExpansion, 'XPTY0018', 'XPTY0019'), 'Nodes and non-node values must not be mixed in step expressions');
-      if onlyNodes then resultList.addOrdered(tempList)
+      if not newListHasOnlyNodes then begin
+        tempListBuffer := tempList.buffer;
+        newListHasOnlyNodes := tempListBuffer[0].kind = pvkNode;
+        for i := 1 to tempList.Count - 1 do
+         if (tempListBuffer[i].kind = pvkNode) <> newListHasOnlyNodes then
+           raiseMixingError;
+        tempList.header.flagsAndPadding.itemsHaveSameKind := newListHasOnlyNodes;
+      end;
+      if resultList.count = 0 then resultHasOnlyNodes := newListHasOnlyNodes
+      else if resultHasOnlyNodes <> newListHasOnlyNodes then raiseMixingError();
+      if newListHasOnlyNodes then resultList.addOrdered(tempList)
       else resultList.add(tempList);
     end;
-
+    if resultHasOnlyNodes then resultList.header.flagsAndPadding.itemsHaveSameKind := true;
   except
     raise;
   end;
