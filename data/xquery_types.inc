@@ -3547,7 +3547,7 @@ end;
 
 
 constructor TXQBoxedStandardMapEntry.create(const akey: IXQValue);
-  function setAtomized: boolean;
+  procedure setAtomized;
   begin
     key := xqvalueAtomize(akey);
     if key.getSequenceCount <> 1 then raiseXPTY0004TypeError(key, 'map key');
@@ -3589,7 +3589,7 @@ function TXQBoxedStandardMapEntry.hasProperty(const akey: ixqvalue; out avalue: 
     result := TXQValueOwnershipTracker.equal(key, xqvalueAtomize(akey))
   end;
 begin
-  if TXQValueOwnershipTracker.isAtomicKeyValue(key) then
+  if TXQValueOwnershipTracker.isAtomicKeyValue(akey) then
     result := TXQValueOwnershipTracker.equal(key, akey)
    else
     result := checkAtomized;
