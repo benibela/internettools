@@ -1572,9 +1572,6 @@ type
     untypedAtomic: TXSSimpleType;
     node: TXSType;
 
-    sequence, function_: TXSType;
-
-
     //3.1 only
     error: TXSSimpleType;
     numeric: TXSUnionType;
@@ -1592,8 +1589,6 @@ type
     function isAbstractType(t: TXSType): boolean;
 
 
-    procedure show(const s: string); //do not use
-    procedure hide(const s: string); //do not use
   private
     typeList, hiddenTypeList: TXQHashmapStrOwningObject;
     procedure cacheDescendants;
@@ -10384,14 +10379,11 @@ xquery__functions.initializeFunctions;
 
 baseSchema.cacheDescendants;
 
-baseSchema.hide('node()');
-baseSchema.hide('sequence*');
-baseSchema.hide('function(*)');
-
 {$ifdef dumpFunctions}baseSchema.logConstructorFunctions;{$endif}
 
 interpretedFunctionSynchronization := default(TRTLCriticalSection);
 InitCriticalSection(interpretedFunctionSynchronization);
+
 finalization
   if not createMemoryLeakOnExit then begin
     freeThreadVars;
@@ -10406,6 +10398,7 @@ finalization
     globalUnnamedVariable.free;
     globalTypeParsingContext.staticContext.Free;
     globalTypeParsingContext.free;
+    baseSchema.node.Free;
     baseSchema.free;
     baseJSONiqSchema.free;
     GlobalInterpretedNativeFunctionStaticContext.Free;

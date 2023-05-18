@@ -1050,11 +1050,6 @@ begin
   else result := isValidNCName(copy(s, 1, i-1)) and isValidNCName(strCopyFrom(s, i+1));
 end;
 
-procedure TXSSchema.hide(const s: string);
-begin
-  hiddenTypeList.include(s, typeList[s]);
-  typeList.findEntity(s)^.Value := nil; //bypass ownership
-end;
 
 procedure TXSSchema.cacheDescendants;
 var
@@ -1174,13 +1169,6 @@ end.
 function TXSSchema.isAbstractType(t: TXSType): boolean;
 begin
   result := (t = anySimpleType) or (t = NOTATION) or (t = anyAtomicType);
-end;
-
-procedure TXSSchema.show(const s: string);
-begin
-  assert(hiddenTypeList.contains(s));
-  typeList.include(s, hiddenTypeList[s]);
-  hiddenTypeList.findEntity(s)^.Value := nil; //bypass ownership
 end;
 
 function TXSSchema.isValidationOnlyType(t: TXSType): boolean;
@@ -1365,9 +1353,7 @@ begin
   untypedAtomic := TXSStringType.Create('untypedAtomic', anyAtomicType, xsstString);
 
   //sequence, node: TXSType;
-  node := TXSType.Create('node()', nil, self);
-  sequence := TXSType.Create('sequence*', nil, self);
-  function_ := TXSType.Create('function(*)', nil, self);
+  node := TXSType.Create('node()', nil, nil);
 
   error := TXSUnionType.Create('error',nil,[]);
   error.variety := xsvAbsent;
