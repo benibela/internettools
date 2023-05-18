@@ -23,7 +23,7 @@
 unit xquery;
 
 {
-Copyright (C) 2008 - 2019 Benito van der Zander (BeniBela)
+Copyright (C) 2008 - 2023 Benito van der Zander (BeniBela)
                           benito@benibela.de
                           www.benibela.de
 
@@ -175,26 +175,23 @@ type
   (***
   @abstract(Variant used in XQuery-expressions)
 
-  This is the base interface used to access the various values occuring during the evaluation of an XQuery expression.
+  This is the base variant used to access the various values occuring during the evaluation of an XQuery expression.
 
   You can read its value with methods like toBoolean, toInt64, toDecimal, toString, toDateTime, toNode, toArray,
   which convert the returned value to the requested type.
 
-
-
-
-
-  Since IXQValue is an interface, it can be used without worrying much about memory management. @br
+  It is reference counted and immutable, so you do not have to worry about memory management. @br
   So if you have an IXQValue @code(value), you can read it like @code(value.toString) or @code(value.toBoolean).
   Or assign it to another value2 just by writing @code(value2 := value).
 
   An IXQValue can store a sequence of IXQValue-s which can be iterated with a for each loop @code(for valueIterator in valueSequence)
-  or using @code(count) and @code(get). An IXQValue can also store an object, whose properties can be accessed with @code(getProperty).
+  or using @code(count) and @code(get). An IXQValue can also store an object (also called map), whose properties can be accessed with @code(getProperty).
 
-  IXQValue provides a chainable functional interface with its map, filter, query, retrieve and order methods. These method evaluate an XQuery expression, whereby the current IXQValue is stored in @code(.) (for a single value) or @code($_) (for a sequence of values) @br
-  For example you can use @code(seq.map('. + 1')) to increment all values stored in a sequence seq. Or @code(seq.map('. || "append"')) to append a string to all values.
-  Or @code(filter('. >= 10')) to drop all values below 10.
-  Or @code(query('reverse($_)')) to reverse a sequence.
+  IXQValue provides a chainable functional interface with its map, filter, query, retrieve and order methods.
+  These method evaluate an XQuery expression, whereby the current IXQValue is stored in @code(.) (for a single value) or @code($_) (for a sequence of values) @br
+  For example, you can use @code(seq.map('. + 1')) to increment all values stored in a sequence seq. Or @code(seq.map('. || "append"')) to append a string to all values. @br
+  Or @code(filter('. >= 10')) to drop all values below 10. @br
+  Or @code(query('reverse($_)')) to reverse a sequence. @br
   A combined example is @code(query('1 to 10').filter('. mod 2 = 0').map('. * 10').query('sum($_)').toString), which will return 300, the sum of all even numbers times 10.
 
   Retrieve will download and parse the resource referenced in this IXQValue.
@@ -204,65 +201,18 @@ type
   IXQValue are usually returned by the evaluation of a query, so you don't have to create your own, but if you want, you can
   use the xqvalue() functions which return a IXQValue corresponding to the type of their parameter.
 
-    Each value is a tuple of the value of a Pascal type (e.g. string, int64, double, bigdecimal), and an XML schema type annotation.
+  Each value is a tuple of the value of a Pascal type (e.g. string, int64, double, bigdecimal), and an XML schema type annotation.
 
-  There are different ways to check which type an IXQValue has:
-  @unorderedList(
-    @item(The method code(typeAnnotation) returns the logical type of the value, i.e. the type seen by an XQuery expression. @br
-          This is an object in a  @noLink(schema) describing the type (e.g. name "xs:string", ranges), and does not necessary
-          correspond to the type used to store the value. )
-    @item(A derivation check @code(is TXQValue...). This checks if the value is stored in a certain implementation class (e.g. TXQValueString))
-    @item(The method @code(kind) returns the kind of the value, an enum corresponding to each of the implementation base classes, e.g. pvkString)
-  )
-
-
+  It is called IXQValue, because it used to be an interface to enable reference counting.
+  The implementation has been changed to a managed record to improve performance.
+  This change should not affect common use, but it is no longer possible to cast it to a class or create user-defined types.
   *)
   IXQValue = record
     encoded: QWord;
 
-    class operator Initialize(var e: IXQValue); inline;
-    class operator Finalize(var e: IXQValue);
-    class operator AddRef(var e: IXQValue);
-    class operator Copy(constref s: IXQValue; var d: IXQValue);
-
-    procedure addRef;
-    procedure release;
-    procedure clear;
-
-    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: QWord ); static; inline;
-    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer ); static; inline;
-    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ); static; //inline;
-    class procedure create(var result: IXQValue; smallishInt: Int64); static; inline;
-    class function int64FitsInEncodedIntRange(i: int64): boolean; inline; static;
-
-    const KIND_BITS = 4;
-    const XSTYPE_BITS = 6;
-    const DATA_SHIFT_BITS = {$ifdef cpu32}32{$else}KIND_BITS + XSTYPE_BITS{$endif};
-    const INT_SHIFT_BITS = KIND_BITS + XSTYPE_BITS;
-    const MAX_GCXQ_INT = Int64.MaxValue shr INT_SHIFT_BITS;
-    const MIN_GCXQ_INT =  SarInt64(Int64.MinValue , INT_SHIFT_BITS);
-
     function kind: TXQValueKind; inline; //**< Primary type of a value
-    function typeName: string;       //**< XPath type name
-    function typeAnnotation: TXSTypeAnnotation; inline;  //**< Returns the class underlying the interface
-    function getDataPointer: pointer; inline;
-    procedure setTypeAnnotation(xst: TXSTypeAnnotation);
-
-    function getDataBoolean: boolean;
-    function getDataInt: int64;
-    //function getDataFloat32: Single;
-    function getDataDouble: double;
-    function getDataDecimal: bigdecimal;
-    function getDataString: string;
-    function getDataNode: TTreeNode; inline;
-    function getDataList: TXQValueWeaklySharedList; inline;
-    function getDataBinary: TXQBoxedBinary; inline;
-    function getDataQName: TXQBoxedQName; inline;
-    function getDataDateTime: TXQBoxedDateTime; inline;
-    function getDataObject: TXQBoxedMapLike; inline;
-    function getDataFunction: TXQBoxedFunction; inline;
-
-
+    function typeName: string;       //**< XPath/XML Schema type name
+    function typeAnnotation: TXSTypeAnnotation; inline;  //**< XPath/XML Schema type
     function isUndefined: boolean;  //**< Returns true, iff the value is undefined or an empty sequence
     function isAssigned: boolean;  //**< Returns false, iff the value is undefined or an empty sequence
 
@@ -280,15 +230,14 @@ type
     function toDateTime: TDateTime;  //**< Returns the value as dateTime; dynamically converted, if necessary
     function toNode: TTreeNode;  //**< Returns the value as node; or nil if it is no node
     function toBinaryBytes: TBytes;
-    function toXQuery: string; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees)
+    function toXQuery: string; //**< Converts the value to an XQuery expression that evaluates to an equal value again (intended for debugging, not serialization, so no guarantees of round tripping)
     function toQName: TXQBoxedQName;
     function toFunction: TXQBoxedFunction;
     function toArrayMembersList: TXQValueWeaklySharedList;
     function toMap: TXQBoxedMapLike;
 
 
-    function getSequenceCount: SizeInt;  //**< Returns the number of values actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
-    function getSequenceFirst: IXQValue;
+    function getSequenceCount: SizeInt;  //**< Returns the number of items actually contained in this value (0 for undefined, element count for sequences, and  1 for everything else)
     function get(i: SizeInt): IXQValue; //**< Returns the i-th value in this sequence. (non-sequence values are considered to be sequences of length 1) (1-based index)
     function hasProperty(const name: string; out value: IXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value
     function hasProperty(const name: IXQValue; out value: IXQValue): boolean; //**< Checks if an object has a certain property, and returns the property value
@@ -334,11 +283,62 @@ type
     function setImmutable(const name: string; const s: string): TXQBoxedMapLike;    //**< Creates a new object with the same values as the current one and changes a property of it (string wrapper)
     function setImmutable(const {%H-}props: PString; {%H-}len: SizeInt; const {%H-}v: IXQValue): IXQValue;
     function hashCode: uint32;
+
+    //FPC Management operators
+    class operator Initialize(var e: IXQValue); inline;
+    class operator Finalize(var e: IXQValue);
+    class operator AddRef(var e: IXQValue);
+    class operator Copy(constref s: IXQValue; var d: IXQValue);
+
+    procedure addRef;
+    procedure release;
+    procedure clear;
+
+    //Internal create functions. DO NOT USE, they do not check if the input is valid, and you need to set the reference count manually
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: QWord ); static; inline;
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer ); static; inline;
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ); static; //inline;
+    class procedure create(var result: IXQValue; smallishInt: Int64); static; inline;
+    class function int64FitsInEncodedIntRange(i: int64): boolean; inline; static;
+
+    //Memory represention of an IXQValue.
+    //For optimal performance, it is stored as 64-bit value, of which KIND_BITS are used for the Pascal type, and XSTYPE_BITS for schema type.
+    //This leaves 54 bit for a pointer, which only works because 64-bit systems only use 48-bit pointers.
+    //This pointer can be string or a node or a boxed value, and you only know what kind of pointer it is from the kind bits.
+    const KIND_BITS = 4;
+    const XSTYPE_BITS = 6;
+    const DATA_SHIFT_BITS = {$ifdef cpu32}32{$else}KIND_BITS + XSTYPE_BITS{$endif};
+    const INT_SHIFT_BITS = KIND_BITS + XSTYPE_BITS;
+    const MAX_GCXQ_INT = Int64.MaxValue shr INT_SHIFT_BITS;
+    const MIN_GCXQ_INT =  SarInt64(Int64.MinValue , INT_SHIFT_BITS);
+
+    function getDataPointer: pointer; inline;
+    procedure setTypeAnnotation(xst: TXSTypeAnnotation);
+
+    //Internal functions to decode the stored value. ONLY USE AFTER CHECKING KIND PROPERTY
+    function getSequenceFirst: IXQValue;
+    function getDataBoolean: boolean;
+    function getDataInt: int64;
+    //function getDataFloat32: Single;
+    function getDataDouble: double;
+    function getDataDecimal: bigdecimal;
+    function getDataString: string;
+    function getDataNode: TTreeNode; inline;
+    function getDataList: TXQValueWeaklySharedList; inline;
+    function getDataBinary: TXQBoxedBinary; inline;
+    function getDataQName: TXQBoxedQName; inline;
+    function getDataDateTime: TXQBoxedDateTime; inline;
+    function getDataObject: TXQBoxedMapLike; inline;
+    function getDataFunction: TXQBoxedFunction; inline;
   end;
   TXQVArray = array of IXQValue;
 
   PXQValueList = ^TXQValueList;
-  (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences *)
+  (*** @abstract(List of TXQValue-s). Can store any xqvalue, even nested sequences.
+       It used to be a class derived from TList, but was changed to a managed record, so it is automatically freed even if exceptions occur.
+
+       The memory representation is the similar to an array, extended with a capacity and flags.
+  *)
   TXQValueList = record
     type
     TFlagsAndPadding = record
