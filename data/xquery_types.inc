@@ -115,11 +115,13 @@ function escapeToXQueryString(const s: string): string;
    result := '"' + result + '"';
  end;
 
- function qualifiedTypeName(const typeName, arg: string; const ignoreDefault: string = ''): string;
+ function qualifiedTypeName(const typeName, arg: string; const ignoreDefault: string = ''; escapeDefault: boolean = false): string;
  begin
    //if typeAnnotation.schema.url <> XMLNamespaceURL_XMLSchema then
    //   exit('Q{'+typeAnnotation.schema.url + '}' + typeName+'('+arg+')');
-   if typeName = ignoreDefault then exit(arg);
+   if typeName = ignoreDefault then
+     if escapeDefault then exit(escapeToXQueryString(arg))
+     else exit(arg);
    exit('xs:'+typeName+'('+escapeToXQueryString(arg)+')');
  end;
 
@@ -755,7 +757,7 @@ begin
     pvkInt64:      result := qualifiedTypeName(toString, 'integer');
     pvkDouble:      result := qualifiedTypeName(toString, '');
     pvkBigDecimal: result := qualifiedTypeName(toString, IfThen(toDecimal.IsIntegral(), 'integer', 'decimal') );
-    pvkString, pvkBinary: result := qualifiedTypeName(escapeToXQueryString(toString), 'string' );
+    pvkString, pvkBinary: result := xquery.qualifiedTypeName(typeName, (toString), 'string', true);
     pvkQName, pvkDateTime: result := TXQBoxedValue(getDataPointer).toXQuery;
 
 
@@ -1873,6 +1875,7 @@ procedure IXQValueHelper.xmlSerialize(var serializer: TXQSerializer);
 
 begin
   case kind of
+    pvkUndefined: serializer.appendXMLEmptyElement(serializer.sequenceTag);
     pvkObject: objectXmlSerialize(serializer);
     pvkSequence: sequenceSerialize;
     pvkNode: nodeSerialize;
@@ -2343,7 +2346,7 @@ end;
 
 function TXQBoxedValue.toXQuery: string;
 begin
-  result := qualifiedTypeName(escapeToXQueryString(toString), '' );
+  result := qualifiedTypeName(toString, '', '', true );
 end;
 
 function TXQBoxedValue.toString: string;
