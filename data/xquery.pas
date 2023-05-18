@@ -316,6 +316,8 @@ type
     function retrieve(): IXQValue; //**< Retrieves referenced resources. This is primarily used for HTTP requests, but can also retrieve files. It will parse the resource as HTML/XML/JSON if possible. It will retrieve each value in a sequence individually
 
     function instanceOf(const typ: TXSType): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
+    function instanceOf(const typ: TXSTypeAnnotation): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
+    function instanceOf(const precomputedTypeDescendants: TXSTypeAnnotations): boolean; //**< If the XPath expression "self instance of typ" should return true.  (abbreviation for typeAnnotation.derivedFrom(..) )
 
     property Count: SizeInt read getSequenceCount;
 
@@ -1569,7 +1571,7 @@ type
     node: TXSType;
 
     sequence, function_: TXSType;
-    untypedOrNodeUnion: TXSUnionType;
+
 
     //3.1 only
     error: TXSSimpleType;
@@ -3644,9 +3646,6 @@ begin
   undeclare(v);
 end;
 
-{$I xquery_types.inc}
-
-
 function TXSTypeAnnotationHelper.derivedFrom(t: TXSType): boolean;
 begin
   result := baseSchema.types[self].derivedFrom(t);
@@ -4618,7 +4617,7 @@ var errCode: string = 'XPTY0004';
     end;
     if (context.staticContext.model in PARSING_MODEL3)
               and (st.kind = tikAtomic) and (st.atomicTypeInfo.isQNameType)
-              and ((v.kind = pvkNode) or v.instanceOf(baseSchema.untypedAtomic)) then begin
+              and ((v.kind = pvkNode) or v.instanceOf(xstUntypedAtomic)) then begin
      errCode := 'XPTY0117';
      exit(true);
     end;
@@ -5285,7 +5284,7 @@ begin
     pvkSequence: begin
       isAlreadyAtomized := true;
       for x in v.GetEnumeratorPtrUnsafe do
-        if not x^.instanceOf(baseSchema.AnyAtomicType) then begin
+        if not x^.instanceOf(schemaTypeDescendantsOfAnyAtomic) then begin
           isAlreadyAtomized := false;
           break;
         end;
@@ -5306,7 +5305,7 @@ begin
       exit;
     end;
     pvkFunction, pvkObject: raise EXQEvaluationException.create('FOTY0013', 'Maps and function values cannot be atomized.' + v.toXQuery);
-    else if v.instanceOf(baseSchema.AnyAtomicType) then exit(v)
+    else if v.instanceOf(schemaTypeDescendantsOfAnyAtomic) then exit(v)
     else raise EXQEvaluationException.Create('XPTY0004','Invalid value for atomization: '+v.toXQuery());
   end;
 end;
@@ -5370,8 +5369,8 @@ begin
       pvkInt64: exit(v.toInt64 = w.toInt64);
       pvkBigDecimal: exit(v.toDecimal = w.toDecimal);
       pvkDateTime:
-        if v.instanceOf(baseSchema.duration) <> w.instanceOf(baseSchema.duration) then exit(false)
-        else if not v.instanceOf(baseSchema.duration) and (v.getDataDateTime.value.hasTimeZone <> w.getDataDateTime.value.hasTimeZone) then
+        if v.instanceOf(schemaTypeDescendantsOfDuration) <> w.instanceOf(schemaTypeDescendantsOfDuration) then exit(false)
+        else if not v.instanceOf(schemaTypeDescendantsOfDuration) and (v.getDataDateTime.value.hasTimeZone <> w.getDataDateTime.value.hasTimeZone) then
           exit(false);
       pvkBoolean, pvkQName: {fallthrough};
       else exit(false);
@@ -5413,7 +5412,7 @@ end;
 
 class function TXQValueOwnershipTracker.isKeyStringLike(const v: IXQValue): boolean;
 begin
-  result := (v.kind = pvkString) and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI))
+  result := (v.kind = pvkString) and (v.instanceOf(schemaTypeDescendantsOfStringMapKeys))
 end;
 
 class function TXQValueOwnershipTracker.isStringLikeAfterAtomize(const v: IXQValue): boolean;
@@ -5421,7 +5420,7 @@ var
   w: IXQValue;
 begin
   case v.kind of
-    pvkString: result := (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.anyURI));
+    pvkString: result := v.instanceOf(schemaTypeDescendantsOfStringMapKeys);
     pvkNode: result := true;
     pvkSequence, pvkArray: begin
       result := false;
@@ -5522,8 +5521,8 @@ begin
         end;
       end
       else begin
-        if pa.instanceOf(baseSchema.AnyAtomicType) then begin
-          if not (pb.instanceOf(baseSchema.anyAtomicType))
+        if pa.instanceOf(schemaTypeDescendantsOfAnyAtomic) then begin
+          if not (pb.instanceOf(schemaTypeDescendantsOfAnyAtomic))
              or not context.staticContext.equalDeepAtomic(pa^, pb^, collation) then
             exit(false);
         end else begin
@@ -5534,7 +5533,7 @@ begin
           end;
           if collation = nil then
             collation := context.staticContext.nodeCollation;
-          if (pb.instanceOf(baseSchema.anyAtomicType)) or
+          if (pb.instanceOf(schemaTypeDescendantsOfAnyAtomic)) or
              (((pa.kind = pvkNode) or (pb.kind = pvkNode))
                 and not pa.toNode.isDeepEqual(pb.toNode, [tetProcessingInstruction, tetComment], @collation.equal)) then
             exit(false);
@@ -6517,7 +6516,7 @@ procedure TXQJsonParser.setConfigFromMap(const map: IXQValue; forJSONToXML: bool
 
   procedure checkType(const v: IXQValue; t: TXSType);
   begin
-    if (v.getSequenceCount <> 1) or (not v.instanceOf(t) and not (v.instanceOf(baseSchema.untypedAtomic)) and (v.kind <> pvkNode)) then
+    if (v.getSequenceCount <> 1) or (not v.instanceOf(t) and not (v.instanceOf(xstUntypedAtomic)) and (v.kind <> pvkNode)) then
       raiseInvalidParam;
   end;
 var vo: IXQValue;
@@ -6549,7 +6548,7 @@ begin
   if jpoJSONiq in options then begin
     if map.hasProperty('jsoniq-multiple-top-level-items', vo) then begin
       if (vo.getSequenceCount < 1) or (vo.kind = pvkNull) then include(options, jpoAllowMultipleTopLevelItems)
-      else  if (vo.getSequenceCount = 1) and (vo.instanceOf(baseSchema.boolean) ) then begin
+      else  if (vo.getSequenceCount = 1) and (vo.instanceOf(xstBoolean) ) then begin
         if vo.toBoolean then include(options, jpoAllowMultipleTopLevelItems)
         else exclude(options, jpoAllowMultipleTopLevelItems)
       end else
@@ -7073,7 +7072,7 @@ var ak, bk: TXQValueKind;
         result := ''; //hide warning
       end;
       pvkString, pvkNode: begin
-        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
+        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(schemaTypeDescendantsOfUntypedAtomic) then raiseXPTY0004TypeError(v, 'decimal');
         result := trim(v.toString);
       end;
       else begin
@@ -7158,10 +7157,10 @@ var ak, bk: TXQValueKind;
       pvkBigDecimal: result := compareAsBigDecimals();
       pvkDouble: result := compareCommonFloat();
       pvkDateTime: begin
-        if (a.typeAnnotation.derivedFrom(baseSchema.duration)) <> (b.typeAnnotation.derivedFrom(baseSchema.duration)) then exit(xqcrIncomparable);
+        if (a.typeAnnotation.derivedFrom(schemaTypeDescendantsOfDuration)) <> (b.typeAnnotation.derivedFrom(schemaTypeDescendantsOfDuration)) then exit(xqcrIncomparable);
         adate := @a.getDataDateTime.value;
         bdate := @b.getDataDateTime.value;
-        if a.typeAnnotation.derivedFrom(baseSchema.duration) and b.typeAnnotation.derivedFrom(baseSchema.duration) then begin
+        if a.typeAnnotation.derivedFrom(schemaTypeDescendantsOfDuration) and b.typeAnnotation.derivedFrom(schemaTypeDescendantsOfDuration) then begin
           result := TXQCompareResult.compare(adate^.toMonths(), bdate^.toMonths());
           if result <> xqcrEqual then exit;
           result := TXQCompareResult.compare(adate^.toDayTime(), bdate^.toDayTime());
@@ -7170,10 +7169,14 @@ var ak, bk: TXQValueKind;
       end;
       pvkQName: begin
         result := xqcrIncomparable;
-        if (a.instanceOf(baseSchema.QName) and b.instanceOf(baseSchema.QName))
-           or (a.instanceOf(baseSchema.NOTATION) and b.instanceOf(baseSchema.NOTATION)) then
-          if (a.getDataQName.url = b.getDataQName.url) and (a.getDataQName.local = b.getDataQName.local) then //ignore prefix
-            result := xqcrEqual;
+        if (a.kind <> pvkQName) or (b.kind <> pvkQName) then exit;
+        if a.typeAnnotation <> b.typeAnnotation then begin
+          if not ( (a.instanceOf(xstQName) and b.instanceOf(xstQName))
+                   or (a.instanceOf(xstNOTATION) and b.instanceOf(xstNOTATION)) ) then
+            exit;
+        end;
+        if (a.getDataQName.url = b.getDataQName.url) and (a.getDataQName.local = b.getDataQName.local) then //ignore prefix
+          result := xqcrEqual;
       end;
       pvkNull: result := xqcrEqual;
       pvkUndefined: result := xqcrEmptySequence;
@@ -7191,7 +7194,7 @@ var ak, bk: TXQValueKind;
   begin
     case k of
       pvkString, pvkNode: begin
-        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(v, 'boolean');
+        if (k <> pvkNode) and strictTypeChecking and not v.instanceOf(schemaTypeDescendantsOfUntypedAtomic) then raiseXPTY0004TypeError(v, 'boolean');
         case v.toString of
           '0', 'false': result := false;
           '1', 'true': result := true;
@@ -7230,8 +7233,8 @@ begin
   if castUnknownToString and ( (ak in [pvkString, pvkNode]) or (bk in [pvkString, pvkNode]) ) then
     exit(compareCommonAsStrings());
   if strictTypeChecking then begin
-    if (ak = pvkString) and not a.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(a, b.typeAnnotation);
-    if (bk = pvkString) and not b.instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(b, a.typeAnnotation);
+    if (ak = pvkString) and not a.instanceOf(schemaTypeDescendantsOfUntypedAtomic) then raiseXPTY0004TypeError(a, b.typeAnnotation);
+    if (bk = pvkString) and not b.instanceOf(schemaTypeDescendantsOfUntypedAtomic) then raiseXPTY0004TypeError(b, a.typeAnnotation);
   end;
   if (ak = pvkDouble) or (bk = pvkDouble) then
     exit(compareCommonFloat());
@@ -7802,9 +7805,9 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
       if not typ.atomicTypeInfo.isQNameType then exit(typ.castAs(result, context))
       else if context.staticContext.model in PARSING_MODEL3 then errCode := 'XPTY0117'
       else errCode := 'XPTY0004';
-    end else if (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (t in [xstFloat, xstDouble]))
-             or ((t.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
-             or (t.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
+    end else if (typ.atomicTypeInfo.derivedFrom(schemaTypeDescendantsOfDouble) and (t in [xstFloat, xstDouble]))
+             or ((t.derivedFrom(schemaTypeDescendantsOfDecimal) and (typ.atomicTypeInfo.derivedFrom(schemaTypeDescendantsOfFloat_Double) )) )
+             or (t.derivedFrom(xstAnyURI) and (typ.atomicTypeInfo.derivedFrom(schemaTypeDescendantsOfString))) then
       exit(typ.castAs(result, context))
     else
       if w.kind <> pvkFunction then errCode := 'XPTY0004'
@@ -7885,9 +7888,9 @@ var atomicCount: SizeInt;
           if typ.atomicTypeInfo.isQNameType then exit(false); //XPTY0117
           exit(typ.castableAs(w, context.staticContext))
         end;
-        if    (typ.atomicTypeInfo.derivedFrom(baseSchema.Double) and (st in [xstFloat, xstDouble]))
-          or ((st.derivedFrom(baseSchema.Decimal) and (typ.atomicTypeInfo.derivedFrom(baseSchema.Float) or typ.atomicTypeInfo.derivedFrom(baseSchema.Double) )) )
-          or (st.derivedFrom(baseSchema.AnyURI) and (typ.atomicTypeInfo.derivedFrom(baseSchema.string_))) then
+        if    (typ.atomicTypeInfo.derivedFrom(schemaTypeDescendantsOfDouble) and (st in [xstFloat, xstDouble]))
+          or ((st.derivedFrom(schemaTypeDescendantsOfDecimal) and (typ.atomicTypeInfo.derivedFrom(schemaTypeDescendantsOfFloat_Double) )) )
+          or (st.derivedFrom(xstAnyURI) and (typ.atomicTypeInfo.derivedFrom(schemaTypeDescendantsOfString))) then
             exit(typ.castableAs(w, context.staticContext));
         result := false;
     end;

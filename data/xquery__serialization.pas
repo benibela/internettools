@@ -235,7 +235,7 @@ var
       pvkBoolean: exit(pp.value.toBoolean);
       pvkString:
         if staticOptions then exit(toSerializationBool(pp.value.toString))
-        else if pp.Value.instanceOf(baseSchema.untypedAtomic) or (pp.Value.kind = pvkNode) then
+        else if pp.Value.instanceOf(xstUntypedAtomic) or (pp.Value.kind = pvkNode) then
           case trim(pp.Value.toString) of
             'false': exit(false);
             'true': exit(true);

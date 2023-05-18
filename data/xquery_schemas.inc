@@ -99,8 +99,8 @@ end;
 class function TXSType.commonIntegerType(const a, b: TXSType): TXSNumericType;
 var aInteger, bInteger: Boolean;
 begin
-  aInteger := a.derivedFrom(baseSchema.Integer);
-  bInteger := b.derivedFrom(baseSchema.Integer);
+  aInteger := a.derivedFrom(schemaTypeDescendantsOfInteger);
+  bInteger := b.derivedFrom(schemaTypeDescendantsOfInteger);
   if (not aInteger) and (not bInteger) then exit(baseSchema.Integer);
   if (not aInteger) or (not bInteger) then begin
     if aInteger then exit(TXSNumericType(a));
@@ -146,13 +146,13 @@ begin
  //That's the opposite of my type hierarchy (float -> decimal, double -> decimal), so handle all cases separately
 
  if a = b then
-   if a.derivedFrom(baseSchema.Integer) then exit(baseSchema.Decimal)
-   else if a.derivedFrom(baseSchema.numeric) then exit(a)
+   if a.derivedFrom(schemaTypeDescendantsOfInteger) then exit(baseSchema.Decimal)
+   else if a.derivedFrom(schemaTypeDescendantsOfNumeric) then exit(a)
    else exit(failureType);
 
- if not a.derivedFrom(baseSchema.numeric) then
+ if not a.derivedFrom(schemaTypeDescendantsOfNumeric) then
    a := failureType;
- if not b.derivedFrom(baseSchema.numeric) then
+ if not b.derivedFrom(schemaTypeDescendantsOfNumeric) then
    b := failureType;
 
  if becomesType(baseSchema.Double) then
@@ -272,7 +272,7 @@ end;
 
 function TXSType.tryCreateValue(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 begin
-  if (v.kind = pvkNode) or ((v.kind = pvkString) and baseSchema.types[v.typeAnnotation].derivedFrom([baseSchema.string_, baseSchema.untypedAtomic])) then
+  if v.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node) then
     exit(tryCreateValue(v.toString, outv));
   result := tryCreateValueInternal(v, outv);
 end;
@@ -406,7 +406,7 @@ end;
 
 function TXSListType.tryCreateValueInternal(const v: IXQValue; outv: PIXQValue): TXSCastingError;
 begin
-  if (v.get(1).kind = pvkNode) or (baseSchema.types[v.get(1).typeAnnotation].derivedFrom([baseSchema.string_, baseSchema.untypedAtomic])) then
+  if v.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node)  then
     exit(tryCreateValue(v.toString, outv));
   Result:=xsceXPTY0004;
 end;
@@ -455,10 +455,10 @@ begin
         xsstDouble: outv^ := xqvalue(v.toDouble, typeAnnotation);
       end;
     exit;
-  end else if st.derivedFrom([schema.decimal, schema.boolean]) then begin
+  end else if st.derivedFrom(schemaTypeDescendantsOfDecimal + schemaTypeDescendantsOfBoolean) then begin
     if v.kind = pvkInt64 then exit(tryCreateValue(v.toInt64, outv))
     else exit(tryCreateValue(v.toDecimal, outv));
-  end else if st.derivedFrom([schema.float, schema.double]) then
+  end else if st.derivedFrom(schemaTypeDescendantsOfFloat_Double) then
     exit(tryCreateValue(v.toDouble, outv))
   else
    exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
@@ -735,8 +735,8 @@ var
   st: TXSType;
 begin
   st := baseSchema.types[v.typeAnnotation];
-  if st.derivedFrom([schema.untypedAtomic, schema.string_]) then exit(tryCreateValue(v.toString, outv));
-  if not st.derivedFrom([schema.boolean, schema.float, schema.double, schema.decimal]) then
+  if st.derivedFrom(schemaTypeDescendantsOfString_UntypedAtomic_Node) then exit(tryCreateValue(v.toString, outv));
+  if not st.derivedFrom(schemaTypeDescendantsOfNumeric + schemaTypeDescendantsOfBoolean) then
     exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v,outv));
   result := xsceNoError;
   if outv <> nil then outv^ := xqvalue(v.toBoolean);
@@ -769,7 +769,7 @@ begin
   case subType of
     xsstString: result := tryCreateValueInternal(v.toString, outv);
     xsstHexBinary, xsstBase64Binary: begin
-      if not st.derivedFrom([schema.hexBinary, schema.base64Binary]) then
+      if not st.derivedFrom(schemaTypeDescendantsOfBinary) then
         exit(xsceXPTY0004ButTryCreatingFromAFakeSingleton(v, outv));
       result := xsceNoError;
       if outv <> nil then
@@ -852,7 +852,7 @@ begin
   result := xsceXPTY0004;
   if self = schema.NOTATION then exit(); //NOTATION itself is an abstract type
   st := baseSchema.types[v.typeAnnotation];
-  if st.derivedFrom([schema.NOTATION, schema.QName]) and (v.kind = pvkQName) then begin
+  if st.derivedFrom(schemaTypeDescendants[xstQName] + schemaTypeDescendants[xstNOTATION]) and (v.kind = pvkQName) then begin
     result := xsceNoError;
     if outv <> nil then begin
       outv^ := v;
@@ -872,7 +872,7 @@ begin
   result := (baseSchema.types[v.typeAnnotation].isQNameType)
             or ((context.model in PARSING_MODEL3)
                 and (v.kind = pvkString)
-                and (v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic))
+                and (v.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node))
                 and (self <> baseSchema.NOTATION)
                 and (baseSchema.isValidQName(trim(v.toString))));
 end;
@@ -881,7 +881,7 @@ procedure TXSQNameType.castAllowed(const v: ixqvalue; const s: string; const con
 begin
   if not (context.model in PARSING_MODEL3) then
     raise EXQEvaluationException.create('XPTY0004', 'Non literal string to QName cast: '+v.toXQuery());
-  if (v.kind <> pvkString) or ((not v.instanceOf(baseSchema.string_) and not v.instanceOf(baseSchema.untypedAtomic))) then
+  if (v.kind <> pvkString) or (not v.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node)) then
     raise EXQEvaluationException.create('XPTY0004', 'Invalid type for cast: '+v.toXQuery());
   if self = baseSchema.NOTATION then
     raise EXQEvaluationException.create('XPST0080', 'Cannot cast to xs:NOTATION');

@@ -334,7 +334,7 @@ begin
           xqtjlmName: raiseInvalidKey('XPTY0004');
           xqtjlmParenthesized:
             for pk in keys.GetEnumeratorPtrUnsafe do begin
-              if not pk^.instanceOf(baseSchema.integer) and not pk^.instanceOf(baseSchema.untypedAtomic)  then raiseInvalidKey('XPTY0004');
+              if not pk^.instanceOf(schemaTypeDescendantsOfIntegerArrayKeys)  then raiseInvalidKey('XPTY0004');
               i := pk^.toInt64;
               if (i >= 1) and (i <= ar.Count) then seq.add(ar[i - 1])
               else raiseInvalidKey('FOAY0001');
@@ -3052,7 +3052,7 @@ begin
     case v^.kind of
       pvkArray: begin
         if (index.kind <> pvkInt64) and (context.staticContext.strictTypeChecking) then begin
-          if not (index.instanceOf(baseSchema.integer) or (index.kind = pvkNode) or (index.instanceOf(baseSchema.untypedAtomic))) then
+          if not (index.instanceOf(schemaTypeDescendantsOfIntegerArrayKeys)) then
             raiseTypeError0004('Expected integer index', index)
         end;
         numindex := index.toInt64;
@@ -3142,7 +3142,7 @@ begin
       for i := 0 to 1 do
         case evilkids[i].kind of
           pvkNode: evilkids[i] := xqvalue(evilkids[i].toString);
-          pvkString: if evilkids[i].instanceOf(baseSchema.untypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
+          pvkString: if evilkids[i].instanceOf(schemaTypeDescendantsOfUntypedAtomic) then evilkids[i] := xqvalue(evilkids[i].toString);
           else;
         end;
     end else if xqofCastUntypedToDouble in op.flags then
@@ -3670,8 +3670,9 @@ end;
 
 function TXQTermVariableGlobal.evaluate(var context: TXQEvaluationContext): IXQValue;
 begin
-  if context.sharedEvaluationContext.variables.hasVariable(definition.getVariable, result) then
+  if context.sharedEvaluationContext.variables.hasVariable(definition.getVariable, result) then begin
     exit();
+  end;
   Result:=evaluateInitial(context);
 end;
 
@@ -4380,11 +4381,11 @@ var
       eqnameKind: TXQEQNameParseResult;
     begin
       if (v.kind = pvkSequence) and (v.getSequenceCount = 1) then v := v.get(1);
-      if (v.instanceOf(baseSchema.QName))  then begin
+      if (v.instanceOf(schemaTypeDescendantsOfQName))  then begin
         vname := (v.getDataQName);
         setTreeNamespaceFromQName(vname.url, vname.prefix, defkind);
         tree.value := vname.local;
-      end else if v.instanceOf(baseSchema.string_) or v.instanceOf(baseSchema.untypedAtomic) or v.instanceOf(baseSchema.node) then begin
+      end else if v.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node) then begin
         eqnameKind := parseEQName(v.toString, namespaceUrlPrefix, tree.value);
         case eqnameKind of
           xqeqnPrefixAbsent:
@@ -4482,8 +4483,8 @@ begin
       if typ = tetAttribute then setTreeNodeNameFromTerm(nameValue, xqdnkUnknown)
       else begin
         nameValueEvaluated := nameValue.evaluate(context);
-        if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic)
-            or nameValueEvaluated.instanceOf(baseSchema.node) or nameValueEvaluated.isUndefined then begin
+        if nameValueEvaluated.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node)
+            or nameValueEvaluated.isUndefined then begin
            tree.value := nameValueEvaluated.toString;
            if (tree.value <> '') and not isValidNCName(tree.value) then raise EXQEvaluationException.create('XQDY0074', 'Invalid namespace prefix');
            setTreeHash;
@@ -4528,7 +4529,7 @@ begin
         tetProcessingInstruction: begin
           xqvalueSeqSqueeze(nameValueEvaluated{%H-});
           if nameValueEvaluated.instanceOf(baseSchema.NCName) then tree.value := nameValueEvaluated.toString
-          else if nameValueEvaluated.instanceOf(baseSchema.string_) or nameValueEvaluated.instanceOf(baseSchema.untypedAtomic) or nameValueEvaluated.instanceOf(baseSchema.node) then begin
+          else if nameValueEvaluated.instanceOf(schemaTypeDescendantsOfString_UntypedAtomic_Node) then begin
             tree.value := strTrim(nameValueEvaluated.toString, WHITE_SPACE);
             if not isValidNCName(tree.value) then raiseEvaluationError('XQDY0041', 'Invalid NCName');
           end else raiseTypeError0004('Need NCName', nameValueEvaluated);

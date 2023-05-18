@@ -439,7 +439,7 @@ begin
     pvkBigDecimal: result := toBoolean;
     pvkString: begin
       if (typeAnnotation in [xstString, xstUntypedAtomic, xstAnyURI])
-        or typeAnnotation.derivedFrom(baseSchema.string_)
+        or typeAnnotation.derivedFrom(schemaTypeDescendantsOfString)
          then
         result := getDataPointer <> nil //empty string is nil in Pascal
        else
@@ -1224,7 +1224,7 @@ begin
     pvkDouble: result := getDataDouble;
     pvkBigDecimal: result := toDouble;
     pvkString: begin
-      if scontext.strictTypeChecking and not instanceOf(baseSchema.untypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
+      if scontext.strictTypeChecking and not instanceOf(schemaTypeDescendantsOfUntypedAtomic) then raiseXPTY0004TypeError(self, 'float/double');
       if not TryStrToXQFloat(getDataString, result) then
         raiseFORG0001InvalidConversion(self, 'float/double')
     end;
@@ -2394,13 +2394,13 @@ var binaries: array[0..1] of tbytes = (nil, nil);
     at, bt: (tBase64, tHex, tUntyped, tOther);
 begin
   if a.typeAnnotation <> b.typeAnnotation then begin
-    if a.instanceOf(baseSchema.base64Binary) then at := tBase64
-    else if a.instanceOf(baseSchema.hexBinary) then at := tHex
-    else if a.instanceOf(baseSchema.untypedAtomic) then at := tUntyped
+    if a.instanceOf(xstbase64Binary) then at := tBase64
+    else if a.instanceOf(xsthexBinary) then at := tHex
+    else if a.instanceOf(xstuntypedAtomic) then at := tUntyped
     else at := tOther;
-    if b.instanceOf(baseSchema.base64Binary) then bt := tBase64
-    else if b.instanceOf(baseSchema.hexBinary) then bt := tHex
-    else if b.instanceOf(baseSchema.untypedAtomic) then bt := tUntyped
+    if b.instanceOf(xstbase64Binary) then bt := tBase64
+    else if b.instanceOf(xsthexBinary) then bt := tHex
+    else if b.instanceOf(xstuntypedAtomic) then bt := tUntyped
     else bt := tOther;
 
     result := xqcrEqual;

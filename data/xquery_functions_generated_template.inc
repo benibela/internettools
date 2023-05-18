@@ -8,7 +8,7 @@ begin
     else if strcontains(s, '-') then result := baseSchema.date.createValue(result)
     else if strcontains(s, ':') then result := baseSchema.time.createValue(result)
     else raise EXQEvaluationException.Create('XPTY0004', 'Expected date time, got: ' + v.toString);
-  end else if result.instanceOf(baseSchema.duration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected date time, got: ' + v.toString);
+  end else if result.instanceOf(schemaTypeDescendantsOfDuration) then raise EXQEvaluationException.Create('XPTY0004', 'Expected date time, got: ' + v.toString);
 end;
 
 function xqFunctionSomethingFrom_Datetime(v: IXQValue; field: integer): IXQValue;

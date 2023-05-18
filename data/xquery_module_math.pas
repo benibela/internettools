@@ -263,7 +263,7 @@ begin
   if a = 1 then exit(xqv(1));
   try
     //if args[1] is TXQValueInt64 then exit(mathIntPower(f, i));
-    if args[1].instanceOf(baseSchema.integer) then begin
+    if args[1].instanceOf(schemaTypeDescendantsOfInteger) then begin
       bd := args[1].toDecimal;
       if bd.isZero() then exit(xqv(1));
       if bd.isLongint() then b := BigDecimalToLongint(bd)

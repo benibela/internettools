@@ -441,7 +441,7 @@ begin
 
   if (ak = pvkInt64) and (bk = pvkInt64) then begin
     t := baseSchema.integer;//  TXSType.commonNumericType(a,b);
-    if t.derivedFrom(baseSchema.integer) then t := baseSchema.decimal;
+    if t.derivedFrom(schemaTypeDescendantsOfInteger) then t := baseSchema.decimal;
     ai := a.toInt64;
     bi := b.toInt64;
     if bi <> 0 then begin
@@ -486,7 +486,7 @@ begin
   end;
 
   t := TXSType.commonDecimalType(a, b) as TXSNumericType;
-  if t.derivedFrom(baseSchema.decimal) then begin
+  if t.derivedFrom(schemaTypeDescendantsOfDecimal) then begin
     bd := b.toDecimal;
     if bd.isZero() then raiseDivisionBy0NotAllowed;
     exit(t.createValue(a.toDecimal / bd));
@@ -494,7 +494,7 @@ begin
 
   f:= b.toDouble;
   if isnan(f) or (f = 0) then begin
-    if a.instanceOf(baseSchema.decimal) and b.instanceOf(baseSchema.decimal) then
+    if a.instanceOf(schemaTypeDescendantsOfDecimal) and b.instanceOf(schemaTypeDescendantsOfDecimal) then
       raiseDivisionBy0NotAllowed;
     if IsNan(f) then exit(xqvalueF(xqfloat.NaN, a, b));
     e := a.toDouble;
@@ -531,7 +531,7 @@ begin
     if i = 0 then raiseDivisionBy0NotAllowed;
     i := a.toInt64 div i;
     //if (t <> baseSchema.integer) then
-    //  if (not t.derivedFrom(baseSchema.integer)) or (not t.constraintsSatisfied(i)) then t := baseSchema.integer;
+    //  if (not t.derivedFrom(schemaTypeDescendantsOfInteger)) or (not t.constraintsSatisfied(i)) then t := baseSchema.integer;
     exit(baseSchema.integer.createValue(i));
   end;
 
@@ -906,7 +906,7 @@ function xqFunctionNumber(const context: TXQEvaluationContext; argc: SizeInt; ar
   var
     temp: IXQValue;
   begin
-    if v.instanceOf(baseSchema.Double) then exit(v);
+    if v.instanceOf(schemaTypeDescendantsOfDouble) then exit(v);
     if baseSchema.double.tryCreateValue(v,  @temp) = xsceNoError then exit(temp)
     else exit(baseSchema.double.createValue(xqfloat.NaN));
   end;
@@ -2761,8 +2761,8 @@ var
   raw: RawByteString;
 begin
   //(binary, encoding?) => string
-  if args[0].typeAnnotation.derivedFrom(baseSchema.hexBinary) then raw := args[0].toString.decodeHex
-  else if args[0].typeAnnotation.derivedFrom(baseSchema.base64Binary) then raw := base64.DecodeStringBase64(args[0].toString)
+  if args[0].typeAnnotation.derivedFrom(xstHexBinary) then raw := args[0].toString.decodeHex
+  else if args[0].typeAnnotation.derivedFrom(xstBase64Binary) then raw := base64.DecodeStringBase64(args[0].toString)
   else raise EXQEvaluationException.create('pxp:binary', 'Unknown binary type: '+baseSchema.types[args[0].typeAnnotation].name);
 
   if argc > 1 then
@@ -3118,7 +3118,7 @@ begin
   ignore(context);
   requiredArgCount(argc, 0, 1);
   if argc = 0 then exit(xqvalue(xqfloat(Random)))
-  else if args[0].instanceOf(baseSchema.integer) then exit(xqvalue(random(args[0].toInt64)))
+  else if args[0].instanceOf(schemaTypeDescendantsOfInteger) then exit(xqvalue(random(args[0].toInt64)))
   else exit(xqvalue(xqfloat(Random * args[0].toDouble)));
 end;
 
@@ -3352,7 +3352,7 @@ begin
     exit(baseSchema.DateTime.createValue(args[0]));
 
   if args[0].isUndefined or args[1].isUndefined then exit(xqvalue);
-  if not args[0].instanceOf(baseSchema.date) or not args[1].instanceOf(baseSchema.time) then
+  if not args[0].instanceOf(xstDate) or not args[1].instanceOf(xstTime) then
     raise EXQEvaluationException.Create('XPTY0004', 'Invalid parameters for date time constructor: '+args[0].toString+','+args[1].toString);
   //todo: error when timezones differ
   dt0 := args[0].getInternalDateTimeData;
@@ -3400,7 +3400,7 @@ var
 begin
   xqv := args^;
   if xqv.isUndefined then exit(xqvalue);
-  if not (xqv.instanceOf(baseSchema.duration)) then xqv := baseSchema.duration.createValue(xqv);
+  if not (xqv.instanceOf(schemaTypeDescendantsOfDuration)) then xqv := baseSchema.duration.createValue(xqv);
   tempValue := xqv.getInternalDateTimeData^;
   TXQBoxedDateTime.setDayTime(tempValue, tempValue.toDayTime());
   if (v <> 6) or (tempValue.microsecs = 0) then result := xqvalue(tempValue.values[v])
@@ -4051,7 +4051,7 @@ var x: PIXQValue;
 begin
   found := false;
   for x in v.GetEnumeratorPtrUnsafe do begin
-    if (x.kind = pvkArray) or x^.instanceOf(baseSchema.untypedOrNodeUnion) then begin
+    if (x.kind = pvkArray) or x^.instanceOf(schemaTypeDescendantsOfUntyped_Node) then begin
       found := true;
       break;
     end;
@@ -4060,7 +4060,7 @@ begin
 
   list := TXQValueList.create(v.getSequenceCount);
   for y in v.GetEnumeratorArrayTransparentUnsafe do
-    if y.instanceOf(baseSchema.untypedOrNodeUnion) then
+    if y.instanceOf(schemaTypeDescendantsOfUntyped_Node) then
       list.add(baseSchema.double.createValue(y))
      else
       list.add(y);
@@ -4163,7 +4163,7 @@ begin
   for pv in v.GetEnumeratorPtrUnsafe do begin
     if result <> baseSchema.types[pv^.typeAnnotation] then raise EXQEvaluationException.Create('FORG0006', 'Mixed date/time/duration types');
   end;
-  if (needDuration) and (not result.derivedFrom(baseSchema.duration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.name);
+  if (needDuration) and (not result.derivedFrom(schemaTypeDescendantsOfDuration)) then raise EXQEvaluationException.Create('FORG0006', 'Expected duration type, got: '+result.name);
 end;
 
 
@@ -4195,10 +4195,10 @@ begin
       ak := result.kind;
     end;
     if (ak in [pvkBoolean,pvkString,pvkDateTime])
-       and ((baseSchema.types[args[0].typeAnnotation] = baseSchema.duration) or not (args[0].instanceOf(baseSchema.duration))) //todo??
-       and not (args[0].instanceOf(baseSchema.untypedAtomic)) then
+       and ((baseSchema.types[args[0].typeAnnotation] = baseSchema.duration) or not (args[0].instanceOf(schemaTypeDescendantsOfDuration))) //todo??
+       and not (args[0].instanceOf(schemaTypeDescendantsOfUntypedAtomic)) then
       raise EXQEvaluationException.Create('FORG0006', 'Wrong type for sum');
-    if result.instanceOf(baseSchema.untypedOrNodeUnion) then result := baseSchema.double.createValue(result.toDecimal);
+    if result.instanceOf(schemaTypeDescendantsOfUntyped_Node) then result := baseSchema.double.createValue(result.toDecimal);
     if ak <> pvkArray then exit();
   end;
 
@@ -4224,7 +4224,7 @@ begin
           end;
       end;
       baseType := baseSchema.integer;
-      for pv in enumerable do if not pv^.instanceOf(baseSchema.integer) then begin
+      for pv in enumerable do if not pv^.instanceOf(schemaTypeDescendantsOfInteger) then begin
         baseType := baseSchema.decimal;
         break;
       end;
@@ -4276,10 +4276,10 @@ begin
   if i = 1 then begin
     result := args[0];
     xqvalueSeqSqueeze(result);
-    if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result))
+    if result.instanceOf(schemaTypeDescendantsOfUntyped_Node) then exit(baseSchema.double.createValue(result))
     else case result.kind of
       pvkInt64, pvkBigDecimal, pvkDouble: exit;
-      pvkDateTime: if (result.instanceOf(baseSchema.yearMonthDuration)) or (result.instanceOf(baseSchema.dayTimeDuration)) then
+      pvkDateTime: if (result.instanceOf(xstYearMonthDuration)) or (result.instanceOf(xstDayTimeDuration)) then
         exit
         else raiseError;
       pvkArray: ; //later
@@ -4342,7 +4342,7 @@ begin
     Result := args[0];
     if result.kind = pvkSequence then result := args[0].get(1);
     if result.getSequenceCount > 0 then begin
-      if result.instanceOf(baseSchema.untypedOrNodeUnion) then exit(baseSchema.double.createValue(result));
+      if result.instanceOf(schemaTypeDescendantsOfUntyped_Node) then exit(baseSchema.double.createValue(result));
       case result.kind of
         pvkUndefined, pvkBoolean, pvkInt64, pvkBigDecimal, pvkDouble, pvkString, pvkBinary: exit; //ok
         pvkDateTime:
@@ -4365,8 +4365,8 @@ begin
       baseType := (baseSchema.types[result.typeAnnotation] as TXSSimpleType).primitive;
       isSeqOfYearDurations := false;
       if baseType = baseSchema.duration then //xs:duration cannot be compared, only its descendants
-        if result.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration) then isSeqOfYearDurations := true
-        else if not result.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration) then raiseError;
+        if result.typeAnnotation.derivedFrom(xstYearMonthDuration) then isSeqOfYearDurations := true
+        else if not result.typeAnnotation.derivedFrom(xstDayTimeDuration) then raiseError;
 
       for pv in enumerable do begin
         if (ord(context.staticContext.compareAtomic(result, pv^, nil)) < 0) <> asmin then
@@ -4374,8 +4374,8 @@ begin
         if ((baseSchema.types[pv^.typeAnnotation] as TXSSimpleType).primitive <> baseType) then
           raiseError;
         if baseType = baseSchema.duration then
-          if   (isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(baseSchema.yearMonthDuration))
-            or (not isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(baseSchema.dayTimeDuration)) then
+          if   (isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(xstYearMonthDuration))
+            or (not isSeqOfYearDurations and not pv^.typeAnnotation.derivedFrom(xstDayTimeDuration)) then
              raiseError
       end;
       exit;
@@ -4445,9 +4445,9 @@ begin
         end;
       end;
       if bestpv = nil then result := seq.get(1) else result := bestpv^;
-      if result.instanceOf(baseSchema.anyURI) then
+      if result.instanceOf(xstAnyURI) then
         for pv in enumerable do
-          if (pv^.instanceOf(baseSchema.string_)) then begin
+          if (pv^.instanceOf(xstString)) then begin
             result := xqvalue(temps);
             exit;
           end;
@@ -8300,7 +8300,7 @@ begin
       exit(true);
     end;
     pvkString:
-      if v.instanceOf(baseSchema.untypedAtomic) or (v.kind = pvkNode) then begin
+      if v.instanceOf(schemaTypeDescendantsOfUntypedAtomic) or (v.kind = pvkNode) then begin
         case trim(v.toString) of
           'false': tempb := false;
           'true': tempb := true;
@@ -8619,7 +8619,7 @@ begin
   for pv in input.GetEnumeratorPtrUnsafe do begin
     key := pv^;
     if haskeyfunction then key := keyfunction.call1(pv^);
-    if key.instanceOf(baseSchema.untypedAtomic) then key := baseSchema.double.createValue(key);
+    if key.instanceOf(schemaTypeDescendantsOfUntypedAtomic) then key := baseSchema.double.createValue(key);
     if bestkey.isUndefined then bestkey := key;
     cmp := context.staticContext.compareAtomic(key, bestkey, collation); //todo: type check
     if cmp = xqcrEqual  then reslist.add(pv^)
