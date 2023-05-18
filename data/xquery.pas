@@ -344,7 +344,7 @@ type
     TFlagsAndPadding = record
       procedure resetFlags; inline;
       case boolean of
-        true: (itemsNeedNoRefCounting, itemsHaveSameKind: boolean);
+        true: (itemsNeedNoRefCounting, itemsHaveSameKind, nodesAreInSameDocument: boolean);
         false: (padding: pointer);
     end;
 
@@ -4271,8 +4271,12 @@ begin
           p := fbuffer[i].getDataPointer;
           fpc_ansistr_decr_ref(p);
         end;
-        pvkNode:  for i := 0 to count - 1 do
-          TTreeNode(fbuffer[i].getDataPointer).getDocument().release;
+        pvkNode:  begin
+          if PHeader(data).flagsAndPadding.nodesAreInSameDocument then
+            TTreeNode(fbuffer[0].getDataPointer).getDocument().release(count)
+          else for i := 0 to count - 1 do
+            TTreeNode(fbuffer[i].getDataPointer).getDocument().release;
+        end;
       end;
     end;
   end;
@@ -9234,7 +9238,8 @@ var
 var
   i: SizeInt;
   tempContext: TXQEvaluationContext;
-  resultHasOnlyNodes, newListHasOnlyNodes: boolean;
+  resultHasOnlyNodes, newListHasOnlyNodes, resultNodesAreInSameDocument: boolean;
+  resultDocument, newListDocument: TTreeDocument;
   n: PIXQValue;
   resultList: TXQValueList;
 
@@ -9282,6 +9287,8 @@ begin
 
     nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
     resultHasOnlyNodes := false;
+    resultNodesAreInSameDocument := true;
+    resultDocument := nil;
     for n in previous.GetEnumeratorPtrUnsafe do begin
       case command.typ of
         tneaFunctionSpecialCase: begin
@@ -9311,7 +9318,8 @@ begin
                 then
                   newList.addNodeNoRC(attrib);
           end;
-          oldnode.getDocument().addRef(newList.count);
+          newListDocument := oldnode.getDocument();
+          newListDocument.addRef(newList.count);
         end else begin
           tempKind := n^.kind;
           case tempKind of
@@ -9336,7 +9344,8 @@ begin
                 newList.addNodeNoRC(newnode);
                 newnode := nodeCondition.getNextNode(newnode);
               end;
-              oldnode.getDocument().addRef(newList.count);
+              newListDocument := oldnode.getDocument();
+              newListDocument.addRef(newList.count);
             end;
             pvkObject, pvkArray: begin
               newListHasOnlyNodes := false;
@@ -9379,7 +9388,10 @@ begin
         end;
       end;
 
-      newList.header.flagsAndPadding.itemsHaveSameKind := newListHasOnlyNodes;
+      with newList.header.flagsAndPadding do begin
+        itemsHaveSameKind := newListHasOnlyNodes;
+        nodesAreInSameDocument := newListHasOnlyNodes;
+      end;
 
       if length(command.filters) > 0 then begin
         case newList.Count of
@@ -9393,20 +9405,30 @@ begin
       if command.typ in [tneaAncestor,tneaSameOrAncestor,tneaPreceding,tneaPrecedingSibling] then
         tempList.revert; //revert the list, because it is now in ancestor order (needed for indices in filtering), but need to be returned in document order
 
-      if not newListHasOnlyNodes then begin
+      if newListHasOnlyNodes then begin
+        if resultList.count = 0 then begin
+          resultHasOnlyNodes := true;
+          resultDocument := newListDocument;
+        end;
+        if newListDocument <> resultDocument then resultNodesAreInSameDocument := false;
+      end else begin
         tempListBuffer := tempList.buffer;
         newListHasOnlyNodes := tempListBuffer[0].kind = pvkNode;
         for i := 1 to tempList.Count - 1 do
          if (tempListBuffer[i].kind = pvkNode) <> newListHasOnlyNodes then
            raiseMixingError;
         tempList.header.flagsAndPadding.itemsHaveSameKind := newListHasOnlyNodes;
+        if resultList.count = 0 then resultHasOnlyNodes := newListHasOnlyNodes;
+        resultNodesAreInSameDocument := false;
       end;
-      if resultList.count = 0 then resultHasOnlyNodes := newListHasOnlyNodes
-      else if resultHasOnlyNodes <> newListHasOnlyNodes then raiseMixingError();
+      if resultHasOnlyNodes <> newListHasOnlyNodes then raiseMixingError();
       if newListHasOnlyNodes then resultList.addOrdered(tempList)
       else resultList.add(tempList);
     end;
-    if resultHasOnlyNodes then resultList.header.flagsAndPadding.itemsHaveSameKind := true;
+    if resultHasOnlyNodes then begin
+      resultList.header.flagsAndPadding.itemsHaveSameKind := true;
+      if resultNodesAreInSameDocument then resultList.header.flagsAndPadding.nodesAreInSameDocument := true;
+    end;
   except
     raise;
   end;
