@@ -345,6 +345,7 @@ begin
     end;
   end else begin
     if not len.isIntegral() then raiseXPTY0004TypeError(b, 'integer length for to operator');
+    list.header.flagsAndPadding.itemsHaveSameKind := true;
     idx := 0;
     i := f;
     while i < t do begin
@@ -7081,6 +7082,7 @@ begin
       matches := wregexprMatch(regex, input, true);
       if matches.findNext then begin
         list := TXQValueList.create(matches.countHint + 1);
+        list.header.flagsAndPadding.itemsHaveSameKind := true;
         lastMatchEnd := 1;
         repeat
           list.add(xqvalue(copy(input, lastMatchEnd, matches.getMatchStart(0) - lastMatchEnd)));
@@ -7104,6 +7106,7 @@ begin
   input := strTrimAndNormalize(argv[0].toString, WHITE_SPACE);
   if input = '' then exit(xqvalue);
   result := xqvalue(strSplit(input, ' '));
+  if result.kind = pvkSequence then result.getDataList.header.flagsAndPadding.itemsHaveSameKind := true;
 end;
 
 

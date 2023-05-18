@@ -199,6 +199,7 @@ var
   p: Pointer;
   tempSequence: TXQValueWeaklySharedList;
 begin
+  //when changing this, also change TXQValueList.release
   case kind of
     pvkUndefined, pvkBoolean, pvkInt64, {pvkFloat32, }pvkNull: {};
     pvkSequence, pvkArray: begin

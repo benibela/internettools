@@ -344,7 +344,7 @@ type
     TFlagsAndPadding = record
       procedure resetFlags; inline;
       case boolean of
-        true: (itemsNeedNoRefCounting: boolean);
+        true: (itemsNeedNoRefCounting, itemsHaveSameKind: boolean);
         false: (padding: pointer);
     end;
 
@@ -4202,7 +4202,7 @@ begin
   PHeader(result).refcount := 1;
   PHeader(result).count := acount;
   PHeader(result).capacity := acapacity;
-  PHeader(result).flagsAndPadding.itemsNeedNoRefCounting := false;
+  PHeader(result).flagsAndPadding.padding := nil;
 end;
 
 class function TXQValueList.create(acapacity: SizeInt): TXQValueList;
@@ -4239,13 +4239,43 @@ end;
 
 procedure TXQValueList.destroy;
 var
-  i: SizeInt;
+  i, fcount: SizeInt;
   fbuffer: PIXQValue;
+  tempSequence: TXQValueWeaklySharedList;
+  p: Pointer;
+  doubleBox: PXQBoxedDouble;
 begin
   fbuffer := buffer;
-  if not PHeader(data).flagsAndPadding.itemsNeedNoRefCounting then
-    for i := 0 to count - 1 do
-      fbuffer[i].release;
+  if not PHeader(data).flagsAndPadding.itemsNeedNoRefCounting then begin
+    fcount := count;
+    if not PHeader(data).flagsAndPadding.itemsHaveSameKind then begin
+      for i := 0 to count - 1 do
+        fbuffer[i].release;
+    end else if fcount > 0 then begin
+      case fbuffer[0].kind of
+        pvkUndefined, pvkBoolean, pvkInt64, {pvkFloat32, }pvkNull: {};
+        pvkSequence, pvkArray: for i := 0 to count - 1 do begin
+          tempSequence := fbuffer[i].getDataList;
+          if InterlockedDecrement(TXQValueList.PHeader(tempSequence.data)^.refcount) = 0 then
+            PXQValueList(@tempSequence)^.destroy;
+        end;
+        pvkDouble: for i := 0 to count - 1 do begin
+          doubleBox := PXQBoxedDouble(fbuffer[i].getDataPointer);
+          if InterlockedDecrement(doubleBox.refcount) = 0 then
+            Freemem(doubleBox);
+        end;
+        pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction:
+          for i := 0 to count - 1 do
+            TXQBoxedValue(fbuffer[i].getDataPointer)._Release;
+        pvkString: for i := 0 to count - 1 do begin
+          p := fbuffer[i].getDataPointer;
+          fpc_ansistr_decr_ref(p);
+        end;
+        pvkNode:  for i := 0 to count - 1 do
+          TTreeNode(fbuffer[i].getDataPointer).getDocument().release;
+      end;
+    end;
+  end;
   Freemem(data);
   data := nil;
 end;
