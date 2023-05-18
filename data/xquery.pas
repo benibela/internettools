@@ -95,7 +95,16 @@ type
   float = record end;
   xqfloat = double;
 
-  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkDouble, pvkBigDecimal, pvkString, pvkBinary, pvkQName, pvkDateTime, pvkSequence, pvkNode, pvkObject, pvkArray, pvkNull, pvkFunction);
+  //this definition might have a huge impact on performance since its order affect the assembly generated for case branches.
+  //but it did not affect the benchmarks
+  TXQValueKind = (pvkUndefined, pvkBoolean, pvkInt64, pvkNull,
+                  pvkNode,
+                  pvkSequence, pvkArray,
+                  pvkDouble,
+                  pvkString,
+                  pvkBigDecimal, pvkBinary, pvkQName, pvkDateTime, pvkObject, pvkFunction
+                  );
+
   TXQBoxedValue = class;
   TXQMapPropertyKeyKind = (xqmpkkStringKeys, xqmpkkStandardKeys );
 
