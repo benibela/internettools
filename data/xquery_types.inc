@@ -896,6 +896,19 @@ begin
   result := typeAnnotation.derivedFrom(typ);
 end;
 
+function IXQValue.instanceOf(const typ: TXSTypeAnnotation): boolean;
+var
+  ta: TXSTypeAnnotation;
+begin
+  ta := typeAnnotation;
+  result := (ta = typ) or (ta in schemaTypeDescendants[typ]);
+end;
+
+function IXQValue.instanceOf(const precomputedTypeDescendants: TXSTypeAnnotations): boolean;
+begin
+  result := typeAnnotation in precomputedTypeDescendants;
+end;
+
 function IXQValue.typeName: string;
 begin
   result := baseSchema.types[typeAnnotation].name;

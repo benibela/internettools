@@ -170,6 +170,7 @@ type
     xstJSONiqObject,
     xstJSONiqArray
   );
+  TXSTypeAnnotations = set of TXSTypeAnnotation;
 
   (***
   @abstract(Variant used in XQuery-expressions)
@@ -1361,18 +1362,15 @@ type
     whiteSpaceFacet: TXSConstrainingFacetWhitespace;
     whiteSpaceFixed: boolean;
 
-    //types in baseSchema are numbered and descendantsIds is a bit field of all descendent types
-    //imported types would have id 0
-    id: integer;
     typeAnnotation: TXSTypeAnnotation;
-    descendantsIds: int64;
+    descendantsIds: TXSTypeAnnotations;
 
 
     constructor Create(aname: string; aparent: TXSType = nil; aschema: TXSSchema = nil);
 
     //function isAtomic: boolean; virtual;
     function derivedFrom(t: TXSType): boolean;
-    function derivedFrom(t: array of TXSType): boolean;
+    function derivedFrom(t: TXSTypeAnnotations): boolean;
     function containsTransitive(t: TXSType): boolean; virtual;
 
     class function commonType(a, b: TXSType): TXSType; static;
@@ -1542,7 +1540,9 @@ type
 
 
   TXSTypeAnnotationHelper = type helper for TXSTypeAnnotation
-    function derivedFrom(t: TXSType): boolean;
+    function derivedFrom(t: TXSType): boolean; inline;
+    function derivedFrom(t: TXSTypeAnnotation): boolean; inline;
+    function derivedFrom(t: TXSTypeAnnotations): boolean; inline;
   end;
 
   TXSSchemaVersion = (xsd10, xsd11);
@@ -3229,6 +3229,85 @@ function xqvalueDeep_equal(const context: TXQEvaluationContext; const a, b: IXQV
         XMLNamespaceURL_MyExtensionOperators = MY_NAMESPACE_PREFIX_URL + 'operators';
         XMLNamespaceURL_XQuery = 'http://www.w3.org/2012/xquery';
 
+const schemaTypeDescendantsOfInteger = [xstInteger, xstNonPositiveInteger, xstNegativeInteger, xstNonNegativeInteger, xstPositiveInteger, xstUnsignedLong, xstUnsignedInt, xstUnsignedShort, xstUnsignedByte, xstLong, xstInt, xstShort, xstByte];
+      schemaTypeDescendantsOfDouble = [xstDouble];
+      schemaTypeDescendantsOfFloat_Double = [xstfloat] + schemaTypeDescendantsOfDouble;
+      schemaTypeDescendantsOfDecimal = [xstDecimal] + schemaTypeDescendantsOfInteger;
+      schemaTypeDescendantsOfNumeric = schemaTypeDescendantsOfDecimal+ schemaTypeDescendantsOfFloat_Double;
+      schemaTypeDescendantsOfBoolean = [xstBoolean];
+      schemaTypeDescendantsOfBinary = [xstHexBinary, xstBase64Binary];
+const schemaTypeDescendantsOfUntypedAtomic = [xstUntypedAtomic];
+      schemaTypeDescendantsOfNode = [xstNode];
+const schemaTypeDescendantsOfIntegerArrayKeys = schemaTypeDescendantsOfInteger + schemaTypeDescendantsOfUntypedAtomic + [xstNode];
+const schemaTypeDescendantsOfString = [xstString, xstNormalizedString, xstToken, xstLanguage, xstNMTOKEN, xstName, xstNCName, xstID, xstIDREF, xstENTITY];
+const schemaTypeDescendantsOfStringMapKeys = schemaTypeDescendantsOfString + schemaTypeDescendantsOfUntypedAtomic + [xstAnyURI];
+      schemaTypeDescendantsOfString_UntypedAtomic_Node = schemaTypeDescendantsOfString + schemaTypeDescendantsOfUntypedAtomic + schemaTypeDescendantsOfNode;
+      schemaTypeDescendantsOfQName = [xstQName];
+      schemaTypeDescendantsOfUntyped_Node = [xstUntyped, xstUntypedAtomic] + schemaTypeDescendantsOfNode;
+      schemaTypeDescendantsOfDuration = [xstDuration, xstYearMonthDuration, xstDayTimeDuration];
+      schemaTypeDescendantsOfAnyAtomic = [xstAnyAtomicType, xstUntypedAtomic, xstBoolean, xstDateTime, xstDate, xstTime, xstGDay, xstGMonth, xstGMonthDay, xstGYear, xstGYearMonth, xstDuration, xstDecimal, xstDouble, xstFloat, xstAnyURI, xstBase64Binary, xstHexBinary, xstString, xstQName, xstNOTATION, xstInteger, xstNonPositiveInteger, xstNegativeInteger, xstNonNegativeInteger, xstPositiveInteger, xstUnsignedLong, xstUnsignedInt, xstUnsignedShort, xstUnsignedByte, xstLong, xstInt, xstShort, xstByte, xstNormalizedString, xstToken, xstLanguage, xstNMTOKEN, xstName, xstNCName, xstID, xstIDREF, xstENTITY, xstYearMonthDuration, xstDayTimeDuration, xstDateTimeStamp, xstJSONiqNull];
+//  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, [untypedAtomic, untyped, node]);
+
+
+const schemaTypeDescendants: array[TXSTypeAnnotation] of TXSTypeAnnotations = (
+[xstUntyped],
+[xstNode],
+[xstUntyped, xstNode, xstAnyType, xstAnySimpleType, xstAnyAtomicType, xstUntypedAtomic, xstBoolean, xstDateTime, xstDate, xstTime, xstGDay, xstGMonth, xstGMonthDay, xstGYear, xstGYearMonth, xstDuration, xstDecimal, xstDouble, xstFloat, xstAnyURI, xstBase64Binary, xstHexBinary, xstString, xstQName, xstNOTATION, xstInteger, xstNonPositiveInteger, xstNegativeInteger, xstNonNegativeInteger, xstPositiveInteger, xstUnsignedLong, xstUnsignedInt, xstUnsignedShort, xstUnsignedByte, xstLong, xstInt, xstShort, xstByte, xstNormalizedString, xstToken, xstLanguage, xstNMTOKEN, xstName, xstNCName, xstID, xstIDREF, xstENTITY, xstNMTOKENS, xstIDREFS, xstENTITIES, xstYearMonthDuration, xstDayTimeDuration, xstDateTimeStamp, xstJSONiqNull, xstJSONiqObject, xstJSONiqArray],
+[xstAnySimpleType, xstAnyAtomicType, xstUntypedAtomic, xstBoolean, xstDateTime, xstDate, xstTime, xstGDay, xstGMonth, xstGMonthDay, xstGYear, xstGYearMonth, xstDuration, xstDecimal, xstDouble, xstFloat, xstAnyURI, xstBase64Binary, xstHexBinary, xstString, xstQName, xstNOTATION, xstInteger, xstNonPositiveInteger, xstNegativeInteger, xstNonNegativeInteger, xstPositiveInteger, xstUnsignedLong, xstUnsignedInt, xstUnsignedShort, xstUnsignedByte, xstLong, xstInt, xstShort, xstByte, xstNormalizedString, xstToken, xstLanguage, xstNMTOKEN, xstName, xstNCName, xstID, xstIDREF, xstENTITY, xstNMTOKENS, xstIDREFS, xstENTITIES, xstYearMonthDuration, xstDayTimeDuration, xstDateTimeStamp, xstJSONiqNull],
+schemaTypeDescendantsOfAnyAtomic,
+[xstUntyped],
+[xstUntypedAtomic],
+[xstBoolean],
+[xstDateTime, xstDateTimeStamp],
+[xstDate],
+[xstTime],
+[xstGDay],
+[xstGMonth],
+[xstGMonthDay],
+[xstGYear],
+[xstGYearMonth],
+[xstDuration, xstYearMonthDuration, xstDayTimeDuration],
+schemaTypeDescendantsOfDecimal,
+schemaTypeDescendantsOfDouble,
+[xstFloat],
+[xstAnyURI],
+[xstBase64Binary],
+[xstHexBinary],
+schemaTypeDescendantsOfString,
+schemaTypeDescendantsOfQName,
+[xstNOTATION],
+schemaTypeDescendantsOfInteger,
+[xstNonPositiveInteger, xstNegativeInteger],
+[xstNegativeInteger],
+[xstNonNegativeInteger, xstPositiveInteger, xstUnsignedLong, xstUnsignedInt, xstUnsignedShort, xstUnsignedByte],
+[xstPositiveInteger],
+[xstUnsignedLong, xstUnsignedInt, xstUnsignedShort, xstUnsignedByte],
+[xstUnsignedInt, xstUnsignedShort, xstUnsignedByte],
+[xstUnsignedShort, xstUnsignedByte],
+[xstUnsignedByte],
+[xstLong, xstInt, xstShort, xstByte],
+[xstInt, xstShort, xstByte],
+[xstShort, xstByte],
+[xstByte],
+[xstNormalizedString, xstToken, xstLanguage, xstNMTOKEN, xstName, xstNCName, xstID, xstIDREF, xstENTITY],
+[xstToken, xstLanguage, xstNMTOKEN, xstName, xstNCName, xstID, xstIDREF, xstENTITY],
+[xstLanguage],
+[xstNMTOKEN],
+[xstName, xstNCName, xstID, xstIDREF, xstENTITY],
+[xstNCName, xstID, xstIDREF, xstENTITY],
+[xstID],
+[xstIDREF],
+[xstENTITY],
+[xstNMTOKENS],
+[xstIDREFS],
+[xstENTITIES],
+[xstYearMonthDuration],
+[xstDayTimeDuration],
+[xstDateTimeStamp],
+[xstJSONiqNull],
+[xstJSONiqObject],
+[xstJSONiqArray]
+);
 
 var GlobalStaticNamespaces: TNamespaceList; //**< List of namespaces which are known in all XPath/XQuery expressions, even if they are not declared there
     AllowJSONDefaultInternal: boolean = false; //**< Default setting for JSON (internally used).
@@ -3572,6 +3651,20 @@ function TXSTypeAnnotationHelper.derivedFrom(t: TXSType): boolean;
 begin
   result := baseSchema.types[self].derivedFrom(t);
 end;
+
+function TXSTypeAnnotationHelper.derivedFrom(t: TXSTypeAnnotation): boolean;
+begin
+  result := self in schemaTypeDescendants[t];
+end;
+
+function TXSTypeAnnotationHelper.derivedFrom(t: TXSTypeAnnotations): boolean;
+begin
+  result := self in t;
+end;
+
+{$I xquery_types.inc}
+
+
 
 
 
@@ -10206,7 +10299,7 @@ xquery__functions.initializeFunctions;
 
 
 
-baseSchema.cacheDescendants; //this ignores the jsoniq types
+baseSchema.cacheDescendants;
 
 baseSchema.hide('node()');
 baseSchema.hide('sequence*');

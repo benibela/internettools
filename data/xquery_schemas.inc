@@ -7,7 +7,7 @@ begin
   name := aname;
   base := aparent;
   schema := aschema;
-  id := -1;
+
 
   if (schema = nil) and (base <> nil) then schema := base.schema;
   if schema <> nil then schema.typeList.include(name, self);
@@ -22,8 +22,8 @@ function TXSType.derivedFrom(t: TXSType): boolean;
 var s: TXSType;
 begin
   if self = t then exit(true);
-  if (t.id >= 0) and (id >= 0) then
-    exit(t.descendantsIds and (int64(1) shl id) <> 0);
+  if (t.typeAnnotation <> xstNoType) and (t.typeAnnotation <> xstnotype) then
+    exit(typeAnnotation in t.descendantsIds);
   s := self;
   while s <> nil do begin
     if s = t then exit(true);
@@ -32,16 +32,19 @@ begin
   result := t.containsTransitive(self);
 end;
 
-function TXSType.derivedFrom(t: array of TXSType): boolean;
+function TXSType.derivedFrom(t: TXSTypeAnnotations): boolean;
 var s: TXSType;
   i: Integer;
   allBasic: Boolean;
 begin
-  if id >= 0 then begin
+  result := typeAnnotation in t;
+end;
+  (*
+  if typeAnnotation <> xstNoType then begin
     allBasic := true;
     for i := 0 to high(t) do
-      if t[i].id < 0 then allBasic := false
-      else if t[i].descendantsIds and (int64(1) shl id) <> 0 then exit(true);
+      if t[i].typeAnnotation = xstNoType then allBasic := false
+      else if typeAnnotation in t[i].descendantsIds then exit(true);
     if allbasic then exit(false);
   end;
   s := self;
@@ -54,7 +57,7 @@ begin
     if t[i] is TXSUnionType then
       if TXSUnionType(t[i]).containsTransitive(self) then exit(true);}
   exit(false);
-end;
+end;                          *)
 
 class function TXSType.commonType(a, b: TXSType): TXSType;
 var ta: TXSType;
@@ -1054,6 +1057,15 @@ begin
 end;
 
 procedure TXSSchema.cacheDescendants;
+var
+  t: TXSTypeAnnotation;
+begin
+  for t := low(types) to high(types) do
+    types[t].descendantsIds := schemaTypeDescendants[t];
+end;
+
+{$ifdef computeDescendants}
+procedure TXSSchema.cacheDescendants;
 var graph: array[0..64] of record
   count: integer;
   children: array[0..23] of integer;
@@ -1132,7 +1144,32 @@ begin
   end;}
 
 end;
+{program Project1;
 
+uses xquery;
+var
+  t, u: TXSType;
+  first: Boolean;
+  tt: TXSTypeAnnotation;
+begin
+  for tt := low(TXSTypeAnnotation) to high(TXSTypeAnnotation) do begin //in baseSchema.types do begin
+    t := baseSchema.types[tt];
+   // writeln(t.typeAnnotation, ':');
+    write('[');
+    first := true;
+    for u in baseSchema.types do begin
+      if not u.derivedFrom(t) then continue;
+      if not first then Write(', ');
+      Write(u.typeAnnotation);
+      first := false
+    end;
+    writeln('],');
+
+  end;
+  writeln;
+end.
+}
+{$endif}
 
 function TXSSchema.isAbstractType(t: TXSType): boolean;
 begin
@@ -1339,7 +1376,6 @@ begin
 
   numeric := TXSUnionType.Create('numeric', anyAtomicType, [double, decimal, float, integer]);
 
-  untypedOrNodeUnion := TXSUnionType.Create(#255'node', anyType, [untypedAtomic, untyped, node]);
 
 
   types[xstNoType                 ] := Untyped;  //used to prevent access violation and in type-of
