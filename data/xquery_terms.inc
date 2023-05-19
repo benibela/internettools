@@ -1051,7 +1051,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
     node: TTreeNode;
   begin
     //this is a sub function, so the f/initialization of nodeCondition is only done for tests that actually are element tests
-    nodeCondition.init(nil, self.nodeMatching);
+    nodeCondition.init(self.nodeMatching);
     if qmCheckNamespacePrefix in self.nodeMatching.matching then begin
       include(nodeCondition.options, xqpncCheckNamespace);
       if qmAttribute in nodeMatching.matching then nodeCondition.requiredNamespaceURL:=context.findNamespaceURL(nodeCondition.requiredNamespaceURL, xqdnkUnknown)

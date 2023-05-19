@@ -1762,7 +1762,7 @@ type
 
     function nodeMatchesExtendedConditions(node: TTreeNode): boolean;
     function getNextNode(prev: TTreeNode): TTreeNode; reintroduce;
-    procedure init(const contextNode: TTreeNode; const command: TXQPathMatchingStep); reintroduce;
+    procedure init(const command: TXQPathMatchingStep); reintroduce;
   end;
 
 
@@ -9274,6 +9274,13 @@ begin
       cachedNamespaceURL:=command.namespaceURLOrPrefix;
       namespaceMatching := xqnmURL;
     end else namespaceMatching := xqnmNone;
+    if not (command.typ in [tneaFunctionSpecialCase, tneaAttribute]) then begin
+      nodeCondition.init(command);
+      if namespaceMatching = xqnmURL then begin
+        nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
+        Include(nodeCondition.options, xqpncCheckNamespace);
+      end else exclude(nodeCondition.options, xqpncCheckNamespace);
+    end;
 
     newList := TXQValueList.create();
     if length(command.filters) > 0 then
@@ -9324,11 +9331,7 @@ begin
               newListHasOnlyNodes := true;
               //writeln(command.serialize);
               //writeln('oldnode: ',n.toNode.typ, ' ',n.toNode.value,': ', n.toString);
-              nodeCondition.init(oldnode, command);
-              if namespaceMatching = xqnmURL then begin
-                nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
-                Include(nodeCondition.options, xqpncCheckNamespace);
-              end else exclude(nodeCondition.options, xqpncCheckNamespace);
+              nodeCondition.setContextNode(oldnode);
               newnode := nodeCondition.getNextNode(nil);
               if newnode = nil then continue;
               newList.clear;
@@ -9657,7 +9660,7 @@ begin
   end;
 end;
 
-procedure TXQPathNodeCondition.init(const contextNode: TTreeNode; const command: TXQPathMatchingStep);
+procedure TXQPathNodeCondition.init(const command: TXQPathMatchingStep);
   function convertMatchingOptionsToMatchedTypes(const qmt: TXQPathMatchingKinds): TTreeElementTypes;
   begin
     result := [];
@@ -9669,6 +9672,7 @@ procedure TXQPathNodeCondition.init(const contextNode: TTreeNode; const command:
     if qmDocument in qmt then include(result, tetDocument);
   end;
 begin
+  inherited init(command.typ);
   options:=[];
   if (qmValue in command.matching) then begin
     Include(options, xqpncCheckValue);
@@ -9682,7 +9686,6 @@ begin
   requiredType := command.requiredType;
   if qmCheckOnSingleChild in command.matching then Include(options, xqpncCheckOnSingleChild);
 
-  inherited init(contextNode, command.typ);
 end;
 
 

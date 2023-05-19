@@ -66,16 +66,19 @@ TTreeNodeEnumeratorConditions = object
 type TTreeNodeEnumeratorBasicAxis = (tneabNoAxis, tneabFollowing, tneabFollowingSibling, tneabPreceding, tneabPrecedingSibling, tneabParent);
 protected
   nextCallback: TTreeNodeEnumeratorNextCallback;
+  axis: TTreeNodeEnumeratorAxis;
+  basicAxis: TTreeNodeEnumeratorBasicAxis;
   start, endnode: TTreeNode;
-  procedure setBasicAxis(axis: TTreeNodeEnumeratorBasicAxis);
+  procedure setBasicAxis(abasicAxis: TTreeNodeEnumeratorBasicAxis);
 public
-  procedure init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
+  procedure setContextNode(contextNode: TTreeNode);
+  procedure init(anaxis: TTreeNodeEnumeratorAxis);
   function getNextNode(current: TTreeNode): TTreeNode;
 end;
 TTreeNodeEnumerator = object(TTreeNodeEnumeratorConditions)
   FCurrent: TTreeNode;
 public
-  procedure init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
+  procedure init(contextNode: TTreeNode; anaxis: TTreeNodeEnumeratorAxis);
   function MoveNext: Boolean;
   property Current: TTreeNode read FCurrent;
   function GetEnumerator: TTreeNodeEnumerator;
@@ -533,9 +536,10 @@ begin
 end;
 
 
-procedure TTreeNodeEnumerator.init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
+procedure TTreeNodeEnumerator.init(contextNode: TTreeNode; anaxis: TTreeNodeEnumeratorAxis);
 begin
-  inherited;
+  inherited init(anaxis);
+  setContextNode(contextNode);
   fCurrent := nil;
 end;
 
@@ -557,7 +561,7 @@ function axisPrevious(current: TTreeNode): TTreeNode; begin result := current.pr
 function axisPreviousSibling(current: TTreeNode): TTreeNode; begin result := current.getPreviousSibling(); end;
 function axisParent(current: TTreeNode): TTreeNode; begin result := current.getParent(); end;
 
-procedure TTreeNodeEnumeratorConditions.setBasicAxis(axis: TTreeNodeEnumeratorBasicAxis);
+procedure TTreeNodeEnumeratorConditions.setBasicAxis(abasicAxis: TTreeNodeEnumeratorBasicAxis);
 const axisCallbacks: array[TTreeNodeEnumeratorBasicAxis] of TTreeNodeEnumeratorNextCallback = (
   @axisAlwaysNil,
   @axisNext,        @axisNextSibling,
@@ -566,12 +570,11 @@ const axisCallbacks: array[TTreeNodeEnumeratorBasicAxis] of TTreeNodeEnumeratorN
   );
 
 begin
-  nextCallback := axisCallbacks[axis];
+  basicAxis := abasicAxis;
+  nextCallback := axisCallbacks[basicAxis];
 end;
 
-procedure TTreeNodeEnumeratorConditions.init(contextNode: TTreeNode; axis: TTreeNodeEnumeratorAxis);
-var
-  basicAxis: TTreeNodeEnumeratorBasicAxis;
+procedure TTreeNodeEnumeratorConditions.setContextNode(contextNode: TTreeNode);
 begin
   start := contextnode;
   endnode := nil;
@@ -649,6 +652,11 @@ begin
 
   if start = nil then basicAxis := tneabNoAxis;
   setBasicAxis(basicAxis);
+end;
+
+procedure TTreeNodeEnumeratorConditions.init(anaxis: TTreeNodeEnumeratorAxis);
+begin
+  axis := anaxis;
 end;
 
 function TTreeNodeEnumeratorConditions.getNextNode(current: TTreeNode): TTreeNode;
