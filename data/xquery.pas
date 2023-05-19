@@ -3950,8 +3950,8 @@ begin
   //i.e. fsingleelement should only used if fcurrent = flast = nil.
   result := (fcurrent = nil) and (fsingleelement <> INVALID_VALUE);
   if result then begin
-    fcurrent := @fsingleelement; //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
-    flast := @fsingleelement;
+    fcurrent := PIXQValue(@fsingleelement); //if this was moved to a virtual function of IXQValue, it could be used for staged lazy evaluation; each stage having its own current and last
+    flast := PIXQValue(@fsingleelement);
   end;
 end;
 
@@ -9404,7 +9404,7 @@ begin
             exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1));
         end;
     end;
-    writeln(command.serialize, ' ',previous.kind, ' ',length(command.filters), ' ',command.typ);
+
 
     resultList:=TXQValueList.create(previous.getSequenceCount);
     newList := TXQValueList.create();

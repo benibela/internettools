@@ -1466,12 +1466,12 @@ function TXQTermSomeEvery.visitchildren(visitor: TXQTerm_Visitor): TXQTerm_Visit
     result := visitor.simpleTermVisit(@children[pos+1+typeDelta], self);
     if result = xqtvaAbort then exit;
 
-    visitor.declare(@children[pos], self);
+    visitor.declare(@TXQTermVariable(children[pos]), self);
 
     result := visitSomeEvery(pos+2+typeDelta);
     if result = xqtvaAbort then exit;
 
-    visitor.undeclare(@children[pos], self);
+    visitor.undeclare(@TXQTermVariable(children[pos]), self);
   end;
 begin
   result := visitSomeEvery(0);
@@ -3260,7 +3260,7 @@ begin
     if path[i].typ = tneaFunctionSpecialCase then visitor.simpleTermVisit(@path[i].specialCase, self);
     if path[i].requiredType <> nil then visitor.simpleTermVisit(@path[i].requiredType, self);
     for j := 0 to high(path[i].filters) do begin
-      result := visitor.simpleTermVisit(@path[i].filters[j], self);
+      result := visitor.simpleTermVisit(@path[i].filters[j].filter, self);
       if result = xqtvaAbort then exit;
     end;
   end;
@@ -4942,7 +4942,7 @@ begin
     xqtdfUserDefined, xqtdfNamedReference: begin
       for i := 0 to parameterCount - 1 do begin
         varDef := children[i] as TXQTermDefineVariable;
-        visitor.declare(@varDef.variable);
+        visitor.declare(@TXQTermVariable(varDef.variable));
         if length(varDef.children) > 0 then begin
           result := visitor.simpleTermVisit(@children[i], self);
           if result = xqtvaAbort then exit;
@@ -4955,7 +4955,7 @@ begin
       end;
       visitor.parent := self;
       for i := parameterCount - 1 downto 0 do
-        visitor.undeclare(@((children[i] as TXQTermDefineVariable).variable));
+        visitor.undeclare(@TXQTermVariable(((children[i] as TXQTermDefineVariable).variable)));
     end;
     xqtdfStaticPartialApplication, xqtdfDynamicPartialApplication: begin
       visitor.simpleTermVisit(@children[0], self);

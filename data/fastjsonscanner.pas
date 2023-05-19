@@ -511,7 +511,7 @@ class function TJSONScanner.decodeJSONString(strStart: pchar; strLength: SizeInt
         if errpchar <> nil then result := errpchar
         else begin
           temp := '\u' + IntToHex(codepoint, 4);
-          result := @temp;
+          result := @temp[1];
         end;
       end;
 

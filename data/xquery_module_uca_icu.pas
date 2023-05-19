@@ -411,10 +411,10 @@ begin
   temp := UnicodeString(s);
   SetLength(result, 1000);
   //ucol_setStrength(collator, config.strength - 1);
-  len := ucol_getSortKey(col, @temp[1], length(temp), @result[1], length(result) + 1);
+  len := ucol_getSortKey(col, @temp[1], length(temp), pbyte(@result[1]), length(result) + 1);
   if len > length(result) + 1 then begin
     SetLength(result, len - 1);
-    len := ucol_getSortKey(col, @temp[1], length(temp), @result[1], length(result) + 1);
+    len := ucol_getSortKey(col, @temp[1], length(temp), pbyte(@result[1]), length(result) + 1);
   end else if len > 0 then SetLength(result, len - 1);
   //writeln('Sort key: "', result, '" for ', temp);
   //writeln('using '+id);

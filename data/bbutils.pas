@@ -4035,7 +4035,7 @@ begin
       if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
       temp8 := temp8 - decimalZeros8;
       if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
-      bytes := @temp8;
+      bytes := PByte(@temp8);
       unsigned := unsigned * 100000000 + (((((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3])* 10 + bytes[4])* 10 + bytes[5])* 10 + bytes[6])* 10 + bytes[7];
       inc(pstart, 8);
     end;
@@ -4044,7 +4044,7 @@ begin
       if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
       temp4 := temp4 - decimalZeros4;
       if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
-      bytes := @temp4;
+      bytes := PByte(@temp4);
       unsigned := unsigned * 10000 + ((((bytes[0] * 10) + bytes[1])* 10 + bytes[2])* 10 + bytes[3]);
       inc(pstart, 4);
     end;
@@ -4086,7 +4086,7 @@ begin
       if (temp8 and selectFirstHalfByte8) <> decimalZeros8 then exit;
       temp8 := temp8 - decimalZeros8;
       if ((temp8 + overflowMaxDigit8) and selectFirstHalfByte8) <> 0 then exit;
-      bytes := @temp8;
+      bytes := PByte(@temp8);
       unsigned := unsigned * uint32(100000000) + (((((((bytes[0] * BASE) + bytes[1])* BASE + bytes[2])* BASE + bytes[3])* BASE + bytes[4])* BASE + bytes[5])* BASE + bytes[6])* BASE + bytes[7];
       inc(pstart, 8);
     end;
@@ -4095,7 +4095,7 @@ begin
       if (temp4 and selectFirstHalfByte4) <> decimalZeros4 then exit;
       temp4 := temp4 - decimalZeros4;
       if ((temp4 + overflowMaxDigit4) and selectFirstHalfByte4) <> 0 then exit;
-      bytes := @temp4;
+      bytes := PByte(@temp4);
       unsigned := unsigned * 10000 + ((((bytes[0] * BASE) + bytes[1])* BASE + bytes[2])* BASE + bytes[3]);
       inc(pstart, 4);
     end;
@@ -4466,7 +4466,7 @@ begin
   while true do begin
     readLen := f.Read({%H-}buffer[low(buffer)], length(buffer));
     if readLen <= 0 then break;
-    result := result + strFromPchar(@buffer[low(buffer)], readLen);
+    result := result + strFromPchar(pchar(@buffer[low(buffer)]), readLen);
   end;
   f.Free;
 end;
@@ -5634,7 +5634,7 @@ begin
                  If they do not match abort, otherwise continue to the next node (which starts at the byte immediate after the current node)
 
               }
-              entityCodePtr := @entityCode[entity];
+              entityCodePtr := pchar(@entityCode[entity]);
               inc(p);
 
               acceptPos := nil;
@@ -5983,7 +5983,7 @@ procedure TPCharView.init(const buffer: TBytes);
 begin
   if system.length(buffer) = 0 then self := default(TPCharView)
   else begin
-    data := @buffer[0];
+    data := pchar(@buffer[0]);
     dataend := data + system.length(buffer);
   end;
 end;

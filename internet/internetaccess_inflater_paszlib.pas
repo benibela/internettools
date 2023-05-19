@@ -107,12 +107,12 @@ begin
   if not headerRead then begin
     if headerBuffer <> '' then begin
       headerBuffer := headerBuffer + strFromPchar(@abuffer, count);
-      stream.next_in:=@headerBuffer[1];
+      stream.next_in:=pbyte(@headerBuffer[1]);
       stream.avail_in:=length(headerBuffer);
     end;
     header := getHeaderLength(expectGZIP, stream.next_in, stream.avail_in, headerLength);
     if header = hBufferTooSmall then begin
-      if stream.next_in=@abuffer then headerBuffer := headerBuffer + strFromPchar(@abuffer, count);
+      if stream.next_in=pbyte(@abuffer) then headerBuffer := headerBuffer + strFromPchar(@abuffer, count);
       exit;
     end;
     headerRead := true;
@@ -154,7 +154,7 @@ var
   headerLength: cardinal;
 begin
   if (not headerRead) and (headerBuffer <> '') then begin
-    header := getHeaderLength(expectGZIP, @headerBuffer[1], length(headerBuffer), headerLength);
+    header := getHeaderLength(expectGZIP, pbyte(@headerBuffer[1]), length(headerBuffer), headerLength);
     if header in [hInvalidHeader, hBufferTooSmall] then headerLength := 0;
     tempBuffer := @headerBuffer[1] + headerLength;
     if header in [hInvalidHeader, hText] then
