@@ -67,7 +67,7 @@ type TTreeNodeEnumeratorBasicAxis = (tneabNoAxis, tneabFollowing, tneabFollowing
 protected
   nextCallback: TTreeNodeEnumeratorNextCallback;
   axis: TTreeNodeEnumeratorAxis;
-  basicAxis: TTreeNodeEnumeratorBasicAxis;
+  fbasicAxis: TTreeNodeEnumeratorBasicAxis;
   start, endnode: TTreeNode;
   procedure setBasicAxis(abasicAxis: TTreeNodeEnumeratorBasicAxis);
 public
@@ -570,15 +570,15 @@ const axisCallbacks: array[TTreeNodeEnumeratorBasicAxis] of TTreeNodeEnumeratorN
   );
 
 begin
-  basicAxis := abasicAxis;
-  nextCallback := axisCallbacks[basicAxis];
+  fbasicAxis := abasicAxis;
+  nextCallback := axisCallbacks[fbasicAxis];
 end;
 
 procedure TTreeNodeEnumeratorConditions.setContextNode(contextNode: TTreeNode);
 begin
   start := contextnode;
   endnode := nil;
-  basicAxis := tneabNoAxis;
+  fbasicAxis := tneabNoAxis;
 
   if contextNode <> nil then
     case axis of
@@ -588,24 +588,24 @@ begin
         if contextNode.typ <> tetAttribute then begin
           start := contextNode.getFirstChild();
           endnode := contextNode.reverse;
-          basicAxis := tneabFollowingSibling;
+          fbasicAxis := tneabFollowingSibling;
         end else start := nil;
       tneaDescendant:
         if contextNode.typ <> tetAttribute then begin
           start := contextNode.getFirstChild();
           endnode := contextNode.reverse;
-          basicAxis := tneabFollowing;
+          fbasicAxis := tneabFollowing;
         end else start := nil;
       tneaSameOrDescendant: begin
         if contextNode.typ in TreeNodesWithChildren then begin
-          basicAxis := tneabFollowing;
+          fbasicAxis := tneabFollowing;
           endnode := contextNode.reverse
         end;
       end;
       tneaFollowingSibling:
         if contextNode.typ <> tetAttribute then begin
           start := contextNode.getNextSibling();
-          basicAxis := tneabFollowingSibling;
+          fbasicAxis := tneabFollowingSibling;
           endnode:=contextNode.getParent();
           if endnode <> nil then endnode := endnode.reverse;
         end else start := nil;
@@ -614,26 +614,26 @@ begin
           if contextNode.hasChildren then start := contextNode.reverse
           else start := start.next;
           while (start <> nil) and (start.typ = tetClose) do start := start.next;
-          basicAxis := tneabFollowing;
+          fbasicAxis := tneabFollowing;
         end else start := nil;
 
       tneaDirectParent: begin
         start := contextNode.getParent();
       end;
       tneaAncestor, tneaSameOrAncestor: begin
-        basicAxis := tneabParent;
+        fbasicAxis := tneabParent;
         if axis = tneaAncestor then start := start.getParent();
       end;
 
       tneaPrecedingSibling:
         if contextNode.typ <> tetAttribute then begin
-          basicAxis := tneabPrecedingSibling;
+          fbasicAxis := tneabPrecedingSibling;
           start := contextNode.getPreviousSibling();
           endnode:=contextnode.getParent();
         end else start := nil;
       tneaPreceding:
         if contextNode.typ <> tetAttribute then begin
-          basicAxis := tneabPreceding;
+          fbasicAxis := tneabPreceding;
           start := contextNode.previous;
           endnode := contextNode.getParent();
         end else start := nil;
@@ -643,15 +643,15 @@ begin
         end else begin
           start := contextNode.attributes;
           endnode := nil;
-          basicAxis := tneabFollowing;
+          fbasicAxis := tneabFollowing;
         end;
       end;
 
       tneaDocumentRoot, tneaFunctionSpecialCase: assert(false);
     end;
 
-  if start = nil then basicAxis := tneabNoAxis;
-  setBasicAxis(basicAxis);
+  if start = nil then fbasicAxis := tneabNoAxis;
+  setBasicAxis(fbasicAxis);
 end;
 
 procedure TTreeNodeEnumeratorConditions.init(anaxis: TTreeNodeEnumeratorAxis);

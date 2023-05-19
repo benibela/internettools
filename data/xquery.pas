@@ -393,6 +393,7 @@ type
     procedure revert; //**< Reverts the list
     procedure sort(cmp: TPointerCompareFunction; sortData: TObject = nil); //**< Sorts the list
     procedure sortInDocumentOrderUnchecked; //**< Sorts the nodes in the list in document order. Does not check if they actually are nodes
+    procedure removeOrderedDuplicateNodesUnchecked; //**< Removes nodes from an ordered sequence. Does not check if they actually are nodes
 
     function refCount: SizeInt;
     property count: sizeint read getCount write setCount;
@@ -1763,6 +1764,8 @@ type
     function nodeMatchesExtendedConditions(node: TTreeNode): boolean;
     function getNextNode(prev: TTreeNode): TTreeNode; reintroduce;
     procedure init(const command: TXQPathMatchingStep); reintroduce;
+    property basicAxis: TTreeNodeEnumeratorBasicAxis read fbasicAxis;
+    property theendnode: TTreeNode read endnode;
   end;
 
 
@@ -4085,6 +4088,35 @@ procedure TXQValueList.sortInDocumentOrderUnchecked;
 begin
   if count < 2 then exit;
   stableSort(@buffer[0], @buffer[count-1], sizeof(IXQValue), @compareXQInDocumentOrder);
+end;
+
+procedure TXQValueList.removeOrderedDuplicateNodesUnchecked;
+var
+  fbuffer: PT;
+  fcount: SizeInt;
+  duplicates: SizeInt = 0;
+  i: sizeint;
+begin
+  fbuffer := buffer;
+  fcount := count;
+  i := 1;
+  while i < fCount do begin
+    if fbuffer[i].getDataNode = fbuffer[i-1].getDataNode then begin
+      duplicates := 1;
+      break;
+    end;
+    inc(i);
+  end;
+  if duplicates = 0 then exit;
+  inc(i);
+  for i := i to fcount - 1 do begin
+    if fbuffer[i].getDataNode = fbuffer[i-1].getDataNode then begin
+      duplicates += 1;
+    end else begin
+      fbuffer[i - duplicates] := fbuffer[i];
+    end;
+  end;
+  count := fcount - duplicates;
 end;
 
 function TXQValueList.refCount: SizeInt;
@@ -9163,9 +9195,90 @@ end;
 
 class function TXQueryEngine.expandSequence(const previous: IXQValue; const command: TXQPathMatchingStep; var context: TXQEvaluationContext; lastExpansion: boolean): IXQValue;
 var oldnode,newnode: TTreeNode;
-    newList: TXQValueList;
     nodeCondition: TXQPathNodeCondition;
+    namespaceMatching: TXQNamespaceMode;
+    lastAcceptedNamespace: TNamespace;
 
+function namespaceExtensionHack(newnode: TTreeNode): boolean;
+begin
+  //extension, use namespace bindings of current item, if it is not statically known
+  result := (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)
+             or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL());
+  if result then
+    lastAcceptedNamespace := newnode.namespace;
+end;
+
+function fastExpandFollowingUnfilteredNodeBufferToNodeList(previousBuffer: PIXQValue; previousCount: SizeInt): IXQValue;
+var resultList: TXQValueList;
+  newnode, endnode: TTreeNode;
+  i: Integer;
+  requiredHash, requiredHashMask: Cardinal;
+begin
+  resultList := TXQValueList.create(previousCount);
+  resultList.header.flagsAndPadding.nodesAreInSameDocument := true;
+  resultList.header.flagsAndPadding.itemsHaveSameKind := true;
+  requiredHash := nodeCondition.requiredValueHash;
+  requiredHashMask := 0;
+  if xqpncCheckValue in nodeCondition.options then requiredHashMask := not requiredHashMask
+  else requiredHash := requiredHashMask;
+  for i := 0 to previousCount - 1 do begin
+    nodeCondition.setContextNode(previousBuffer[i].toNode);
+    newnode := nodeCondition.getNextNode(nil);
+    if newnode = nil then continue;
+    endnode := nodeCondition.theendnode; //FPC can only keep local variables in registers
+    if nodeCondition.basicAxis = tneabFollowing then begin
+      while (newnode <> nil) and (newnode <> endnode) do begin
+        if (newnode.hash and requiredHashMask = requiredHash) and nodeCondition.nodeMatchesExtendedConditions(newnode) then
+          if (namespaceMatching <> xqnmPrefix) or (newnode.namespace = lastAcceptedNamespace) or namespaceExtensionHack(newnode) then
+            resultList.addNodeNoRC(newnode);
+        newnode := newnode.next;
+      end;
+    end else if nodeCondition.basicAxis = tneabFollowingSibling then begin
+      while (newnode <> nil) and (newnode <> endnode) and (newnode.typ <> tetClose) do begin
+        if (newnode.hash and requiredHashMask = requiredHash) and nodeCondition.nodeMatchesExtendedConditions(newnode) then
+          if (namespaceMatching <> xqnmPrefix) or (newnode.namespace = lastAcceptedNamespace) or namespaceExtensionHack(newnode) then
+            resultList.addNodeNoRC(newnode);
+        case newnode.typ of
+          tetOpen, tetDocument: newnode := newnode.reverse;
+        end;
+        newnode := newnode.next;
+      end;
+    end else begin //fallback to slow behaviour (special handling is required for attribute nodes)
+      while newnode <> nil do begin
+        if (namespaceMatching <> xqnmPrefix) or (newnode.namespace = lastAcceptedNamespace) or namespaceExtensionHack(newnode) then
+          resultList.addNodeNoRC(newnode);
+        newnode := nodeCondition.getNextNode(newnode);
+      end;
+    end;
+  end;
+  if resultList.count = 1 then begin
+       result := resultList.buffer[0];
+    xqvalueVaporize(resultList.buffer[0]);
+  end else begin
+    previousBuffer[0].toNode.getDocument.addRef(resultList.count);
+    resultList.sortInDocumentOrderUnchecked;
+    resultList.removeOrderedDuplicateNodesUnchecked;
+    result := resultList.toXQValueSequenceSqueezed;
+  end;
+end;
+
+function fastExpandFollowingUnfilteredNodeListToNodeList: IXQValue;
+var
+  previousList: TXQValueWeaklySharedList;
+  previousBuffer: PIXQValue;
+begin
+  previousList := previous.getDataList;
+  previousBuffer := previousList.Buffer;
+  result := fastExpandFollowingUnfilteredNodeBufferToNodeList(previousBuffer, previousList.Count);
+end;
+
+function fastExpandFollowingUnfilteredNodeToNodeList: IXQValue;
+begin
+  result := fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1);
+end;
+
+var
+  newList: TXQValueList;
 procedure jsoniqDescendants(const v: IXQValue; const searchedProperty: string);
 var
   temp: IXQValue;
@@ -9241,7 +9354,6 @@ var
   tempNamespace: TNamespace;
   cachedNamespaceURL: string;
   tempKind: TXQValueKind;
-  namespaceMatching: TXQNamespaceMode;
   tempList: TXQValueList;
   pv: PIXQValue;
   attrib: TTreeNode;
@@ -9253,8 +9365,8 @@ var
 begin
   if (previous.getSequenceCount = 0) then exit(previous);
 
-  resultList:=TXQValueList.create(previous.getSequenceCount);
   try
+    lastAcceptedNamespace := TNamespace(pointer(not 0));
     if command.typ = tneaFunctionSpecialCase then begin
       tempContext := context;
       tempContext.SeqLength:=previous.getSequenceCount;
@@ -9276,18 +9388,30 @@ begin
     end else namespaceMatching := xqnmNone;
     if not (command.typ in [tneaFunctionSpecialCase, tneaAttribute]) then begin
       nodeCondition.init(command);
+      nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
       if namespaceMatching = xqnmURL then begin
         nodeCondition.requiredNamespaceURL:=cachedNamespaceURL;
         Include(nodeCondition.options, xqpncCheckNamespace);
       end else exclude(nodeCondition.options, xqpncCheckNamespace);
-    end;
 
+      if (length(command.filters) = 0) and (command.typ in [tneaDirectChild, tneaDirectChildImplicit, tneaDescendant, tneaSameOrDescendant, tneaFollowingSibling, tneaFollowing]) then
+        case previous.kind of
+          pvkSequence:
+            with previous.getDataList do
+              if header.flagsAndPadding.itemsHaveSameKind and header.flagsAndPadding.nodesAreInSameDocument and (count > 0) and (items[0].kind = pvkNode) then
+                exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(buffer, count));
+          pvkNode:
+            exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1));
+        end;
+    end;
+    writeln(command.serialize, ' ',previous.kind, ' ',length(command.filters), ' ',command.typ);
+
+    resultList:=TXQValueList.create(previous.getSequenceCount);
     newList := TXQValueList.create();
     if length(command.filters) > 0 then
       newList2 := TXQValueList.create();
 
 
-    nodeCondition.equalFunction:=@context.staticContext.nodeCollation.equal;
     resultHasOnlyNodes := false;
     resultNodesAreInSameDocument := true;
     resultDocument := nil;
@@ -9336,10 +9460,8 @@ begin
               if newnode = nil then continue;
               newList.clear;
               while newnode <> nil do begin
-                if (namespaceMatching <> xqnmPrefix)
-                   or (newnode.getNamespacePrefix() = command.namespaceURLOrPrefix)                            //extension, use namespace bindings of current item, if it is not statically known
-                   or (newnode.getNamespaceURL(command.namespaceURLOrPrefix) = newnode.getNamespaceURL()) then
-                newList.addNodeNoRC(newnode);
+                if (namespaceMatching <> xqnmPrefix) or (newnode.namespace = lastAcceptedNamespace) or namespaceExtensionHack(newnode) then
+                  newList.addNodeNoRC(newnode);
                 newnode := nodeCondition.getNextNode(newnode);
               end;
               newListDocument := oldnode.getDocument();
@@ -9398,7 +9520,10 @@ begin
           else tempList := filter(xqvalueSeqSqueezed(newList));
         end;
       end else tempList := newList; //no filter, no need to copy lists
-
+  {    if (newListHasOnlyNodes<>newList.header.flagsAndPadding.itemsHaveSameKind)
+       or (newListHasOnlyNodes<>tempList.header.flagsAndPadding.itemsHaveSameKind) then
+        writeln(newListHasOnlyNodes, ' ',newList.header.flagsAndPadding.itemsHaveSameKind, ' ',tempList.header.flagsAndPadding.itemsHaveSameKind, ' ',templist.count);
+                                                                                                         }
       if tempList.Count = 0 then continue;
       if command.typ in [tneaAncestor,tneaSameOrAncestor,tneaPreceding,tneaPrecedingSibling] then
         tempList.revert; //revert the list, because it is now in ancestor order (needed for indices in filtering), but need to be returned in document order

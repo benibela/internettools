@@ -745,7 +745,6 @@ function xqvalueToNormalizedNodeSeq(const v: IXQValue): TXQValueList;
 var
  i: SizeInt;
  x: PIXQValue;
- hasDuplicates: Boolean;
  tempList: TXQValueList;
 begin
   case v.kind of
@@ -763,23 +762,7 @@ begin
         result.add(x^);
       end;
       result.sortInDocumentOrderUnchecked;
-      hasDuplicates := false;
-      for i:=1 to result.Count-1 do
-        if result[i].getDataNode = result[i-1].getDataNode then begin
-          hasDuplicates := true;
-          break;
-        end;
-      if hasDuplicates then begin
-        tempList := result;
-        result := TXQValueList.create(Result.count);
-        result.add(tempList[0]);
-        for i:=1 to tempList.Count-1 do
-          if tempList[i].getDataNode <> tempList[i-1].getDataNode then
-            result.add(tempList[i]);
-      end;
-{      for i:=result.Count-1 downto 1 do
-        if result[i].toNode = result[i-1].toNode then
-          result.Delete(i);}
+      result.removeOrderedDuplicateNodesUnchecked;
     end;
     else raise EXQEvaluationException.Create('XPTY0004', 'expected node lists');
   end;
