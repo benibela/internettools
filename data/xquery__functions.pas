@@ -7284,7 +7284,7 @@ end;
 function xqFunctionArrayRemove({%H-}argc: SizeInt; argv: PIXQValue): IXQValue;
 var
   iter: TXQValueEnumeratorPtrUnsafe;
-  p: SizeInt;
+  p: SizeInt64;
   list: TXQValueList;
   indices: TSizeintArray = nil;
   i: SizeInt;
@@ -7307,8 +7307,9 @@ begin
       SetLength(indices, argv[1].getSequenceCount);
       i := 0;
       for pv in argv[1].GetEnumeratorPtrUnsafe do begin
-        indices[i] := pv^.toInt64 - 1;
-        if (indices[i] < 0) or (indices[i] >= a.Count) then raiseInvalidArrayOutOfBounds(argv^, indices[i]);
+        p := pv^.toInt64 - 1;
+        if (p < 0) or (p >= a.Count) then raiseInvalidArrayOutOfBounds(argv^, indices[i]);
+        indices[i] := p;
         inc(i);
       end;
       stableSort(indices);
