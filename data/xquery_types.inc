@@ -12,7 +12,7 @@ end;
 
 procedure xqswap(var a, b: IXQValue); inline;
 var
-  t: qword;
+  t: IXQValue.TEncodedData;
 begin
   t := a.encoded;
   a.encoded := b.encoded;
@@ -140,7 +140,8 @@ end;
 
 function IXQValue.getDataPointer: pointer;
 begin
-  result := pointer(encoded shr DATA_SHIFT_BITS)
+//  result := pointer(encoded shr DATA_SHIFT_BITS)
+  result := pointer(SarInt64(encoded, DATA_SHIFT_BITS));
 end;
 
 procedure IXQValue.setTypeAnnotation(xst: TXSTypeAnnotation);
@@ -228,7 +229,7 @@ begin
   end;
 end;
 
-class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: QWord);
+class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: IXQValue.TEncodedData);
 begin
   if result.encoded <> 0 then
     result.release;
@@ -239,7 +240,7 @@ class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp
 begin
   if result.encoded <> 0 then
     result.release;
-  result.encoded := (QWord(data) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
+  result.encoded := (IXQValue.TEncodedData(data) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
 end;
 
 class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue);
@@ -247,7 +248,7 @@ begin
   if result.encoded <> 0 then
     result.release;
   box._AddRef;
-  result.encoded := (QWord(pointer(box)) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
+  result.encoded := (IXQValue.TEncodedData(pointer(box)) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
 end;
 
 {$push}{$RangeChecks off}{$OverflowChecks off}
@@ -1267,7 +1268,7 @@ end;
 
 function xqvalueTrue: IXQValue;
 begin
-  IXQValue.create(result, pvkBoolean, xstBoolean, QWord(-1));
+  IXQValue.create(result, pvkBoolean, xstBoolean, IXQValue.TEncodedData(-1));
 end;
 
 function xqvalueFalse: IXQValue;
@@ -1278,7 +1279,7 @@ end;
 function xqvalue(const v: Boolean): IXQValue;
 begin
   case v of
-    true:  IXQValue.create(result, pvkBoolean, xstBoolean, QWord(-1));
+    true:  IXQValue.create(result, pvkBoolean, xstBoolean, IXQValue.TEncodedData(-1));
     false: IXQValue.create(result, pvkBoolean, xstBoolean, 0);
   end;
   //result := TXQValueBoolean.Create(v);

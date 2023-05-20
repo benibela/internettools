@@ -208,7 +208,9 @@ type
   This change should not affect common use, but it is no longer possible to cast it to a class or create user-defined types.
   *)
   IXQValue = record
-    encoded: QWord;
+    type TEncodedData = Int64;
+  public
+    encoded: TEncodedData;
 
     function kind: TXQValueKind; inline; //**< Primary type of a value
     function typeName: string;       //**< XPath/XML Schema type name
@@ -295,7 +297,7 @@ type
     procedure clear;
 
     //Internal create functions. DO NOT USE, they do not check if the input is valid, and you need to set the reference count manually
-    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: QWord ); static; inline;
+    class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: TEncodedData ); static; inline;
     class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; data: pointer ); static; inline;
     class procedure create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue ); static; //inline;
     class procedure create(var result: IXQValue; smallishInt: Int64); static; inline;
@@ -443,7 +445,7 @@ type
   TXQValueEnumeratorPtrUnsafe = record
   private
     fcurrent, flast: PIXQValue;
-    fsingleelement: QWord{IXQValue};
+    fsingleelement: IXQValue.TEncodedData{IXQValue};
     class procedure clear(out enum: TXQValueEnumeratorPtrUnsafe); static;
     class procedure makesingleelement(const v: ixqvalue; out enum: TXQValueEnumeratorPtrUnsafe); static;
     function MoveNextSingleElement: Boolean;
@@ -3928,7 +3930,7 @@ end;
 
 
 
-const INVALID_VALUE = QWord(PtrInt(-1));
+const INVALID_VALUE = IXQValue.TEncodedData(PtrInt(-1));
 
 class procedure TXQValueEnumeratorPtrUnsafe.clear(out enum: TXQValueEnumeratorPtrUnsafe);
 begin
