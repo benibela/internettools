@@ -9400,7 +9400,7 @@ begin
           pvkSequence:
             with previous.getDataList do
               if header.flagsAndPadding.itemsHaveSameKind and header.flagsAndPadding.nodesAreInSameDocument and (count > 0) and (items[0].kind = pvkNode) then
-                exit(fastExpandFollowingUnfilteredNodeListToNodeList); //cannot access
+                exit(fastExpandFollowingUnfilteredNodeListToNodeList); //cannot access buffer here
           pvkNode:
             exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1));
         end;

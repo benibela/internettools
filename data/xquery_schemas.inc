@@ -33,31 +33,10 @@ begin
 end;
 
 function TXSType.derivedFrom(t: TXSTypeAnnotations): boolean;
-var s: TXSType;
-  i: Integer;
-  allBasic: Boolean;
 begin
   result := typeAnnotation in t;
 end;
-  (*
-  if typeAnnotation <> xstNoType then begin
-    allBasic := true;
-    for i := 0 to high(t) do
-      if t[i].typeAnnotation = xstNoType then allBasic := false
-      else if typeAnnotation in t[i].descendantsIds then exit(true);
-    if allbasic then exit(false);
-  end;
-  s := self;
-  while s <> nil do begin
-    for i := 0 to high(t) do
-      if s = t[i] then exit(true);
-    s := s.base;
-  end;
-  {for i := 0 to high(t) do
-    if t[i] is TXSUnionType then
-      if TXSUnionType(t[i]).containsTransitive(self) then exit(true);}
-  exit(false);
-end;                          *)
+
 
 class function TXSType.commonType(a, b: TXSType): TXSType;
 var ta: TXSType;
