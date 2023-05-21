@@ -9253,15 +9253,18 @@ begin
       end;
     end;
   end;
-  if resultList.count = 1 then begin
-       result := resultList.buffer[0];
-    xqvalueVaporize(resultList.buffer[0]);
-  end else begin
-    previousBuffer[0].toNode.getDocument.addRef(resultList.count);
-    resultList.sortInDocumentOrderUnchecked;
-    resultList.removeOrderedDuplicateNodesUnchecked;
-    result := resultList.toXQValueSequenceSqueezed;
-  end;
+  case resultList.count of
+    0: result.clear;
+    1: begin
+      result := resultList.buffer[0];
+      xqvalueVaporize(resultList.buffer[0]);
+    end
+    else
+      previousBuffer[0].toNode.getDocument.addRef(resultList.count);
+      resultList.sortInDocumentOrderUnchecked;
+      resultList.removeOrderedDuplicateNodesUnchecked;
+      result := resultList.toXQValueSequenceSqueezed;
+  end;      ;
 end;
 
 function fastExpandFollowingUnfilteredNodeListToNodeList: IXQValue;
