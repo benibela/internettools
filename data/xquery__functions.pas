@@ -317,11 +317,11 @@ end;
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
 var i, f,t: BigDecimal;
     len: BigDecimal;
-    idx: Integer;
     list: TXQValueList;
     resbuffer: PIXQValue;
     temp: IXQValue;
     len32: LongInt;
+    e, et: int64;
     //resbuffer: PIXQValue;
 begin
   ignore(cxt);
@@ -339,24 +339,25 @@ begin
   if (f >= IXQValue.MIN_GCXQ_INT) and (t <= IXQValue.MAX_GCXQ_INT) then begin
     list.header.flagsAndPadding.itemsNeedNoRefCounting := true;
     temp := xqvalue(BigDecimalToInt64(f));
-    for idx := 0 to len32 - 1 do begin
-      resbuffer[idx].encoded := temp.encoded;
-      int64(temp.encoded) := int64(temp.encoded) +  Int64(1 shl IXQValue.INT_SHIFT_BITS);
+    e := temp.encoded;
+    et := e + (len32 - 1) * Int64(1 shl IXQValue.INT_SHIFT_BITS);
+    while e <= et do begin
+      resbuffer^.encoded := e;
+      e := e + Int64(1 shl IXQValue.INT_SHIFT_BITS);
+      inc(resbuffer);
     end;
   end else begin
     if not len.isIntegral() then raiseXPTY0004TypeError(b, 'integer length for to operator');
     list.header.flagsAndPadding.itemsHaveSameKind := true;
-    idx := 0;
     i := f;
     while i < t do begin
-      resbuffer[idx] := xqvalue(i, xstInteger);
-      //resseqseq.add(xqvalue(i));
+      resbuffer^ := xqvalue(i, xstInteger);
+      inc(resbuffer);
       i += 1;
-      idx+=1;
     end;
-    assert(idx + 1 = len);
+    //assert(idx + 1 = len);
     //resseqseq.add(xqvalue(t));
-    resbuffer[idx] := xqvalue(i, xstInteger);// typ.createValue(t);
+    resbuffer^ := xqvalue(i, xstInteger);// typ.createValue(t);
   end;
   result := xqvalueSeqSqueezed(list);
 end;
