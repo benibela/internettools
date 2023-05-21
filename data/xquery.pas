@@ -9277,10 +9277,6 @@ begin
   result := fastExpandFollowingUnfilteredNodeBufferToNodeList(previousBuffer, previousList.Count);
 end;
 
-function fastExpandFollowingUnfilteredNodeToNodeList: IXQValue;
-begin
-  result := fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1);
-end;
 
 var
   newList: TXQValueList;
@@ -9404,7 +9400,7 @@ begin
           pvkSequence:
             with previous.getDataList do
               if header.flagsAndPadding.itemsHaveSameKind and header.flagsAndPadding.nodesAreInSameDocument and (count > 0) and (items[0].kind = pvkNode) then
-                exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(buffer, count));
+                exit(fastExpandFollowingUnfilteredNodeListToNodeList); //cannot access
           pvkNode:
             exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1));
         end;
