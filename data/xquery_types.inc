@@ -140,8 +140,11 @@ end;
 
 function IXQValue.getDataPointer: pointer;
 begin
-//  result := pointer(encoded shr DATA_SHIFT_BITS)
+{$ifdef cpu32}
+  result := pointer(encoded shr DATA_SHIFT_BITS)
+{$else}
   result := pointer(SarInt64(encoded, DATA_SHIFT_BITS));
+{$endif}
 end;
 
 procedure IXQValue.setTypeAnnotation(xst: TXSTypeAnnotation);
