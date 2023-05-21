@@ -1018,7 +1018,8 @@ begin
       if (pos('"', url) = 0) and (pos('{', url) = 0) and (pos('}', url) = 0) then cururl := url
       else if (url[1] = '{') and (url[length(url)] = '}') and (pos('$', url) > 0) and (trim(copy(url, 2, length(url)-2))[1] = '$') and
         reader.parser.variableChangeLog.hasVariable(trim(copy(url, pos('$', url)+1, length(url) - pos('$', url) - 1)), tempvalue) then begin
-        with reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue).get(1) do
+        if tempvalue.isUndefined then exit;
+        with reader.parser.QueryEngine.evaluateXPath3('pxp:resolve-html(., pxp:get("url"))', tempvalue.get(1)) do
           if kind = pvkObject then prepareInternetRequest(curmethod, cururl, post, reader.internet)
           else cururl := toString;
       end else cururl := reader.parser.replaceEnclosedExpressions(url);
