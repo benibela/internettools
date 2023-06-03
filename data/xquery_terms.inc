@@ -1035,6 +1035,7 @@ function TXQTermSequenceType.instanceOf(const ta: IXQValue; const context: TXQEv
                       else;
                     end;
                   tikAny: result := true;
+                  else ;
                 end;
               end;
             end;
@@ -1211,6 +1212,7 @@ begin
       else;
     end;
     tikAtomic: ;
+    tikNone, tikUnion: ;//todo
   end;
   exit(false);
 end;

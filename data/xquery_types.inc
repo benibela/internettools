@@ -141,7 +141,7 @@ end;
 function IXQValue.getDataPointer: pointer;
 begin
 {$ifdef cpu32}
-  result := pointer(encoded shr DATA_SHIFT_BITS)
+  result := {%H-}pointer(encoded shr DATA_SHIFT_BITS)
 {$else}
   result := pointer(SarInt64(encoded, DATA_SHIFT_BITS));
 {$endif}
@@ -243,7 +243,7 @@ class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp
 begin
   if result.encoded <> 0 then
     result.release;
-  result.encoded := (IXQValue.TEncodedData(data) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
+  result.encoded := ({%H-}IXQValue.TEncodedData(data) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
 end;
 
 class procedure IXQValue.create(var result: IXQValue; akind: TXQValueKind; xstyp: TXSTypeAnnotation; box: TXQBoxedValue);
@@ -251,7 +251,7 @@ begin
   if result.encoded <> 0 then
     result.release;
   box._AddRef;
-  result.encoded := (IXQValue.TEncodedData(pointer(box)) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
+  result.encoded := ({%H-}IXQValue.TEncodedData(pointer(box)) shl DATA_SHIFT_BITS) or (ord(xstyp) shl KIND_BITS)  or (ord(akind)) ;
 end;
 
 {$push}{$RangeChecks off}{$OverflowChecks off}
@@ -791,7 +791,7 @@ begin
       if kind = pvkSequence then result += ')' else result += ']';
     end;
     pvkFunction: result := getDataFunction.toXQuery;
-    else result := 'serialization failed??';
+    {$IFDEF POINTLESS_CASE_ELSE}else result := 'serialization failed??';{$ENDIF}
   end;
 end;
 
@@ -960,8 +960,9 @@ begin
         exit(getSequenceFirst.setImmutable(name, value));
     pvkObject:
       exit(getDataObject.setImmutable(name, value));
+    else
+      raiseInternalErrorObjectExpected('setImmutable');
   end;
-  raiseInternalErrorObjectExpected('setImmutable');
   result := nil;
 end;
 
@@ -973,8 +974,9 @@ begin
         exit(getSequenceFirst.setImmutable(name, v));
     pvkObject:
       exit(getDataObject.setImmutable(name, v));
+    else
+      raiseInternalErrorObjectExpected('setImmutable');
   end;
-  raiseInternalErrorObjectExpected('setImmutable');
   result := nil;
 end;
 
@@ -1022,8 +1024,9 @@ begin
       exit(getDataObject.setImmutable(props, len, v).boxInIXQValue);
     pvkArray:
       exit(arraySetImmutable());
+    else
+      raiseInternalErrorObjectExpected('setImmutable (or array)');
   end;
-  raiseInternalErrorObjectExpected('setImmutable (or array)');
   result.clear;
 end;
 
@@ -1111,7 +1114,7 @@ begin
     pvkNode: Result:=TXQDefaultTypeInfo.hash(toString);
     pvkObject, pvkArray, pvkFunction: raiseXPTY0004TypeError(self, 'hashcode');
     pvkNull: result := 0;
-    else result := 0
+    {$IFDEF POINTLESS_CASE_ELSE}else result := 0{$ENDIF}
   end;
 end;
 {$pop}
@@ -1271,18 +1274,18 @@ end;
 
 function xqvalueTrue: IXQValue;
 begin
-  IXQValue.create(result, pvkBoolean, xstBoolean, IXQValue.TEncodedData(-1));
+  IXQValue.create(result{%H-}, pvkBoolean, xstBoolean, IXQValue.TEncodedData(-1));
 end;
 
 function xqvalueFalse: IXQValue;
 begin
-  IXQValue.create(result, pvkBoolean, xstBoolean, 0);
+  IXQValue.create(result{%H-}, pvkBoolean, xstBoolean, 0);
 end;
 
 function xqvalue(const v: Boolean): IXQValue;
 begin
   case v of
-    true:  IXQValue.create(result, pvkBoolean, xstBoolean, IXQValue.TEncodedData(-1));
+    true:  IXQValue.create(result{%H-}, pvkBoolean, xstBoolean, IXQValue.TEncodedData(-1));
     false: IXQValue.create(result, pvkBoolean, xstBoolean, 0);
   end;
   //result := TXQValueBoolean.Create(v);
@@ -1297,7 +1300,7 @@ end;
 function xqvalue(const d: Int64): IXQValue;
 begin
   if IXQValue.int64FitsInEncodedIntRange(d) then
-    IXQValue.create(result, d)
+    IXQValue.create(result{%H-}, d)
   else
     boxIntInDecimal(result, d, xstInteger);
 end;
@@ -1305,7 +1308,7 @@ end;
 function xqvalue(const d: Int64; typeAnnotation: TXSTypeAnnotation): IXQValue;
 begin
   if IXQValue.int64FitsInEncodedIntRange(d) then begin
-    IXQValue.create(result, d);
+    IXQValue.create(result{%H-}, d);
     result.setTypeAnnotation(typeAnnotation);
   end else
     boxIntInDecimal(result, d, typeAnnotation);
@@ -1313,7 +1316,7 @@ end;
 
 function xqvalue(v: Integer): IXQValue;
 begin
-  IXQValue.create(result, v);
+  IXQValue.create(result{%H-}, v);
 end;
 
 
@@ -1323,7 +1326,7 @@ var
 begin
   box := TXQBoxedDouble.create(v);
   box.refcount := 1;
-  IXQValue.create(result, pvkDouble, typeAnnotation, box);
+  IXQValue.create(result{%H-}, pvkDouble, typeAnnotation, box);
 end;
 
 {$if defined(FPC_HAS_TYPE_SINGLE) and defined(FPC_HAS_TYPE_DOUBLE) }
@@ -1359,7 +1362,7 @@ var
   box: TXQBoxedDecimal;
 begin
   box := TXQBoxedDecimal.create(v);
-  IXQValue.create(result, pvkBigDecimal, typeAnnotation, box);
+  IXQValue.create(result{%H-}, pvkBigDecimal, typeAnnotation, box);
 end;
 
 function xqvalue(const v: string): IXQValue;
@@ -1368,7 +1371,7 @@ var
 begin
   p := pointer(v);
   fpc_AnsiStr_Incr_Ref(p);
-  IXQValue.create(result, pvkString, xstString, p);
+  IXQValue.create(result{%H-}, pvkString, xstString, p);
 end;
 
 function xqvalue(const v: string; typeAnnotation: TXSTypeAnnotation):IXQValue;  //**< Creates a string IXQValue
@@ -1377,7 +1380,7 @@ var
 begin
   p := pointer(v);
   fpc_AnsiStr_Incr_Ref(p);
-  IXQValue.create(result, pvkString, typeAnnotation, p);
+  IXQValue.create(result{%H-}, pvkString, typeAnnotation, p);
 end;
 
 function xqvalue(sl: TStringList): IXQValue;
@@ -1396,12 +1399,12 @@ end;
 
 function xqvalue(v: TXQBoxedFunction): IXQValue;
 begin
-  IXQValue.create(result, pvkFunction, xstNoType, v);
+  IXQValue.create(result{%H-}, pvkFunction, xstNoType, v);
 end;
 
 function xqvalue(v: TXQBoxedQName): IXQValue;
 begin
-  IXQValue.create(result, pvkQName, xstQName, v);
+  IXQValue.create(result{%H-}, pvkQName, xstQName, v);
 end;
 
 function xqvalue(v: TXQBoxedBinary): IXQValue;
@@ -1411,14 +1414,14 @@ begin
   case v.dataType of
     bdtHex: t := xstHexBinary;
     bdtBase64: t := xstBase64Binary;
-    else t := xstNoType;
+    {$IFDEF POINTLESS_CASE_ELSE}else t := xstNoType;{$ENDIF}
   end;
-  IXQValue.create(result, pvkBinary, t, v);
+  IXQValue.create(result{%H-}, pvkBinary, t, v);
 end;
 
 function xqvalue(v: TXQBoxedDateTime): IXQValue;
 begin
-  IXQValue.create(result, pvkDateTime, v.typeAnnotationType.typeAnnotation, v);
+  IXQValue.create(result{%H-}, pvkDateTime, v.typeAnnotationType.typeAnnotation, v);
 end;
 
 function xqvalue(const sl: array of string): IXQValue;
@@ -1457,12 +1460,12 @@ end;
 function xqvalueArray(var l: TXQValueList): IXQValue;
 begin
   l.AddRef();
-  IXQValue.create(result, pvkArray, xstJSONiqArray, l.data);
+  IXQValue.create(result{%H-}, pvkArray, xstJSONiqArray, l.data);
 end;
 
 function xqvalueJSONiqNull: IXQValue;
 begin
-  IXQValue.create(result, pvkNull, xstJSONiqNull, nil)
+  IXQValue.create(result{%H-}, pvkNull, xstJSONiqNull, nil)
 end;
 
 
@@ -2268,7 +2271,7 @@ var tempContext: TXQEvaluationContext;
         exit(xqvalue(data, xstUntypedAtomic));
       itfXML, itfHTML, itfXMLPreparsedEntity:
         result := xqvalue(tempContext.parseDoc(data, uri, contenttype));
-      {$if FPC_FULLVERSION < 030300}else result.clear;{$endif}
+      {$ifdef POINTLESS_CASE_ELSE}else result.clear;{$endif}
     end;
   end;
 
@@ -2390,7 +2393,7 @@ begin
   case dataType of
     bdtHex: result := encoded.DecodeHexToBytes;
     bdtBase64: result := base64ToBytes(encoded);
-    else result := nil;
+    {$IFDEF POINTLESS_CASE_ELSE}else result := nil;{$ENDIF}
   end;
 end;
 
@@ -2511,7 +2514,7 @@ begin
   tempmin := min;
   if subtractTimeZone and (timezone <> high(Integer)) then tempmin -= timezone;
   dayStamp := trunc(dateEncode(year, month, day));
-  timeStamp := hour * 3600  + tempmin *60 + seconds;
+  timeStamp := int64(hour) * 3600  + tempmin *60 + seconds;
   result := (dayStamp * int64(SecsPerDay) + timeStamp) * MicroSecsPerSec + microsecs;
 end;
 
@@ -2940,7 +2943,7 @@ end;
 
 function TXQBoxedMapLike.boxInIXQValue: IXQValue;
 begin
-  IXQValue.create(result, pvkObject, xstJSONiqObject, self);
+  IXQValue.create(result{%H-}, pvkObject, xstJSONiqObject, self);
 end;
 
 

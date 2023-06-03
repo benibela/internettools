@@ -4599,7 +4599,7 @@ end;
 function TXQValueList.toXQValueArray: IXQValue;
 begin
   AddRef();
-  IXQValue.create(result, pvkArray, xstJSONiqArray, data);
+  IXQValue.create(result{%H-}, pvkArray, xstJSONiqArray, data);
 end;
 
 function TXQValueList.toXQValueSequenceSqueezed: IXQValue;
@@ -5178,7 +5178,7 @@ var
   o: TObject;
   procedure checkAddr(tocheck: pointer; name: string); inline;
   begin
-    if (tocheck <= addr) and ( addr - tocheck < delta ) then begin
+    if (tocheck <= addr) and ( PtrUInt ( addr - tocheck ) < delta ) then begin
       delta := addr - tocheck;
       result := name + ' + ' + IntToStr(delta);
     end;
@@ -5640,7 +5640,7 @@ begin
       if len64 <= 0 then goto exitWithZeroLength; //this is written so weirdly to avoid overflows. Like now knowing len64 is positive, we can add negative numbers, but not positive ones
       if from64 >= 1 then begin
         from := from64;
-        if len64 >= maxLen - from + 1 then goto exitFromFromTillInfinity;
+        if len64 >= SizeInt64( maxLen ) - from + 1  then goto exitFromFromTillInfinity;
         len := len64
       end else begin
         until64 := from64 + len64;
@@ -6434,6 +6434,7 @@ function TXQJsonParser.popContainer: TJSONParsingPhase;
       jppRoot: outputSeq[outputseq.count - 1] := a;
       jppArrayExpectComma: containerStack[containerCount-1].list^[containerStack[containerCount-1].list.count - 1] := a;
       jppObjectExpectComma: containerStack[containerCount-1].map.setMutable(containerStack[containerCount].objectKey, a);
+      else ;
     end;
   end;
 
@@ -9242,6 +9243,7 @@ begin
             resultList.addNodeNoRC(newnode);
         case newnode.typ of
           tetOpen, tetDocument: newnode := newnode.reverse;
+          else ;
         end;
         newnode := newnode.next;
       end;
@@ -9403,6 +9405,7 @@ begin
                 exit(fastExpandFollowingUnfilteredNodeListToNodeList); //cannot access buffer here
           pvkNode:
             exit(fastExpandFollowingUnfilteredNodeBufferToNodeList(@previous, 1));
+          else ;
         end;
     end;
 

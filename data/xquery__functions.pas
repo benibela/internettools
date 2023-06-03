@@ -252,10 +252,10 @@ begin
     if a.isDuration then exit(xqvalue);
     adatevalue := @a.value;
     ai := adatevalue^.toMicroSecondStamp();
-    if (adatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
+    if (adatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai -= int64(cxt.staticContext.ImplicitTimezoneInMinutes) * 60 * MicroSecsPerSec;
     bdatevalue := @b.value;
     ai -= bdatevalue^.toMicroSecondStamp();
-    if (bdatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += cxt.staticContext.ImplicitTimezoneInMinutes * 60 * MicroSecsPerSec;
+    if (bdatevalue^.timezone = high(Integer)) and (cxt.staticContext.ImplicitTimezoneInMinutes <> high(Integer)) then ai += int64(cxt.staticContext.ImplicitTimezoneInMinutes) * 60 * MicroSecsPerSec;
 
     xqtempdt := TXQBoxedDateTime.create(baseSchema.dayTimeDuration);//, abs(tempdt));
     xqtempdt.value.year:=0;
@@ -340,7 +340,7 @@ begin
     list.header.flagsAndPadding.itemsNeedNoRefCounting := true;
     temp := xqvalue(BigDecimalToInt64(f));
     e := temp.encoded;
-    et := e + (len32 - 1) * Int64(1 shl IXQValue.INT_SHIFT_BITS);
+    et := e + (int64(len32) - 1) * Int64(1 shl IXQValue.INT_SHIFT_BITS);
     while e <= et do begin
       resbuffer^.encoded := e;
       e := e + Int64(1 shl IXQValue.INT_SHIFT_BITS);
@@ -744,9 +744,7 @@ end;
 
 function xqvalueToNormalizedNodeSeq(const v: IXQValue): TXQValueList;
 var
- i: SizeInt;
  x: PIXQValue;
- tempList: TXQValueList;
 begin
   case v.kind of
     pvkUndefined: result:=TXQValueList.create(0);
@@ -2543,7 +2541,6 @@ var resseq: TXQValueList;
     n: TTreeNode;
     tempv: IXQValue;
     resolvedUri: RawByteString;
-    tempobj: TXQBoxedStringMapPendingUpdate;
   begin
     for iv in seq.GetEnumeratorPtrUnsafe do
       case iv^.kind of
@@ -4744,7 +4741,6 @@ end;
 function xqFunctionTail({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
 var
   len: SizeInt;
-  i: SizeInt;
   seq: TXQValueList;
   iterator: TXQValueEnumeratorPtrUnsafe;
 begin
@@ -7273,7 +7269,7 @@ begin
     len := a.Count - p;
     if len < 0 then len := 0;
   end;
-  if (p < 0) or (p + len >= a.Count + 1) then raiseInvalidArrayOutOfBounds(argv^, p);
+  if (p < 0) or (p + len > a.Count) then raiseInvalidArrayOutOfBounds(argv^, p);
   iter := a.GetEnumeratorPtrUnsafe;
   list := TXQValueList.create(len);
   list.header.flagsAndPadding := a.header.flagsAndPadding;
@@ -7321,7 +7317,8 @@ begin
         if p <= indices[i] then begin
           iter.CopyToList(list, indices[i] - p);
           iter.MoveNext;
-          p := indices[i] + 1;
+          p := indices[i];
+          inc(p);
         end;
       if p < a.Count then iter.CopyToList(list, a.Count - p);
     end;
@@ -7684,6 +7681,7 @@ begin
             end;
           end;
         end;
+      else ;
     end;
   end;
 end;

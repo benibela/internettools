@@ -1344,8 +1344,12 @@ begin
     tetOpen, tetDocument: result := deepNodeText();
     tetAttribute, tetNamespace: result := TTreeAttribute(self).realvalue;
     tetText, tetComment: result := value;
-    tetProcessingInstruction: if attributes = nil then result := '' else result := attributes.getStringValue;
+    tetProcessingInstruction: begin
+      result := '' ;
+          if attributes <> nil then result := attributes.getStringValue;
+    end;
     tetClose: begin assert(false); result := ''; end;
+//    tetNa result :='';
   end;
 end;
 

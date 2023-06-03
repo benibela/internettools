@@ -7030,6 +7030,7 @@ begin
               value := value *  10; //fixed length ns
             res.nanosecond := value;
           end;
+          else {prevent warning};
         end;
         continue;
       end;
@@ -7056,7 +7057,7 @@ begin
             if dtpfStrict in options.flags then exit(dtprFailure);
           end else if valueUnsigned > 59 then exit(dtprFailure);
           input.rightOfFirst(2);
-          res.timezone := value * 60 + valueUnsigned;
+          res.timezone := value * 60 + longint(valueUnsigned);
           if signed then res.timezone := -res.timezone;
         end
       end;

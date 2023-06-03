@@ -1082,6 +1082,7 @@ begin
   case templateType of
     tetCommandSiblingsHeaderOpen: cacheSibling(true);
     tetCommandSiblingsOpen: cacheSibling(false);
+    else ;
   end;
 
   if (test <> nil) or (condition <> nil) or (valuepxp <> nil) or (source <> nil) or (length(textRegexs) > 0) then exit;
