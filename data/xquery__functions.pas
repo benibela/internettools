@@ -79,6 +79,10 @@ function xqvalueArrowThinOperator(const cxt: TXQEvaluationContext; const ta, tb:
 begin
   result := raisePlaceHolderError(cxt, ta, tb, 'op: =>');
 end;
+function xqvalueFunctionOperator(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
+begin
+  result := raisePlaceHolderError(cxt, ta, tb, 'op: ->');
+end;
 function xqvalueOtherwiseOperator(const cxt: TXQEvaluationContext; const ta, tb: IXQValue): IXQValue;
 begin
   result := raisePlaceHolderError(cxt, ta, tb, 'op: otherwise');
@@ -9318,7 +9322,8 @@ begin
   op.registerBinaryOp('unary~hack+', @xqvalueUnaryPlus, 200, [xqofAssociativeSyntax,xqofCastUntypedToDouble], [empty, numericOrEmpty, numericOrEmpty], []);
 
   op.registerBinaryOp('=>',@xqvalueArrowOperator,190, [xqofAssociativeSyntax], []).acceptedModels:= PARSING_MODEL3_1;
-  op.registerBinaryOp('->',@xqvalueArrowThinOperator,190, [xqofAssociativeSyntax], []).acceptedModels:= PARSING_MODEL4;
+  op.registerBinaryOp('=!>',@xqvalueArrowThinOperator,190, [xqofAssociativeSyntax], []).acceptedModels:= PARSING_MODEL4;
+  op.registerBinaryOp('->',@xqvalueFunctionOperator,190, [xqofAssociativeSyntax], []).acceptedModels:= PARSING_MODEL4;
 
   op.registerBinaryOp('cast as',@xqvalueCastAs,170, [], []);
   op.registerBinaryOp('castable as',@xqvalueCastableAs,160, [], []);

@@ -43,17 +43,22 @@ begin
 
   t('replicate(("A", "B"), 3)', 'A B A B A B');
 
-  t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ->($k,$v){string-length($k) > 1})=>map:keys()', 'foo bar');
-
-  t('"The cat sat on the mat" => tokenize() -> concat(".") -> upper-case() => string-join(" ")', 'THE. CAT. SAT. ON. THE. MAT.');
-  t('("xyz", "abc") -> (upper-case#1)()', 'XYZ ABC');
+  t('"The cat sat on the mat" => tokenize() =!> concat(".") =!> upper-case() => string-join(" ")', 'THE. CAT. SAT. ON. THE. MAT.');
+  t('("xyz", "abc") =!> (upper-case#1)()', 'XYZ ABC');
   t(' ("$" => concat(?))("abc") ', '$abc');
-  t(' ("$" -> concat(?))("abc") ', '$abc');
-  t(' ("2" -> xs:integer())', '2');
-  t('( ("x,y,z", "a,b,c") -> (tokenize#2)(?) ) ! (.(","))', 'x y z a b c');
-  t(' 1 to 3 -> { . * 2 } ', '1 2 3 4 5 6' );
-  t(' (1 to 3) -> { . * 2 } ', '2 4 6' );
+  t(' ("$" =!> concat(?))("abc") ', '$abc');
+  t(' ("2" =!> xs:integer())', '2');
+  t('( ("x,y,z", "a,b,c") =!> (tokenize#2)(?) ) ! (.(","))', 'x y z a b c');
+  t(' 1 to 3 =!> (function{ . * 2 })()', '1 2 3 4 5 6' );
+  t(' (1 to 3) =!> (function{ . * 2 })() ', '2 4 6' );
 
+  t('for-each(1 to 3, function {. + 3})', '4 5 6');
+  t('for-each(1 to 3, $x -> {$x + 3})', '4 5 6');
+  t('for-each(1 to 3, ($x) -> {$x + 3})', '4 5 6');
+  t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ($k,$v) -> {string-length($k) > 1})=>map:keys()', 'foo bar');
+  t('function { . + 1} (2)', '3');
+  t('($x) -> {$x + 1} (2)', '3');
+  t('() -> {1} ()', '1');
 
   t('1 otherwise 2', '1');
   t('() otherwise 2', '2');
@@ -81,11 +86,11 @@ begin
 
   t('highest(1 to 3)', '3');
   t('highest(1 to 3, ())', '3');
-  t('highest(1 to 3, (), ->{-.})', '1');
+  t('highest(1 to 3, (), function{-.})', '1');
   t('highest(("red", "green", "blue"), (), map{"red": xs:hexBinary("FF0000"), "green": xs:hexBinary("008000"), "blue": xs:hexBinary("0000FF")})', 'red');
   t('lowest(1 to 3)', '1');
   t('lowest(1 to 3, ())', '1');
-  t('lowest(1 to 3, (), ->{-.})', '3');
+  t('lowest(1 to 3, (), function {-.})', '3');
   t('lowest(("red", "green", "blue"), (), map{"red": xs:hexBinary("FF0000"), "green": xs:hexBinary("008000"), "blue": xs:hexBinary("0000FF")})', 'blue');
 
   t('intersperse(1 to 3, "-")', '1 - 2 - 3');
