@@ -367,7 +367,11 @@ end;
 implementation
 
 const divisionDefaultPrecision = 18;
-      divisionDefaultFlags = [bddfKeepDividentPrecision, bddfKeepDivisorPrecision, bddfAddHiddenDigit, bddfFillIntegerPart];
+      divisionDefaultFlags = [bddfKeepDividentPrecision,
+        bddfKeepDivisorPrecision,
+        bddfAddHiddenDigit,
+        bddfFillIntegerPart
+      ];
 
 const powersOf10: array[0..9] of longint = (1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000);
 
@@ -1473,6 +1477,9 @@ begin
   end else exit(-compareAbsolute(b,a));
 end;
 
+
+
+
 {what is that for?
 function compareAbsolutePrecisionBins(const a, b: BigDecimal; precisionBins: integer): integer;
 var
@@ -2155,6 +2162,58 @@ var temp: BigDecimal;
       subAbsoluteScaledNoAlias(remainder, b, 0, result);
   end;
 
+  {ALTERNATE_DIVISION_ROUNDING
+
+  current rounding calculates an additional digit and truncates. The additional digit is later used for rounding when the number is converted to a string.
+
+  This rounds directly here, if the remainder is >= b / 2.
+  But it is disabled because it is not tested.
+
+  function isRemainderAtLeastHalfOfB: boolean;
+    function isRemainderAtLeastHalfOfBSlow: boolean;
+    begin
+      addAbsoluteNoAlias(temp, remainder, remainder);
+      result := compareAbsolute(remainder, b) >= 1;
+    end;
+
+  var
+    i, j, k: Integer;
+    half: BigDecimalBin;
+  begin
+    for i := high(b.digits) downto 0 do
+      if (b.digits[i] <> 0) then begin
+        j := i + b.exponent - remainder.exponent;
+        if j < 0 then
+          exit(not remainder.isZero());
+        if j > high(remainder.digits) then
+          exit(false);
+        for k := high(remainder.digits) downto j + 1 do
+          if remainder.digits[k] <> 0 then
+            exit(true);
+        half := b.digits[i] shr 1;
+        if remainder.digits[j] > half then
+          exit(true);
+        if remainder.digits[j] < half then
+          exit(false);
+        break;
+      end;
+    result := isRemainderAtLeastHalfOfBSlow;
+  end;
+
+  procedure incLastDigitOfQuotient;
+  var
+    oldq: BigDecimal;
+  begin
+    oldq := quotient;
+    SetLength(oldq.digits, length(oldq.digits));
+    SetLength(temp.digits, 1);
+    temp.digits[0] := powersOf10[-targetPrecision];
+    temp.signed := quotient.signed;
+    temp.lastDigitHidden := quotient.signed;
+    temp.exponent := quotient.exponent;
+    addAbsoluteNoAlias(quotient, oldq, temp);
+  end;}
+
 var
   i: Integer;
 
@@ -2257,6 +2316,19 @@ begin
       remainder.digits[i] := a.digits[i];
     remainder.exponent -= abin + 1;
   end;
+
+  {ALTERNATE_DIVISION_ROUNDING if bddfRoundQuotient in flags then begin
+    if isRemainderAtLeastHalfOfB then begin
+      if quotient.digits[rbin+1] + powersOf10[-targetPrecision] < ELEMENT_OVERFLOW then begin
+        writeln(quotient.digits[rbin+1]);
+        writeln(' ',powersOf10[-targetPrecision]);
+        quotient.digits[rbin+1] := quotient.digits[rbin+1] + powersOf10[-targetPrecision] ??div 10 here?
+        writeln(quotient.lastDigitHidden);
+      end
+      else
+        incLastDigitOfQuotient();
+    end;
+  end;}
 
   if (a.signed <> b.signed) and not remainder.isZero() then
     remainder.signed := a.signed <> b.signed;
