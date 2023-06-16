@@ -319,39 +319,20 @@ begin
 end;
 
 function xqvalueTo(const cxt: TXQEvaluationContext; const a, b: IXQValue): IXQValue;
-var i, f,t: BigDecimal;
+var f,t: BigDecimal;
     len: BigDecimal;
     list: TXQValueList;
-    resbuffer: PIXQValue;
     temp: IXQValue;
     len32: LongInt;
-    e, et: int64;
+    e: int64;
     //resbuffer: PIXQValue;
-begin
-  ignore(cxt);
-  if a.isUndefined or b.isUndefined then exit(xqvalue);
-  f := a.toDecimal();
-  t := b.toDecimal();
-  if t < f then exit(xqvalue);
-  if t = f then exit(a);
-  len := t - f + 1;
-  if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
-  len32 := BigDecimalToLongint(len);
-  list := TXQValueList.create(len32);
-  list.count := len32;
-  resbuffer := list.buffer;
-  if (f >= IXQValue.MIN_GCXQ_INT) and (t <= IXQValue.MAX_GCXQ_INT) then begin
-    list.header.flagsAndPadding.itemsNeedNoRefCounting := true;
-    temp := xqvalue(BigDecimalToInt64(f));
-    e := temp.encoded;
-    et := e + (int64(len32) - 1) * Int64(1 shl IXQValue.INT_SHIFT_BITS);
-    while e <= et do begin
-      resbuffer^.encoded := e;
-      e := e + Int64(1 shl IXQValue.INT_SHIFT_BITS);
-      inc(resbuffer);
-    end;
-  end else begin
-    if not len.isIntegral() then raiseXPTY0004TypeError(b, 'integer length for to operator');
+  procedure slowPath;
+  var
+    resbuffer: PIXQvalue;
+    i: BigDecimal;
+  begin
+    resbuffer := list.buffer;
+    FillChar(resbuffer^, list.capacity * sizeof(IXQValue), 0);
     list.header.flagsAndPadding.itemsHaveSameKind := true;
     i := f;
     while i < t do begin
@@ -363,6 +344,40 @@ begin
     //resseqseq.add(xqvalue(t));
     resbuffer^ := xqvalue(i, xstInteger);// typ.createValue(t);
   end;
+var
+  resbuffer: PIXQValue;
+  resbufferData, resbufferDataEnd: ^IXQValue.TEncodedData;
+
+begin
+  ignore(cxt);
+  if a.isUndefined or b.isUndefined then exit(xqvalue);
+  f := a.toDecimal();
+  t := b.toDecimal();
+  if t < f then exit(xqvalue);
+  if t = f then exit(a);
+  len := t - f + 1;
+  if len > MaxInt then raise EXQEvaluationException.Create('XPDY0130', 'Too large to operation ');
+  len32 := BigDecimalToLongint(len);
+  list := TXQValueList.createUNSAFE_UNITIALIZED(len32);
+  list.count := len32;
+  resbuffer := list.buffer;
+  if not len.isIntegral() then raiseXPTY0004TypeError(b, 'integer length for to operator');
+  if (f >= IXQValue.MIN_GCXQ_INT) and (t <= IXQValue.MAX_GCXQ_INT) then begin
+    list.header.flagsAndPadding.itemsNeedNoRefCounting := true;
+    temp := xqvalue(BigDecimalToInt64(f));
+    e := temp.encoded;
+    resbufferData := @resbuffer^.encoded;
+    resbufferDataEnd := resbufferData + len32 and not 1;
+    while resbufferData < resbufferDataEnd do begin
+      resbufferData^ := e;
+      e := e + Int64(1 shl IXQValue.INT_SHIFT_BITS);
+      resbufferData[1] := e; //loop is unrolled for two iterations
+      e := e + Int64(1 shl IXQValue.INT_SHIFT_BITS);
+      inc(resbufferData, 2);
+    end;
+    if len32 and 1 = 1 then
+      resbufferData^ := e;
+  end else slowPath;
   result := xqvalueSeqSqueezed(list);
 end;
 

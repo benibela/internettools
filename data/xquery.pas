@@ -382,6 +382,7 @@ type
     class function getMemForList(acount, acapacity: SizeInt): pointer; static;
   public
     class function create(acapacity: SizeInt = 0): TXQValueList; static;
+    class function createUNSAFE_UNITIALIZED(acapacity: SizeInt = 0): TXQValueList; static;
     class function create(const other: TXQValueList): TXQValueList; static;
     class function create(const other: TXQValueWeaklySharedList): TXQValueList; static;
     class function createNew: PXQValueList; static;
@@ -4239,6 +4240,12 @@ begin
   result.release;
   result.data := getMemForList(0, acapacity);
   FillChar(result.buffer^, acapacity * sizeof(T), 0);
+end;
+
+class function TXQValueList.createUNSAFE_UNITIALIZED(acapacity: SizeInt): TXQValueList;
+begin
+  result.release;
+  result.data := getMemForList(0, acapacity);
 end;
 
 class function TXQValueList.create(const other: TXQValueList): TXQValueList;
