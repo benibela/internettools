@@ -986,6 +986,12 @@ begin
 end;
 
 procedure TTemplateActionPage.perform(reader: TMultipageTemplateReader);
+  procedure clearData;
+  begin
+    reader.dataLoaded := false;
+    reader.lastData := '';
+  end;
+
 var
   cururl: String;
   post: String;
@@ -999,14 +1005,12 @@ var
 begin
   if (condition <> '') and not evaluateQuery(reader, condition).toBoolean then
     exit;
-  reader.dataLoaded := false;
-  reader.lastData := '';
 
   if data <> '' then begin
     page := reader.parser.replaceEnclosedExpressions(data);
     if url <> '' then
       reader.internet.lastUrl := strResolveURI(reader.parser.replaceEnclosedExpressions(url), reader.internet.lastUrl);
-
+    clearData;
   end else if url <> '' then begin
     cururl := url;
     curmethod := method;
@@ -1030,6 +1034,7 @@ begin
       if Assigned(reader.onPageProcessed) then reader.onPageProcessed(reader, reader.parser);
       exit;
     end;
+    clearData;
 
     for j:=0 to high(postparams) do begin
       if post <> '' then post += '&';
