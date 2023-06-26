@@ -2468,11 +2468,11 @@ begin
   result := TXQTermDefineFunction.create();
   result.annotations := nil;
   try
-    if isVariableTerm(args) then begin
+    {if isVariableTerm(args) then begin
       result.parameterCount := 1;
       result.push(TXQTermDefineVariable.create(args));
       args := nil;
-    end else if args is TXQTermSequence then begin
+    end else }if args is TXQTermSequence then begin
       result.parameterCount := length(TXQTermSequence(args).children);
       for i := 0 to high(TXQTermSequence(args).children) do
         result.push(TXQTermDefineVariable.create(TXQTermSequence(args).children[i]));

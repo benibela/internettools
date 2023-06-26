@@ -53,7 +53,7 @@ begin
   t(' (1 to 3) =!> (function{ . * 2 })() ', '2 4 6' );
 
   t('for-each(1 to 3, function {. + 3})', '4 5 6');
-  t('for-each(1 to 3, $x -> {$x + 3})', '4 5 6');
+//  t('for-each(1 to 3, $x -> {$x + 3})', '4 5 6');
   t('for-each(1 to 3, ($x) -> {$x + 3})', '4 5 6');
   t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ($k,$v) -> {string-length($k) > 1})=>map:keys()', 'foo bar');
   t('function { . + 1} (2)', '3');
