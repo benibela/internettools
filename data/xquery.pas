@@ -5236,7 +5236,23 @@ end;
 
 
 function charUnicodeZero(const cp: integer): integer;
-const UNICODE_ZEROS: array[1..55] of integer = ($0030,$0660,$06F0,$07C0,$0966,$09E6,$0A66,$0AE6,$0B66,$0BE6,$0C66,$0CE6,$0D66,$0DE6,$0E50,$0ED0,$0F20,$1040,$1090,$17E0,$1810,$1946,$19D0,$1A80,$1A90,$1B50,$1BB0,$1C40,$1C50,$A620,$A8D0,$A900,$A9D0,$A9F0,$AA50,$ABF0,$FF10,$104A0,$11066,$110F0,$11136,$111D0,$112F0,$114D0,$11650,$116C0,$11730,$118E0,$16A60,$16B50,$1D7CE,$1D7D8,$1D7E2,$1D7EC,$1D7F6);
+//generation: grep 'ZERO;Nd' UnicodeData.txt  | grep -oE '^[0-9A-F]+' > /tmp/new
+//compare to old:  xidel -e 'file:read-text-lines("new")[not(. = file:read-text-lines("old"))] ! `{.}: {let $x := x:integer("x"||.) return x:cps($x to ($x+9))}` '
+const UNICODE_ZEROS: array[1..68] of integer = ($0030,$0660,$06F0,$07C0,$0966,$09E6,$0A66,$0AE6,$0B66,$0BE6,$0C66,$0CE6,$0D66,$0DE6,$0E50,$0ED0,$0F20,$1040,$1090,$17E0,$1810,$1946,$19D0,$1A80,$1A90,$1B50,$1BB0,$1C40,$1C50,$A620,$A8D0,$A900,$A9D0,$A9F0,$AA50,$ABF0,$FF10,$104A0,$11066,$110F0,$11136,$111D0,$112F0,$114D0,$11650,$116C0,$11730,$118E0,$16A60,$16B50,$1D7CE,$1D7D8,$1D7E2,$1D7EC,$1D7F6,
+$10D30,
+$11450,
+$11950,
+$11C50,
+$11D50,
+$11DA0,
+$11F50,
+$16AC0,
+$1E140,
+$1E2F0,
+$1E4F0,
+$1E950,
+$1FBF0
+);
 var
   i: Integer;
 begin
