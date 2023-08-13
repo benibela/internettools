@@ -189,6 +189,8 @@ public
   procedure endTestCase(tc: TTestCase; const result: TTestCaseResultValue); virtual; abstract;
   procedure endTestSet(ts: TTestSet; const result: TResultSet); virtual;
   procedure endXQTS(const result: TResultSet); virtual;
+
+  procedure onGlobalTracing(term: TXQTerm; const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue);
 end;
 
 { TTextLogger }
@@ -590,6 +592,19 @@ begin
   if totalTests = 0 then totalTests := 1;
   writeln(stderr, 'Total results: ', result[tcrPass] * 100 / totalTests :4:2, '%'  );
   printResults(stderr, result);
+end;
+
+procedure TLogger.onGlobalTracing(term: TXQTerm; const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue);
+var
+  i: Integer;
+begin
+  write(term.ClassName, ': ');
+  if term is TXQTermNamedFunction then write(TXQTermNamedFunction(term).func.name, ': ')
+  else if term is TXQTermBinaryOp then write(TXQTermBinaryOp(term).op.name, ': ');
+
+  if argc > 0 then write(args[0].toXQuery);
+  for i := 1 to argc - 1 do write(', ',args[i].toXQuery);
+  writeln;
 end;
 
 { TTextLogger }
@@ -1935,6 +1950,8 @@ begin
   clr.declareString('format', 'html or text output','text');
   clr.declareString('parser', 'Parser used for xml files. Either simple or fcl-xml', 'simple');
   clr.declareString('dependencies', 'Additional dependencies to assume as true');
+  clr.declareFlag('trace', 'Trace debugging');
+
   //clr.declareString('dependencies-false', 'Additional dependencies to assume as false');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
@@ -2024,6 +2041,8 @@ begin
     else raise Exception.Create('Invalid output format')
   end;
 
+  if clr.readFlag('trace') then
+    XQOnGlobalDebugTracing := @logger.onGlobalTracing;
 
   logger.loadCatalogue;
   loadCatalog('catalog.xml');
