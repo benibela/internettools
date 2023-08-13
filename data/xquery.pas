@@ -45,6 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 {$I ../internettoolsconfig.inc}
 {$DEFINE ALLOW_EXTERNAL_DOC_DOWNLOAD}
 
+{$IF FPC_FULLVERSION <> 30301}
+{$define HAS_SAFE_INLINE} //cannot inline due to fpc bug 40280
+{$endif}
 
 //{$define dumpFunctions}
 interface
@@ -370,7 +373,7 @@ type
     function getItem(i: sizeint): IXQValue;
     procedure setCapacity(AValue: sizeint);
     procedure setItem(i: sizeint; AValue: IXQValue);
-    function getBuffer: PT; inline;
+    function getBuffer: PT; {$ifdef HAS_SAFE_INLINE}inline;{$endif}
     function getCount: SizeInt; inline;
     procedure setCount(c: SizeInt);
     class procedure raiseInvalidIndexError(adata: pointer; i: SizeInt); static;
@@ -403,7 +406,7 @@ type
     property capacity: sizeint read getCapacity write setCapacity;
     property items[i: sizeint]: IXQValue read getitem write setItem; default;
     property buffer: PT read getBuffer;
-    function header: PHeader; inline;
+    function header: PHeader; {$ifdef HAS_SAFE_INLINE}inline;{$endif}
 
     procedure insert(i: SizeInt; const value: IXQValue);  //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
     procedure add(const value: IXQValue); //**< Adds an IXQValue to the sequence. (Remember that XPath sequences are not allowed to store other sequences, so if a sequence it passed, only the values of the other sequence are added, not the sequence itself)
@@ -494,8 +497,8 @@ type
     function Count: SizeInt;
     function GetEnumeratorPtrUnsafe: TXQValueEnumeratorPtrUnsafe;
     property Items[i: SizeInt]: IXQValue read getItem; default;
-    function Buffer: PIXQValue; inline;
-    function header: TXQValueList.PHeader; inline;
+    function Buffer: PIXQValue; {$ifdef HAS_SAFE_INLINE}inline;{$endif}
+    function header: TXQValueList.PHeader; {$ifdef HAS_SAFE_INLINE}inline;{$endif}
 
     function stringifyNodes: TXQValueList;
     function hasNodes: boolean;
