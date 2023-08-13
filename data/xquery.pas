@@ -4333,8 +4333,8 @@ begin
   frefcount := InterlockedDecrement(PHeader(data).refcount) ;
   if frefcount = 0 then
     destroy
-{   else
-    data := nil; //prevent double free }
+   else
+    data := nil; //prevent double free
 end;
 
 procedure TXQValueList.setCount(c: SizeInt);
