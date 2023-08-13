@@ -894,7 +894,7 @@ end;
 initialization
   flreCache := TFLRECacheHashMap.Create;
   flreCacheList := TFPList.Create;
-  flreCacheLock := default(TRTLCriticalSection);
+  {$IF FPC_FULLVERSION < 30300}flreCacheLock := default(TRTLCriticalSection);{$endif}
   InitCriticalSection(flreCacheLock);
 
 finalization

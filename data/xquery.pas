@@ -10536,7 +10536,7 @@ baseSchema.cacheDescendants;
 
 {$ifdef dumpFunctions}baseSchema.logConstructorFunctions;{$endif}
 
-interpretedFunctionSynchronization := default(TRTLCriticalSection);
+{$IF FPC_FULLVERSION < 30300}interpretedFunctionSynchronization := default(TRTLCriticalSection);{$endif}
 InitCriticalSection(interpretedFunctionSynchronization);
 
 finalization
