@@ -44,6 +44,7 @@ unit bbnormalizeunicode;
 {$IFDEF fpc}
 {$MODE objfpc}{$H+}
 {$COperators on}
+{$ModeSwitch autoderef}
 {$ENDIF}
 
 interface
@@ -51,6 +52,14 @@ interface
 uses
   Classes, SysUtils;
 
+type TUTF8NormalizationProperty = packed record
+  comp_exclusion: boolean;
+  decomp_type_exists: boolean;
+  decomp_seqindex: UInt16; //actually could be changed to 15 bits
+  comb_index: UInt16;      //actually could be changed to 13 bits
+  combining_class: UInt16; //actually could be changed to 8 bits
+end;
+PUTF8NormalizationProperty=^TUTF8NormalizationProperty;
 const
   UTF8PROC_NULLTERM = 1 shl 0;
   UTF8PROC_STABLE = 1 shl 1;
@@ -124,7 +133,6 @@ const
 type
 
   PPByte = ^PByte;
-  putf8proc_compressed_property = ^DWord;
 
 function utf8proc_NFD(str: PChar): PChar;
 function utf8proc_NFC(str: PChar): PChar;
@@ -133,7 +141,7 @@ function utf8proc_NFKC(str: PChar): PChar;
 function utf8proc_codepoint_valid(uc: longint): boolean;
 function utf8proc_iterate(str: PByte; strlen: longint; dst: pLongInt): longint;
 function utf8proc_encode_char(uc: longint; dst: PByte): longint;
-function utf8proc_get_compressed_property(uc: longint): putf8proc_compressed_property;
+function utf8proc_get_normalization_property(uc: longint): PUTF8NormalizationProperty;
 function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer): longint;
 function utf8proc_decomposer(str: PByte; strlen: longint; buffer: plongint; bufsize: longint; options: integer): longint;
 function utf8proc_map(str: PByte; strlen: longint; dstptr: PPByte; options: integer): longint;
@@ -141,6 +149,9 @@ function utf8proc_reencode(buffer: plongint; length: longint; options: integer):
 //function utf8proc_getinfostring(pr: putf8proc_property_t; Chara: Longint = -1): string;
 
 implementation
+
+const UINT16_MAX = high(word);
+type utf8proc_uint16_t = word;
 
 {$I bbnormuniinfo_data.inc}
 
@@ -299,13 +310,13 @@ begin
 end;
 
 
-function utf8proc_get_compressed_property(uc: longint): putf8proc_compressed_property;
+function utf8proc_get_normalization_property(uc: longint): PUTF8NormalizationProperty;
 begin
   Result := @utf8proc_properties[utf8proc_stage2table[utf8proc_stage1table[uc shr 8] + (uc and $FF)]]
 end;
 
 function utf8proc_decompose_char(uc: longint; dst: plongint; bufsize: longint; options: integer): longint;
-var pproperty: putf8proc_compressed_property;
+var pproperty: PUTF8NormalizationProperty;
   decomp_entry: PWord;
   hangul_sindex: longint;
   hangul_tindex: longint;
@@ -313,9 +324,9 @@ var pproperty: putf8proc_compressed_property;
   temp: longint;
   i: Integer;
   decomp_cp: integer;
-  aproperty: DWord;
+  aproperty: TUTF8NormalizationProperty;
 begin
-  pproperty := utf8proc_get_compressed_property(uc);
+  pproperty := utf8proc_get_normalization_property(uc);
   aproperty := pproperty^;
   hangul_sindex := uc - UTF8PROC_HANGUL_SBASE;
 
@@ -348,14 +359,21 @@ begin
 
   if (options and (UTF8PROC_COMPOSE or UTF8PROC_DECOMPOSE)) <> 0 then
   begin
-    if (aproperty and UTF8PROC_PROPERTY_DECOMP_MAPPING_MASK > 0)
-        and ((aproperty and UTF8PROC_PROPERTY_IS_DECOMP_COMPAT = 0) or (options and UTF8PROC_COMPAT <> 0)) then
+    if (aproperty.decomp_seqindex <> UINT16_MAX)
+        and ((not aproperty.decomp_type_exists) or (options and UTF8PROC_COMPAT <> 0)) then
     begin
+      //seqindex_write_char_decomposed
       written := 0;
-      decomp_entry := @utf8proc_sequences[(aproperty and UTF8PROC_PROPERTY_DECOMP_MAPPING_MASK) shr UTF8PROC_PROPERTY_DECOMP_MAPPING_OFFSET];
-      i := (aproperty and UTF8PROC_PROPERTY_DECOMP_LENGTH_MASK) shr UTF8PROC_PROPERTY_DECOMP_LENGTH_OFFSET;
-      while i >= 1 do begin
+      i := aproperty.decomp_seqindex;
+      decomp_entry := @utf8proc_sequences[i and $3FFF];
+      i {len} := i shr 14;
+      if i >= 3 then begin
+        i := decomp_entry^;
+        inc(decomp_entry);
+      end;
+      while i >= 0 {todo: 1 or 0?} do begin
         decomp_cp := decomp_entry^;
+        //seqindex_decode_entry
         if decomp_cp and %1111100000000000 = %1101100000000000 then begin
           inc(decomp_entry);
           dec(i);
@@ -384,7 +402,7 @@ end;
 
 function utf8proc_decomposer(str: PByte; strlen: longint; buffer: plongint; bufsize: longint; options: integer): longint;
 var
-  property1, property2: DWORD;
+  property1, property2: PUTF8NormalizationProperty;
   wpos: longint;
   uc: longint;
   rpos: longint;
@@ -462,10 +480,10 @@ begin
 
       uc1 := buffer[pos];
       uc2 := buffer[pos + 1];
-      property1 := utf8proc_get_compressed_property(uc1)^;
-      property2 := utf8proc_get_compressed_property(uc2)^;
-      if (property1 and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK > property2 and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK)
-          and (property2 and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK > 0) then
+      property1 := utf8proc_get_normalization_property(uc1);
+      property2 := utf8proc_get_normalization_property(uc2);
+      if (property1.combining_class > property2.combining_class)
+          and (property2.combining_class > 0) then
       begin
         buffer[pos] := uc2;
         buffer[pos + 1] := uc1;
@@ -485,7 +503,7 @@ end;
 
 function utf8proc_reencode(buffer: plongint; length: longint; options: integer): longint;
 var
-  starter_property, current_property: putf8proc_compressed_property;
+  starter_property, current_property: PUTF8NormalizationProperty;
   rpos: longint;
   wpos: longint;
   uc: longint;
@@ -497,7 +515,8 @@ var
   hangul_sindex: longint;
   hangul_vindex: longint;
   hangul_tindex: longint;
-  maxindex, minindex, tempindex: integer;
+  {$ifdef XXXXX_OLD_COMBINING_XXXX}maxindex, minindex, tempindex: integer;{$endif}
+  sidx,idx: integer;
 begin
   starter_property := nil;
   if (options and (UTF8PROC_NLF2LS or UTF8PROC_NLF2PS or UTF8PROC_STRIPCC) <> 0) then
@@ -566,8 +585,8 @@ begin
     for rpos := 0 to Pred(length) do
     begin
       current_char := buffer[rpos];
-      current_property := utf8proc_get_compressed_property(current_char);
-      if (starter <> nil) and (current_property^ and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK > max_combining_class) then
+      current_property := utf8proc_get_normalization_property(current_char);
+      if (starter <> nil) and (current_property.combining_class > max_combining_class) then
       begin
         hangul_lindex := starter^ - UTF8PROC_HANGUL_LBASE;
         if (hangul_lindex >= 0) and (hangul_lindex < UTF8PROC_HANGUL_LCOUNT) then
@@ -593,8 +612,9 @@ begin
         end;
         if starter_property = nil then
         begin
-          starter_property := utf8proc_get_compressed_property(starter^);
+          starter_property := utf8proc_get_normalization_property(starter^);
         end;
+        {$ifdef XXXXX_OLD_COMBINING_XXXX}
         if (starter_property^ and UTF8PROC_PROPERTY_HAS_COMB_INDEX1 <> 0)
             and (current_property^ and UTF8PROC_PROPERTY_HAS_COMB_INDEX2 <> 0) then
         begin
@@ -610,19 +630,47 @@ begin
             minindex += 2;
           end;
           if ((composition >= 0) and
-            ((0 = (options and UTF8PROC_STABLE)) or (0 = utf8proc_get_compressed_property(composition)^ and UTF8PROC_PROPERTY_IS_COMP_EXCLUSION ))) then
+            ((0 = (options and UTF8PROC_STABLE)) or (0 = utf8proc_get_normalization_property(composition)^ and UTF8PROC_PROPERTY_IS_COMP_EXCLUSION ))) then
           begin
             starter^ := composition;
             starter_property := nil;
             continue;
           end;
         end;
+        {$else}
+        if (starter_property.comb_index < $8000)
+            and (current_property.comb_index <> UINT16_MAX)
+            and (current_property.comb_index >= $8000 ) then
+        begin
+          sidx := starter_property.comb_index;
+          idx := current_property.comb_index and $3FFF;
+          //writeln(Current_Char);
+          //writeln(sidx, ' ',idx, ' ',utf8proc_combinations[sidx]);
+          if ((idx >= utf8proc_combinations[sidx]) and (idx <= utf8proc_combinations[sidx + 1] ) ) then begin
+             idx += sidx + 2 - utf8proc_combinations[sidx];
+             if (current_property.comb_index and $4000 <> 0) then
+               composition := (utf8proc_combinations[idx] shl 16) or utf8proc_combinations[idx+1]
+             else
+               composition := utf8proc_combinations[idx];
+
+             if ((composition >= 0) and
+               ((0 = (options and UTF8PROC_STABLE)) or (not utf8proc_get_normalization_property(composition)^.comp_exclusion ))) then
+             begin
+               starter^ := composition;
+               starter_property := nil;
+               continue;
+             end;
+           end;
+        end;
+
+        {$endif}
       end;
+
       buffer[wpos] := current_char;
-      if current_property^ and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK <> 0 then
+      if current_property.combining_class <> 0 then
       begin
-        if current_property^ and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK > max_combining_class then
-          max_combining_class := current_property^ and UTF8PROC_PROPERTY_COMBINING_CLASS_MASK;
+        if current_property.combining_class > max_combining_class then
+          max_combining_class := current_property.combining_class;
       end
       else
       begin
