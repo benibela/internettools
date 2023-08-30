@@ -376,7 +376,6 @@ begin
         //seqindex_decode_entry
         if decomp_cp and %1111100000000000 = %1101100000000000 then begin
           inc(decomp_entry);
-          dec(i);
           decomp_cp := ((decomp_cp and %0000001111111111) shl 10) or (decomp_entry^ and %0000001111111111);
           decomp_cp += $10000;
         end;
