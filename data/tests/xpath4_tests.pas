@@ -54,11 +54,11 @@ begin
 
   t('for-each(1 to 3, function {. + 3})', '4 5 6');
 //  t('for-each(1 to 3, $x -> {$x + 3})', '4 5 6');
-  t('for-each(1 to 3, ($x) -> {$x + 3})', '4 5 6');
-  t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ($k,$v) -> {string-length($k) > 1})=>map:keys()', 'foo bar');
+//  t('for-each(1 to 3, ($x) -> {$x + 3})', '4 5 6');
+//  t('map:filter(map{ "a": 1, "b": 2, "foo": 3, "bar": 4 }, ($k,$v) -> {string-length($k) > 1})=>map:keys()', 'foo bar');
   t('function { . + 1} (2)', '3');
-  t('($x) -> {$x + 1} (2)', '3');
-  t('() -> {1} ()', '1');
+//  t('($x) -> {$x + 1} (2)', '3');
+//  t('() -> {1} ()', '1');
 
   t('1 otherwise 2', '1');
   t('() otherwise 2', '2');

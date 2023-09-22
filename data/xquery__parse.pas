@@ -153,7 +153,6 @@ protected
   function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
   function parseFunctionDeclarationWithoutArgs(): TXQTermDefineFunction;
   function parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
-  function parseLambdaFunctionDeclaration(args: TXQTerm): TXQTermDefineFunction;
   function parseIf: TXQTermIf;
   function parseTryCatch: TXQTermTryCatch;
 
@@ -2445,48 +2444,6 @@ begin
   result := parseFunctionDeclaration(annotations, true)
 end;
 
-function TXQParsingContext.parseLambdaFunctionDeclaration(args: TXQTerm): TXQTermDefineFunction;
-  function isVariableTerm(t: TXQTerm): boolean;
-  begin
-    result := (t is TXQTermVariable) or
-              ((t is TXQTermPendingEQNameToken) and (TXQTermPendingEQNameToken(t).pending = xqptVariable));
-  end;
-
-var
-  i: Integer;
-begin
-  require4('for $x->{} function declarations');
-  expect('->');
-
-  if args is TXQTermSequence then begin
-    for i := 0 to high(TXQTermSequence(args).children) do
-      if not isVariableTerm(TXQTermSequence(args).children[i]) then begin
-        raiseSyntaxErrorFatal('Need variables ($a,$b,..) -> for lambda function');
-      end;
-  end;
-
-  result := TXQTermDefineFunction.create();
-  result.annotations := nil;
-  try
-    {if isVariableTerm(args) then begin
-      result.parameterCount := 1;
-      result.push(TXQTermDefineVariable.create(args));
-      args := nil;
-    end else }if args is TXQTermSequence then begin
-      result.parameterCount := length(TXQTermSequence(args).children);
-      for i := 0 to high(TXQTermSequence(args).children) do
-        result.push(TXQTermDefineVariable.create(TXQTermSequence(args).children[i]));
-      TXQTermSequence(args).children := nil;
-    end else if (args is TXQTermConstant) and (TXQTermConstant(args).value.isUndefined)  then begin
-      result.parameterCount := 0;
-    end else raiseSyntaxError('Need variables ($a,$b,..) -> for lambda function');
-    result.push(parseEnclosedExpr);
-    args.free;
-  except
-    result.free;
-    raise;
-  end;
-end;
 
 function TXQParsingContext.parseIf: TXQTermIf;
 var
@@ -3488,10 +3445,6 @@ begin
           end else exit(astroot);
         end;
         '=!>': thinArrowOperator;
-        '->': begin
-          replace := ripBinOpApart(@astroot, 10000);
-          replace^ := parseLambdaFunctionDeclaration(replace^);
-        end
         else begin
           op := TXQueryEngine.findOperator(pos);
           if op <> nil then pushBinaryOp(op)
@@ -4973,7 +4926,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
           else begin
             insertAt := 0;
             if (not thin) or (tdf.kind <> xqtdfUserDefined) or (tdf.parameterCount <> 1) or ((tdf[0] as TXQTermDefineVariable).getVariable.value <> '=!>') then
-              raiseSyntaxError('need function after =>/-> operator', b);
+              raiseSyntaxError('need function after =>/=!> operator', b);
             result := tdf[1] as TXQTermSimpleMap;
             (tdf[1] as TXQTermSimpleMap)[0].free;
             (tdf[1] as TXQTermSimpleMap)[0] := b[0];
