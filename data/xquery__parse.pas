@@ -878,6 +878,7 @@ begin
     'namespace-node',
     'switch': reserved := isModel3;
 
+    'fn': reserved := parsingModel in PARSING_MODEL4;
 
     'array', 'map': reserved := parsingModel in PARSING_MODEL3_1;
 
@@ -2440,7 +2441,10 @@ end;
 
 function TXQParsingContext.parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
 begin
-  expect('function'); expect('(');
+  skipWhitespaceAndComment();
+  if (parsingModel in PARSING_MODEL4) and (pos^ = 'f') and ((pos+1)^ = 'n') then expect('fn')
+  else expect('function');
+  expect('(');
   result := parseFunctionDeclaration(annotations, true)
 end;
 
@@ -3090,6 +3094,7 @@ begin
         if namespacePrefix = '' then begin
           case word of
             'function': if parsingModel in PARSING_MODEL3 then exit(parseFunctionDeclaration(nil, true));
+            'fn': if parsingModel in PARSING_MODEL4 then exit(parseFunctionDeclaration(nil, true));
           end;
 
           if isKindTestFunction(word) then begin
@@ -3130,7 +3135,7 @@ begin
           expect('{');
           exit(parseJSONLikeObjectConstructor(true));
         end;
-        'function': if parsingModel in PARSING_MODEL4 then
+        'function', 'fn': if parsingModel in PARSING_MODEL4 then
           exit(parseFunctionDeclarationWithoutArgs());
       end;
       '#': begin
