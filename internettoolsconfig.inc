@@ -47,3 +47,8 @@
 {$goto on}
 {$COperators on}
 {$ifdef FPC_HAS_CPSTRING}{$define HAS_CPSTRING}{$endif}
+
+{$IF FPC_FULLVERSION < 030300}
+{$DEFINE POINTLESS_CASE_ELSE}
+{$ENDIF}
+

@@ -675,7 +675,7 @@ TReplaceCallback = class
     capture: integer;
   end;
   constructor create(rep: string; noescape: boolean);
-  function callback(const Input:PFLRERawByteChar;const Captures:TFLRECaptures):TFLRERawByteString;
+  function callback(const Input:PFLRERawByteChar;const InputLength:TFLRESizeInt;const Captures:TFLRECaptures):TFLRERawByteString;
 end;
 {$endif}
 
@@ -803,7 +803,7 @@ begin
   end else repin := rep;
 end;
 
-function TReplaceCallback.callback(const Input: PFLRERawByteChar; const Captures: TFLRECaptures): TFLRERawByteString;
+function TReplaceCallback.callback(const Input: PFLRERawByteChar; const InputLength:TFLRESizeInt;const Captures: TFLRECaptures): TFLRERawByteString;
 
 var pos: integer;
   procedure abort;
@@ -894,7 +894,7 @@ end;
 initialization
   flreCache := TFLRECacheHashMap.Create;
   flreCacheList := TFPList.Create;
-  flreCacheLock := default(TRTLCriticalSection);
+  {$IF FPC_FULLVERSION < 30300}flreCacheLock := default(TRTLCriticalSection);{$endif}
   InitCriticalSection(flreCacheLock);
 
 finalization

@@ -189,6 +189,8 @@ public
   procedure endTestCase(tc: TTestCase; const result: TTestCaseResultValue); virtual; abstract;
   procedure endTestSet(ts: TTestSet; const result: TResultSet); virtual;
   procedure endXQTS(const result: TResultSet); virtual;
+
+  procedure onGlobalTracing(term: TXQTerm; const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue);
 end;
 
 { TTextLogger }
@@ -592,6 +594,19 @@ begin
   printResults(stderr, result);
 end;
 
+procedure TLogger.onGlobalTracing(term: TXQTerm; const context: TXQEvaluationContext; argc: SizeInt; args: PIXQValue);
+var
+  i: Integer;
+begin
+  write(term.ClassName, ': ');
+  if term is TXQTermNamedFunction then write(TXQTermNamedFunction(term).func.name, ': ')
+  else if term is TXQTermBinaryOp then write(TXQTermBinaryOp(term).op.name, ': ');
+
+  if argc > 0 then write(args[0].toXQuery);
+  for i := 1 to argc - 1 do write(', ',args[i].toXQuery);
+  writeln;
+end;
+
 { TTextLogger }
 
 constructor TTextLogger.create(clr: TCommandLineReader);
@@ -741,7 +756,7 @@ end;
 type PIXQValue = ^IXQValue;
 function comparison(data: TObject; a, b: PIXQValue): integer;
 begin
-  if not xq.StaticContext.comparableTypes(a^ as TXQValue, b^ as TXQValue) then
+  if not xq.StaticContext.comparableTypes(a^ , b^ ) then
     exit(strCompareClever(a^.typeName, b^.typeName));
   result := ord(xq.StaticContext.compareAtomic(a^, b^, nil));
 end;
@@ -889,26 +904,26 @@ function TAssertionAssert.check(var testResult: TTestCaseResultValue; errorCode:
 
   function normalize(const v: IXQValue): IXQValue;
   var
-    vs: TXQValueSequence;
+    vs: TXQValueWeaklySharedList;
   begin
     if v.getSequenceCount <= 1 then exit(v);
-    vs := v as TXQValueSequence;
-    vs.seq.sort(TPointerCompareFunction(@comparison));
+    vs := v.getDataList;
+    PXQValueList(@vs)^.sort(TPointerCompareFunction(@comparison));
     result := v;
   end;
 
   function parseXMLFragment: IXQValue;
   var
     n: TTreeNode;
-    resseq: TXQValueSequence;
+    resseq: TXQValueList;
   begin
     n := tree.parseTree(value).getFirstChild();
-    resseq := nil;
-    result := xqvalue(n);
+    resseq := TXQValueList.create();
     while n.getNextSibling() <> nil do begin
       n := n.getNextSibling();
-      xqvalueSeqConstruct(result, resseq, xqvalue(n));
+      resseq.Add(xqvalue(n));
     end;
+    result := resseq.toXQValueSequenceSqueezed;
   end;
 
 const OK: array[boolean] of TTestCaseResult = (tcrFail, tcrPass);
@@ -1109,7 +1124,7 @@ var
 begin
   result.error := '';
   result.allOfInfo := '';
-  result.value := nil;
+  result.value.clear;
   if not arrayStrContains(config.forceTestCase, name) then begin
     result.result:= tcrNA;
     exit();
@@ -1548,7 +1563,7 @@ begin
     end;
     if n.hasAttribute('select') then params[i].value := xq.parseQuery(n['select']).evaluate()
     else params[i].value := xqvalue();
-    if n.hasAttribute('as') then if 'xs:'+params[i].value.typeAnnotation.name <> n['as'] then raise Exception.Create('Type mismatch in environment definition');
+    if n.hasAttribute('as') then if 'xs:'+params[i].value.typeName <> n['as'] then raise Exception.Create('Type mismatch in environment definition');
     if n.hasAttribute('source') then raise exception.Create('Unsupported environment param attribute');
     if n.hasAttribute('declared') then params[i].declared := n['declared']= 'true';
   end;
@@ -1637,16 +1652,17 @@ end;
 function TEnvironment.getCollection(sender: TObject; const variable: string; var value: IXQValue): boolean;
 var
   i, j: Integer;
-  resseq: TXQValueSequence;
+  resseq: TXQValueList;
 begin
   value := xqvalue();
-  resseq := nil;
+  resseq := TXQValueList.create();
   if collections = nil then exit;
   for i := 0 to collections.count - 1 do
     if collections[i] = variable then begin
       for j := 0 to tlist(collections.Objects[i]).Count - 1 do
-        xqvalueSeqConstruct(value, resseq, xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
+        resseq.Add(xqvalue(TSource(tlist(collections.Objects[i])[j]).tree));
     end;
+  value := resseq.toXQValueSequenceSqueezed;
 end;
 
 procedure TEnvironment.getExternalVariable(const context: TXQStaticContext; sender: TObject; const namespaceUrl, variable: string;
@@ -1662,7 +1678,7 @@ begin
       value := params[i].value;
       exit
     end;
-  if (variable = '$') and (contextItem <> nil) then value := contextItem; //use default value otherwise
+  if (variable = '$') and (contextItem.isAssigned) then value := contextItem; //use default value otherwise
 end;
 
 
@@ -1934,6 +1950,8 @@ begin
   clr.declareString('format', 'html or text output','text');
   clr.declareString('parser', 'Parser used for xml files. Either simple or fcl-xml', 'simple');
   clr.declareString('dependencies', 'Additional dependencies to assume as true');
+  clr.declareFlag('trace', 'Trace debugging');
+
   //clr.declareString('dependencies-false', 'Additional dependencies to assume as false');
   //clr.declareString('exclude-cases', 'Do not run certain test cases');
 
@@ -2023,6 +2041,8 @@ begin
     else raise Exception.Create('Invalid output format')
   end;
 
+  if clr.readFlag('trace') then
+    XQOnGlobalDebugTracing := @logger.onGlobalTracing;
 
   logger.loadCatalogue;
   loadCatalog('catalog.xml');
