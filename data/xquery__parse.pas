@@ -150,9 +150,9 @@ protected
   function splitVariableForDotNotation(t: TXQTerm): TXQTerm;
   function parseDefineVariable: TXQTermDefineVariable;
   function parseAnnotations: TXQAnnotations;
-  function parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
-  function parseFunctionDeclarationWithoutArgs(): TXQTermDefineFunction;
-  function parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
+  function parseFunctionDeclaration(const annotations: TXQAnnotations; anonymous: boolean = false): TXQTermDefineFunction;
+  function parseFunctionDeclarationWithoutArgs(const annotations: TXQAnnotations): TXQTermDefineFunction;
+  function parseInlineFunctionDeclaration(const annotations: TXQAnnotations): TXQTermDefineFunction;
   function parseIf: TXQTermIf;
   function parseTryCatch: TXQTermTryCatch;
 
@@ -2391,7 +2391,7 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseFunctionDeclaration(annotations: TXQAnnotations; anonymous: boolean): TXQTermDefineFunction;
+function TXQParsingContext.parseFunctionDeclaration(const annotations: TXQAnnotations; anonymous: boolean): TXQTermDefineFunction;
 begin
   try
     result := TXQTermDefineFunction.create();
@@ -2444,12 +2444,12 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseFunctionDeclarationWithoutArgs(): TXQTermDefineFunction;
+function TXQParsingContext.parseFunctionDeclarationWithoutArgs(const annotations: TXQAnnotations): TXQTermDefineFunction;
 var
   sm: TXQTermSimpleMap;
 begin
   result := TXQTermDefineFunction.create();
-  result.annotations := nil;
+  result.annotations := annotations;
   result.parameterCount := 1;
   result.push(TXQTermDefineVariable.create('->', nil));
   TXQTermDefineVariable(result[0]).push(TXQTermSequenceType.create(tikAny));
@@ -2464,13 +2464,24 @@ begin
   end;
 end;
 
-function TXQParsingContext.parseInlineFunctionDeclaration(annotations: TXQAnnotations): TXQTermDefineFunction;
+function TXQParsingContext.parseInlineFunctionDeclaration(const annotations: TXQAnnotations): TXQTermDefineFunction;
 begin
   skipWhitespaceAndComment();
   if (parsingModel in PARSING_MODEL4) and (pos^ = 'f') and ((pos+1)^ = 'n') then expect('fn')
   else expect('function');
-  expect('(');
-  result := parseFunctionDeclaration(annotations, true)
+  skipWhitespaceAndComment();
+  case pos^ of
+  '(': begin
+    inc(pos);
+    result := parseFunctionDeclaration(annotations, true)
+  end;
+  '{': begin
+    require4();
+    result := parseFunctionDeclarationWithoutArgs(annotations);
+  end else
+    expect('(...){');
+    result := nil;
+  end;
 end;
 
 
@@ -3161,7 +3172,7 @@ begin
           exit(parseJSONLikeObjectConstructor(true));
         end;
         'function', 'fn': if parsingModel in PARSING_MODEL4 then
-          exit(parseFunctionDeclarationWithoutArgs());
+          exit(parseFunctionDeclarationWithoutArgs(nil));
       end;
       '#': begin
         require3('Named Function Reference');
