@@ -2326,13 +2326,39 @@ end;
 
 
 function TXQParsingContext.parseAnnotations: TXQAnnotations;
+  function parseAnnotationValue(var term: TXQTerm): boolean;
+  begin
+    skipWhitespaceAndComment();
+    if not ( ( pos^ in ['''', '"', '.', '0'..'9'])) then begin
+      if parsingModel in PARSING_MODEL4 then begin
+        if (pos^ in ['t', 'f']) then begin
+          if nextTokenIs('true') then term := TXQTermConstant.create(xqvalueTrue)
+          else if nextTokenIs('false') then term := TXQTermConstant.create(xqvalueFalse)
+          else exit(false);
+          expect('('); expect(')');
+          exit(true);
+        end;
+        if pos^ = '-' then begin
+          term := parseValue;
+          result := (term is TXQTermBinaryOp)
+            and (TXQTermBinaryOp(term).op.name = 'unary~hack-')
+            and (TXQTermBinaryOp(term).children[1] is TXQTermConstant)
+            and (TXQTermConstant(TXQTermBinaryOp(term).children[1]).value.typeAnnotation.derivedFrom(schemaTypeDescendantsOfNumeric)  );
+          exit;
+        end;
+      end;
+      exit(false);
+    end;
+    term := parseValue;
+    result := (term is TXQTermConstant) and (TXQTermConstant(term).value.Count = 1);
+  end;
 var
   namespaceUrl: string;
   namespacePrefix: string;
   local: string;
   mode: TXQNamespaceMode;
 begin
-  requireXQuery3('Annotations need XQuery 3');
+  requireXQuery3('Annotations need XQuery 3+');
   try
     result := nil;
     setlength(result, 1);
@@ -2349,9 +2375,8 @@ begin
         if nextTokenIs('(') then begin
           while true do begin
             SetLength(params, length(params) + 1);
-            params[high(params)] := parseValue;
-            if not objInheritsFrom(params[high(params)], TXQTermConstant) or (TXQTermConstant(params[high(params)]).value.Count <> 1) then
-              raiseSyntaxError('Only literals allowed as annotation arguments');
+            if not parseAnnotationValue(params[high(params)]) then
+                raiseSyntaxError('Only literals allowed as annotation arguments');
             if not nextTokenIs(',') then break;
           end;
           expect(')')
