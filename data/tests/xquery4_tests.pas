@@ -28,6 +28,9 @@ begin
 
   t('for member $m at $i in [10,20,30] return $m + $i', '11 22 33');
 
+//errortest('switch ((1,2)) case 1 return A case (1,2) return B default return "D"', 'x');
+  t('switch (1) case 3 return "A" case 1,2 return "B" default return "D"', 'B');
+
   writeln('XQuery 4.0 ', tester.count, ' completed');
   tester.free
 end;

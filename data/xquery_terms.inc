@@ -3891,6 +3891,7 @@ var
   i, j: SizeInt;
   operand: IXQValue;
   seq: TXQTermWithChildren;
+  pv: PIXQValue;
 begin
   v := children[0].evaluate(context);
   if v.getSequenceCount > 1 then raiseXPTY0004TypeError(v, 'singleton');
@@ -3900,7 +3901,14 @@ begin
     seq := TXQTermWithChildren(children[i]);
     for j := 0 to high(seq.children) - 1 do begin
       operand := xqvalueAtomize(seq.children[j].evaluate(context));
-      if operand.getSequenceCount > 1 then raiseXPTY0004TypeError(operand, 'Sequences are not allowed as case operands in a switch statement');
+      if operand.getSequenceCount > 1 then begin
+        if not (context.staticContext.model in PARSING_MODEL4) then
+          raiseXPTY0004TypeError(operand, 'Sequences are not allowed as case operands in a switch statement');
+        for pv in operand.GetEnumeratorPtrUnsafe do
+          if xqvalueDeep_equal(context, v, pv^, context.staticContext.collation) then
+            exit(seq.children[high(seq.children)].evaluate(context));
+        continue;
+      end;
       if xqvalueDeep_equal(context, v, operand, context.staticContext.collation) then
         exit(seq.children[high(seq.children)].evaluate(context));
     end;

@@ -1900,30 +1900,48 @@ function TXQParsingContext.parseSwitch: TXQTermSwitch;
 var
   word: String;
   tempSeq: TXQTermWithChildren;
+  braced: boolean;
 begin
   requireXQuery3('for switch statement');
-  expect('(');
   result := TXQTermSwitch.Create;
-  result.push(parsePrimaryLevel());
-  expect(')');
-
-  word := nextToken();
-  if word <> 'case' then raiseSyntaxError('Need at least one case');
-  while word = 'case' do begin
+  try
     skipWhitespaceAndComment();
-    tempSeq := TXQTermWithChildren.Create;
-    result.push(tempSeq);
+    if pos^ = '(' then begin
+      expect('(');
+      result.push(parsePrimaryLevel());
+      expect(')');
+    end else begin
+      require4('switch (..) case ... OR xpath 4: switch (x) { case ... } ');
+      if not (pos^ in ['{', 'c']) then
+        raiseSyntaxError('switch (..) case ... OR xpath 4: switch (x) { case ... } ');
+      result.push(TXQTermConstant.create(xqvalueTrue));
+    end;
+    braced := nextTokenIs('{');
+
+    word := nextToken();
+    if word <> 'case' then raiseSyntaxError('Need at least one case');
     while word = 'case' do begin
+      skipWhitespaceAndComment();
+      tempSeq := TXQTermWithChildren.Create;
+      result.push(tempSeq);
+      while word = 'case' do begin
+        if parsingModel in PARSING_MODEL4 then tempSeq.push(parsePrimaryLevel())
+        else tempSeq.push(parse());
+        word := nextToken();
+      end;
+      if word <> 'return' then raiseSyntaxError('expected return');
       tempSeq.push(parse());
       word := nextToken();
     end;
-    if word <> 'return' then raiseSyntaxError('expected return');
-    tempSeq.push(parse());
-    word := nextToken();
+    if word <> 'default' then raiseSyntaxError('expected "default" clause');
+    expect('return');
+    result.push(parse());
+
+    if braced then expect('}');
+  except
+    result.free;
+    raise;
   end;
-  if word <> 'default' then raiseSyntaxError('expected "default" clause');
-  expect('return');
-  result.push(parse());
 end;
 
 function TXQParsingContext.parseDirectConstructor(): TXQTermConstructor;
