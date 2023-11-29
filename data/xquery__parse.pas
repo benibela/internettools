@@ -1878,11 +1878,13 @@ function TXQParsingContext.parseTypeSwitch: TXQTermTypeSwitch;
 var
   word: String;
   clause: TXQTermTypeSwitch.TXQTermTypeSwitchClause;
+  braced: Boolean;
 begin
   requireXQuery('for typeswitch statement');
   result := TXQTermTypeSwitch.Create;
   try
     result.push(expectTerm('(', @parsePrimaryLevel, ')'));
+    braced := nextTokenIs('{');
 
     word := nextToken();
     while word = 'case' do begin
@@ -1905,6 +1907,8 @@ begin
     result.push(clause);
     if pos^ = '$' then clause.variable := TXQTermVariable(pointer(parseVariable));
     clause.expr := expectTerm('return', @parse);
+
+    if braced then expect('}');
   except
     result.free;
     raise;
