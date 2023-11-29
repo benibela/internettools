@@ -3389,6 +3389,7 @@ PARSING_MODEL4 = [xqpmXPath4_0, xqpmXQuery4_0];
 PARSING_MODEL_XPATHXQUERY = [xqpmXPath2, xqpmXPath3_0, xqpmXPath3_1, xqpmXPath4_0, xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1, xqpmXQuery4_0];
 PARSING_MODEL_XQUERY = [xqpmXQuery1, xqpmXQuery3_0, xqpmXQuery3_1, xqpmXQuery4_0];
 PARSING_MODEL_XQUERY3 = [xqpmXQuery3_0, xqpmXQuery3_1, xqpmXQuery4_0];
+PARSING_MODEL_XQUERY4 = [xqpmXQuery4_0];
 
 var XMLNamespace_XPathFunctions, XMLnamespace_XPathFunctionsArray, XMLnamespace_XPathFunctionsMap, XMLNamespace_MyExtensionsNew, XMLNamespace_MyExtensionsMerged, XMLNamespace_MyExtensionOperators, XMLNamespace_XMLSchema: TNamespace;
 

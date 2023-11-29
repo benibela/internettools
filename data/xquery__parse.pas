@@ -105,7 +105,7 @@ protected
   procedure expect(c: char);
   procedure expect(s: string);
   function nextToken(lookahead: boolean=false): string;
-  function nextTokenIs(const s: string): boolean; //checks the next token and skips it if it matches
+  function nextTokenIs(const s: string; lookahead: boolean=false): boolean; //checks the next token and skips it if it matches
   function nextTokenNCName(): string; inline; //returns a NCName
 
   function expectTerm(const a: string; const bt: TParseTermFunction; c: string = ''): TXQTerm;
@@ -1060,7 +1060,7 @@ begin
   else lastTokenStart := start;
 end;
 
-function TXQParsingContext.nextTokenIs(const s: string): boolean;
+function TXQParsingContext.nextTokenIs(const s: string; lookahead: boolean=false): boolean;
 var
   temppos: pchar;
   i: SizeInt;
@@ -1076,7 +1076,7 @@ begin
     if not (temppos^ in WHITE_SPACE + SYMBOLS + [#0]) then
       exit(false);
   result := true;
-  pos := temppos;
+  if not lookahead then pos := temppos;
 end;
 
 function TXQParsingContext.nextTokenNCName(): string;
@@ -3207,6 +3207,8 @@ begin
         end;
         'function', 'fn': if parsingModel in PARSING_MODEL4 then
           exit(parseFunctionDeclarationWithoutArgs(nil));
+        'switch': if parsingModel in PARSING_MODEL_XQUERY4 then
+          exit(parseSwitch);
       end;
       '#': begin
         require3('Named Function Reference');
@@ -3243,6 +3245,8 @@ begin
             raiseParsingError('XQST0075', 'Schema validation is not supported');
           end;
         end;
+        'switch': if (nextTokenIs('case', true)) and (parsingModel in PARSING_MODEL_XQUERY4) then
+          exit(parseSwitch);
       end;
 
     if (word = '') or (word[1] in [',', ';', ':', ')', ']', '}']) then //todo: check if valid xml node name
