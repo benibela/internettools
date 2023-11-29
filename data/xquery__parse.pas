@@ -73,6 +73,7 @@ type
    pattern: string;
  end;
 
+TParseTermFunction = function : TXQTerm of object;
 
 TXQParsingContext = class(TXQAbstractParsingContext)
 protected
@@ -106,6 +107,10 @@ protected
   function nextToken(lookahead: boolean=false): string;
   function nextTokenIs(const s: string): boolean; //checks the next token and skips it if it matches
   function nextTokenNCName(): string; inline; //returns a NCName
+
+  function expectTerm(const a: string; const bt: TParseTermFunction; c: string = ''): TXQTerm;
+  function expectTerm(a: char; const bt: TParseTermFunction; c: Char): TXQTerm;
+
   // $foo       -> ('', '', 'foo',    xqnmPrefix)
   // $*:foo     -> ('', '*', 'foo',   xqnmNone)
   // $prf:foo   -> ('', 'prf', 'foo', xqnmPrefix)
@@ -1081,6 +1086,20 @@ begin
     raiseSyntaxError('Invalid NCName: "'+result+'" (possibly missing expression, missing argument, additional comma ",", or additional closing parentheses. It expects the start of something, but finds the end or something unparsable. ) ');
 end;
 
+function TXQParsingContext.expectTerm(const a: string; const bt: TParseTermFunction; c: string): TXQTerm;
+begin
+  expect(a);
+  result := bt();
+  if c <> '' then expect(c);
+end;
+
+function TXQParsingContext.expectTerm(a: char; const bt: TParseTermFunction; c: Char): TXQTerm;
+begin
+  expect(a);
+  result := bt();
+  if c <> #0 then expect(c);
+end;
+
 function TXQParsingContext.nextTokenEQName(out url, prefix, localpart: string; allowWildcards: boolean): TXQNamespaceMode;
   procedure wildCardError;
   begin
@@ -1863,9 +1882,7 @@ begin
   requireXQuery('for typeswitch statement');
   result := TXQTermTypeSwitch.Create;
   try
-    expect('(');
-    result.push(parsePrimaryLevel());
-    expect(')');
+    result.push(expectTerm('(', @parsePrimaryLevel, ')'));
 
     word := nextToken();
     while word = 'case' do begin
@@ -1878,8 +1895,7 @@ begin
         if pos^ = '$' then begin clause.variable := TXQTermVariable(pointer(parseVariable)); expect('as'); end;
         clause.typ := parseSequenceTypeUnion([]);
       end;
-      expect('return');
-      clause.expr := parse;
+      clause.expr := expectTerm('return', @parse);
       word := nextToken();
     end;
 
@@ -1888,8 +1904,7 @@ begin
     clause := TXQTermTypeSwitch.TXQTermTypeSwitchClause.Create;
     result.push(clause);
     if pos^ = '$' then clause.variable := TXQTermVariable(pointer(parseVariable));
-    expect('return');
-    clause.expr := parse();
+    clause.expr := expectTerm('return', @parse);
   except
     result.free;
     raise;
@@ -1907,9 +1922,7 @@ begin
   try
     skipWhitespaceAndComment();
     if pos^ = '(' then begin
-      expect('(');
-      result.push(parsePrimaryLevel());
-      expect(')');
+      result.push(expectTerm('(', @parsePrimaryLevel, ')'));
     end else begin
       require4('switch (..) case ... OR xpath 4: switch (x) { case ... } ');
       if not (pos^ in ['{', 'c']) then
@@ -1934,8 +1947,7 @@ begin
       word := nextToken();
     end;
     if word <> 'default' then raiseSyntaxError('expected "default" clause');
-    expect('return');
-    result.push(parse());
+    result.push(expectTerm('return', @parse));
 
     if braced then expect('}');
   except
@@ -3430,14 +3442,14 @@ var astroot: TXQTerm;
 
   procedure thinArrowOperator;
   var
-    marker: PChar;
+    //marker: PChar;
     //isFunctionDeclaration: Boolean;
     op: TXQOperatorInfo;
     tarrow: TXQTermBinaryOp;
   begin
     op := TXQueryEngine.findOperator('=!>');
     replace := ripBinOpApart(@astroot, op.priority);
-    marker := pos;
+    //marker := pos;
     expect('=!>');
     require4();
     skipWhitespaceAndComment();
