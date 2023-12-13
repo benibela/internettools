@@ -846,7 +846,7 @@ type
     //procedure FreeInstance;override;
 
     //class function classKind: TXQValueKind; virtual;
-    function toXQuery: string;
+    function toXQuery: string; virtual;
     function toString: string; override;
   end;
 
@@ -896,6 +896,7 @@ type
     constructor create(const aurl, aprefixedLocal: string);
     constructor create(const ns: TNamespace; const alocal: string);
     function toString: string; override;
+    function toXQuery: string; override;
   end;
 
 
@@ -923,6 +924,7 @@ type
 
     function isDuration: boolean;
     function toString: string; override;
+    function toXQuery: string; override;
     function clone: TXQBoxedDateTime;
   protected
     class function tryCreateFromString(const s, format: string; data: PXQValueDateTimeData): TDateTimeParsingResult; static;

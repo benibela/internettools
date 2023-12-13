@@ -2353,7 +2353,7 @@ end;
 
 function TXQBoxedValue.toXQuery: string;
 begin
-  result := qualifiedTypeName(toString, '', '', true );
+  result := toString;
 end;
 
 function TXQBoxedValue.toString: string;
@@ -2483,6 +2483,11 @@ function TXQBoxedQName.toString: string;
 begin
   if prefix <> '' then result := prefix + ':' + local
   else result := local;
+end;
+
+function TXQBoxedQName.toXQuery: string;
+begin
+  Result:='xs:QName("'+toString+'")';
 end;
 
 
@@ -2818,6 +2823,11 @@ begin
      else
       result := 'PT0S';
   end;
+end;
+
+function TXQBoxedDateTime.toXQuery: string;
+begin
+  Result:=qualifiedTypeName(typeAnnotationType.name, toString, '', true );
 end;
 
 function TXQBoxedDateTime.clone: TXQBoxedDateTime;
