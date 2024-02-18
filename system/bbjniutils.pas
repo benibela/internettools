@@ -108,6 +108,9 @@ type
 
   function arrayToJArray(a: array of string): jobject;
 
+private
+  function getClassNameOfObject(obj: jobject): string;
+public
   procedure RethrowJavaExceptionIfThereIsOne(aExceptionClass: JNIExceptionClass);
   procedure RethrowJavaExceptionIfThereIsOne();
   function ExceptionDescribeAndClear: string;
@@ -1139,6 +1142,15 @@ begin
     setStringArrayElement(result, i, a[i]);
 end;
 
+function TJavaEnv.getClassNameOfObject(obj: jobject): string;
+var
+  temp: jobject;
+begin
+  temp:= env^^.CallObjectMethod(env, obj, jCommonClasses.&Object.getClass);
+  result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, jCommonClasses.&Class.getName));
+  DeleteLocalRef(temp);
+end;
+
 
 procedure TJavaEnv.RethrowJavaExceptionIfThereIsOne(aExceptionClass: JNIExceptionClass);
 var cause: jobject;
@@ -1157,16 +1169,13 @@ end;
 
 function TJavaEnv.ExceptionDescribeAndClear: string;
 var je: jthrowable;
-    temp: jobject;
 begin
   je := env^^.ExceptionOccurred(env);
   if je = nil then exit('');
   env^^.ExceptionDescribe(env);
   env^^.ExceptionClear(env); //carefully, we need to clear before calling anything else
-  temp:= env^^.CallObjectMethod(env, je, jCommonClasses.&Object.getClass);
-  result := jStringToStringAndDelete(env^^.CallObjectMethod(env, temp, jCommonClasses.&Class.getName)) + ': '
+  result := getClassNameOfObject(je) + ': '
           + jStringToStringAndDelete(env^^.CallObjectMethod(env, je, jCommonClasses.Throwable.getMessage));
-  DeleteLocalRef(temp);
   deleteLocalRef(je);
 end;
 
@@ -1231,6 +1240,24 @@ end;
 
 procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TStreamLikeWriteNativeInt; jmInputStreamRead,
   jmInputStreamClose: jmethodID);
+
+  function RethrowNonEOFException: boolean;
+  var je: jthrowable;
+    className, fullError: String;
+  begin
+    result := false;
+    je := env^^.ExceptionOccurred(env);
+    if je = nil then exit();
+    className := getClassNameOfObject(je);
+    fullError := ExceptionDescribeAndClear;
+    if className = 'java.io.EOFException' then
+      exit(true)
+     else begin
+      fullError := 'InputStream.read error: '+fullError;
+      raise EAndroidInterfaceException.create(fullError, je);
+     end;
+  end;
+
 const BUFFERLEN = 8192;
 var wrappedBuffer: jvalue;
     temp: JBoolean;
@@ -1242,7 +1269,8 @@ begin
 
   wrappedBuffer.l := env^^.NewByteArray(env, BUFFERLEN);
   len := env^^.CallIntMethodA(env, stream,  jmInputStreamRead, @wrappedBuffer);;
-  RethrowJavaExceptionIfThereIsOne;
+  if ExceptionCheck and RethrowNonEOFException then
+    len := 0; //ignore java.io.EOFException. InputStream.read cannot throw java.io.EOFException, but it does with okhttp
   while len >= 0 do begin
     if len > 0 then begin
       buffer := env^^.GetPrimitiveArrayCritical(env, wrappedBuffer.l, temp);
