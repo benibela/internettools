@@ -1270,7 +1270,7 @@ begin
   wrappedBuffer.l := env^^.NewByteArray(env, BUFFERLEN);
   len := env^^.CallIntMethodA(env, stream,  jmInputStreamRead, @wrappedBuffer);;
   if ExceptionCheck and RethrowNonEOFException then
-    len := 0; //ignore java.io.EOFException. InputStream.read cannot throw java.io.EOFException, but it does with okhttp
+    len := -1; //ignore java.io.EOFException. InputStream.read cannot throw java.io.EOFException, but it does with okhttp
   while len >= 0 do begin
     if len > 0 then begin
       buffer := env^^.GetPrimitiveArrayCritical(env, wrappedBuffer.l, temp);
