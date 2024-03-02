@@ -1248,12 +1248,12 @@ procedure TJavaEnv.inputStreamReadAllAndDelete(stream: jobject; readCallback: TS
     result := false;
     je := env^^.ExceptionOccurred(env);
     if je = nil then exit();
-    className := getClassNameOfObject(je);
     fullError := ExceptionDescribeAndClear;
+    className := getClassNameOfObject(je);
     if className = 'java.io.EOFException' then
       exit(true)
      else begin
-      fullError := 'InputStream.read error: '+fullError;
+      fullError := 'InputStream.read error: ('+className+') '+fullError;
       raise EAndroidInterfaceException.create(fullError, je);
      end;
   end;
