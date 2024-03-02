@@ -47,6 +47,7 @@ public
 end;
 
 
+function LoadICU: boolean;
 //**Registers the module to the XQuery engine
 procedure registerModuleUCAICU;
 
