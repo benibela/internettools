@@ -3327,12 +3327,23 @@ begin
 end;
 
 function xqFunctionParse_date({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
-var d, fmt: string;
+var d, fmt, errorMessage: string;
+  outerNode: TTreeNode;
 begin
   d := args[0].toString;
   if argc = 2 then fmt := args[1].toString
-  else if not guessDateFormatTry(d, fmt) then
-    raiseXQEvaluationException('pxp:parse-date', 'Failed to parse date: '+d);
+  else if not guessDateFormatTry(d, fmt) then begin
+    errorMessage := 'Failed to parse date: '+d;
+    if (args[0].kind = pvkNode) then begin
+      outerNode := args[0].toNode;
+      if outerNode.typ = tetText then outerNode := outerNode.parent;
+      if (outerNode <> nil) and striEqual(outerNode.value, 'span') then outerNode := outerNode.parent;
+      if (outerNode <> nil) and striEqual(outerNode.value, 'td') then outerNode := outerNode.parent;
+//      if (outerNode <> nil) and striEqual(outerNode.value, 'tr') then outerNode := outerNode.parent;
+      if (outerNode <> nil) then errorMessage += LineEnding + ' in node ' + outerNode.outerXML();
+    end;
+    raiseXQEvaluationException('pxp:parse-date', errorMessage);
+  end;
   result := xqvalue(TXQBoxedDateTime.create(baseSchema.date, d, fmt));
 end;
 function xqFunctionParse_time({%H-}argc: SizeInt; args: PIXQValue): IXQValue;
