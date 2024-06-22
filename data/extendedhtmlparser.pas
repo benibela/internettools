@@ -868,9 +868,23 @@ begin
 end;
 
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
+  procedure addShortRead(const cmd: string);
+  var temp: TTemplateElement;
+  begin
+    temp := getDocument().createElementPair('s') as TTemplateElement;
+    temp.namespace := XMLNamespace_TemplateT;
+    temp.templateType:=tetCommandShortRead;
+    temp.reverse.namespace := temp.namespace;
+    temp.templateReverse.templateType:=tetIgnore;
+    temp.addChild(getDocument().createNode());
+    temp.templateNext.typ := tetText;
+    temp.templateNext.templateType := tetIgnore;
+    temp.templateNext.value:=cmd;
+    addChild(temp);
+  end;
+
 var
  curChild: TTreeNode;
- temp: TTemplateElement;
  rv: String;
  tempattrib, attrib: TTreeAttribute;
 begin
@@ -895,18 +909,10 @@ begin
       templateAttributes.Add(attrib.value+'='+attrib.realvalue);
       removeAttribute(attrib);
     end else if  parser.AllowVeryShortNotation and (rv <> '') and (rv[1] = '{') and (rv[length(rv)] = '}') then begin
-      temp := getDocument().createElementPair('s') as TTemplateElement;
-      temp.namespace := XMLNamespace_TemplateT;
-      temp.templateType:=tetCommandShortRead;
-      temp.reverse.namespace := temp.namespace;
-      temp.templateReverse.templateType:=tetIgnore;
-      temp.addChild(getDocument().createNode());
-      temp.templateNext.typ := tetText;
-      temp.templateNext.templateType := tetIgnore;
       rv := copy(rv, 2, length(rv) - 2);
-      if isVariableName(rv) then temp.templateNext.value:= rv + ':= @'+attrib.getNodeName()
-      else temp.templateNext.value:='@'+attrib.getNodeName() + ' / (' + rv +')';
-      addChild(temp);
+      if isVariableName(rv) then rv := rv + ':= @'+attrib.getNodeName()
+      else rv :='@'+attrib.getNodeName() + ' / (' + rv +')';
+      addShortRead(rv);
       if templateAttributes = nil then templateAttributes := TStringAttributeList.Create;
       //todo: optimize ?
       if templateAttributes.Values['condition'] = '' then templateAttributes.Values['condition'] := 'exists(@'+attrib.getNodeName()+')'
@@ -920,19 +926,21 @@ begin
   if templateAttributes <> nil then
     if templateAttributes.Values['optional'] = 'true' then flags+=[tefOptional];
 
-  if templateType = tetCommandShortRead then begin
-    curChild := getFirstChild();
-    while curChild <> nil do begin
-      TTemplateElement(curChild).templateType:=tetIgnore;
-      curChild := curChild.getNextSibling();
+  case templateType of
+    tetCommandShortRead: begin
+      curChild := getFirstChild();
+      while curChild <> nil do begin
+        TTemplateElement(curChild).templateType:=tetIgnore;
+        curChild := curChild.getNextSibling();
+      end;
     end;
-  end;
 
-  if templateType = tetCommandSwitchOpen then begin
-    curChild := getFirstChild();
-    while curChild <> nil do begin
-      TTemplateElement(curChild).flags+=[tefSwitchChild];
-      curChild := curChild.getNextSibling();
+    tetCommandSwitchOpen: begin
+      curChild := getFirstChild();
+      while curChild <> nil do begin
+        TTemplateElement(curChild).flags+=[tefSwitchChild];
+        curChild := curChild.getNextSibling();
+      end;
     end;
   end;
 end;
@@ -2280,7 +2288,10 @@ var el: TTemplateElement;
     temp: TTemplateElement;
     implicitLoopMin, implicitLoopMax: string;
 begin
-   //read template
+  //read template
+  //after parsing, there seem to be four steps of postprocessing
+  //   postprocess, this function, resetAttributeMatching and initializeCaches
+  //(only the last one depends on the input document encoding)
   FTemplate.parseTree(template, templateName);
   templateDocument := FTemplate.getLastTree.getDocument();
   el := TTemplateElement(templateDocument.next);
