@@ -113,6 +113,8 @@ TTemplateElement=class(TTreeNode)
   procedure initializeCaches(parser: THtmlTemplateParser; recreate: boolean = false);
   procedure freeCaches;
   destructor destroy;override;
+private
+  procedure addShortReadChild(const cmd: string);
 end;
 
 
@@ -867,21 +869,22 @@ begin
   end;
 end;
 
+procedure TTemplateElement.addShortReadChild(const cmd: string);
+var temp: TTemplateElement;
+begin
+  temp := getDocument().createElementPair('s') as TTemplateElement;
+  temp.namespace := XMLNamespace_TemplateT;
+  temp.templateType:=tetCommandShortRead;
+  temp.reverse.namespace := temp.namespace;
+  temp.templateReverse.templateType:=tetIgnore;
+  temp.addChild(getDocument().createNode());
+  temp.templateNext.typ := tetText;
+  temp.templateNext.templateType := tetIgnore;
+  temp.templateNext.value:=cmd;
+  addChild(temp);
+end;
+
 procedure TTemplateElement.postprocess(parser: THtmlTemplateParser);
-  procedure addShortRead(const cmd: string);
-  var temp: TTemplateElement;
-  begin
-    temp := getDocument().createElementPair('s') as TTemplateElement;
-    temp.namespace := XMLNamespace_TemplateT;
-    temp.templateType:=tetCommandShortRead;
-    temp.reverse.namespace := temp.namespace;
-    temp.templateReverse.templateType:=tetIgnore;
-    temp.addChild(getDocument().createNode());
-    temp.templateNext.typ := tetText;
-    temp.templateNext.templateType := tetIgnore;
-    temp.templateNext.value:=cmd;
-    addChild(temp);
-  end;
 
 var
  curChild: TTreeNode;
@@ -912,7 +915,7 @@ begin
       rv := copy(rv, 2, length(rv) - 2);
       if isVariableName(rv) then rv := rv + ':= @'+attrib.getNodeName()
       else rv :='@'+attrib.getNodeName() + ' / (' + rv +')';
-      addShortRead(rv);
+      addShortReadChild(rv);
       if templateAttributes = nil then templateAttributes := TStringAttributeList.Create;
       //todo: optimize ?
       if templateAttributes.Values['condition'] = '' then templateAttributes.Values['condition'] := 'exists(@'+attrib.getNodeName()+')'
@@ -2309,51 +2312,54 @@ begin
 
   el := TTemplateElement(templateDocument.next);
   while el <> nil do begin
-    if (el.templateType = tetCommandMeta) and (el.templateAttributes<>nil) then begin
-      if el.templateAttributes.Values['encoding'] <> '' then
-        raise EHTMLParseException.Create('The meta encoding attribute is deprecated');
-      if el.templateAttributes.Values['text-matching'] <> '' then
-        defaultTextMatching := el.templateAttributes.Values['text-matching']
-      else if el.templateAttributes.Values['default-text-matching'] <> '' then {deprecated}
-        defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
-      i := el.templateAttributes.IndexOfName('text-case-sensitive');
-      if i < 0 then i := el.templateAttributes.IndexOfName('default-text-case-sensitive'); {deprecated}
-      if i >= 0 then begin
-        defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i];
-        if defaultCaseSensitive = '' then defaultCaseSensitive := 'true';
-      end;
-    end else if el.templateType = tetHTMLText then begin
-      if (FVeryShortNotation) and (el.value <> '') then begin
-        if el.value[1] = '?' then begin
-          delete(el.value,1,1);
-          temp := TTemplateElement(el.getPrevious());
-          if temp.typ = tetClose then temp := temp.templateReverse;
-          temp.flags += [tefOptional];
-        end;
-        if (el.value <> '') and (el.value[1] in ['*', '+', '{']) and takeLoopCounter(el.value, implicitLoopMin, implicitLoopMax) then begin
-          looper := createTemplateElement(tetCommandLoopOpen);
-          TTemplateElement(el.getPrevious()).insertSurrounding(looper, createTemplateElement(tetCommandLoopClose));
-          if implicitLoopMin <> '' then looper.setTemplateAttribute('min', implicitLoopMin);
-          if implicitLoopMax <> '' then looper.setTemplateAttribute('max', implicitLoopMax);
-        end;
-        if el.value = '' then el.templateType := tetIgnore
-        else if el.value[1] = '{' then begin
-          el.value[1] := ' ';
-          el.value[length(el.value)] := ' ';
-          el.insertSurrounding(createTemplateElement(tetCommandShortRead));
-          el.templateType := tetIgnore;
+    case el.templateType of
+      tetCommandMeta: if (el.templateAttributes<>nil) then begin
+        if el.templateAttributes.Values['encoding'] <> '' then
+          raise EHTMLParseException.Create('The meta encoding attribute is deprecated');
+        if el.templateAttributes.Values['text-matching'] <> '' then
+          defaultTextMatching := el.templateAttributes.Values['text-matching']
+        else if el.templateAttributes.Values['default-text-matching'] <> '' then {deprecated}
+          defaultTextMatching := el.templateAttributes.Values['default-text-matching'];
+        i := el.templateAttributes.IndexOfName('text-case-sensitive');
+        if i < 0 then i := el.templateAttributes.IndexOfName('default-text-case-sensitive'); {deprecated}
+        if i >= 0 then begin
+          defaultCaseSensitive := el.templateAttributes.ValueFromIndex[i];
+          if defaultCaseSensitive = '' then defaultCaseSensitive := 'true';
         end;
       end;
-      if el.templateType = tetHTMLText then begin
-        el.templateType := tetMatchText;
+      tetHTMLText: begin
+        if (FVeryShortNotation) and (el.value <> '') then begin
+          if el.value[1] = '?' then begin
+            delete(el.value,1,1);
+            temp := TTemplateElement(el.getPrevious());
+            if temp.typ = tetClose then temp := temp.templateReverse;
+            temp.flags += [tefOptional];
+          end;
+          if (el.value <> '') and (el.value[1] in ['*', '+', '{']) and takeLoopCounter(el.value, implicitLoopMin, implicitLoopMax) then begin
+            looper := createTemplateElement(tetCommandLoopOpen);
+            TTemplateElement(el.getPrevious()).insertSurrounding(looper, createTemplateElement(tetCommandLoopClose));
+            if implicitLoopMin <> '' then looper.setTemplateAttribute('min', implicitLoopMin);
+            if implicitLoopMax <> '' then looper.setTemplateAttribute('max', implicitLoopMax);
+          end;
+          if el.value = '' then el.templateType := tetIgnore
+          else if el.value[1] = '{' then begin
+            el.value[1] := ' ';
+            el.value[length(el.value)] := ' ';
+            el.insertSurrounding(createTemplateElement(tetCommandShortRead));
+            el.templateType := tetIgnore;
+          end;
+        end;
+        if el.templateType = tetHTMLText then begin
+          el.templateType := tetMatchText;
+          if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
+          el.templateAttributes.Values[defaultTextMatching] := el.value;
+        end;
+      end;
+      tetMatchText: if (defaultCaseSensitive <> '') then begin
         if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
-        el.templateAttributes.Values[defaultTextMatching] := el.value;
+        if el.templateAttributes.IndexOfName('case-sensitive') < 0 then
+          el.templateAttributes.Values['case-sensitive'] := defaultCaseSensitive;
       end;
-    end;
-    if (el.templateType = tetMatchText) and (defaultCaseSensitive <> '') then begin
-      if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
-      if el.templateAttributes.IndexOfName('case-sensitive') < 0 then
-        el.templateAttributes.Values['case-sensitive'] := defaultCaseSensitive;
     end;
     el := el.templateNext;
   end;
