@@ -84,7 +84,7 @@ var i:longint;
       for j:=0 to sl.count-1 do
         if (extParser.variableChangeLog.getName(j)<>sl.Names[j]) or
            (xsafestr(extParser.variableChangeLog.get(j))<>StringReplace(StringReplace(sl.ValueFromIndex[j], '[[#13]]', #13, [rfReplaceAll]), '[[#10]]', #10, [rfReplaceAll])  )     then begin
-             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+xsafestr(extParser.variableChangeLog.get(j)) +'" (btw. "'+extParser.variableChangeLog.debugTextRepresentation+'") expected: "'+s+'"';
+             errormsg := 'Test failed: '+ inttostr(i)+': '{+data[i][1] }+ #13#10' got: "'+xsafestr(extParser.variableChangeLog.get( j)) +'" (btw. "'+extParser.variableChangeLog.debugTextRepresentation+'") expected: "'+s+'"';
              //errormsg:= StringReplace(errormsg, #13, '#13', [rfReplaceAll]);
              //errormsg:= StringReplace(errormsg, #10, '#10', [rfReplaceAll]);
              WriteLn(errormsg);
@@ -93,13 +93,18 @@ var i:longint;
   end;
 var previoushtml, temp: string;
   tempobj: TXQBoxedStringMap;
-    procedure t(const template, html, expected: string);
+    procedure runtest(const template, html: string);
     begin
       inc(globalTestCount);
       if html<>'' then previoushtml:=html;
       if template='' then exit;
       extParser.parseTemplate(template);
       extParser.parseHTML(previoushtml, 'unittest');
+    end;
+    procedure t(const template, html, expected: string);
+    begin
+      runtest(template, html);
+      if template='' then exit;
       checklog(expected);
     end;
 
@@ -174,6 +179,13 @@ var previoushtml, temp: string;
    procedure cmp(a,b: string);
    begin
      if a <> b then raise Exception.Create('Test failed: '+a+' <> '+b);
+   end;
+
+   procedure tformrequest(const template, html, expected: string);
+   begin
+     runtest(template, html);
+     if extParser.variableChangeLog.get('form-request').toXQuery <> expected then
+       raise Exception.Create('Form request failed. expected: '+expected + ' eval res: '+extParser.variableChangeLog.debugTextRepresentation);
    end;
 
 begin
@@ -1464,6 +1476,19 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   q('let <r><t:meta-attribute name="x" case-sensitive="true"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '2');
   q('let <r><t:meta-attribute name="x" case-sensitive="false"/><a x="X">{.}</a></r> := <r><a x="Xa">0</a><a x="x">1</a><a x="X">2</a></r> return .', '1');
   q('let <a>{$b := (1,2), $c := $b, $c := $b}</a> := <a>10</a> return join(($b))', '1 2');
+
+
+  t('<form>{form(.)?url}</form>', '<form><input name="a" value="x"/><input name="b" value="y"/><input name="c" value="z"/></form>', '_result=unittest?a=x&b=y&c=z');
+  tformrequest('<form t:form-request=""></form>', '', '{"method": "GET", "url": "unittest?a=x&b=y&c=z"}');
+  tformrequest('<form><input t:form-request=""/></form>', '', '{"method": "GET", "url": "unittest?a=x&b=y&c=z"}');
+  tformrequest('<form><input t:form-request="123"/></form>', '', '{"method": "GET", "url": "unittest?a=123&b=y&c=z"}');
+  tformrequest('<form><input name="b" t:form-request=""/></form>', '', '{"method": "GET", "url": "unittest?a=x&b=y&c=z"}');
+  tformrequest('<form><input name="b" t:form-request="123"/></form>', '', '{"method": "GET", "url": "unittest?a=x&b=123&c=z"}');
+  tformrequest('<form><input name="a" t:form-request=""/><input name="b" t:form-request=""/></form>', '', '{"method": "GET", "url": "unittest?a=x&b=y&c=z"}');
+  tformrequest('<form><input name="a" t:form-request="1"/><input name="b" t:form-request="23"/></form>', '', '{"method": "GET", "url": "unittest?a=1&b=23&c=z"}');
+  tformrequest('<form><input name="a" t:form-request=""/><input name="b" t:form-request=""/><input name="c" t:form-request=""/></form>', '', '{"method": "GET", "url": "unittest?a=x&b=y&c=z"}');
+  tformrequest('<form><input name="a" t:form-request="1"/><input name="b" t:form-request="23"/><input name="c" t:form-request="''bar''"/></form>', '', '{"method": "GET", "url": "unittest?a=1&b=23&c=bar"}');
+  tformrequest('<form><input name="a" t:form-request="''foo''"/><input name="c" t:form-request="''bar''"/></form>', '', '{"method": "GET", "url": "unittest?a=foo&b=y&c=bar"}');
 
 
   xstring('hallo"''"''world', 'hallo"''"''world');

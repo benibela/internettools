@@ -593,13 +593,23 @@ TXQTermVariableArray = array of TXQTermVariable;
     @unorderedList(
       @item(@code(template:optional="true") @br if this is set the file is read successesfully even if the tag doesn't exist.@br
                                                You should never have an optional element as direct children of a loop, because the loop has lower priority as the optional element, so the parser will skip loop iterations if it can find a later match for the optional element.
-                                               But it is fine to use optional tags that have an non-optional parent tag within the loop. )
+                                               But it is fine to use optional tags that have an non-optional parent tag within the loop.
+      )
       @item(@code(template:condition="xpath") @br if this is given, a tag is only accepted as matching, iff the given xpath-expression returns true (powerful, but slow) @br
                                                       (condition is not the same as test: if test evaluates to false, the template tag is ignored; if condition evaluates to false, the html tag is not found)
       )
+      @item(@code(template:form-request="xpath") @br see below for HTML Form requests.)
     )
 
     The default prefixes for template commands are "template:" and "t:", you can change that with the templateNamespace-property or by defining a new namespace in the template like @code(xmlns:yournamespace="http://www.benibela.de/2011/templateparser" ). (only the xmlns:prefix form is supported, not xmlns without prefix)
+
+    @bold(HTML Form requests)
+    Elements of an HTML form can be marked with the template:form-request attribute.
+    This simulates entering values in the form and submitting it.
+    After matching is completed, a variable @code($form-request) is created which is a JSON object describing the HTTP request sent for submitting the form.
+
+    For example, @code(<input name="foo" template:form-request="'bar'"/>) will create a form-request variable with containing the parameter @code(foo=bar).
+    For all other input elements that might be in the form, the default values will be used.
 
 
     @bold(Short notation)
@@ -677,6 +687,7 @@ THtmlTemplateParser=class
     procedure GetTemplateRealVariableDefinitions(var vars: TXQTermVariableArray; out hasDefaultVariable: Boolean);
     function GetTemplateContextDependencies: TXQContextDependencies;
   protected
+    FTemplateHasFormRequest: boolean;
     FCurrentTemplateName: string; //currently loaded template, only needed for debugging (a little memory waste)
 
     procedure raiseMatchingException(message: string); virtual;
@@ -2044,6 +2055,62 @@ begin
 end;
 
 function THtmlTemplateParser.matchLastTrees: Boolean;
+var oldVariableCount: SizeInt;
+
+  procedure setFinalFormRequest;
+    function getAssociatedForm(t: TTreeNode): TTreeNode;
+    begin
+      result := t;
+      while (result <> nil) and not striEqual(result.value, 'form') do
+        result := result.parent;
+    end;
+
+  var allRequests: TXQValueList;
+      currentForm: TTreeNode = nil;
+      currentRequest: TXQValueList;
+  procedure pushNewRequest;
+  var formArgs: array[0..1] of IXQValue;
+    request: IXQValue;
+  begin
+    if currentForm = nil then exit;
+    formArgs[0] := xqvalue(currentForm);
+    formArgs[1] := xqvalueSeqSqueezed(currentRequest);
+    request := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsNew).findComplexFunction('form', 2, xqpmXQuery4_0).func(FQueryContext, 2, @formArgs[0]);
+    allRequests.add(request);
+    currentRequest := TXQValueList.create();
+  end;
+
+  var
+    i: SizeInt;
+    newForm: TTreeNode = nil;
+    tempv: IXQValue;
+    element: TTreeNode;
+    tempva: TXQValueWeaklySharedList;
+  begin
+    allRequests := TXQValueList.create();
+    currentRequest := TXQValueList.create();
+    for i := oldVariableCount to FVariableLog.count - 1 do
+      if (FVariableLog.getName(i) = '_form-request') and (FVariableLog.getNamespace(i) = XMLNamespaceURL_MyExtensionsNew) then begin
+        tempv := FVariableLog.get(i);
+        if (tempv.kind <> pvkArray) or (tempv.Size <> 2) or (tempv.toArrayMembersList.Items[0].kind <> pvkNode) then
+          raise EHTMLParseException.Create('Invalid form-request type: '+tempv.toXQuery);
+        tempva := tempv.toArrayMembersList;
+        element := tempva.items[0].toNode;
+        newForm := getAssociatedForm(element);
+        if newForm <> currentForm then begin
+          pushNewRequest;
+          currentForm := newForm;
+        end;
+//        writeln(element.outerXML());
+        if tempva.Items[1].isUndefined then currentRequest.add(tempva.items[0])
+        else currentRequest.add(TXQBoxedStandardMapEntry.create(xqvalue(element.getAttribute('name')), tempva.Items[1]).boxInIXQValue);
+      end;
+    pushNewRequest;
+    if allRequests.count > 0 then
+      FVariableLog.add('form-request', xqvalueSeqSqueezed(allRequests));
+  end;
+
+
   function nodeInfo(node: TTreeNode): string;
     function textNodeInfo(node: TTreeNode): string;
     begin
@@ -2076,6 +2143,7 @@ function THtmlTemplateParser.matchLastTrees: Boolean;
   end;
 
 
+
 var cur,last,realLast, next:TTemplateElement;
     errCur:TTemplateElement = nil;
     errLast:TTemplateElement = nil;
@@ -2098,6 +2166,7 @@ begin
   end;
   FreeAndNil(FVariableLogCondensed);
 
+  oldVariableCount := FVariableLog.count;
   oldFunctionCount := length(FQueryEngine.StaticContext.functions);
 
   initializeCaches;
@@ -2118,6 +2187,8 @@ begin
   if temp = nil then raiseMatchingException('No HTML tree');
   if FTemplate.getLastTree = nil then raiseMatchingException('No template tree');
   result:=matchTemplateTree(FHtmlTree, temp, FHtmlTree.reverse, TTemplateElement(FTemplate.getLastTree.next), TTemplateElement(FTemplate.getLastTree.reverse));
+
+  if result and FTemplateHasFormRequest then setFinalFormRequest();
 
   //delete functions, so multiple parsing attempts do not intermix
   for i := oldFunctionCount to high(FQueryEngine.StaticContext.functions) do
@@ -2309,6 +2380,7 @@ begin
 
   defaultTextMatching := 'starts-with';
   defaultCaseSensitive := '';
+  FTemplateHasFormRequest := false;
 
   el := TTemplateElement(templateDocument.next);
   while el <> nil do begin
