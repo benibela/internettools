@@ -2327,6 +2327,13 @@ begin
           if defaultCaseSensitive = '' then defaultCaseSensitive := 'true';
         end;
       end;
+      tetHTMLOpen: if el.templateAttributes <> nil then begin
+        i := el.templateAttributes.IndexOfName('form-request');
+        if i >= 0 then begin
+          FTemplateHasFormRequest := true;
+          el.addShortReadChild('$x:_form-request := array:append([.], ('+el.templateAttributes.ValueFromIndex[i]+'))'); //do not use [] syntax because it might confuse 3.1 and jsoniq
+        end;
+      end;
       tetHTMLText: begin
         if (FVeryShortNotation) and (el.value <> '') then begin
           if el.value[1] = '?' then begin
@@ -2353,6 +2360,8 @@ begin
           el.templateType := tetMatchText;
           if el.templateAttributes = nil then el.templateAttributes := TStringList.Create;
           el.templateAttributes.Values[defaultTextMatching] := el.value;
+          if (defaultCaseSensitive <> '') then
+            el.templateAttributes.Values['case-sensitive'] := defaultCaseSensitive;
         end;
       end;
       tetMatchText: if (defaultCaseSensitive <> '') then begin
