@@ -1217,21 +1217,39 @@ begin
   exit(false);
 end;
 
+procedure dynamicCallForwardArguments(fresult: TXQBoxedFunction; const v: IXQValue; arguments: array of TXQTermSequenceType);
+var i: SizeInt;
+    tempvar: TXQTermVariable;
+begin
+  fresult.ownsTerms := true;
+  fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(v));
+  setlength(fresult.parameters, length(arguments) - 1);
+  for i := 0 to high(fresult.parameters) do begin
+    tempvar := TXQTermVariable.create(IntToStr(i)+'.');
+    tempvar.index := high(fresult.parameters);
+    TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
+    fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
+    fresult.parameters[i].seqtype := TXQTermSequenceType(arguments[i].clone);
+  end;
+  fresult.resulttype := TXQTermSequenceType(arguments[high(arguments)].clone);
+end;
+
 function TXQTermSequenceType.functionCoercion(const context: TXQStaticContext; const v: IXQValue): IXQValue;
 var
   fun: TXQBoxedFunction;
-  needCoercion: Boolean;
+  needCoercion, isWildcardFunction: Boolean;
   i: SizeInt;
   fresult: TXQBoxedFunction;
-  tempvar: TXQTermVariable;
+
 begin
   //function coercion f(v, w, ..)=>s  passed to f(a, b, ..)=>r becomes f(a intersect v, b intersect w, ..)=>r intersect s
   //if v.kind <> pvkFunction then raise EXQEvaluationException.Create('XPTY0004', 'Expected function, but got : '+result.toXQuery());
 
   //note: function coercion is only used with strict type checking enabled
-  if length(arguments) = 0 then exit(v);
+  isWildcardFunction := length(arguments) = 0;
   case v.kind of
     pvkFunction: begin
+      if isWildcardFunction then exit(v);
       fun := v.getDataFunction;
       if (length(arguments) <> length(fun.parameters) + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
       needCoercion := false;
@@ -1252,10 +1270,17 @@ begin
       copyAnnotations(fresult.annotations, fun.annotations);
       fresult.context := fun.context;
       fresult.context.sharedEvaluationContext := nil;
+      dynamicCallForwardArguments(fresult, v, arguments);
     end;
     pvkObject, pvkArray: begin
-      if (length(arguments) <> 1 + 1) then raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
+      if not (isWildcardFunction or (length(arguments) = 1 + 1)) then
+        raise EXQEvaluationException.Create('XPTY0004', 'Invalid argument count');
       fresult := TXQBoxedFunction.create();
+      fresult.context.staticContext := context; //currently only used for strict type checking of array indices
+      if isWildcardFunction then begin
+        if v.kind = pvkArray then dynamicCallForwardArguments(fresult, v, globalTypes.functionFromArray)
+        else dynamicCallForwardArguments(fresult, v, globalTypes.functionFromMap);
+      end else dynamicCallForwardArguments(fresult, v, arguments);
     end;
     else begin
       raiseInternalError(2019010223);
@@ -1263,18 +1288,6 @@ begin
     end;
   end;
   //see TXQTermDefineFunction.defineDynamicPartialApplication
-  fresult.context.staticContext := context; //currently only used for strict type checking of array indices
-  fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(v));
-  setlength(fresult.parameters, length(arguments) - 1);
-  for i := 0 to high(fresult.parameters) do begin
-    tempvar := TXQTermVariable.create(IntToStr(i)+'.');
-    tempvar.index := high(fresult.parameters);
-    TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
-    fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
-    fresult.parameters[i].seqtype := TXQTermSequenceType(arguments[i].clone);
-  end;
-  fresult.ownsTerms := true;
-  fresult.resulttype := TXQTermSequenceType(arguments[high(arguments)].clone);
   result := xqvalue(fresult);
 end;
 

@@ -3444,6 +3444,7 @@ private
    function star(t: TXQTermSequenceType): TXQTermSequenceType;
    function f(args: array of TXQTermSequenceType): TXQTermSequenceType;
 public
+   functionFromArray, functionFromMap: array[0..1] of TXQTermSequenceType;
    case boolean of
    true: (
     none,

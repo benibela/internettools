@@ -1532,6 +1532,11 @@ begin
     nodeMatching.namespaceURLOrPrefix := 'http://www.w3.org/2010/xslt-xquery-serialization'
   end;
   elementSerializationParamsOrEmpty := orEmpty(elementSerializationParams);
+
+  functionFromArray[0] := integer; //is that correct?
+  functionFromArray[1] := itemStar;
+  functionFromMap[0] := atomic;
+  functionFromMap[1] := itemStar;
 end;
 
 procedure TXQGlobalTypes.free;

@@ -126,6 +126,8 @@ begin
   t('for-each("a", map { "a": 123 } )', '123');
   t('for-each(2, [ "1", 9 ])', '9');
   f('for-each("2", [ "1", 9 ])', 'XPTY0004');
+  t('count(function-name([]))', '0');
+  t('function-arity([])', '1');
 
   t('(map {}, array {}) ! (position(), . instance of map(*), . instance of map(string,string), '+
               '. instance of array(*), . instance of array(string), ' +
