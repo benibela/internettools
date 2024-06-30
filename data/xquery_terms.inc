@@ -1220,12 +1220,15 @@ end;
 procedure dynamicCallForwardArguments(fresult: TXQBoxedFunction; const v: IXQValue; arguments: array of TXQTermSequenceType);
 var i: SizeInt;
     tempvar: TXQTermVariable;
+    temp: string[10];
 begin
   fresult.ownsTerms := true;
   fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(v));
   setlength(fresult.parameters, length(arguments) - 1);
   for i := 0 to high(fresult.parameters) do begin
-    tempvar := TXQTermVariable.create(IntToStr(i)+'.');
+    str(i, temp);
+    tempvar := TXQTermVariable.create(temp+'.');
+    writeln(tempvar.value);
     tempvar.index := high(fresult.parameters);
     TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
     fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);
