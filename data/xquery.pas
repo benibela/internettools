@@ -1930,7 +1930,7 @@ type
     class function subtypeItemTypeAtomic(xsa, xsb: TXSType): boolean; static;
     //if self is a subtype-itemtype of tb
     function subtypeItemTypeOf(tb: TXQTermSequenceType): boolean;
-    function functionCoercion(const v: IXQValue): IXQValue;
+    function functionCoercion(const context: TXQStaticContext; const v: IXQValue): IXQValue;
     function isItemStar(): boolean;
     function isAtomicType(a: TXSType; shouldAllowNone: boolean = false;  shouldAllowMultiple: boolean = false): boolean;
   end;
@@ -7885,10 +7885,10 @@ class procedure TXQAbstractFunctionInfo.convertType(var result: IXQValue; const 
     for pv in temp.GetEnumeratorPtrUnsafe do begin
       case pv.kind of
         pvkFunction:
-          if context.staticContext.strictTypeChecking then seq.add(typ.functionCoercion(pv^))
+          if context.staticContext.strictTypeChecking then seq.add(typ.functionCoercion(context.staticContext, pv^))
           else seq.add(pv^);
         pvkArray, pvkObject:
-          seq.add(typ.functionCoercion(pv^));
+          seq.add(typ.functionCoercion(context.staticContext, pv^));
         else
           term.raiseTypeError0004('Expected function', pv^);
       end;

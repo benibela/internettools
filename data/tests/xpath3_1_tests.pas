@@ -123,6 +123,10 @@ begin
   t('sort(map:remove( map {"a": 1, "b": 2, "c": 3, "d": 4}, ("b", "d", "e") ) ? *)', '1 3');
   t('sort(map:for-each(map{"a": 2, "b": 3}, function($k, $v){$k ||$v}))', 'a2 b3');
 
+  t('for-each("a", map { "a": 123 } )', '123');
+  t('for-each(2, [ "1", 9 ])', '9');
+  f('for-each("2", [ "1", 9 ])', 'XPTY0004');
+
   t('(map {}, array {}) ! (position(), . instance of map(*), . instance of map(string,string), '+
               '. instance of array(*), . instance of array(string), ' +
               '"F", . instance of function(*), . instance of function(integer) as item()*, . instance of function(integer) as item(), . instance of function(string) as item()*, . instance of function(string) as item() )',

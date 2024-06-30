@@ -1217,7 +1217,7 @@ begin
   exit(false);
 end;
 
-function TXQTermSequenceType.functionCoercion(const v: IXQValue): IXQValue;
+function TXQTermSequenceType.functionCoercion(const context: TXQStaticContext; const v: IXQValue): IXQValue;
 var
   fun: TXQBoxedFunction;
   needCoercion: Boolean;
@@ -1263,6 +1263,7 @@ begin
     end;
   end;
   //see TXQTermDefineFunction.defineDynamicPartialApplication
+  fresult.context.staticContext := context; //currently only used for strict type checking of array indices
   fresult.body := TXQTermDynamicFunctionCall.create(TXQTermConstant.Create(v));
   setlength(fresult.parameters, length(arguments) - 1);
   for i := 0 to high(fresult.parameters) do begin
