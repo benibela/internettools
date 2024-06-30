@@ -1228,7 +1228,6 @@ begin
   for i := 0 to high(fresult.parameters) do begin
     str(i, temp);
     tempvar := TXQTermVariable.create(temp+'.');
-    writeln(tempvar.value);
     tempvar.index := high(fresult.parameters);
     TXQTermDynamicFunctionCall(fresult.body).push(tempvar);
     fresult.parameters[i].variable := TXQTermVariable(TXQTermDynamicFunctionCall(fresult.body).children[high(TXQTermDynamicFunctionCall(fresult.body).children)].clone);

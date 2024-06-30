@@ -4924,11 +4924,23 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
   end;
 
   function visitNamedFunction(var f: TXQTermNamedFunction): TXQTerm;
+  var
+    v: PXQFunctionParameterTypes;
+    checkTypes: Boolean;
+    i: Integer;
   begin
     lookupNamedFunction(f);
     result := f;
     if (result.ClassType = TXQTermNamedFunction) and (f.func <> nil) then begin
-      if staticContext.strictTypeChecking then f.version := f.func.getVersion(length(f.children));
+      v := f.func.getVersion(length(f.children));
+      if v <> nil then begin
+        checkTypes := staticContext.strictTypeChecking;
+        if not checkTypes then for i := 0 to high(v^.types) do if v^.types[i].kind = tikFunctionTest then begin
+          checkTypes := true; //force type checking, so array/map coercion is used
+          break;
+        end;
+        if checkTypes then f.version := v;
+      end;
     end else if (result.ClassType = TXQTermNamedFunctionTypeConstructor) and (length(f.children) = 1) then
      result := staticallyCastQNameAndNotation(TXQTermNamedFunctionTypeConstructor(result), TXSType(TObject(f.func)), staticContext);
   end;

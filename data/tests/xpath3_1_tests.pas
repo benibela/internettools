@@ -123,8 +123,17 @@ begin
   t('sort(map:remove( map {"a": 1, "b": 2, "c": 3, "d": 4}, ("b", "d", "e") ) ? *)', '1 3');
   t('sort(map:for-each(map{"a": 2, "b": 3}, function($k, $v){$k ||$v}))', 'a2 b3');
 
+  tester.ps.StaticContext.strictTypeChecking := false;
   t('for-each("a", map { "a": 123 } )', '123');
   t('for-each(2, [ "1", 9 ])', '9');
+  t('array:for-each(["a"], map { "a": 123 } )', '123');
+  t('array:for-each([2], [ "1", 9 ])', '9');
+  //f('for-each("2", [ "1", 9 ])', 'XPTY0004');
+  tester.ps.StaticContext.strictTypeChecking := true;
+  t('for-each("a", map { "a": 123 } )', '123');
+  t('for-each(2, [ "1", 9 ])', '9');
+  t('array:for-each(["a"], map { "a": 123 } )', '123');
+  t('array:for-each([2], [ "1", 9 ])', '9');
   f('for-each("2", [ "1", 9 ])', 'XPTY0004');
   t('count(function-name([]))', '0');
   t('function-arity([])', '1');
