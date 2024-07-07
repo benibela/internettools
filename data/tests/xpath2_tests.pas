@@ -3408,6 +3408,11 @@ begin
   t('form(//form, "second=minute").url', 'abs://hello?one=o1&second=minute&three=o1&three=o2&three=o3&alternate=o2&alternate=o4');
   t('form(//form, "three=thymes").url', 'abs://hello?one=o1&second=o2&three=thymes&alternate=o2&alternate=o4');
   t('form(//form, "alternate=o1&alternate=o3").url', 'abs://hello?one=o1&second=o2&three=o1&three=o2&three=o3&alternate=o1&alternate=o3');
+  t('form(//form, //option[@value="o1"]).url', 'abs://hello?one=o1&second=o1&three=o1&alternate=o1');
+  t('form(//form, //option[@value="o2"]).url', 'abs://hello?one=o1&second=o2&three=o2&alternate=o2');
+  t('form(//form, //select[3]//option[@value="o1"]).url', 'abs://hello?one=o1&second=o1&three=o1&three=o2&three=o3&alternate=o2&alternate=o4');
+  t('form(//form, //select[4]//option[@value="o1"]).url', 'abs://hello?one=o1&second=o2&three=o1&alternate=o2&alternate=o4');
+
 
   t('//form/form(.).url', 'abs://example?_charset_=UTF-8', '<html><form action="abs://example"><input type="hidden" name="_charset_"/></form></html>');
   t('//form/form(., "_charset_=foo").url', 'abs://example?_charset_=foo');

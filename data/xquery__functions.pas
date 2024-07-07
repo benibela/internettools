@@ -1264,7 +1264,7 @@ function nodeToFormData(node: TTreeNode; cmp: TStringComparisonFunc; includeAllI
   end;
 
 //submittable elements:   button input object select textarea
-type TSubmittableElement = (seButton, seInput, seObject, seSelect, seTextarea);
+type TSubmittableElement = (seButton, seInput, seObject, seSelect, seOption, seTextarea);
 type TInputElementType = (ieNotAnInputElement, ietOther, ietHidden, ietTextOrSearch, ietCheckboxOrRadiobutton, ietImageButton, ietButton, ietFile );
 const IMAGE_BUTTON_DEFAULT_COORD = '0';
 var name: string;
@@ -1318,11 +1318,13 @@ begin
       end;
     end else exit;
     HTMLNodeNameHashs.&object:  if cmp(node.value, 'object') then kind := seObject else exit;
+    HTMLNodeNameHashs.option: if  cmp(node.value, 'option') then kind := seOption else exit;
     else exit;
   end;
 
   if not includeAllInputs then begin
     if kind = seObject then exit; //we have no plugins?
+    if kind = seOption then exit; //handled through select element
     if ((kind = seButton) or (inputKind in [ietImageButton,ietButton])) and (result.kind <> hrhfSubmitButton) then exit;
     if (kind <> seObject) and node.hasAttribute('disabled', cmp) then exit;
     if (inputKind = ietCheckboxOrRadiobutton) and not node.hasAttribute('checked', cmp) then exit;
@@ -1340,7 +1342,7 @@ begin
 
   name := node.getAttribute('name', cmp);
 
-  if (name = '') and (inputKind <> ietImageButton) then exit;
+  if (name = '') and (inputKind <> ietImageButton) and (kind <> seOption) then exit;
 
   case kind of
     seSelect: begin
@@ -1354,6 +1356,13 @@ begin
       end;
       if (length(result.names) = 0) and (assigned(firstOption)) then
         pushEntryNameValue(firstOption);
+    end;
+    seOption: begin
+      for ancestor in node.getEnumeratorAncestors do
+        if cmp(ancestor.value, 'select') then begin
+          pushEntry(ancestor.getAttribute('name', cmp), node.getAttribute('value', cmp));
+          break;
+        end;
     end;
     seInput: begin
       case inputKind of
