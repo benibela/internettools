@@ -782,7 +782,7 @@ const
 
 implementation
 
-uses math,strutils,bbutilsbeta, xquery.internals.common, xquery.internals.protectionbreakers;
+uses math,strutils,bbutilsbeta, xquery.internals.common, xquery.internals.protectionbreakers,htmlformutils;
 
 const //TEMPLATE_COMMANDS=[tetCommandMeta..tetCommandIfClose];
       firstRealTemplateType = tetMatchElementOpen;
@@ -2058,13 +2058,6 @@ function THtmlTemplateParser.matchLastTrees: Boolean;
 var oldVariableCount: SizeInt;
 
   procedure setFinalFormRequest;
-    function getAssociatedForm(t: TTreeNode): TTreeNode;
-    begin
-      result := t;
-      while (result <> nil) and not striEqual(result.value, 'form') do
-        result := result.parent;
-    end;
-
   var allRequests: TXQValueList;
       currentForm: TTreeNode = nil;
       currentRequest: TXQValueList;
@@ -2075,7 +2068,7 @@ var oldVariableCount: SizeInt;
     if currentForm = nil then exit;
     formArgs[0] := xqvalue(currentForm);
     formArgs[1] := xqvalueSeqSqueezed(currentRequest);
-    request := TXQueryEngine.findNativeModule(XMLNamespaceURL_MyExtensionsNew).findComplexFunction('form', 2, xqpmXQuery4_0).func(FQueryContext, 2, @formArgs[0]);
+    request := xqFunctionForm(FQueryContext, 2, @formArgs[0]);
     allRequests.add(request);
     currentRequest := TXQValueList.create();
   end;

@@ -1489,7 +1489,9 @@ t('<a><b>  abc <t:s>text()</t:s></b></a>', '<a><b>  abc1</b><b>abc2</b><b>abc3</
   tformrequest('<form><input name="a" t:form-request=""/><input name="b" t:form-request=""/><input name="c" t:form-request=""/></form>', '', '{"method": "GET", "url": "unittest?a=x&b=y&c=z"}');
   tformrequest('<form><input name="a" t:form-request="1"/><input name="b" t:form-request="23"/><input name="c" t:form-request="''bar''"/></form>', '', '{"method": "GET", "url": "unittest?a=1&b=23&c=bar"}');
   tformrequest('<form><input name="a" t:form-request="''foo''"/><input name="c" t:form-request="''bar''"/></form>', '', '{"method": "GET", "url": "unittest?a=foo&b=y&c=bar"}');
-
+  tformrequest('<form><select name="sel" t:form-request=""></select></form>', '<form><select name="sel"><option value="A"/><option value="B"/></select></form>', '{"method": "GET", "url": "unittest?sel=A"}');
+  tformrequest('<form><select name="sel" t:form-request="''x''"></select></form>', '<form><select name="sel"><option value="A"/><option value="B"/></select></form>', '{"method": "GET", "url": "unittest?sel=x"}');
+  tformrequest('<form><select name="sel"><option value="B" t:form-request=""/></select></form>', '<form><select name="sel"><option value="A"/><option value="B"/></select></form>', '{"method": "GET", "url": "unittest?sel=B"}');
 
   xstring('hallo"''"''world', 'hallo"''"''world');
   xstring('foo{1+2}bar', 'foo3bar');
