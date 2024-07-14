@@ -5029,7 +5029,7 @@ function TFinalNamespaceResolving.visit(t: PXQTerm): TXQTerm_VisitAction;
         end;
         tcall := tdf[0] as TXQTermWithChildren;
       end else begin
-        raiseSyntaxError('=>/=!>', b);
+        raiseSyntaxError('=>/=!> can only be used with a function call (it might help to insert parentheses)', b);
         exit
       end;
       setlength(tcall.children, length(tcall.children) + 1);
