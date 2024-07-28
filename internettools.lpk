@@ -15,7 +15,7 @@
     <Description Value="This package provides standard conformant XPath/XQuery 3.1 interpreters with a compatibility mode for older XPath/XQuery versions and extensions for - among others - JSONiq, pattern matching, CSS and HTML; as well as functions to perform HTTP/S requests on Windows/Linux/MacOSX/Android and an XProc-like webscraping language"/>
     <License Value="GPLv3"/>
     <Version Major="1"/>
-    <Files Count="40">
+    <Files Count="41">
       <Item1>
         <Filename Value="internettoolsconfig.inc"/>
         <Type Value="Binary"/>
@@ -176,6 +176,10 @@
         <Filename Value="data/fastjsonscanner.pas"/>
         <UnitName Value="fastjsonscanner"/>
       </Item40>
+      <Item41>
+        <Filename Value="data/htmlformutils.pas"/>
+        <UnitName Value="htmlformutils"/>
+      </Item41>
     </Files>
     <CompatibilityMode Value="True"/>
     <i18n>
