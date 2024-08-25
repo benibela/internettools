@@ -470,6 +470,8 @@ begin
   result := '<tr'+color+'><td>'+caption+'</td><td>'+inttostr( r[tcrPass])+ '</td><td>'+ inttostr(r[tcrFail])+ '</td><td>'+ inttostr(r[tcrWrongError])+ '</td><td>'+ inttostr(r[tcrNA])+ '</td><td>'+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'</td></tr>';
 end;
 
+const CATALOG_SRC: string = 'https://github.com/w3c/qt3tests/blob/master/';
+
 procedure THTMLLogger.endTestSet(ts: TTestSet; const r: TResultSet);
 var i: integer;
 begin
@@ -480,7 +482,7 @@ begin
   end;
   bufferOverview.add(formatResultHTML('<a href="#'+ts.name+'">'+ts.name+'</a>', r, true));
   bufferBody.add('<h3><a name="'+ts.name+'">'+ts.name+'</a></h3>');
-  bufferBody.add('<a href="https://github.com/w3c/qt3tests/blob/master/'+ts.fileName+'" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
+  bufferBody.add('<a href="'+CATALOG_SRC+ts.fileName+'" rel="nofollow">'+ts.fileName+'</a>:<br><br>');
   bufferBody.add('Passed: ' + inttostr( r[tcrPass])+ '  Failures: '+ inttostr(r[tcrFail])+ '  Wrong errors: '+ inttostr(r[tcrWrongError])+ '  N/A: '+ inttostr(r[tcrNA])+ '  Skipped: '+ inttostr((r[tcrDisputed]+r[tcrTooBig]+r[tcrNotRun]))+'<br>');
   for i := 0 to bufferTestSet.Count - 1 do
     bufferBody.add(bufferTestSet[i]);
@@ -1786,6 +1788,7 @@ begin
     registerModuleBinary;
     xq.ImplicitTimezoneInMinutes := -GetLocalTimeOffset;
   end;
+  if cat.getFirstChild().getAttribute('version') = '4.0' then CATALOG_SRC := 'https://github.com/qt4cg/qt4tests/blob/master/';
   basePath := strBeforeLast(cat.documentURI,'/');
   for v in xq.parseQuery('/*:catalog/*', xqpmXPath2).evaluate(cat) do begin
     e :=  v.toNode;
