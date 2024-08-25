@@ -31,12 +31,13 @@ var
   
   timing: TStringList=nil; //wird zur Speicherplatzoptimierung nicht freigegeben
                            //(bzw. erst nach Programmende von Windows)
-
+  averageTime: TStringList = nil;
   OnLog: TStringNotifyEvent = nil;
 
 {$ifdef android}
 function __android_log_write(prio:longint;tag,text:pchar):longint; cdecl; external 'liblog.so' name '__android_log_write';
 {$endif}
+
 
 implementation
 uses bbutils;
@@ -91,6 +92,23 @@ end;
     end;
   end;
 
+  function getMapIndexOf(map: TStringList; const title: string): longint;
+  begin
+    result:=map.IndexOf(title);
+    if result=-1 then begin
+      result:=map.count;
+      map.add(title);
+    end;
+  end;
+  procedure setMapTime(map: TStringList; index, time: longint);
+  begin
+    map.Objects[index]:=tobject(pointer(time));
+  end;
+  function getMapTime(map: TStringList; index: longint): longint;
+  begin
+    result := cardinal(pointer(map.Objects[index]))
+  end;
+
   procedure startTiming(const title: string);
   var index:longint;
   begin
@@ -98,17 +116,13 @@ end;
 {    if ThreadID<>MainThreadID then
       exit; //timing isn't thread save}
     if timing=nil then timing:=TStringList.Create;
-    index:=timing.IndexOf(title);
-    if index=-1 then begin
-      index:=timing.count;
-      timing.add(title);
-    end;
+    index := getMapIndexOf(timing,title);
     log('started timing of '+title);
-    timing.Objects[index]:=tobject(pointer(trunc(frac(now)*MSecsPerDay)));
+    setMapTime(timing, index, trunc(frac(now)*MSecsPerDay));
   end;
 
   procedure stopTiming(const title: string);
-  var time,oldtime:cardinal;
+  var time,oldtime, delta:cardinal;
     i: Integer;
   begin
 {    if ThreadID<>MainThreadID then
@@ -116,12 +130,17 @@ end;
     time:=trunc(frac(now)*MSecsPerDay);
     if (timing.count = 1) and (title = '') then i := 0
     else i := timing.IndexOf(title);
-    oldtime:=cardinal(pointer(timing.Objects[i]));
+    oldtime:=getMapTime(timing, i);
+    delta := time-oldtime;
     if (timing.count > 1) or (title <> '') then
-      log('stopped timing of '+title+' run-time: '+IntToStr(time-oldtime)+' ms')
+      log('stopped timing of '+title+' run-time: '+IntToStr(delta)+' ms')
      else
-      log('run-time: '+IntToStr(time-oldtime)+' ms');
+      log('run-time: '+IntToStr(delta)+' ms');
     timing.Delete(i);
+    if averageTime <> nil then begin
+      i := getMapIndexOf(averageTime, title);
+      setMapTime(averageTime, i, getMapTime(averageTime, i) + delta)
+    end;
   end;
 
 
