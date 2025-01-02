@@ -1143,11 +1143,16 @@ begin
       prec := getReasonablePrecision(args[1]);
       if prec < -4933 {approximately extended range} then result := baseType.createValue(f)
       else if prec > 4933 then result := baseType.createValue(0)
-      else begin
-        p := power(10, prec);
+      else if prec >= 0 then begin //only use positive exponent, because intpower gives rounding errors
+        p := intpower(10, prec);
         temp := f /  p;
-        if frac(temp) = 0 then result := baseType.createValue(f)
+        if frac(temp) = 0 then result := baseType.createValue(f) //return original value f
         else result := baseType.createValue(floatRoundHalfToEven(temp) * p)
+      end else begin
+        p := intpower(10, -prec);
+        temp := f *  p;
+        if frac(temp) = 0 then result := baseType.createValue(f)
+        else result := baseType.createValue(floatRoundHalfToEven(temp) / p)
       end;
     end
   end;
