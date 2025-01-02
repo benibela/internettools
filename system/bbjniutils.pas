@@ -4,6 +4,7 @@ unit bbjniutils;
 {$modeswitch advancedrecords}
 {$ModeSwitch typehelpers}
 {$Macro on}
+//{$TypedAddress+}
 
 interface
 
@@ -555,16 +556,16 @@ end;
 
 function TJavaEnv.getclass(n: pchar): jclass;
 var
-  jn: jobject;
+  jn: jvalue;
 begin
   if jCustomClassLoader <> nil then begin
-    jn := stringToJString(n);
+    jn.l := stringToJString(n);
     result := callObjectMethod(jCustomClassLoader, jCustomClassLoaderFindClassMethod, @jn);
     if ExceptionCheck then begin
       env^^.ExceptionClear(env);
       result := nil;
     end;
-    deleteLocalRef(jn);
+    deleteLocalRef(jn.l);
     if result <> nil then exit;
   end;
   result := env^^.FindClass(env, n);
@@ -1292,8 +1293,10 @@ begin
 end;
 
 function TJavaEnv.getMapProperty(map: jobject; value: jobject): jobject;
+var temp: jvalue;
 begin
-  result := callObjectMethod(map, jCommonClasses.Map.get_L, @value);
+  temp.l := value;
+  result := callObjectMethod(map, jCommonClasses.Map.get_L, @temp);
 end;
 
 {$ifdef android}
@@ -1312,7 +1315,7 @@ end;
 
 function TJavaEnv.getAssetAsString(assets: jobject; name: string): string;
 var
-  temp: jobject;
+  temp: jvalue;
   stream: jobject;
   templ: TStringArray;
   i: Integer;
@@ -1327,9 +1330,9 @@ begin
     name := strJoin(templ, '/');
   end;
 
-  temp := stringToJString(name);
+  temp.l := stringToJString(name);
   stream := callObjectMethodChecked(assets, jCommonClasses.android.AssetManager.open, @temp);
-  deleteLocalRef(temp);
+  deleteLocalRef(temp.l);
 
   result := inputStreamToStringAndDelete(stream);
 end;
