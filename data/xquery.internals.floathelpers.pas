@@ -146,9 +146,12 @@ begin
     ff := system.frac(f);
     if ff >= 0 then result := (f - ff)
     else result := (f - ff - 1);
-  end else begin
-    p := power(10, prec);
+  end else if prec > 0 then begin //only use positive exponent for intpower to avoid precision issues
+    p := intpower(10, prec);
     result := double(f / p).round * p;
+  end else begin
+    p := intpower(10, -prec);
+    result := double(f * p).round / p;
   end;
 
 end;
