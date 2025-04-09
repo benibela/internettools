@@ -1,6 +1,6 @@
 unit internetaccess_inflater_paszlib;
 
-{$mode objfpc}{$H+}
+{$I ../internettoolsconfig.inc}
 
 interface
 
