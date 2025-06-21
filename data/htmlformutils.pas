@@ -1307,7 +1307,7 @@ begin
       resobj.setMutable('host', decoded.host);
     if decoded.port <> '' then
       resobj.setMutable('port', decoded.port);
-    if decoded.params <> '' then begin
+    if decoded.path <> '' then begin
       if strBeginsWith(decoded.path, '/') then delete(decoded.path, 1, 1);
       resobj.setMutable('path', decoded.path);
     end;
