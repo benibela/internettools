@@ -1,5 +1,5 @@
 {==============================================================================|
-| Project : Ararat Synapse                                       | 001.004.000 |
+| Project : Ararat Synapse                                       | 001.004.001 |
 | Project : Internet Tools                                       | 001.004.000 |
 |==============================================================================|
 | Content: SSL support by OpenSSL                                              |
@@ -171,7 +171,7 @@ type
     {:See @inherited}
     function GetPeerNameHash: cardinal; override; {pf}
     {:See @inherited}
-    function GetPeerFingerprint: string; override;
+    function GetPeerFingerprint: ansistring; override;
     {:See @inherited}
     function GetCertInfo: string; override;
     {:See @inherited}
@@ -720,7 +720,7 @@ begin
   X509Free(cert);
 end;
 
-function TSSLOpenSSLOverride.GetPeerFingerprint: string;
+function TSSLOpenSSLOverride.GetPeerFingerprint: ansistring;
 var
   cert: PX509;
   x: integer;
