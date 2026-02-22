@@ -2068,7 +2068,7 @@ begin
   result := FBuffer[fcount - 1];
 end;
 
-function TCopyingArrayList.GetEnumerator: TElement;
+function TCopyingArrayList.GetEnumerator: TEnumerator;
 begin
   initEnumerator(result);
 end;
