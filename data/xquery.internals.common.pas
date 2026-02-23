@@ -542,7 +542,7 @@ begin
   result.entity := @map^.Entities[entityId];
 end;
 
-function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.key: string;
+function TXQBaseHashmapValuePointerLikeReadOnly.TKeyPairEnumerator.key: TKey;
 begin
   result := map^.Entities[entityId].Key;
 end;
