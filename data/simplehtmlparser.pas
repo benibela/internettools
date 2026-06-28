@@ -239,7 +239,9 @@ var pos,marker,htmlEnd,cdataTagStartMarker: pchar;
                 inc(pos);
                 if (pos^ = '-') then begin
                   inc(pos);
-                  while (pos<=htmlEnd) and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>')) do
+                  while (pos<=htmlEnd)
+                        and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>'))
+                        and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'!') or ((pos+3)^<>'>')) do
                     inc(pos);
                 end;
               end;
@@ -293,7 +295,11 @@ begin
                marker := pos;
                if (pos^ = '-') and ((pos+1)^ = '-') then begin
                  marker+=2;
-                 while (pos<=htmlEnd) and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>')) do
+                 //Scan for the comment end. A comment is closed by "-->", but HTML5
+                 //also tolerates the malformed "--!>" (comment-end-bang) as a closer.
+                 while (pos<=htmlEnd)
+                       and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'>'))
+                       and ((pos^<>'-') or ((pos+1)^<>'-') or ((pos+2)^<>'!') or ((pos+3)^<>'>')) do
                    inc(pos);
                end;
                if assigned(commentEvent) and (commentEvent(marker, pos-marker) = prStop) then
